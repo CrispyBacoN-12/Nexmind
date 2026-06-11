@@ -1,7 +1,7 @@
 // NEXMIND orchestrator bot — schedules the desk against a running app server.
 // All logic lives in the app; this script only decides WHEN to call it.
 //   manage  every 5 min  (always — open positions must close even when halted)
-//   scan    every 15 min (skipped while the kill switch is on)
+//   scan    every 15 min (watchlist + NASDAQ-100 universe; skipped while the kill switch is on)
 //   intel   every 30 min (news + Fear & Greed)
 // Run: npm run bot   (NEXMIND_URL overrides http://localhost:3000)
 
@@ -14,8 +14,11 @@ function log(job: string, msg: string) {
   console.log(`[${new Date().toISOString().slice(11, 19)}] ${job.padEnd(6)} ${msg}`);
 }
 
-async function post(path: string): Promise<Json> {
-  const res = await fetch(`${BASE}${path}`, { method: "POST" });
+async function post(path: string, body?: Json): Promise<Json> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+  });
   if (!res.ok) throw new Error(`POST ${path} → HTTP ${res.status}`);
   return (await res.json()) as Json;
 }
@@ -39,7 +42,11 @@ async function runScan() {
     return;
   }
   const r = await post("/api/scan-all");
-  log("scan", `scanned ${r.scanned ?? 0} · executed ${r.executed ?? 0} · cost $${Number(r.totalCostUsd ?? 0).toFixed(4)}`);
+  log("scan", `watchlist: scanned ${r.scanned ?? 0} · executed ${r.executed ?? 0} · cost $${Number(r.totalCostUsd ?? 0).toFixed(4)}`);
+
+  const u = await post("/api/scan-universe", { preset: "nasdaq100", max: 120 });
+  const setups = Array.isArray(u.setups) ? u.setups.length : 0;
+  log("scan", `nasdaq100: scanned ${u.scanned ?? 0} · setups ${setups} · executed ${u.executed ?? 0} · cost $${Number(u.totalCostUsd ?? 0).toFixed(4)}`);
 }
 
 async function runIntel() {
