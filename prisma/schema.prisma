@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// One member of the AI guild (Secretary, analysts, risk, dev/design teams…).
+model Agent {
+  id        Int      @id @default(autoincrement())
+  codename  String   @unique // HAWK, SAGE, ARIA…
+  name      String // display name / motto subtitle
+  role      String // "Market Intel", "Risk Manager"…
+  team      String // Trading, Dev, Design, Content, Intelligence, Finance, Systems, HQ
+  status    String   @default("idle") // online | idle | offline | working
+  rarity    String   @default("rare") // common | rare | epic | legendary
+  modelTier String   @default("haiku") // haiku | sonnet | opus
+  emoji     String   @default("🤖")
+  title     String? // "Sky Prophet"
+  motto     String? // flavor line
+  artifact  String? // flavor item
+  skills    String   @default("[]") // JSON string[] of skill tags
+  reportsTo String? // codename of manager, for the org graph
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// A command from the user routed through the Secretary into a pipeline of steps.
+model Pipeline {
+  id         Int            @id @default(autoincrement())
+  command    String
+  status     String         @default("running") // running | done | failed
+  summary    String? // Secretary's final report
+  costUsd    Float          @default(0)
+  steps      PipelineStep[]
+  createdAt  DateTime       @default(now())
+  finishedAt DateTime?
+}
+
+model PipelineStep {
+  id         Int       @id @default(autoincrement())
+  pipeline   Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  pipelineId Int
+  order      Int
+  agent      String // agent codename executing this step
+  task       String
+  output     String? // agent result text
+  status     String    @default("pending") // pending | running | done | failed
+  model      String?
+  costUsd    Float     @default(0)
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
+
+/// A candidate setup emitted by the no-AI Scanner before the team weighs in.
+model Signal {
+  id         Int      @id @default(autoincrement())
+  symbol     String
+  timeframe  String   @default("1h")
+  side       String // long | short
+  price      Float
+  atr        Float?
+  indicators String   @default("{}") // JSON snapshot of indicator readings
+  note       String?
+  status     String   @default("proposed") // proposed | voted | vetoed | executed | discarded
+  trade      Trade?
+  createdAt  DateTime @default(now())
+}
+
+/// A paper trade and the full team decision trail behind it.
+model Trade {
+  id              Int       @id @default(autoincrement())
+  signal          Signal?   @relation(fields: [signalId], references: [id])
+  signalId        Int?      @unique
+  symbol          String
+  side            String // long | short
+  entry           Float
+  sl              Float
+  tp1             Float
+  tp2             Float?
+  lot             Float
+  riskReward      Float?
+  status          String    @default("open") // open | closed | cancelled
+  outcome         String? // win | loss | breakeven
+  pnl             Float? // realized P/L (paper)
+  rMultiple       Float? // realized R multiple
+  hawkVotes       String   @default("[]") // JSON of the 3 analyst opinions
+  sageVerdict     String? // approve | veto + reasoning
+  ironRulesPassed Boolean   @default(false)
+  decisionLog     String   @default("[]") // JSON timeline of every gate
+  stagedTp        String   @default("{}") // JSON ladder state
+  openedAt        DateTime  @default(now())
+  closedAt        DateTime?
+}
+
+/// Research gathered by SCOUT and fed back to the analysts as context.
+model NewsItem {
+  id        Int      @id @default(autoincrement())
+  source    String // Yahoo | Binance | FearGreed…
+  title     String
+  summary   String?
+  sentiment String? // bullish | bearish | neutral
+  symbol    String?
+  url       String?
+  createdAt DateTime @default(now())
+}
+
+/// A lesson distilled from a losing trade, surfaced to future HAWK prompts.
+model Lesson {
+  id        Int      @id @default(autoincrement())
+  tradeId   Int?
+  text      String
+  tags      String   @default("[]")
+  createdAt DateTime @default(now())
+}
+
+/// A symbol the Scanner watches. Scanned on demand (single tick or "Scan all").
+model Watchlist {
+  id        Int      @id @default(autoincrement())
+  symbol    String   @unique // Yahoo Finance symbol, e.g. GC=F, BTC-USD, AAPL
+  label     String? // friendly name, e.g. "Gold"
+  enabled   Boolean  @default(true)
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+/// A code-generation request handled by NOVA: propose files, preview, then apply.
+model BuildJob {
+  id        Int       @id @default(autoincrement())
+  request   String
+  status    String    @default("proposed") // proposed | applied | failed
+  notes     String? // NOVA's explanation
+  files     String    @default("[]") // JSON: proposed [{ path, action, content }]
+  backup    String    @default("[]") // JSON: prior file contents, for rollback
+  preview   String    @default("[]") // JSON: files written to the /_preview sandbox
+  result    String? // per-file apply result
+  costUsd   Float     @default(0)
+  createdAt DateTime  @default(now())
+  appliedAt DateTime?
+}
+
+/// Aggregated performance report (daily / weekly / monthly).
+model Report {
+  id          Int      @id @default(autoincrement())
+  period      String // daily | weekly | monthly
+  periodStart DateTime
+  periodEnd   DateTime
+  trades      Int      @default(0)
+  winRate     Float    @default(0)
+  drawdown    Float    @default(0)
+  expectancy  Float    @default(0)
+  pnl         Float    @default(0)
+  body        String? // narrative summary
+  createdAt   DateTime @default(now())
+}
+
+/// App-wide key-value settings (kill switch, limits, cached intel).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
