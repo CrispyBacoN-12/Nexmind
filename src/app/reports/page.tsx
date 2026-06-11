@@ -18,7 +18,7 @@ const PERIODS: { label: string; days: number }[] = [
 export default async function ReportsPage() {
   const [closed, recent, lessons] = await Promise.all([
     prisma.trade.findMany({ where: { status: "closed" }, orderBy: { closedAt: "desc" } }),
-    prisma.trade.findMany({ orderBy: { openedAt: "desc" }, take: 30 }),
+    prisma.trade.findMany({ where: { status: "closed" }, orderBy: { closedAt: "desc" }, take: 30 }),
     prisma.lesson.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
   ]);
 
@@ -47,9 +47,9 @@ export default async function ReportsPage() {
       })}
 
       <div className="mb-6">
-        <CardTitle>📜 Trade history (latest 30)</CardTitle>
+        <CardTitle>📜 Closed trades (latest 30)</CardTitle>
         {recent.length === 0 ? (
-          <Empty title="No trades yet" hint="Run a scan or let the bot trade — every paper fill shows up here." />
+          <Empty title="No closed trades yet" hint="When a position hits its TP or SL it lands here — open positions live on the War Room." />
         ) : (
           <Card className="p-0 overflow-x-auto">
             <table className="w-full text-xs">
@@ -70,8 +70,8 @@ export default async function ReportsPage() {
               <tbody>
                 {recent.map((t) => {
                   const ladder = safeParse<{ tp1Hit?: boolean }>(t.stagedTp, {});
-                  const tone = t.status === "open" ? "info" : t.outcome === "win" ? "positive" : t.outcome === "loss" ? "negative" : "neutral";
-                  const label = t.status === "open" ? (ladder.tp1Hit ? "open · TP1✓" : "open") : t.outcome ?? "closed";
+                  const tone = t.outcome === "win" ? "positive" : t.outcome === "loss" ? "negative" : "neutral";
+                  const label = `${t.outcome ?? "closed"}${ladder.tp1Hit ? " · TP1✓" : ""}`;
                   return (
                     <tr key={t.id} className="border-b border-(--color-border) last:border-0">
                       <td className="px-3 py-2 font-mono font-medium">{t.symbol}</td>
@@ -83,7 +83,7 @@ export default async function ReportsPage() {
                       <td className={`px-3 py-2 text-right font-mono ${colorForChange(t.pnl ?? 0)}`}>{t.pnl != null ? fmtMoney(t.pnl) : "—"}</td>
                       <td className="px-3 py-2 text-right font-mono">{t.rMultiple != null ? fmtNumber(t.rMultiple, 2) : "—"}</td>
                       <td className="px-3 py-2"><Badge tone={tone}>{label}</Badge></td>
-                      <td className="px-3 py-2 text-right text-(--color-muted) font-mono">{fmtAgo(t.closedAt ?? t.openedAt)}</td>
+                      <td className="px-3 py-2 text-right text-(--color-muted) font-mono">{t.closedAt ? fmtAgo(t.closedAt) : "—"}</td>
                     </tr>
                   );
                 })}
