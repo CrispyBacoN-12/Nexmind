@@ -14,7 +14,7 @@ import type { Interval, Range } from "@/lib/yahoo";
 export interface TickStep { stage: string; note: string }
 export interface TickResult {
   symbol: string;
-  outcome: "no-setup" | "no-consensus" | "vetoed" | "rules-blocked" | "executed";
+  outcome: "no-setup" | "already-open" | "no-consensus" | "vetoed" | "rules-blocked" | "executed";
   steps: TickStep[];
   tradeId?: number;
   costUsd: number;
@@ -42,6 +42,17 @@ export async function runTradeTick(
   const scan = await scanSymbol(symbol, opts.range, opts.interval);
   symbol = scan.symbol; // use the resolved symbol (e.g. JMART → JMART.BK)
   steps.push({ stage: "scanner", note: scan.note });
+
+  // One open position per symbol — re-scanning the same persisting setup must
+  // not stack a duplicate trade (and must not burn AI calls finding that out).
+  const existing = await prisma.trade.findFirst({
+    where: { symbol, status: "open" },
+    select: { id: true },
+  });
+  if (existing) {
+    steps.push({ stage: "dedupe", note: `position #${existing.id} already open — skipped` });
+    return { symbol, outcome: "already-open", steps, costUsd };
+  }
 
   const signal = await prisma.signal.create({
     data: {
