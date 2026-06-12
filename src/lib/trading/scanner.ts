@@ -4,6 +4,7 @@
 import { fetchYahooCandlesSmart, type Interval, type Range } from "@/lib/yahoo";
 import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
 import { findRecentUpLeg } from "@/lib/swings";
+import { lorentzianLast, type LCState } from "@/lib/lc/lorentzian";
 
 export interface ScanSnapshot {
   price: number;
@@ -15,6 +16,8 @@ export interface ScanSnapshot {
   minusDI: number | null;
   macdHist: number | null;
   atr: number | null;
+  /** Lorentzian Classification state (confluence filter); null when history is too short. */
+  lc?: LCState | null;
 }
 
 export interface ScanResult {
@@ -38,6 +41,8 @@ const last = <T,>(arr: (T | null)[]): T | null => {
  * the two can never drift apart.
  *   long  = uptrend (sma20>sma50, ADX>25, +DI>-DI) + healthy pullback (RSI 40–60) + MACD turning up
  *   short = mirror image.
+ * Confluence: when a Lorentzian Classification state is present in the snapshot,
+ * the LC signal AND kernel direction must agree with the rule-based side.
  */
 export function decideSetup(s: ScanSnapshot): { side: "long" | "short" | null; note: string } {
   const { sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal } = s;
@@ -46,11 +51,21 @@ export function decideSetup(s: ScanSnapshot): { side: "long" | "short" | null; n
   if (trending && s20 != null && s50 != null && r != null && pDI != null && mDI != null) {
     const up = s20 > s50 && pDI > mDI;
     const down = s20 < s50 && mDI > pDI;
-    if (up && r >= 40 && r <= 60 && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) {
-      return { side: "long", note: `uptrend pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}` };
-    }
-    if (down && r >= 40 && r <= 60) {
-      return { side: "short", note: `downtrend pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}` };
+    let side: "long" | "short" | null = null;
+    if (up && r >= 40 && r <= 60 && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) side = "long";
+    else if (down && r >= 40 && r <= 60) side = "short";
+
+    if (side) {
+      const base = `${side === "long" ? "uptrend" : "downtrend"} pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}`;
+      if (s.lc) {
+        const lcAgrees =
+          side === "long" ? s.lc.signal === 1 && s.lc.kernelBullish : s.lc.signal === -1 && s.lc.kernelBearish;
+        if (!lcAgrees) {
+          return { side: null, note: `${base} · LC disagrees (${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction})` };
+        }
+        return { side, note: `${base} · LC ${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction} ✓` };
+      }
+      return { side, note: base };
     }
   }
   return { side: null, note: "no setup" };
@@ -66,7 +81,7 @@ export function decideSetup(s: ScanSnapshot): { side: "long" | "short" | null; n
  */
 export async function scanSymbol(
   symbol: string,
-  range: Range = "1mo",
+  range: Range = "3mo", // 3mo of 1h bars (~400) gives the LC classifier real training depth
   interval: Interval = "1h",
 ): Promise<ScanResult> {
   const resp = await fetchYahooCandlesSmart(symbol, range, interval);
@@ -89,6 +104,7 @@ export async function scanSymbol(
 
   const snapshot: ScanSnapshot = {
     price, sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal,
+    lc: lorentzianLast(candles),
   };
 
   let { side, note } = decideSetup(snapshot);

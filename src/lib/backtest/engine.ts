@@ -12,6 +12,7 @@
 import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
 import { decideSetup, type ScanSnapshot } from "@/lib/trading/scanner";
 import { decideAction, type LadderState, type OpenPosition } from "@/lib/trading/positionRules";
+import { lorentzianSeries } from "@/lib/lc/lorentzian";
 
 // Same constants as the live desk (hawk.computeLevels defaults + manage POINT_VALUE).
 const ATR_SL_MULT = 1.5;
@@ -54,6 +55,7 @@ function snapshots(candles: Candle[]): ScanSnapshot[] {
   const { histogram } = macd(closes);
   const atrArr = atr(candles, 14);
   const { adx: adxArr, plusDI, minusDI } = adx(candles, 14);
+  const lc = lorentzianSeries(candles); // confluence filter, same as the live scanner
   return candles.map((c, i) => ({
     price: c.c,
     sma20: s20[i],
@@ -64,6 +66,12 @@ function snapshots(candles: Candle[]): ScanSnapshot[] {
     minusDI: minusDI[i],
     macdHist: histogram[i],
     atr: atrArr[i],
+    lc: {
+      prediction: lc.prediction[i],
+      signal: lc.signal[i],
+      kernelBullish: lc.kernelBullish[i],
+      kernelBearish: lc.kernelBearish[i],
+    },
   }));
 }
 
