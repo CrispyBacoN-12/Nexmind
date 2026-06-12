@@ -34,6 +34,29 @@ const last = <T,>(arr: (T | null)[]): T | null => {
 };
 
 /**
+ * The pure setup decision — shared by the live scanner and the backtester so
+ * the two can never drift apart.
+ *   long  = uptrend (sma20>sma50, ADX>25, +DI>-DI) + healthy pullback (RSI 40–60) + MACD turning up
+ *   short = mirror image.
+ */
+export function decideSetup(s: ScanSnapshot): { side: "long" | "short" | null; note: string } {
+  const { sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal } = s;
+
+  const trending = adxVal != null && adxVal > 25;
+  if (trending && s20 != null && s50 != null && r != null && pDI != null && mDI != null) {
+    const up = s20 > s50 && pDI > mDI;
+    const down = s20 < s50 && mDI > pDI;
+    if (up && r >= 40 && r <= 60 && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) {
+      return { side: "long", note: `uptrend pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}` };
+    }
+    if (down && r >= 40 && r <= 60) {
+      return { side: "short", note: `downtrend pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}` };
+    }
+  }
+  return { side: null, note: "no setup" };
+}
+
+/**
  * Scan one symbol. Returns a directional setup or `side: null` when nothing lines up.
  * Setup logic (intentionally simple, tune later):
  *   long  = uptrend (sma20>sma50, ADX>25, +DI>-DI) + healthy pullback (RSI 40–60) + MACD turning up
@@ -68,21 +91,7 @@ export async function scanSymbol(
     price, sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal,
   };
 
-  let side: "long" | "short" | null = null;
-  let note = "no setup";
-
-  const trending = adxVal != null && adxVal > 25;
-  if (trending && s20 != null && s50 != null && r != null && pDI != null && mDI != null) {
-    const up = s20 > s50 && pDI > mDI;
-    const down = s20 < s50 && mDI > pDI;
-    if (up && r >= 40 && r <= 60 && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) {
-      side = "long";
-      note = `uptrend pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}`;
-    } else if (down && r >= 40 && r <= 60) {
-      side = "short";
-      note = `downtrend pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}`;
-    }
-  }
+  let { side, note } = decideSetup(snapshot);
 
   // Annotate with the most recent confirmed up-leg for the structure analyst.
   const leg = findRecentUpLeg(candles, 80, 3);
