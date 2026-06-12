@@ -3,9 +3,9 @@
 //   manage  every 5 min  (always — open positions must close even when halted)
 //   scan    every 15 min (watchlist + NASDAQ-100 universe; skipped while the kill switch is on)
 //   intel   every 30 min (news + Fear & Greed)
-// Run: npm run bot   (NEXMIND_URL overrides http://localhost:3000)
+// Run: npm run bot   (NEXMIND_URL overrides http://localhost:3275)
 
-const BASE = process.env.NEXMIND_URL ?? "http://localhost:3000";
+const BASE = process.env.NEXMIND_URL ?? "http://localhost:3275";
 const MINUTE_MS = 60_000;
 
 type Json = Record<string, unknown>;
