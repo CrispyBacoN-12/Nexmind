@@ -48,10 +48,12 @@ export interface InvestResult {
   costUsd: number;
 }
 
+const THAI = "Write every free-text field (reason, horizon, thesis, risks) in Thai. Keep tickers, numbers and financial abbreviations (P/E, ROE, MA) as-is.";
+
 const PERSONAS: { persona: InvestorView["persona"]; system: string }[] = [
-  { persona: "growth", system: "You are a long-term growth investor (think 3-5 year holding periods). You care about revenue/EPS growth, market position, and secular trends. Be concise and honest." },
-  { persona: "value", system: "You are a disciplined value investor. You care about valuation (P/E, P/B vs quality), balance sheet strength, margins, and margin of safety. Be concise and honest." },
-  { persona: "skeptic", system: "You are the devil's advocate on an investment committee. Your job is to find reasons NOT to buy: stretched valuation, deteriorating fundamentals, broken trend, hype. Be concise and honest — but concede when the case is genuinely strong." },
+  { persona: "growth", system: `You are a long-term growth investor (think 3-5 year holding periods). You care about revenue/EPS growth, market position, and secular trends. Be concise and honest. ${THAI}` },
+  { persona: "value", system: `You are a disciplined value investor. You care about valuation (P/E, P/B vs quality), balance sheet strength, margins, and margin of safety. Be concise and honest. ${THAI}` },
+  { persona: "skeptic", system: `You are the devil's advocate on an investment committee. Your job is to find reasons NOT to buy: stretched valuation, deteriorating fundamentals, broken trend, hype. Be concise and honest — but concede when the case is genuinely strong. ${THAI}` },
 ];
 
 const VIEW_SCHEMA = {
@@ -119,7 +121,7 @@ export async function analyzeLongTerm(symbol: string): Promise<InvestResult> {
       system:
         "You chair the investment committee. Synthesize the three analysts into a final long-term verdict. " +
         "Give an accumulation price zone (entryLow-entryHigh) near sensible technical/valuation levels, a holding horizon, " +
-        "3-5 thesis bullets and 2-4 key risks. Be decisive and honest — 'watch' and 'avoid' are valid answers.",
+        `3-5 thesis bullets and 2-4 key risks. Be decisive and honest — 'watch' and 'avoid' are valid answers. ${THAI}`,
       prompt: `${chart.symbol}\n${statsLine}\n${fundLine}\nCommittee reads: ${views.map((x) => `${x.persona}=${x.stance}(${Math.round(x.confidence * 100)}%: ${x.reason})`).join("; ")}\nJSON {rating, entryLow, entryHigh, horizon, thesis, risks}.`,
       maxTokens: 700,
       jsonSchema: VERDICT_SCHEMA,
