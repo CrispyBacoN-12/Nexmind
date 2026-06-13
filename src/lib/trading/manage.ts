@@ -8,6 +8,8 @@
 import { prisma } from "@/lib/db";
 import { fetchYahooCandles } from "@/lib/yahoo";
 import { decideAction, type LadderState } from "./positionRules";
+import { generateLesson, type LessonInput } from "./memo";
+import { Prisma, type Trade } from "@/generated/prisma/client";
 
 // Simplified paper P/L: USD per 1.0 price-point per lot. Real instruments differ
 // (contract sizes, pip values); this keeps the demo consistent and transparent.
@@ -114,6 +116,10 @@ export async function manageOpenTrades(): Promise<ManageSummary> {
       },
     });
     closed.push({ id: t.id, symbol: t.symbol, outcome: action.outcome, exit: action.exit, price: cur, pnl });
+
+    if (action.outcome === "loss") {
+      await recordLesson(t, { outcome: "loss", exit: action.exit, pnl, rMultiple });
+    }
   }
 
   return { checked: open.length, closed, partials };
@@ -121,4 +127,15 @@ export async function manageOpenTrades(): Promise<ManageSummary> {
 
 function safeParse<T>(s: string, fallback: T): T {
   try { return JSON.parse(s) as T; } catch { return fallback; }
+}
+
+/** MEMO distills a lesson for a loss. Lesson.tradeId is unique, so a P2002 just means it's already recorded. */
+async function recordLesson(trade: Trade, close: LessonInput): Promise<void> {
+  try {
+    const { text } = await generateLesson(trade, close);
+    await prisma.lesson.create({ data: { tradeId: trade.id, text } });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return;
+    console.error(`MEMO: failed to record lesson for trade ${trade.id}`, e);
+  }
 }
