@@ -111,7 +111,7 @@ model NewsItem {
 /// A lesson distilled from a losing trade, surfaced to future HAWK prompts.
 model Lesson {
   id        Int      @id @default(autoincrement())
-  tradeId   Int?
+  tradeId   Int?     @unique
   text      String
   tags      String   @default("[]")
   createdAt DateTime @default(now())
