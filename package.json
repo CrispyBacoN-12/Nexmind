@@ -13,7 +13,8 @@
     "db:studio": "prisma studio",
     "bot": "tsx scripts/bot.ts",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "backtest": "tsx scripts/backtest.ts"
+    "backtest": "tsx scripts/backtest.ts",
+    "backfill-lessons": "tsx scripts/backfill-lessons.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
