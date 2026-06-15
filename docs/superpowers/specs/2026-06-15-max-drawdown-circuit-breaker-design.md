@@ -30,6 +30,13 @@ no auto-recovery.
   positions can still close).
 - Out of scope: per-symbol or per-day drawdown limits, auto-recovery /
   cooldown timers, mark-to-market equity.
+- Out of scope (for now): caching `currentDrawdownPct` and adding
+  `@@index([status, closedAt])` to the `Trade` model. The Reports page
+  already does an equivalent full-table scan of closed trades on every load
+  without caching, so this feature doesn't make anything worse at current
+  scale (single-user paper-trading demo on SQLite). If closed-trade volume
+  grows large enough for this to matter, both the Reports query and this
+  feature's query should be addressed together as a dedicated perf pass.
 
 ## Components
 
@@ -48,7 +55,9 @@ export function currentDrawdownPct(closed: ClosedTrade[], startingBalance: numbe
 
 - Reuses the `ClosedTrade` type from `src/lib/trading/stats.ts` (same shape:
   `{ pnl, rMultiple, outcome, closedAt }`).
-- Algorithm: sort by `closedAt` ascending, `equity = startingBalance`,
+- Algorithm: copy and sort by `closedAt` ascending
+  (`[...closed].sort((a, b) => (a.closedAt?.getTime() ?? 0) - (b.closedAt?.getTime() ?? 0))`
+  — does not mutate the input array), `equity = startingBalance`,
   `peak = startingBalance`; for each trade `equity += pnl`,
   `peak = max(peak, equity)`. Return `peak <= 0 ? 0 : Math.max(0, (peak - equity) / peak * 100)`.
 - Empty input → `0`.
@@ -79,7 +88,7 @@ At the end of `manageOpenTrades()`, after the existing close/partial loop:
 const killSwitchOn = await isKillSwitchOn();
 if (!killSwitchOn) {
   const [allClosed, startingBalance, haltPct] = await Promise.all([
-    prisma.trade.findMany({ where: { status: "closed" }, select: { pnl: true, rMultiple: true, outcome: true, closedAt: true } }),
+    prisma.trade.findMany({ where: { status: "closed" }, orderBy: { closedAt: "asc" }, select: { pnl: true, rMultiple: true, outcome: true, closedAt: true } }),
     getStartingBalance(),
     getDrawdownHaltPct(),
   ]);
@@ -123,10 +132,14 @@ if (!killSwitchOn) {
   — `currentDrawdownPct` returns a non-negative number (3.2 means 3.2% below
   peak); the UI negates it for display, matching the sign convention of
   `PerfStats.maxDrawdownPct` on the Reports page. Always visible, not just
-  when tripped.
-- When `s.killSwitch && s.killSwitchReason`, render a warning banner near the
-  kill switch toggle showing `s.killSwitchReason`, so the user can tell the
-  halt was automatic rather than something they did.
+  when tripped. When `currentDrawdownPct === 0`, display `0.0%` (not `-0.0%`)
+  — only prefix the `-` when `dd > 0`.
+- When `s.killSwitch && s.killSwitchReason`, render a warning banner directly
+  above/around the existing kill switch toggle showing `s.killSwitchReason`,
+  so the user can tell the halt was automatic rather than something they did.
+  The toggle itself (flip `killSwitch` back to off) is the reset control —
+  placing the banner immediately next to it means the user sees the reason
+  and the fix in the same glance, with no separate reset button needed.
 
 ## Testing
 
@@ -140,6 +153,8 @@ if (!killSwitchOn) {
     highest point even after equity recovers partway)
   - multiple peaks/troughs — drawdown reflects the *current* gap to the
     all-time peak, not the largest historical drawdown
+  - two trades with the same `closedAt` timestamp — sort is stable and both
+    contribute to equity regardless of relative order
 - No new tests for `manage.ts` wiring — it's I/O-heavy and untested by
   existing convention (same as `engine.ts`'s sizing wiring). Verified via
   `tsc --noEmit`, the existing suite, and a manual check against the dev DB
