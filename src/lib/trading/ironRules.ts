@@ -18,7 +18,8 @@ export interface AccountState {
   maxSpread?: number; // max acceptable spread in price units
   minRiskReward?: number; // R:R floor (default 1.5)
   pipValueUsdPerLot?: number; // for estimating worst-case loss; default 1
-  killSwitch?: boolean; // global halt — blocks every new trade
+  killSwitch?: boolean; // per-portfolio halt — blocks every new trade
+  globalTradingHalt?: boolean; // manual global emergency brake — blocks all portfolios
   openPositions?: number; // current open trade count
   maxOpenPositions?: number; // cap; enforced only when both counts provided
 }
@@ -43,6 +44,8 @@ export function riskReward(t: ProposedTrade): number {
  */
 export function applyIronRules(t: ProposedTrade, acc: AccountState): IronVerdict {
   const failures: string[] = [];
+
+  if (acc.globalTradingHalt) failures.push("global trading halt engaged — all trading stopped");
 
   if (acc.killSwitch) failures.push("kill switch engaged — trading halted");
 

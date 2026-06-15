@@ -71,3 +71,14 @@ test("below the position cap still passes", () => {
   const v = applyIronRules(goodLong, { ...baseAcc, openPositions: 4, maxOpenPositions: 5 });
   assert.equal(v.passed, true);
 });
+
+test("applyIronRules: global trading halt blocks every new trade", () => {
+  const t = { symbol: "AAPL", side: "long" as const, entry: 100, sl: 98, tp1: 106, lot: 0.1 };
+  const acc = {
+    dailyLossUsd: 0, dailyLossCapUsd: 200, maxLotPerTrade: 0.2,
+    minRiskReward: 1.5, pipValueUsdPerLot: 1, globalTradingHalt: true,
+  };
+  const v = applyIronRules(t, acc);
+  assert.equal(v.passed, false);
+  assert.ok(v.failures.some((f) => /global trading halt/i.test(f)));
+});
