@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NEXMIND — AI Trading Guild
 
-## Getting Started
+A multi-agent "AI guild" web app: a personal Secretary routes your commands to the
+right team, and an AI trading desk makes team-based decisions on live market data —
+all in **paper mode** (no broker, no money at risk).
 
-First, run the development server:
+## The trading desk (paper)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+SCANNER (no AI)  →  HAWK ×3 (vote 2/3)  →  SAGE (risk veto)  →  Iron Rules (pure code)  →  paper fill
+   indicators        3 analysts             may VETO/tighten      R:R, spread, lot,         staged TP
+   on Yahoo data     trend/structure/        SL & TP              daily-loss cap            + decision log
+                     counter-trend
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **SCANNER** computes MA/RSI/MACD/ATR/ADX + swing detection on free Yahoo candles. No AI — wakes the team only on a setup.
+- **HAWK ×3** — three analyst personas reason independently; 2-of-3 must agree on a direction.
+- **SAGE** — independent risk review with VETO power; may tighten SL/TP. Uses the most capable model.
+- **Iron Rules** — pure, deterministic gate (`src/lib/trading/ironRules.ts`). Never an LLM. Hard-clamps every value.
+- **Executor** — simulates a fill and logs the full decision trail to the DB.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## The agent pipeline (Command Bridge)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+ARIA (the Secretary) plans an ordered set of steps across the 20+ guild agents
+(dev / design / content / intelligence / trading / finance / systems), runs each,
+and reports back — e.g. *"design a dashboard"* → LUNA (UX) → NOVA (frontend) → summary.
 
-## Learn More
+## Stack
 
-To learn more about Next.js, take a look at the following resources:
+Next.js 16 (App Router) · Prisma 7 + SQLite · Anthropic SDK · Tailwind v4 · TypeScript.
+Indicator/Yahoo/swing libs are reused from the sibling `stock-tracker` project.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install
+cp .env.example .env          # add ANTHROPIC_API_KEY to enable real AI (optional)
+npm run db:push -- --url "file:./dev.db"   # create the SQLite schema
+npm run db:seed               # seed the 28-agent roster + demo trades
+npm run dev                   # http://localhost:3000
+```
 
-## Deploy on Vercel
+**Without an `ANTHROPIC_API_KEY`** the app still runs: HAWK/SAGE and the Secretary use a
+deterministic **mock path**, so you can demo the full pipeline before paying for tokens.
+Add the key to switch on real Claude analysis (model tiers: Haiku/Sonnet/Opus per agent).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Market data
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+NEXMIND reads candles and prices through a provider router
+(`src/lib/marketData.ts`). By default it uses Yahoo Finance (no key needed).
+If you set `ALPACA_KEY` and `ALPACA_SECRET` in `.env.local`, it uses Alpaca's
+free IEX feed instead and falls back to Yahoo automatically on any error.
+This is data-only; NEXMIND does not place orders through Alpaca.
+
+## Pages
+
+| Route | What |
+|---|---|
+| `/` | **War Room** — live trade feed, decision trails, SAGE vetoes, SCOUT intel |
+| `/command` | **Command Bridge** — dispatch a command to ARIA; run a paper trade tick |
+| `/roster` | **Agent Roster** — the 20+ guild cards, filterable by team |
+| `/graph` | **Team Graph** — the org tree (CEO → Secretary → leads → specialists) |
+| `/reports` | **Reports** — win rate, expectancy, drawdown by period + lessons learned |
+
+## API
+
+- `POST /api/trade-tick` `{ symbol }` — run the desk once (e.g. `GC=F`, `BTC-USD`, `EURUSD=X`).
+- `POST /api/pipeline` `{ command }` → `{ pipelineId }`; `GET /api/pipeline?id=N` to read steps + summary.
+
+## Tests
+
+```bash
+npm test          # node --test over src/**/*.test.ts (Iron Rules covered)
+```
+
+## Roadmap status
+
+M0–M5 are built (scaffold, data model + War Room, agent pipeline, paper trading engine,
+SCOUT intel surface, reports + lessons scaffold). **Go-Live is deferred**: a Python/FastAPI
+MT5 bridge replaces the paper `executor` behind the same interface once ≥1 month of demo
+metrics clear thresholds. See `../../.claude/plans/ai-peaceful-falcon.md`.
