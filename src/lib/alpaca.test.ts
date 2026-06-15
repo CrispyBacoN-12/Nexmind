@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { intervalToTimeframe, rangeToLookbackMs, parseAlpacaBars } from "./alpaca";
+import { intervalToTimeframe, rangeToLookbackMs, parseAlpacaBars, fetchAlpacaCandles } from "./alpaca";
 
 test("intervalToTimeframe maps every supported interval", () => {
   assert.equal(intervalToTimeframe("5m"), "5Min");
@@ -41,4 +41,17 @@ test("parseAlpacaBars converts bars to Candle[] with unix-second timestamps", ()
 test("parseAlpacaBars throws on empty or missing bars (so the router can fall back)", () => {
   assert.throws(() => parseAlpacaBars({ symbol: "AAPL", bars: [] }, "AAPL", "1d", "5m"));
   assert.throws(() => parseAlpacaBars({ symbol: "AAPL" }, "AAPL", "1d", "5m"));
+});
+
+test("fetchAlpacaCandles throws when no API key is configured", async () => {
+  const prevKey = process.env.ALPACA_KEY;
+  const prevSecret = process.env.ALPACA_SECRET;
+  delete process.env.ALPACA_KEY;
+  delete process.env.ALPACA_SECRET;
+  try {
+    await assert.rejects(() => fetchAlpacaCandles("AAPL", "1d", "5m"), /key/i);
+  } finally {
+    if (prevKey !== undefined) process.env.ALPACA_KEY = prevKey;
+    if (prevSecret !== undefined) process.env.ALPACA_SECRET = prevSecret;
+  }
 });

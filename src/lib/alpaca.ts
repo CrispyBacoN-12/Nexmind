@@ -61,3 +61,50 @@ export function parseAlpacaBars(
     candles,
   };
 }
+
+const ALPACA_DATA_BASE = "https://data.alpaca.markets/v2/stocks";
+
+/**
+ * Fetch candles from Alpaca's IEX (free) feed. Throws when no key is set, on a
+ * non-OK response, or when the body has no bars — callers fall back to Yahoo.
+ */
+export async function fetchAlpacaCandles(
+  symbol: string,
+  range: Range = "1mo",
+  interval: Interval = "1h",
+): Promise<CandleResponse> {
+  const key = process.env.ALPACA_KEY;
+  const secret = process.env.ALPACA_SECRET;
+  if (!key || !secret) {
+    throw new Error("alpaca: missing ALPACA_KEY / ALPACA_SECRET");
+  }
+
+  const start = new Date(Date.now() - rangeToLookbackMs(range)).toISOString();
+  const end = new Date().toISOString();
+  const params = new URLSearchParams({
+    timeframe: intervalToTimeframe(interval),
+    start,
+    end,
+    feed: "iex",
+    limit: "10000",
+    sort: "asc",
+  });
+  const url = `${ALPACA_DATA_BASE}/${encodeURIComponent(symbol)}/bars?${params}`;
+
+  const res = await fetch(url, {
+    headers: {
+      "APCA-API-KEY-ID": key,
+      "APCA-API-SECRET-KEY": secret,
+      Accept: "application/json",
+    },
+    // Match the Yahoo fetcher's short cache window to bound request volume.
+    next: { revalidate: 30 },
+  });
+
+  if (!res.ok) {
+    throw new Error(`alpaca upstream ${res.status}`);
+  }
+
+  const json = await res.json();
+  return parseAlpacaBars(json, symbol, range, interval);
+}
