@@ -6,6 +6,8 @@ import { Card, CardTitle, Button, Badge } from "@/components/ui";
 interface Settings {
   killSwitch: boolean;
   maxOpenPositions: number;
+  startingBalance: number;
+  riskPctPerTrade: number;
   fearGreed: { value: number; label: string } | null;
 }
 
@@ -18,7 +20,7 @@ export function SafetyPanel() {
   }
   useEffect(() => { void load(); }, []);
 
-  async function update(patch: Partial<Settings>) {
+  async function update(patch: { killSwitch?: boolean; maxOpenPositions?: number; startingBalance?: number; riskPctPerTrade?: number }) {
     setBusy(true);
     try {
       setS(await fetch("/api/settings", {
@@ -64,6 +66,29 @@ export function SafetyPanel() {
           value={s.maxOpenPositions}
           disabled={busy}
           onChange={(e) => update({ maxOpenPositions: Number(e.target.value) })}
+          className="w-16 rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm"
+        />
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        <label className="text-xs text-(--color-muted)">Starting balance ($)</label>
+        <input
+          type="number"
+          min={1}
+          value={s.startingBalance}
+          disabled={busy}
+          onChange={(e) => update({ startingBalance: Number(e.target.value) })}
+          className="w-24 rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm"
+        />
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        <label className="text-xs text-(--color-muted)">Risk per trade (%)</label>
+        <input
+          type="number"
+          min={0.1}
+          step={0.1}
+          value={s.riskPctPerTrade}
+          disabled={busy}
+          onChange={(e) => update({ riskPctPerTrade: Number(e.target.value) })}
           className="w-16 rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm"
         />
       </div>
