@@ -5,9 +5,12 @@ import { Card, CardTitle, Button, Badge } from "@/components/ui";
 
 interface Settings {
   killSwitch: boolean;
+  killSwitchReason: string;
   maxOpenPositions: number;
   startingBalance: number;
   riskPctPerTrade: number;
+  drawdownHaltPct: number;
+  currentDrawdownPct: number;
   fearGreed: { value: number; label: string } | null;
 }
 
@@ -20,7 +23,7 @@ export function SafetyPanel() {
   }
   useEffect(() => { void load(); }, []);
 
-  async function update(patch: { killSwitch?: boolean; maxOpenPositions?: number; startingBalance?: number; riskPctPerTrade?: number }) {
+  async function update(patch: { killSwitch?: boolean; maxOpenPositions?: number; startingBalance?: number; riskPctPerTrade?: number; drawdownHaltPct?: number }) {
     setBusy(true);
     try {
       setS(await fetch("/api/settings", {
@@ -40,6 +43,11 @@ export function SafetyPanel() {
         <CardTitle>🛡️ Safety</CardTitle>
         {s.fearGreed && <Badge tone="info">F&G {s.fearGreed.value} · {s.fearGreed.label}</Badge>}
       </div>
+      {s.killSwitch && s.killSwitchReason && (
+        <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+          {s.killSwitchReason}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 mt-2">
         <div>
           <div className={`text-sm font-medium ${s.killSwitch ? "text-red-400" : ""}`}>
@@ -91,6 +99,24 @@ export function SafetyPanel() {
           onChange={(e) => update({ riskPctPerTrade: Number(e.target.value) })}
           className="w-16 rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm"
         />
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        <label className="text-xs text-(--color-muted)">Max drawdown halt (%)</label>
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={s.drawdownHaltPct}
+          disabled={busy}
+          onChange={(e) => update({ drawdownHaltPct: Number(e.target.value) })}
+          className="w-16 rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm"
+        />
+      </div>
+      <div className="flex items-center justify-between gap-2 mt-2">
+        <span className="text-xs text-(--color-muted)">Current drawdown</span>
+        <span className="text-xs font-mono">
+          {s.currentDrawdownPct === 0 ? "0.0%" : `-${s.currentDrawdownPct.toFixed(1)}%`}
+        </span>
       </div>
     </Card>
   );
