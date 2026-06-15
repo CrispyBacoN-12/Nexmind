@@ -17,6 +17,10 @@ export function intervalToTimeframe(interval: Interval): string {
     case "1h": return "1Hour";
     case "1d": return "1Day";
     case "1wk": return "1Week";
+    default: {
+      const _exhaustive: never = interval;
+      throw new Error(`alpaca: unsupported interval ${_exhaustive}`);
+    }
   }
 }
 
