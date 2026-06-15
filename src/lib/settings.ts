@@ -21,6 +21,16 @@ export async function getMaxOpenPositions(): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : 5;
 }
 
+export async function getStartingBalance(): Promise<number> {
+  const n = parseFloat(await getSetting("startingBalance", "10000"));
+  return Number.isFinite(n) && n > 0 ? n : 10000;
+}
+
+export async function getRiskPctPerTrade(): Promise<number> {
+  const n = parseFloat(await getSetting("riskPctPerTrade", "1"));
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
 export interface FearGreed { value: number; label: string; fetchedAt: string }
 
 export async function getFearGreed(): Promise<FearGreed | null> {
