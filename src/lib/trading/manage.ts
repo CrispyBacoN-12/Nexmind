@@ -10,6 +10,8 @@ import { fetchYahooCandles } from "@/lib/yahoo";
 import { decideAction, type LadderState } from "./positionRules";
 import { generateLesson, type LessonInput } from "./memo";
 import { Prisma, type Trade } from "@/generated/prisma/client";
+import { currentDrawdownPct } from "./circuitBreaker";
+import { isKillSwitchOn, getStartingBalance, getDrawdownHaltPct, setSetting } from "@/lib/settings";
 
 // Simplified paper P/L: USD per 1.0 price-point per lot. Real instruments differ
 // (contract sizes, pip values); this keeps the demo consistent and transparent.
@@ -119,6 +121,27 @@ export async function manageOpenTrades(): Promise<ManageSummary> {
 
     if (action.outcome === "loss") {
       await recordLesson(t, { outcome: "loss", exit: action.exit, pnl, rMultiple });
+    }
+  }
+
+  const killSwitchOn = await isKillSwitchOn();
+  if (!killSwitchOn) {
+    const [allClosed, startingBalance, haltPct] = await Promise.all([
+      prisma.trade.findMany({
+        where: { status: "closed" },
+        orderBy: { closedAt: "asc" },
+        select: { pnl: true, rMultiple: true, outcome: true, closedAt: true },
+      }),
+      getStartingBalance(),
+      getDrawdownHaltPct(),
+    ]);
+    const dd = currentDrawdownPct(allClosed.map((t) => ({ ...t, pnl: t.pnl ?? 0 })), startingBalance);
+    if (dd >= haltPct) {
+      await setSetting("killSwitch", "true");
+      await setSetting(
+        "killSwitchReason",
+        `Auto-halted: drawdown -${dd.toFixed(1)}% exceeded ${haltPct}% limit at ${new Date().toISOString()}`,
+      );
     }
   }
 
