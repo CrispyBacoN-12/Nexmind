@@ -3,7 +3,7 @@
 // final verdict with an accumulation zone. Analysis only, never places a trade.
 
 import { callAgent, callAgentJSON, aiEnabled } from "@/lib/anthropic";
-import { fetchYahooCandlesSmart } from "@/lib/yahoo";
+import { fetchCandles } from "@/lib/marketData";
 import { computeLongTermStats, type LongTermStats } from "./stats";
 import { fetchFundamentals, fundamentalsLine, type Fundamentals } from "@/lib/market/fundamentals";
 
@@ -70,7 +70,7 @@ const VERDICT_SCHEMA = {
 const fmt = (n: number | null, d = 1) => (n == null ? "n/a" : n.toFixed(d));
 
 export async function analyzeLongTerm(symbol: string): Promise<InvestResult> {
-  const chart = await fetchYahooCandlesSmart(symbol, "5y", "1wk");
+  const chart = await fetchCandles(symbol, "5y", "1wk");
   const stats = computeLongTermStats(chart.candles);
   const fundamentals = await fetchFundamentals(chart.symbol);
 

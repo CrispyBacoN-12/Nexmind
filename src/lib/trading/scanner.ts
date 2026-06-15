@@ -1,7 +1,8 @@
 // SCANNER — the no-AI market watcher. Computes indicators on free Yahoo candles
 // and emits a candidate setup only when conditions align. Cheap: no AI calls.
 
-import { fetchYahooCandlesSmart, type Interval, type Range } from "@/lib/yahoo";
+import { type Interval, type Range } from "@/lib/yahoo";
+import { fetchCandles } from "@/lib/marketData";
 import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
 import { findRecentUpLeg } from "@/lib/swings";
 import { lorentzianLast, type LCState } from "@/lib/lc/lorentzian";
@@ -84,7 +85,7 @@ export async function scanSymbol(
   range: Range = "3mo", // 3mo of 1h bars (~400) gives the LC classifier real training depth
   interval: Interval = "1h",
 ): Promise<ScanResult> {
-  const resp = await fetchYahooCandlesSmart(symbol, range, interval);
+  const resp = await fetchCandles(symbol, range, interval);
   const candles = resp.candles;
   symbol = resp.symbol; // use the resolved symbol (e.g. JMART → JMART.BK)
   const closes = candles.map((c) => c.c);

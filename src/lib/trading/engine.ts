@@ -9,7 +9,8 @@ import { runHawk, type HawkVerdict, type HawkVote, type ProposedLevels } from ".
 import { runSage, type SageVerdict } from "./sage";
 import { applyIronRules, riskReward, type AccountState } from "./ironRules";
 import { isKillSwitchOn, getMaxOpenPositions, getFearGreed, getStartingBalance, getRiskPctPerTrade } from "@/lib/settings";
-import { fetchYahooCandlesSmart, type Interval, type Range } from "@/lib/yahoo";
+import { type Interval, type Range } from "@/lib/yahoo";
+import { fetchCandles } from "@/lib/marketData";
 import { dailyReturns, pearsonCorrelation } from "./correlation";
 import { computeLot } from "./positionSizing";
 
@@ -204,7 +205,7 @@ async function todaysRealizedLoss(): Promise<number> {
 /** Daily returns for correlation, or null if the candle fetch fails. */
 async function fetchDailyReturns(symbol: string): Promise<number[] | null> {
   try {
-    const resp = await fetchYahooCandlesSmart(symbol, "3mo", "1d");
+    const resp = await fetchCandles(symbol, "3mo", "1d");
     return dailyReturns(resp.candles);
   } catch {
     return null;

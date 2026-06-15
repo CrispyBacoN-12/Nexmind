@@ -6,7 +6,7 @@
 // positions stay open forever.
 
 import { prisma } from "@/lib/db";
-import { fetchYahooCandles } from "@/lib/yahoo";
+import { fetchCandles } from "@/lib/marketData";
 import { decideAction, type LadderState } from "./positionRules";
 import { generateLesson, type LessonInput } from "./memo";
 import { Prisma, type Trade } from "@/generated/prisma/client";
@@ -46,7 +46,7 @@ async function makePriceFetcher() {
     if (cache.has(symbol)) return cache.get(symbol)!;
     let p: number | null = null;
     try {
-      const r = await fetchYahooCandles(symbol, "1d", "5m");
+      const r = await fetchCandles(symbol, "1d", "5m");
       p = r.price ?? r.candles.at(-1)?.c ?? null;
     } catch {
       p = null;
