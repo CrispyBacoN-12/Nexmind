@@ -31,6 +31,15 @@ export async function getRiskPctPerTrade(): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+export async function getDrawdownHaltPct(): Promise<number> {
+  const n = parseFloat(await getSetting("drawdownHaltPct", "10"));
+  return Number.isFinite(n) && n > 0 ? n : 10;
+}
+
+export async function getKillSwitchReason(): Promise<string> {
+  return getSetting("killSwitchReason", "");
+}
+
 export interface FearGreed { value: number; label: string; fetchedAt: string }
 
 export async function getFearGreed(): Promise<FearGreed | null> {
