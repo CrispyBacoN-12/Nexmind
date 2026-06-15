@@ -41,7 +41,7 @@ export async function runTradeTick(
 
   // 1) SCANNER
   const scan = await scanSymbol(symbol, opts.range, opts.interval);
-  symbol = scan.symbol; // use the resolved symbol (e.g. JMART → JMART.BK)
+  symbol = scan.symbol; // carry the symbol forward from the scan result
   steps.push({ stage: "scanner", note: scan.note });
 
   // One open position per symbol — re-scanning the same persisting setup must

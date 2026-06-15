@@ -1,4 +1,4 @@
-// SCANNER — the no-AI market watcher. Computes indicators on free Yahoo candles
+// SCANNER — the no-AI market watcher. Computes indicators on market candles (via the marketData router)
 // and emits a candidate setup only when conditions align. Cheap: no AI calls.
 
 import { type Interval, type Range } from "@/lib/yahoo";
@@ -87,7 +87,7 @@ export async function scanSymbol(
 ): Promise<ScanResult> {
   const resp = await fetchCandles(symbol, range, interval);
   const candles = resp.candles;
-  symbol = resp.symbol; // use the resolved symbol (e.g. JMART → JMART.BK)
+  symbol = resp.symbol; // carry the symbol forward from the fetch response
   const closes = candles.map((c) => c.c);
   const price = resp.price ?? closes.at(-1) ?? 0;
 
