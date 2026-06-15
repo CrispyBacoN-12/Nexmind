@@ -13,10 +13,10 @@ export interface PortfolioTrade {
 }
 
 export interface PortfolioStats {
-  equity: number;        // startingBalance + realized P/L
+  equity: number;        // startingBalance + realized P/L only (excludes unrealized P/L on open positions — no mark-to-market in this phase)
   realizedPnl: number;   // sum of closed-trade pnl
   openCount: number;     // number of open trades
-  currentDrawdownPct: number; // non-negative % below the all-time equity peak
+  currentDrawdownPct: number; // non-negative % below the all-time peak of REALIZED equity (open positions not marked)
 }
 
 export function computePortfolioStats(trades: PortfolioTrade[], startingBalance: number): PortfolioStats {
