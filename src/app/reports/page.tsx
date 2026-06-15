@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { Card, CardTitle, Stat, PageHeader, Empty, Badge } from "@/components/ui";
 import { fmtMoney, fmtNumber, colorForChange, fmtAgo } from "@/lib/utils";
 import { computeStats, type ClosedTrade } from "@/lib/trading/stats";
+import { getStartingBalance } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,11 @@ const PERIODS: { label: string; days: number }[] = [
 ];
 
 export default async function ReportsPage() {
-  const [closed, recent, lessons] = await Promise.all([
+  const [closed, recent, lessons, startingBalance] = await Promise.all([
     prisma.trade.findMany({ where: { status: "closed" }, orderBy: { closedAt: "desc" } }),
     prisma.trade.findMany({ where: { status: "closed" }, orderBy: { closedAt: "desc" }, take: 30 }),
     prisma.lesson.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
+    getStartingBalance(),
   ]);
 
   const asClosed: ClosedTrade[] = closed.map((t) => ({ pnl: t.pnl ?? 0, rMultiple: t.rMultiple, outcome: t.outcome, closedAt: t.closedAt }));
@@ -31,7 +33,7 @@ export default async function ReportsPage() {
       {PERIODS.map((p) => {
         const since = new Date(); since.setDate(since.getDate() - p.days); if (p.days === 1) since.setHours(0, 0, 0, 0);
         const window = asClosed.filter((t) => (t.closedAt?.getTime() ?? 0) >= since.getTime());
-        const s = computeStats(window);
+        const s = computeStats(window, startingBalance);
         return (
           <div key={p.label} className="mb-6">
             <CardTitle>{p.label}</CardTitle>
@@ -40,7 +42,24 @@ export default async function ReportsPage() {
               <Stat label="Win Rate" value={`${fmtNumber(s.winRate, 0)}%`} sub={`${s.wins}/${s.trades}`} />
               <Stat label="Net P/L" value={fmtMoney(s.pnl)} subColor={colorForChange(s.pnl)} />
               <Stat label="Expectancy" value={fmtMoney(s.expectancy)} sub="per trade" subColor={colorForChange(s.expectancy)} />
-              <Stat label="Max Drawdown" value={fmtMoney(s.maxDrawdown)} subColor="text-rose-400" />
+              <Stat
+                label="Max Drawdown"
+                value={fmtMoney(s.maxDrawdown)}
+                sub={s.maxDrawdownPct != null ? `${fmtNumber(s.maxDrawdownPct, 1)}%` : undefined}
+                subColor="text-rose-400"
+              />
+              <Stat
+                label="Sharpe Ratio"
+                value={s.sharpeRatio != null ? fmtNumber(s.sharpeRatio, 2) : "—"}
+                sub="annualized"
+                subColor={s.sharpeRatio != null ? colorForChange(s.sharpeRatio) : undefined}
+              />
+              <Stat
+                label="Sortino Ratio"
+                value={s.sortinoRatio != null ? fmtNumber(s.sortinoRatio, 2) : "—"}
+                sub="annualized"
+                subColor={s.sortinoRatio != null ? colorForChange(s.sortinoRatio) : undefined}
+              />
             </div>
           </div>
         );
