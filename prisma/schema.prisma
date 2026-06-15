@@ -58,6 +58,8 @@ model PipelineStep {
 /// A candidate setup emitted by the no-AI Scanner before the team weighs in.
 model Signal {
   id         Int      @id @default(autoincrement())
+  portfolio  Portfolio @relation(fields: [portfolioId], references: [id])
+  portfolioId Int
   symbol     String
   timeframe  String   @default("1h")
   side       String // long | short
@@ -70,9 +72,30 @@ model Signal {
   createdAt  DateTime @default(now())
 }
 
+/// One isolated paper portfolio: its own balance, risk config, and kill switch.
+model Portfolio {
+  id               Int         @id @default(autoincrement())
+  name             String
+  kind             String      @default("swing")
+  status           String      @default("active")
+  startingBalance  Float       @default(10000)
+  riskPctPerTrade  Float       @default(1)
+  maxOpenPositions Int         @default(5)
+  drawdownHaltPct  Float       @default(10)
+  killSwitch       Boolean     @default(false)
+  killSwitchReason String      @default("")
+  sort             Int         @default(0)
+  createdAt        DateTime    @default(now())
+  trades           Trade[]
+  signals          Signal[]
+  watchlist        Watchlist[]
+}
+
 /// A paper trade and the full team decision trail behind it.
 model Trade {
   id              Int       @id @default(autoincrement())
+  portfolio       Portfolio @relation(fields: [portfolioId], references: [id])
+  portfolioId     Int
   signal          Signal?   @relation(fields: [signalId], references: [id])
   signalId        Int?      @unique
   symbol          String
@@ -120,11 +143,15 @@ model Lesson {
 /// A symbol the Scanner watches. Scanned on demand (single tick or "Scan all").
 model Watchlist {
   id        Int      @id @default(autoincrement())
-  symbol    String   @unique // Yahoo Finance symbol, e.g. GC=F, BTC-USD, AAPL
+  portfolio  Portfolio @relation(fields: [portfolioId], references: [id])
+  portfolioId Int
+  symbol    String // Yahoo Finance symbol, e.g. GC=F, BTC-USD, AAPL
   label     String? // friendly name, e.g. "Gold"
   enabled   Boolean  @default(true)
   sort      Int      @default(0)
   createdAt DateTime @default(now())
+
+  @@unique([portfolioId, symbol])
 }
 
 /// A code-generation request handled by NOVA: propose files, preview, then apply.
