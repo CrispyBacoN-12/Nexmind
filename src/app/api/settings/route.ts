@@ -1,19 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSetting, setSetting, getFearGreed, getMaxOpenPositions, getStartingBalance, getRiskPctPerTrade, getDrawdownHaltPct, getKillSwitchReason } from "@/lib/settings";
-import { prisma } from "@/lib/db";
-import { currentDrawdownPct } from "@/lib/trading/circuitBreaker";
+import { getCurrentDrawdownPct } from "@/lib/trading/circuitBreaker";
 
 export const dynamic = "force-dynamic";
 
 async function snapshot() {
-  const [closed, startingBalance] = await Promise.all([
-    prisma.trade.findMany({
-      where: { status: "closed" },
-      orderBy: { closedAt: "asc" },
-      select: { pnl: true, rMultiple: true, outcome: true, closedAt: true },
-    }),
-    getStartingBalance(),
-  ]);
+  const startingBalance = await getStartingBalance();
   return NextResponse.json({
     killSwitch: (await getSetting("killSwitch", "false")) === "true",
     killSwitchReason: await getKillSwitchReason(),
@@ -21,7 +13,7 @@ async function snapshot() {
     startingBalance,
     riskPctPerTrade: await getRiskPctPerTrade(),
     drawdownHaltPct: await getDrawdownHaltPct(),
-    currentDrawdownPct: currentDrawdownPct(closed.map((t) => ({ ...t, pnl: t.pnl ?? 0 })), startingBalance),
+    currentDrawdownPct: await getCurrentDrawdownPct(startingBalance),
     fearGreed: await getFearGreed(),
   });
 }

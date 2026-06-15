@@ -10,7 +10,7 @@ import { fetchYahooCandles } from "@/lib/yahoo";
 import { decideAction, type LadderState } from "./positionRules";
 import { generateLesson, type LessonInput } from "./memo";
 import { Prisma, type Trade } from "@/generated/prisma/client";
-import { currentDrawdownPct } from "./circuitBreaker";
+import { getCurrentDrawdownPct } from "./circuitBreaker";
 import { isKillSwitchOn, getStartingBalance, getDrawdownHaltPct, setSetting } from "@/lib/settings";
 
 // Simplified paper P/L: USD per 1.0 price-point per lot. Real instruments differ
@@ -126,16 +126,8 @@ export async function manageOpenTrades(): Promise<ManageSummary> {
 
   const killSwitchOn = await isKillSwitchOn();
   if (!killSwitchOn) {
-    const [allClosed, startingBalance, haltPct] = await Promise.all([
-      prisma.trade.findMany({
-        where: { status: "closed" },
-        orderBy: { closedAt: "asc" },
-        select: { pnl: true, rMultiple: true, outcome: true, closedAt: true },
-      }),
-      getStartingBalance(),
-      getDrawdownHaltPct(),
-    ]);
-    const dd = currentDrawdownPct(allClosed.map((t) => ({ ...t, pnl: t.pnl ?? 0 })), startingBalance);
+    const [startingBalance, haltPct] = await Promise.all([getStartingBalance(), getDrawdownHaltPct()]);
+    const dd = await getCurrentDrawdownPct(startingBalance);
     if (dd >= haltPct) {
       await setSetting("killSwitch", "true");
       await setSetting(
