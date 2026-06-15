@@ -5,6 +5,7 @@ import { callAgent, callAgentJSON, aiEnabled } from "@/lib/anthropic";
 import { scanSymbol, type ScanSnapshot } from "./scanner";
 import { prisma } from "@/lib/db";
 import { getFearGreed } from "@/lib/settings";
+import { fetchFundamentals, fundamentalsLine, type Fundamentals } from "@/lib/market/fundamentals";
 
 export type View = "bullish" | "bearish" | "neutral";
 
@@ -20,6 +21,7 @@ export interface AnalysisResult {
   price: number;
   snapshot: ScanSnapshot;
   scannerNote: string;
+  fundamentals: Fundamentals;
   views: PersonaView[];
   overall: { bias: View; confidence: number; summary: string };
   risk: { note: string; suggestedSl: number | null; suggestedTp: number | null };
@@ -61,6 +63,8 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
   const scan = await scanSymbol(symbol);
   const s = scan.snapshot;
   const newsDigest = await latestNewsDigest();
+  const fundamentals = await fetchFundamentals(scan.symbol);
+  const fundLine = fundamentalsLine(fundamentals, scan.symbol);
   const atr = s.atr ?? scan.price * 0.01;
 
   let views: PersonaView[];
@@ -69,7 +73,7 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
   let cost = 0;
 
   if (aiEnabled()) {
-    const prompt = `Analyze ${symbol}. ${snapshotLine(s)}.${newsDigest ? ` Intel: ${newsDigest}.` : ""}\nGive your read (bullish / bearish / neutral) with confidence 0-1 and one-sentence reason. JSON {view, confidence, reason}.`;
+    const prompt = `Analyze ${symbol}. ${snapshotLine(s)}.\n${fundLine}\n${newsDigest ? `Intel: ${newsDigest}.\n` : ""}Give your read (bullish / bearish / neutral) with confidence 0-1 and one-sentence reason. Weigh in the fundamentals where relevant. JSON {view, confidence, reason}.`;
     const results = await Promise.all(
       PERSONAS.map((p) =>
         callAgentJSON<{ view: View; confidence: number; reason: string }>({
@@ -83,7 +87,7 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
     const summaryRes = await callAgent({
       tier: "sonnet",
       system: "You are HAWK, lead market analyst. Synthesize the team's reads into a clear 3-4 sentence verdict for a trader. No fluff.",
-      prompt: `${symbol}. ${snapshotLine(s)}.\nAnalyst reads: ${views.map((v) => `${v.persona}=${v.view}(${v.reason})`).join("; ")}.${newsDigest ? ` Intel: ${newsDigest}.` : ""}\nWrite the verdict.`,
+      prompt: `${symbol}. ${snapshotLine(s)}.\n${fundLine}\nAnalyst reads: ${views.map((v) => `${v.persona}=${v.view}(${v.reason})`).join("; ")}.${newsDigest ? ` Intel: ${newsDigest}.` : ""}\nWrite the verdict.`,
       maxTokens: 350,
     });
     summary = summaryRes.text;
@@ -108,7 +112,7 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
   const confidence = avg(views.filter((v) => v.view === bias).map((v) => v.confidence)) || avg(views.map((v) => v.confidence));
 
   return {
-    symbol: scan.symbol, price: scan.price, snapshot: s, scannerNote: scan.note,
+    symbol: scan.symbol, price: scan.price, snapshot: s, scannerNote: scan.note, fundamentals,
     views, overall: { bias, confidence, summary }, risk, newsDigest, costUsd: cost,
   };
 }

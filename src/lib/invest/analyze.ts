@@ -5,6 +5,7 @@
 import { callAgent, callAgentJSON, aiEnabled } from "@/lib/anthropic";
 import { fetchYahooCandlesSmart } from "@/lib/yahoo";
 import { computeLongTermStats, type LongTermStats } from "./stats";
+import { fetchFundamentals, fundamentalsLine, type Fundamentals } from "@/lib/market/fundamentals";
 
 export type Stance = "buy" | "hold" | "avoid";
 export type Verdict = "strong-buy" | "buy" | "watch" | "avoid";
@@ -14,21 +15,6 @@ export interface InvestorView {
   stance: Stance;
   confidence: number; // 0..1
   reason: string;
-}
-
-export interface Fundamentals {
-  name: string | null;
-  industry: string | null;
-  marketCapM: number | null; // millions USD (Finnhub convention)
-  peTTM: number | null;
-  pb: number | null;
-  roePct: number | null;
-  netMarginPct: number | null;
-  revenueGrowthPct: number | null;
-  epsGrowthPct: number | null;
-  debtToEquity: number | null;
-  dividendYieldPct: number | null;
-  note?: string; // why fundamentals are missing, when they are
 }
 
 export interface InvestResult {
@@ -92,11 +78,7 @@ export async function analyzeLongTerm(symbol: string): Promise<InvestResult> {
     `Price ${fmt(stats.price, 2)} · CAGR(5y) ${fmt(stats.cagrPct)}%/y · 52w change ${fmt(stats.change52wPct)}% · ` +
     `vs 40-week MA ${fmt(stats.priceVsSma40wPct)}% · drawdown from 5y high ${fmt(stats.drawdownFromHighPct)}% · ` +
     `52w range position ${fmt(stats.rangePos52wPct)}/100 · weekly RSI ${fmt(stats.rsiWeekly)}`;
-  const fundLine = fundamentals.note
-    ? `Fundamentals: ${fundamentals.note}`
-    : `Fundamentals: ${fundamentals.name ?? chart.symbol} (${fundamentals.industry ?? "?"}) · mktcap $${fmt(fundamentals.marketCapM, 0)}M · ` +
-      `P/E ${fmt(fundamentals.peTTM)} · P/B ${fmt(fundamentals.pb)} · ROE ${fmt(fundamentals.roePct)}% · net margin ${fmt(fundamentals.netMarginPct)}% · ` +
-      `rev growth ${fmt(fundamentals.revenueGrowthPct)}% · EPS growth ${fmt(fundamentals.epsGrowthPct)}% · D/E ${fmt(fundamentals.debtToEquity, 2)} · div yield ${fmt(fundamentals.dividendYieldPct)}%`;
+  const fundLine = fundamentalsLine(fundamentals, chart.symbol);
 
   let views: InvestorView[];
   let verdict: InvestResult["verdict"];
@@ -141,58 +123,6 @@ export async function analyzeLongTerm(symbol: string): Promise<InvestResult> {
   }
 
   return { symbol: chart.symbol, price: stats.price, stats, fundamentals, views, verdict, costUsd: cost };
-}
-
-// ---- fundamentals (Finnhub free tier; US listings) ----
-
-const NON_EQUITY = /=[FX]$|-USD$|^\^/; // futures (GC=F), forex (EURUSD=X), crypto (BTC-USD), indices (^GSPC)
-
-async function fetchFundamentals(symbol: string): Promise<Fundamentals> {
-  const empty: Fundamentals = {
-    name: null, industry: null, marketCapM: null, peTTM: null, pb: null, roePct: null,
-    netMarginPct: null, revenueGrowthPct: null, epsGrowthPct: null, debtToEquity: null, dividendYieldPct: null,
-  };
-  if (NON_EQUITY.test(symbol)) return { ...empty, note: "not a single stock — judged on price history alone" };
-  const key = process.env.FINNHUB_API_KEY;
-  if (!key) return { ...empty, note: "FINNHUB_API_KEY not set" };
-
-  try {
-    const [profileRes, metricRes] = await Promise.all([
-      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${key}`),
-      fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${key}`),
-    ]);
-    if (!profileRes.ok || !metricRes.ok) return { ...empty, note: `Finnhub HTTP ${profileRes.status}/${metricRes.status}` };
-
-    const profile = (await profileRes.json()) as { name?: string; finnhubIndustry?: string; marketCapitalization?: number };
-    const metric = ((await metricRes.json()) as { metric?: Record<string, number> }).metric ?? {};
-    if (!profile.name && Object.keys(metric).length === 0) {
-      return { ...empty, note: "no fundamentals on Finnhub (non-US listing?) — judged on price history alone" };
-    }
-
-    const pick = (...keys: string[]) => {
-      for (const k of keys) {
-        const v = metric[k];
-        if (typeof v === "number" && Number.isFinite(v)) return v;
-      }
-      return null;
-    };
-
-    return {
-      name: profile.name ?? null,
-      industry: profile.finnhubIndustry ?? null,
-      marketCapM: profile.marketCapitalization ?? null,
-      peTTM: pick("peTTM", "peAnnual"),
-      pb: pick("pbAnnual", "pb"),
-      roePct: pick("roeTTM", "roeAnnual"),
-      netMarginPct: pick("netProfitMarginTTM", "netProfitMarginAnnual"),
-      revenueGrowthPct: pick("revenueGrowthTTMYoy", "revenueGrowth3Y"),
-      epsGrowthPct: pick("epsGrowthTTMYoy", "epsGrowth3Y"),
-      debtToEquity: pick("totalDebt/totalEquityAnnual", "totalDebt/totalEquityQuarterly"),
-      dividendYieldPct: pick("dividendYieldIndicatedAnnual", "currentDividendYieldTTM"),
-    };
-  } catch (e) {
-    return { ...empty, note: `fundamentals fetch failed: ${String(e).slice(0, 80)}` };
-  }
 }
 
 // ---- helpers ----
