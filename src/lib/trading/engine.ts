@@ -8,8 +8,10 @@ import { scanSymbol, type ScanResult } from "./scanner";
 import { runHawk, type HawkVerdict, type HawkVote, type ProposedLevels } from "./hawk";
 import { runSage, type SageVerdict } from "./sage";
 import { applyIronRules, riskReward, type AccountState } from "./ironRules";
-import { isKillSwitchOn, getMaxOpenPositions, getFearGreed } from "@/lib/settings";
-import type { Interval, Range } from "@/lib/yahoo";
+import { isKillSwitchOn, getMaxOpenPositions, getFearGreed, getStartingBalance, getRiskPctPerTrade } from "@/lib/settings";
+import { fetchYahooCandlesSmart, type Interval, type Range } from "@/lib/yahoo";
+import { dailyReturns, pearsonCorrelation } from "./correlation";
+import { computeLot } from "./positionSizing";
 
 export interface TickStep { stage: string; note: string }
 export interface TickResult {
@@ -28,8 +30,6 @@ const DEFAULT_ACCOUNT: AccountState = {
   minRiskReward: 1.5,
   pipValueUsdPerLot: 1,
 };
-
-const DEFAULT_LOT = 0.1;
 
 export async function runTradeTick(
   symbol: string,
@@ -99,7 +99,44 @@ export async function runTradeTick(
 
   // 4) IRON RULES
   const levels = sage.adjusted;
-  const lot = opts.lot ?? DEFAULT_LOT;
+  let lot: number;
+  if (opts.lot != null) {
+    lot = opts.lot;
+  } else {
+    const openPositions = await prisma.trade.findMany({
+      where: { status: "open" },
+      select: { symbol: true },
+    });
+    const openSymbols = [...new Set(openPositions.map((p) => p.symbol))].filter((s) => s !== symbol);
+
+    let avgCorrelation: number | null = null;
+    if (openSymbols.length > 0) {
+      const currentReturns = await fetchDailyReturns(symbol);
+      if (currentReturns) {
+        const correlations: number[] = [];
+        for (const openSymbol of openSymbols) {
+          const openReturns = await fetchDailyReturns(openSymbol);
+          if (!openReturns) continue;
+          const corr = pearsonCorrelation(currentReturns, openReturns);
+          if (corr != null) correlations.push(corr);
+        }
+        if (correlations.length > 0) {
+          avgCorrelation = correlations.reduce((a, b) => a + b, 0) / correlations.length;
+        }
+      }
+    }
+
+    const riskUsd = ((await getStartingBalance()) * (await getRiskPctPerTrade())) / 100;
+    const sizing = computeLot({
+      entry: levels.entry,
+      sl: levels.sl,
+      riskUsd,
+      maxLotPerTrade: DEFAULT_ACCOUNT.maxLotPerTrade,
+      avgCorrelation,
+    });
+    lot = sizing.lot;
+    steps.push({ stage: "sizing", note: sizing.reasoning });
+  }
   const account: AccountState = {
     ...DEFAULT_ACCOUNT,
     dailyLossUsd: await todaysRealizedLoss(),
@@ -162,6 +199,16 @@ async function todaysRealizedLoss(): Promise<number> {
   const closed = await prisma.trade.findMany({ where: { status: "closed", closedAt: { gte: start } } });
   const loss = closed.reduce((s, t) => s + Math.min(0, t.pnl ?? 0), 0);
   return Math.abs(loss);
+}
+
+/** Daily returns for correlation, or null if the candle fetch fails. */
+async function fetchDailyReturns(symbol: string): Promise<number[] | null> {
+  try {
+    const resp = await fetchYahooCandlesSmart(symbol, "3mo", "1d");
+    return dailyReturns(resp.candles);
+  } catch {
+    return null;
+  }
 }
 
 // ---- mock path (no API key): deterministic so the pipeline is demoable ----
