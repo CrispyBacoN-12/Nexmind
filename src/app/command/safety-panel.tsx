@@ -115,7 +115,10 @@ export function SafetyPanel() {
       <div className="flex items-center justify-between gap-2 mt-2">
         <span className="text-xs text-(--color-muted)">Current drawdown</span>
         <span className="text-xs font-mono">
-          {s.currentDrawdownPct === 0 ? "0.0%" : `-${s.currentDrawdownPct.toFixed(1)}%`}
+          {(() => {
+            const ddPct = s.currentDrawdownPct.toFixed(1);
+            return ddPct === "0.0" ? "0.0%" : `-${ddPct}%`;
+          })()}
         </span>
       </div>
     </Card>
