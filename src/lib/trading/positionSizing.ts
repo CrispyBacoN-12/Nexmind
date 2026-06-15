@@ -53,7 +53,7 @@ export function computeLot(input: SizingInput): SizingResult {
     avgCorrelation != null
       ? ` · corr ${avgCorrelation.toFixed(2)} (×${corrMultiplier}) → ${lot} lot`
       : "";
-  const reasoning = `risk $${riskUsd} / SL dist ${slDistance.toFixed(2)} = ${riskLot.toFixed(2)} lot${corrNote}`;
+  const reasoning = `risk $${riskUsd.toFixed(2)} / SL dist ${slDistance.toFixed(2)} = ${riskLot.toFixed(2)} lot${corrNote}`;
 
   return { lot, riskUsd, slDistance, corrMultiplier, avgCorrelation, reasoning };
 }
