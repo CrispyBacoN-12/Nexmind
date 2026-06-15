@@ -26,7 +26,7 @@ export async function fetchCandles(
     try {
       return await fetchAlpacaCandles(symbol, range, interval);
     } catch (e) {
-      console.warn(`marketData: Alpaca failed for ${symbol}, falling back to Yahoo —`, e);
+      console.error(`marketData: Alpaca failed for ${symbol}, falling back to Yahoo —`, e);
     }
   }
   return fetchYahooCandles(symbol, range, interval);
