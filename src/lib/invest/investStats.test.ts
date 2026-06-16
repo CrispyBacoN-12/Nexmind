@@ -34,5 +34,6 @@ test("computeInvestStats: a missing price falls back to cost basis (never zero) 
   const holdings = [h("AAPL", 10, 100)];
   const s = computeInvestStats(holdings, () => null, 0);
   assert.equal(s.marketValue, 1000);
+  assert.equal(s.unrealizedPnl, 0); // cost-basis fallback cancels out
   assert.deepEqual(s.missingPrices, ["AAPL"]);
 });
