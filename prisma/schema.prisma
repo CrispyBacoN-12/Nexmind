@@ -82,8 +82,8 @@ model Portfolio {
   riskPctPerTrade  Float       @default(1)
   maxOpenPositions Int         @default(5)
   drawdownHaltPct  Float       @default(10)
-  cash             Float       @default(0)
-  rebalanceBandPct Float       @default(5)
+  cash             Float       @default(0)   // invest portfolio: uninvested cash (0 for swing)
+  rebalanceBandPct Float       @default(5)   // invest portfolio: drift % before TRIM/ADD
   killSwitch       Boolean     @default(false)
   killSwitchReason String      @default("")
   sort             Int         @default(0)
