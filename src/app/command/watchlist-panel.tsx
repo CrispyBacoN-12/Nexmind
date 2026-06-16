@@ -32,7 +32,7 @@ export function WatchlistPanel({ portfolioId }: { portfolioId: number }) {
   }
 
   async function remove(id: number) {
-    await fetch(`/api/watchlist?id=${id}`, { method: "DELETE" });
+    await fetch(`/api/watchlist?id=${id}&portfolioId=${portfolioId}`, { method: "DELETE" });
     void load();
   }
 

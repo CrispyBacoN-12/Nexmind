@@ -27,10 +27,13 @@ export async function POST(req: Request) {
   return Response.json(item);
 }
 
-// Remove a symbol by row id. DELETE ?id=N
+// Remove a symbol by row id, scoped to its portfolio. DELETE ?id=N&portfolioId=M
 export async function DELETE(req: Request) {
-  const id = new URL(req.url).searchParams.get("id");
-  if (!id) return Response.json({ error: "id required" }, { status: 400 });
-  await prisma.watchlist.delete({ where: { id: Number(id) } });
+  const url = new URL(req.url);
+  const id = Number(url.searchParams.get("id"));
+  const portfolioId = Number(url.searchParams.get("portfolioId"));
+  if (!Number.isInteger(id)) return Response.json({ error: "id required" }, { status: 400 });
+  if (!Number.isInteger(portfolioId)) return Response.json({ error: "portfolioId required" }, { status: 400 });
+  await prisma.watchlist.deleteMany({ where: { id, portfolioId } });
   return Response.json({ ok: true });
 }
