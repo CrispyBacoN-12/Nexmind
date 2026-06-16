@@ -16,12 +16,25 @@ const PERIODS: { label: string; days: number }[] = [
   { label: "Last 30 days", days: 30 },
 ];
 
-export default async function ReportsPage() {
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ portfolio?: string }> }) {
+  const sp = await searchParams;
+  const activePortfolios = await prisma.portfolio.findMany({ where: { status: "active" }, orderBy: { sort: "asc" } });
+  const selectedId = Number(sp.portfolio) || activePortfolios[0]?.id || 0;
+
+  if (!selectedId) {
+    return (
+      <div>
+        <PageHeader title="Reports" description="Win rate, expectancy, and drawdown across periods — the demo metrics that gate going live." />
+        <Empty title="No portfolio yet" hint="Create a portfolio on the Command Bridge to start tracking reports." />
+      </div>
+    );
+  }
+
   const [closed, recent, lessons, startingBalance] = await Promise.all([
-    prisma.trade.findMany({ where: { status: "closed" }, orderBy: { closedAt: "desc" } }),
-    prisma.trade.findMany({ where: { status: "closed" }, orderBy: { closedAt: "desc" }, take: 30 }),
+    prisma.trade.findMany({ where: { status: "closed", portfolioId: selectedId }, orderBy: { closedAt: "desc" } }),
+    prisma.trade.findMany({ where: { status: "closed", portfolioId: selectedId }, orderBy: { closedAt: "desc" }, take: 30 }),
     prisma.lesson.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
-    getStartingBalance(),
+    getStartingBalance(selectedId),
   ]);
 
   const asClosed: ClosedTrade[] = closed.map((t) => ({ pnl: t.pnl ?? 0, rMultiple: t.rMultiple, outcome: t.outcome, closedAt: t.closedAt }));

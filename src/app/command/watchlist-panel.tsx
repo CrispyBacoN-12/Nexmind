@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardTitle, Button, Badge } from "@/components/ui";
 
 interface Item { id: number; symbol: string; label: string | null; enabled: boolean }
@@ -11,23 +11,23 @@ const outcomeTone: Record<string, "positive" | "warning" | "negative" | "neutral
   "no-consensus": "neutral", "no-setup": "neutral", "already-open": "info", error: "negative",
 };
 
-export function WatchlistPanel() {
+export function WatchlistPanel({ portfolioId }: { portfolioId: number }) {
   const [items, setItems] = useState<Item[]>([]);
   const [sym, setSym] = useState("");
   const [scanning, setScanning] = useState(false);
   const [results, setResults] = useState<ScanRow[] | null>(null);
   const [summary, setSummary] = useState("");
 
-  async function load() {
-    const data = await fetch("/api/watchlist").then((r) => r.json());
+  const load = useCallback(async () => {
+    const data = await fetch(`/api/watchlist?portfolioId=${portfolioId}`).then((r) => r.json());
     setItems(Array.isArray(data) ? data : []);
-  }
-  useEffect(() => { void load(); }, []);
+  }, [portfolioId]);
+  useEffect(() => { void load(); }, [load]);
 
   async function add() {
     const symbol = sym.trim();
     if (!symbol) return;
-    await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol }) });
+    await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ portfolioId, symbol }) });
     setSym(""); void load();
   }
 
@@ -40,7 +40,7 @@ export function WatchlistPanel() {
     if (scanning) return;
     setScanning(true); setResults(null); setSummary("");
     try {
-      const data = await fetch("/api/scan-all", { method: "POST" }).then((r) => r.json());
+      const data = await fetch("/api/scan-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ portfolioId }) }).then((r) => r.json());
       setResults(data.results ?? []);
       setSummary(`scanned ${data.scanned} · ${data.executed} executed · cost $${(data.totalCostUsd ?? 0).toFixed(4)}`);
     } finally { setScanning(false); }
