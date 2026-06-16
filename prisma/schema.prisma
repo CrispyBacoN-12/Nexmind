@@ -82,6 +82,8 @@ model Portfolio {
   riskPctPerTrade  Float       @default(1)
   maxOpenPositions Int         @default(5)
   drawdownHaltPct  Float       @default(10)
+  cash             Float       @default(0)
+  rebalanceBandPct Float       @default(5)
   killSwitch       Boolean     @default(false)
   killSwitchReason String      @default("")
   sort             Int         @default(0)
@@ -89,6 +91,22 @@ model Portfolio {
   trades           Trade[]
   signals          Signal[]
   watchlist        Watchlist[]
+  holdings         Holding[]
+}
+
+/// A buy-and-hold position in an invest portfolio (avg-cost accounting).
+model Holding {
+  id          Int       @id @default(autoincrement())
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
+  portfolioId Int
+  symbol      String
+  shares      Float
+  avgCost     Float
+  status      String    @default("held") // held | sold
+  realizedPnl Float     @default(0)
+  openedAt    DateTime  @default(now())
+  closedAt    DateTime?
+  updatedAt   DateTime  @updatedAt
 }
 
 /// A paper trade and the full team decision trail behind it.

@@ -36,11 +36,14 @@ export async function POST(req: Request) {
   if (b.drawdownHaltPct != null && !(b.drawdownHaltPct > 0)) return NextResponse.json({ error: "drawdownHaltPct must be > 0" }, { status: 400 });
 
   const maxSort = await prisma.portfolio.aggregate({ _max: { sort: true } });
+  const kind = typeof b.kind === "string" && b.kind.trim() ? b.kind.trim() : "swing";
+  const startingBalance = b.startingBalance ?? 10000;
   const created = await prisma.portfolio.create({
     data: {
       name,
-      kind: typeof b.kind === "string" && b.kind.trim() ? b.kind.trim() : "swing",
-      startingBalance: b.startingBalance ?? 10000,
+      kind,
+      startingBalance,
+      cash: kind === "invest" ? startingBalance : 0,
       riskPctPerTrade: b.riskPctPerTrade ?? 1,
       maxOpenPositions: b.maxOpenPositions ? Math.floor(b.maxOpenPositions) : 5,
       drawdownHaltPct: b.drawdownHaltPct ?? 10,
