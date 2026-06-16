@@ -8,7 +8,7 @@ import { scanSymbol, type ScanResult } from "./scanner";
 import { runHawk, type HawkVerdict, type HawkVote, type ProposedLevels } from "./hawk";
 import { runSage, type SageVerdict } from "./sage";
 import { applyIronRules, riskReward, type AccountState } from "./ironRules";
-import { isKillSwitchOn, getMaxOpenPositions, getFearGreed, getStartingBalance, getRiskPctPerTrade } from "@/lib/settings";
+import { isKillSwitchOn, getMaxOpenPositions, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt } from "@/lib/settings";
 import { type Interval, type Range } from "@/lib/yahoo";
 import { fetchCandles } from "@/lib/marketData";
 import { dailyReturns, pearsonCorrelation } from "./correlation";
@@ -34,6 +34,7 @@ const DEFAULT_ACCOUNT: AccountState = {
 
 export async function runTradeTick(
   symbol: string,
+  portfolioId: number,
   opts: { range?: Range; interval?: Interval; lot?: number } = {},
 ): Promise<TickResult> {
   const steps: TickStep[] = [];
@@ -47,7 +48,7 @@ export async function runTradeTick(
   // One open position per symbol — re-scanning the same persisting setup must
   // not stack a duplicate trade (and must not burn AI calls finding that out).
   const existing = await prisma.trade.findFirst({
-    where: { symbol, status: "open" },
+    where: { symbol, status: "open", portfolioId },
     select: { id: true },
   });
   if (existing) {
@@ -59,6 +60,7 @@ export async function runTradeTick(
     data: {
       symbol, timeframe: scan.timeframe, side: scan.side ?? "long", price: scan.price, atr: scan.atr,
       indicators: JSON.stringify(scan.snapshot), note: scan.note, status: "proposed",
+      portfolioId,
     },
   });
 
@@ -105,7 +107,7 @@ export async function runTradeTick(
     lot = opts.lot;
   } else {
     const openPositions = await prisma.trade.findMany({
-      where: { status: "open" },
+      where: { status: "open", portfolioId },
       select: { symbol: true },
     });
     const openSymbols = [...new Set(openPositions.map((p) => p.symbol))].filter((s) => s !== symbol);
@@ -127,7 +129,7 @@ export async function runTradeTick(
       }
     }
 
-    const riskUsd = ((await getStartingBalance()) * (await getRiskPctPerTrade())) / 100;
+    const riskUsd = ((await getStartingBalance(portfolioId)) * (await getRiskPctPerTrade(portfolioId))) / 100;
     const sizing = computeLot({
       entry: levels.entry,
       sl: levels.sl,
@@ -140,10 +142,11 @@ export async function runTradeTick(
   }
   const account: AccountState = {
     ...DEFAULT_ACCOUNT,
-    dailyLossUsd: await todaysRealizedLoss(),
-    killSwitch: await isKillSwitchOn(),
-    openPositions: await prisma.trade.count({ where: { status: "open" } }),
-    maxOpenPositions: await getMaxOpenPositions(),
+    dailyLossUsd: await todaysRealizedLoss(portfolioId),
+    killSwitch: await isKillSwitchOn(portfolioId),
+    globalTradingHalt: await isGlobalTradingHalt(),
+    openPositions: await prisma.trade.count({ where: { status: "open", portfolioId } }),
+    maxOpenPositions: await getMaxOpenPositions(portfolioId),
   };
   const verdict = applyIronRules(
     { symbol, side: hawk.side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, lot },
@@ -166,7 +169,7 @@ export async function runTradeTick(
   steps.push({ stage: "exec", note: `paper fill ${levels.entry.toFixed(4)} · staged TP armed` });
   const trade = await prisma.trade.create({
     data: {
-      signalId: signal.id,
+      signalId: signal.id, portfolioId,
       symbol, side: hawk.side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, tp2: levels.tp2,
       lot, riskReward: riskReward({ symbol, side: hawk.side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, lot }),
       status: "open", ironRulesPassed: true,
@@ -195,9 +198,9 @@ async function latestLessons(): Promise<string> {
   return lessons.map((l) => l.text).join("; ");
 }
 
-async function todaysRealizedLoss(): Promise<number> {
+async function todaysRealizedLoss(portfolioId: number): Promise<number> {
   const start = new Date(); start.setHours(0, 0, 0, 0);
-  const closed = await prisma.trade.findMany({ where: { status: "closed", closedAt: { gte: start } } });
+  const closed = await prisma.trade.findMany({ where: { status: "closed", closedAt: { gte: start }, portfolioId } });
   const loss = closed.reduce((s, t) => s + Math.min(0, t.pnl ?? 0), 0);
   return Math.abs(loss);
 }
