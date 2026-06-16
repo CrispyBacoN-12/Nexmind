@@ -37,7 +37,8 @@ async function main() {
     symbols = first.split(",");
     label = "custom list";
   } else {
-    const wl = await getWatchlist();
+    const firstPortfolio = await prisma.portfolio.findFirst({ orderBy: { sort: "asc" } });
+    const wl = firstPortfolio ? await getWatchlist(firstPortfolio.id) : [];
     symbols = [...UNIVERSES["nasdaq100"].symbols, ...wl.filter((w) => w.enabled).map((w) => w.symbol)];
     label = "nasdaq100 + watchlist";
   }

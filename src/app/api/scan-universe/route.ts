@@ -1,6 +1,9 @@
 import { runTradeTick } from "@/lib/trading/engine";
 import { manageOpenTrades } from "@/lib/trading/manage";
 import { UNIVERSES, discoverActive, prepareSymbols } from "@/lib/trading/universe";
+import { prisma } from "@/lib/db";
+import { canPortfolioTrade } from "@/lib/portfolioGuards";
+import { isGlobalTradingHalt } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -14,10 +17,16 @@ interface Row { symbol: string; outcome: string; tradeId?: number; costUsd: numb
 // POST { preset?: "us-mega"|"dow30"|"nasdaq100", discover?: boolean, max?: number }
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
+  const portfolioId = Number(body.portfolioId);
+  if (!Number.isInteger(portfolioId)) return Response.json({ error: "portfolioId is required" }, { status: 400 });
+  const portfolio = await prisma.portfolio.findUnique({ where: { id: portfolioId } });
+  if (!portfolio) return Response.json({ error: "portfolio not found" }, { status: 404 });
+  if (!canPortfolioTrade(portfolio.status)) return Response.json({ error: "portfolio is archived" }, { status: 409 });
+  if (await isGlobalTradingHalt()) return Response.json({ error: "global trading halt is on" }, { status: 409 });
   const max = Math.min(typeof body.max === "number" ? body.max : MAX_SYMBOLS, MAX_SYMBOLS);
 
   // First close any positions that have hit TP/SL.
-  const managed = await manageOpenTrades();
+  const managed = await manageOpenTrades(portfolioId);
 
   // Build the symbol list.
   let raw: string[] = [];
@@ -42,7 +51,7 @@ export async function POST(req: Request) {
     while (cursor < symbols.length) {
       const symbol = symbols[cursor++];
       try {
-        const r = await runTradeTick(symbol);
+        const r = await runTradeTick(symbol, portfolioId);
         totalCost += r.costUsd;
         results.push({ symbol, outcome: r.outcome, tradeId: r.tradeId, costUsd: r.costUsd });
       } catch (e) {
