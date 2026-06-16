@@ -65,11 +65,12 @@ export function planRebalance(input: RebalanceInput): RebalanceAction[] {
 
   // BUY — new in-zone buy/strong-buy names, until at capacity, cash permitting.
   let heldCount = survivingHeld.size;
-  const heldSymbols = new Set(holdings.map((h) => h.symbol));
+  const heldSymbols = new Set(holdings.map((h) => h.symbol)); // original holdings — never "buy" a name we already hold/are selling
+  const buyRank = (r: Rating) => (r === "strong-buy" ? 0 : 1); // strong-buy before buy
   const buyCandidates = reads
     .filter((r) => !heldSymbols.has(r.symbol) && BUYABLE.includes(r.rating))
     .filter((r) => r.entryHigh == null || r.price <= r.entryHigh)
-    .sort((a, b) => (a.rating === "strong-buy" ? -1 : 1) - (b.rating === "strong-buy" ? -1 : 1));
+    .sort((a, b) => buyRank(a.rating) - buyRank(b.rating));
   for (const r of buyCandidates) {
     if (heldCount >= maxPositions) break;
     if (r.price <= 0) continue;

@@ -80,3 +80,15 @@ test("ordering: sells and trims come before buys and adds", () => {
   );
   assert.ok(lastSellOrTrim < firstBuyOrAdd);
 });
+
+test("BUY is capped by available cash (partial slice when cash < target)", () => {
+  // target = equity/maxPositions = 10000/4 = 2500, but only 1000 cash available
+  const actions = planRebalance(baseInput({
+    reads: [{ symbol: "MSFT", rating: "buy", entryHigh: null, price: 100 }],
+    cash: 1000, equity: 10000,
+  }));
+  const buy = actions.find((a) => a.symbol === "MSFT");
+  assert.equal(buy?.kind, "buy");
+  // spend = min(2500, 1000) = 1000 → 1000/100 = 10 shares (not the full 25)
+  assert.ok(Math.abs((buy?.shares ?? 0) - 10) < 1e-9);
+});
