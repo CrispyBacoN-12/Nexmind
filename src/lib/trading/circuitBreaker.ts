@@ -17,10 +17,12 @@ export function currentDrawdownPct(closed: ClosedTrade[], startingBalance: numbe
   return peak <= 0 ? 0 : Math.max(0, ((peak - equity) / peak) * 100);
 }
 
-/** Loads all closed trades and computes the current drawdown vs. the all-time equity peak. */
-export async function getCurrentDrawdownPct(startingBalance: number): Promise<number> {
+/** Loads a portfolio's closed trades and computes its drawdown vs. its peak. */
+export async function getCurrentDrawdownPct(portfolioId: number): Promise<number> {
+  const { getStartingBalance } = await import("@/lib/settings");
+  const startingBalance = await getStartingBalance(portfolioId);
   const closed = await prisma.trade.findMany({
-    where: { status: "closed" },
+    where: { status: "closed", portfolioId },
     orderBy: { closedAt: "asc" },
     select: { pnl: true, rMultiple: true, outcome: true, closedAt: true },
   });

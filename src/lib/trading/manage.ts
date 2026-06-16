@@ -11,7 +11,7 @@ import { decideAction, type LadderState } from "./positionRules";
 import { generateLesson, type LessonInput } from "./memo";
 import { Prisma, type Trade } from "@/generated/prisma/client";
 import { getCurrentDrawdownPct } from "./circuitBreaker";
-import { isKillSwitchOn, getStartingBalance, getDrawdownHaltPct, setSetting } from "@/lib/settings";
+import { isKillSwitchOn, getDrawdownHaltPct } from "@/lib/settings";
 
 // Simplified paper P/L: USD per 1.0 price-point per lot. Real instruments differ
 // (contract sizes, pip values); this keeps the demo consistent and transparent.
@@ -57,8 +57,8 @@ async function makePriceFetcher() {
 }
 
 /** Walk every open trade through the ladder rules: partial at TP1, close at TP2/SL. */
-export async function manageOpenTrades(): Promise<ManageSummary> {
-  const open = await prisma.trade.findMany({ where: { status: "open" } });
+export async function manageOpenTrades(portfolioId: number): Promise<ManageSummary> {
+  const open = await prisma.trade.findMany({ where: { status: "open", portfolioId } });
   const priceOf = await makePriceFetcher();
   const closed: CloseResult[] = [];
   const partials: PartialResult[] = [];
@@ -124,16 +124,18 @@ export async function manageOpenTrades(): Promise<ManageSummary> {
     }
   }
 
-  const killSwitchOn = await isKillSwitchOn();
+  const killSwitchOn = await isKillSwitchOn(portfolioId);
   if (!killSwitchOn) {
-    const [startingBalance, haltPct] = await Promise.all([getStartingBalance(), getDrawdownHaltPct()]);
-    const dd = await getCurrentDrawdownPct(startingBalance);
+    const haltPct = await getDrawdownHaltPct(portfolioId);
+    const dd = await getCurrentDrawdownPct(portfolioId);
     if (dd >= haltPct) {
-      await setSetting("killSwitch", "true");
-      await setSetting(
-        "killSwitchReason",
-        `Auto-halted: drawdown -${dd.toFixed(1)}% exceeded ${haltPct}% limit at ${new Date().toISOString()}`,
-      );
+      await prisma.portfolio.update({
+        where: { id: portfolioId },
+        data: {
+          killSwitch: true,
+          killSwitchReason: `Auto-halted: drawdown -${dd.toFixed(1)}% exceeded ${haltPct}% limit at ${new Date().toISOString()}`,
+        },
+      });
     }
   }
 
