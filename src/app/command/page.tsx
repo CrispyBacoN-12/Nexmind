@@ -228,7 +228,7 @@ export default function CommandBridge() {
 
           {selectedPortfolioId != null ? (
             <>
-              <SafetyPanel portfolioId={selectedPortfolioId} />
+              <SafetyPanel portfolioId={selectedPortfolioId} onChanged={() => loadPortfolios()} />
               <WatchlistPanel portfolioId={selectedPortfolioId} />
               <MarketScanPanel portfolioId={selectedPortfolioId} />
             </>

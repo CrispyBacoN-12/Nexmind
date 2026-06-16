@@ -11,7 +11,7 @@ interface Portfolio {
 }
 interface Global { globalTradingHalt: boolean; fearGreed: { value: number; label: string } | null }
 
-export function SafetyPanel({ portfolioId }: { portfolioId: number }) {
+export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; onChanged?: () => void }) {
   const [p, setP] = useState<Portfolio | null>(null);
   const [g, setG] = useState<Global | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,6 +33,7 @@ export function SafetyPanel({ portfolioId }: { portfolioId: number }) {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       await load();
+      onChanged?.();
     } finally { setBusy(false); }
   }
 
@@ -44,6 +45,7 @@ export function SafetyPanel({ portfolioId }: { portfolioId: number }) {
         body: JSON.stringify({ globalTradingHalt: next }),
       });
       await load();
+      onChanged?.();
     } finally { setBusy(false); }
   }
 
