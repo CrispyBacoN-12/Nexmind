@@ -1,5 +1,5 @@
-// Typed access to the Setting key-value table. Defaults apply when a key is absent,
-// so the app behaves identically before any setting has ever been written.
+// Typed access to per-portfolio risk config (from the Portfolio row) and to
+// genuinely global state (the Setting key-value table).
 
 import { prisma } from "@/lib/db";
 
@@ -12,32 +12,44 @@ export async function setSetting(key: string, value: string): Promise<void> {
   await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
 }
 
-export async function isKillSwitchOn(): Promise<boolean> {
-  return (await getSetting("killSwitch", "false")) === "true";
+/** Load a portfolio row or throw — the trading core must never fall back to defaults. */
+export async function getPortfolio(portfolioId: number) {
+  const p = await prisma.portfolio.findUnique({ where: { id: portfolioId } });
+  if (!p) throw new Error(`portfolio ${portfolioId} not found`);
+  return p;
 }
 
-export async function getMaxOpenPositions(): Promise<number> {
-  const n = parseInt(await getSetting("maxOpenPositions", "5"), 10);
+export async function isKillSwitchOn(portfolioId: number): Promise<boolean> {
+  return (await getPortfolio(portfolioId)).killSwitch;
+}
+
+export async function getKillSwitchReason(portfolioId: number): Promise<string> {
+  return (await getPortfolio(portfolioId)).killSwitchReason;
+}
+
+export async function getMaxOpenPositions(portfolioId: number): Promise<number> {
+  const n = (await getPortfolio(portfolioId)).maxOpenPositions;
   return Number.isFinite(n) && n > 0 ? n : 5;
 }
 
-export async function getStartingBalance(): Promise<number> {
-  const n = parseFloat(await getSetting("startingBalance", "10000"));
+export async function getStartingBalance(portfolioId: number): Promise<number> {
+  const n = (await getPortfolio(portfolioId)).startingBalance;
   return Number.isFinite(n) && n > 0 ? n : 10000;
 }
 
-export async function getRiskPctPerTrade(): Promise<number> {
-  const n = parseFloat(await getSetting("riskPctPerTrade", "1"));
+export async function getRiskPctPerTrade(portfolioId: number): Promise<number> {
+  const n = (await getPortfolio(portfolioId)).riskPctPerTrade;
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-export async function getDrawdownHaltPct(): Promise<number> {
-  const n = parseFloat(await getSetting("drawdownHaltPct", "10"));
+export async function getDrawdownHaltPct(portfolioId: number): Promise<number> {
+  const n = (await getPortfolio(portfolioId)).drawdownHaltPct;
   return Number.isFinite(n) && n > 0 ? n : 10;
 }
 
-export async function getKillSwitchReason(): Promise<string> {
-  return getSetting("killSwitchReason", "");
+/** Manual global emergency brake — blocks new entries across every portfolio. */
+export async function isGlobalTradingHalt(): Promise<boolean> {
+  return (await getSetting("globalTradingHalt", "false")) === "true";
 }
 
 export interface FearGreed { value: number; label: string; fetchedAt: string }
