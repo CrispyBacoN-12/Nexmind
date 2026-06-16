@@ -1,5 +1,6 @@
-// One-time: create a Default portfolio from the current global Setting values,
-// then attach every existing Trade/Signal/Watchlist row to it. Idempotent.
+// One-time: ensure a Default portfolio exists, seeded from the current global
+// Setting values. Idempotent. Row attachment (setting portfolioId on existing
+// Trade/Signal/Watchlist rows) ran during the nullable phase of the migration.
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
