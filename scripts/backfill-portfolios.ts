@@ -31,10 +31,7 @@ async function main() {
     });
   }
 
-  const t = await prisma.trade.updateMany({ where: { portfolioId: null }, data: { portfolioId: def.id } });
-  const s = await prisma.signal.updateMany({ where: { portfolioId: null }, data: { portfolioId: def.id } });
-  const w = await prisma.watchlist.updateMany({ where: { portfolioId: null }, data: { portfolioId: def.id } });
-  console.log(`Backfill → portfolio #${def.id}: trades ${t.count}, signals ${s.count}, watchlist ${w.count}`);
+  console.log(`Default portfolio ready → #${def.id}. (Row attachment completed during the nullable migration phase.)`);
 }
 
 main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
