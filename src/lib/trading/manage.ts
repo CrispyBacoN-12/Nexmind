@@ -126,8 +126,10 @@ export async function manageOpenTrades(portfolioId: number): Promise<ManageSumma
 
   const killSwitchOn = await isKillSwitchOn(portfolioId);
   if (!killSwitchOn) {
-    const haltPct = await getDrawdownHaltPct(portfolioId);
-    const dd = await getCurrentDrawdownPct(portfolioId);
+    const [haltPct, dd] = await Promise.all([
+      getDrawdownHaltPct(portfolioId),
+      getCurrentDrawdownPct(portfolioId),
+    ]);
     if (dd >= haltPct) {
       await prisma.portfolio.update({
         where: { id: portfolioId },

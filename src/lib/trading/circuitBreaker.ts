@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { getStartingBalance } from "@/lib/settings";
 import type { ClosedTrade } from "./stats";
 
 /**
@@ -19,7 +20,6 @@ export function currentDrawdownPct(closed: ClosedTrade[], startingBalance: numbe
 
 /** Loads a portfolio's closed trades and computes its drawdown vs. its peak. */
 export async function getCurrentDrawdownPct(portfolioId: number): Promise<number> {
-  const { getStartingBalance } = await import("@/lib/settings");
   const startingBalance = await getStartingBalance(portfolioId);
   const closed = await prisma.trade.findMany({
     where: { status: "closed", portfolioId },
