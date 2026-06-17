@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
   const portfolio = await prisma.portfolio.findUnique({ where: { id: portfolioId } });
   if (!portfolio) return Response.json({ error: "portfolio not found" }, { status: 404 });
-  if (!isSwingKind(portfolio.kind)) return Response.json({ error: "this route only runs on a swing portfolio" }, { status: 409 });
+  if (!isSwingKind(portfolio.kind)) return Response.json({ error: "not a swing portfolio" }, { status: 409 });
 
   const summary = await manageOpenTrades(portfolioId);
   return Response.json(summary);
