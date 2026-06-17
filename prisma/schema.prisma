@@ -92,6 +92,7 @@ model Portfolio {
   signals          Signal[]
   watchlist        Watchlist[]
   holdings         Holding[]
+  optionHoldings   OptionHolding[]
 }
 
 /// A buy-and-hold position in an invest portfolio (avg-cost accounting).
@@ -103,6 +104,24 @@ model Holding {
   shares      Float
   avgCost     Float
   status      String    @default("held") // held | sold
+  realizedPnl Float     @default(0)
+  openedAt    DateTime  @default(now())
+  closedAt    DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+/// A long single-leg option position (avg-cost not needed — one buy per lot).
+model OptionHolding {
+  id          Int       @id @default(autoincrement())
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
+  portfolioId Int
+  underlying  String
+  type        String                     // call | put
+  strike      Float
+  expiry      DateTime
+  contracts   Int                        // 1 contract = 100 shares
+  premiumPaid Float                      // entry premium per share
+  status      String    @default("open") // open | closed | expired
   realizedPnl Float     @default(0)
   openedAt    DateTime  @default(now())
   closedAt    DateTime?
