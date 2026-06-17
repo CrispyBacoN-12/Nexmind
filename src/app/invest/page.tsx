@@ -80,7 +80,10 @@ export default function InvestPage() {
     const d = await fetch(`/api/invest/holdings?portfolioId=${id}`).then((r) => r.json());
     setHeld(d.holdings ?? []); setPstats(d.stats ?? null);
   }, []);
-  useEffect(() => { if (selectedId != null) void loadHoldings(selectedId); }, [selectedId, loadHoldings]);
+  useEffect(() => {
+    setPlan(null);
+    if (selectedId != null) void loadHoldings(selectedId);
+  }, [selectedId, loadHoldings]);
 
   async function generatePlan() {
     if (selectedId == null || planBusy) return;
