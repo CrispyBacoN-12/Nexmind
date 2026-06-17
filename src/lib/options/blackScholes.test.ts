@@ -36,3 +36,14 @@ test("greeks: deep-ITM call delta → ~1, deep-OTM → ~0", () => {
   assert.ok(greeks("call", 200, 100, 1, 0.04, 0.2).delta > 0.95);
   assert.ok(greeks("call", 50, 100, 1, 0.04, 0.2).delta < 0.05);
 });
+
+test("greeks: at/after expiry (T=0) degenerate — ITM delta ±1, OTM 0, others 0", () => {
+  const itmCall = greeks("call", 120, 100, 0, 0.04, 0.2);
+  assert.equal(itmCall.delta, 1);
+  assert.equal(itmCall.gamma, 0);
+  assert.equal(itmCall.vega, 0);
+  const itmPut = greeks("put", 80, 100, 0, 0.04, 0.2);
+  assert.equal(itmPut.delta, -1);
+  const otm = greeks("call", 80, 100, 0, 0.04, 0.2);
+  assert.equal(otm.delta, 0);
+});
