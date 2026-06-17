@@ -9,3 +9,13 @@ export function canPortfolioTrade(status: string): boolean {
 export function isInvestKind(kind: string): boolean {
   return kind === "invest";
 }
+
+/** An options portfolio runs the autonomous options desk. */
+export function isOptionsKind(kind: string): boolean {
+  return kind === "options";
+}
+
+/** A swing portfolio runs the autonomous trade desk (the default kind). */
+export function isSwingKind(kind: string): boolean {
+  return kind === "swing";
+}

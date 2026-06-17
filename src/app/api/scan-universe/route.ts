@@ -2,7 +2,7 @@ import { runTradeTick } from "@/lib/trading/engine";
 import { manageOpenTrades } from "@/lib/trading/manage";
 import { UNIVERSES, discoverActive, prepareSymbols } from "@/lib/trading/universe";
 import { prisma } from "@/lib/db";
-import { canPortfolioTrade, isInvestKind } from "@/lib/portfolioGuards";
+import { canPortfolioTrade, isSwingKind } from "@/lib/portfolioGuards";
 import { isGlobalTradingHalt } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const portfolio = await prisma.portfolio.findUnique({ where: { id: portfolioId } });
   if (!portfolio) return Response.json({ error: "portfolio not found" }, { status: 404 });
   if (!canPortfolioTrade(portfolio.status)) return Response.json({ error: "portfolio is archived" }, { status: 409 });
-  if (isInvestKind(portfolio.kind)) return Response.json({ error: "swing routes do not run on an invest portfolio" }, { status: 409 });
+  if (!isSwingKind(portfolio.kind)) return Response.json({ error: "this route only runs on a swing portfolio" }, { status: 409 });
   if (await isGlobalTradingHalt()) return Response.json({ error: "global trading halt is on" }, { status: 409 });
   const max = Math.min(typeof body.max === "number" ? body.max : MAX_SYMBOLS, MAX_SYMBOLS);
 
