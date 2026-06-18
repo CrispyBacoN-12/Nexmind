@@ -8,7 +8,16 @@ interface Portfolio {
   killSwitch: boolean; killSwitchReason: string;
   maxOpenPositions: number; startingBalance: number; riskPctPerTrade: number;
   drawdownHaltPct: number; currentDrawdownPct: number;
+  scanInterval: string; scanRange: string;
 }
+
+// Scanner timeframe presets (interval|range). Day trade uses short intraday
+// bars; swing/position widen out.
+const TIMEFRAME_PRESETS: { label: string; interval: string; range: string }[] = [
+  { label: "Day trade · 15m / 5d", interval: "15m", range: "5d" },
+  { label: "Swing · 1h / 3mo", interval: "1h", range: "3mo" },
+  { label: "Position · 1d / 1y", interval: "1d", range: "1y" },
+];
 interface Global { globalTradingHalt: boolean; fearGreed: { value: number; label: string } | null }
 
 export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; onChanged?: () => void }) {
@@ -110,6 +119,27 @@ export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; o
           onChange={(e) => patch({ drawdownHaltPct: Number(e.target.value) })}
           className="w-16 rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm" />
       </div>
+      {p.kind === "swing" && (
+        <div className="flex items-center gap-2 mt-2">
+          <label className="text-xs text-(--color-muted)">Scan timeframe</label>
+          <select
+            value={`${p.scanInterval}|${p.scanRange}`}
+            disabled={busy}
+            onChange={(e) => {
+              const [interval, range] = e.target.value.split("|");
+              patch({ scanInterval: interval, scanRange: range });
+            }}
+            className="rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm"
+          >
+            {TIMEFRAME_PRESETS.some((t) => t.interval === p.scanInterval && t.range === p.scanRange) ? null : (
+              <option value={`${p.scanInterval}|${p.scanRange}`}>{p.scanInterval} / {p.scanRange}</option>
+            )}
+            {TIMEFRAME_PRESETS.map((t) => (
+              <option key={t.label} value={`${t.interval}|${t.range}`}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2 mt-2">
         <span className="text-xs text-(--color-muted)">Current drawdown</span>
         <span className="text-xs font-mono">{dd === "0.0" ? "0.0%" : `-${dd}%`}</span>

@@ -2,6 +2,16 @@
 // genuinely global state (the Setting key-value table).
 
 import { prisma } from "@/lib/db";
+import { ALLOWED_RANGES, ALLOWED_INTERVALS, type Range, type Interval } from "@/lib/yahoo";
+
+/** The swing scanner's candle timeframe for a portfolio, validated against the
+ *  provider's allowed values (falls back to the 1h/3mo swing default). */
+export async function getScanTimeframe(portfolioId: number): Promise<{ range: Range; interval: Interval }> {
+  const p = await getPortfolio(portfolioId);
+  const interval = (ALLOWED_INTERVALS as readonly string[]).includes(p.scanInterval) ? (p.scanInterval as Interval) : "1h";
+  const range = (ALLOWED_RANGES as readonly string[]).includes(p.scanRange) ? (p.scanRange as Range) : "3mo";
+  return { range, interval };
+}
 
 export async function getSetting(key: string, fallback: string): Promise<string> {
   const row = await prisma.setting.findUnique({ where: { key } });
