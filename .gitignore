@@ -42,3 +42,13 @@ next-env.d.ts
 
 # git worktrees (superpowers)
 /.worktrees/
+
+# local SQLite dev database
+dev.db
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# local Claude Code config
+/.claude/

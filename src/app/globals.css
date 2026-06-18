@@ -1,26 +1,154 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #070b10;
+  --card: #0c131b;
+  --card-2: #0f1822;
+  --border: #1b2734;
+  --foreground: #d8e2ec;
+  --muted: #6b7c8d;
+  --accent: #34d399; /* emerald */
+  --accent-2: #22d3ee; /* cyan */
+
+  /* Yggdrasil — the world-tree office */
+  --ygg-gold: #e3bd6a;
+  --ygg-leaf: #3fae73;
+  --ygg-bark: #2a2016;
+  --ygg-deep: #061009;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-card: var(--card);
+  --color-card-2: var(--card-2);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-ygg-gold: var(--ygg-gold);
+  --color-ygg-leaf: var(--ygg-leaf);
+  --color-ygg-bark: var(--ygg-bark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background:
+    radial-gradient(1200px 600px at 70% -10%, rgba(34, 211, 238, 0.06), transparent),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Thin terminal-style scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+
+.font-mono { font-family: var(--font-mono), ui-monospace, monospace; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.live-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* ---------- Yggdrasil office scene ---------- */
+.ygg-scene {
+  background:
+    radial-gradient(900px 500px at 50% -8%, rgba(63, 174, 115, 0.10), transparent 70%),
+    radial-gradient(700px 600px at 50% 120%, rgba(227, 189, 106, 0.07), transparent 70%),
+    linear-gradient(180deg, #08130d 0%, var(--ygg-deep) 60%, #040a07 100%);
+}
+
+/* a workstation seat — avatar that glows by status */
+.ygg-seat {
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+}
+.ygg-seat:hover { transform: translateY(-3px); }
+
+.seat-online {
+  box-shadow: 0 0 0 1px rgba(63, 174, 115, 0.5), 0 0 18px -2px rgba(63, 174, 115, 0.7);
+  animation: seat-breathe 2.4s ease-in-out infinite;
+}
+.seat-working {
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.5), 0 0 18px -2px rgba(34, 211, 238, 0.75);
+  animation: seat-breathe 1.3s ease-in-out infinite;
+}
+.seat-idle { box-shadow: 0 0 0 1px rgba(227, 189, 106, 0.35); opacity: 0.85; }
+.seat-offline { opacity: 0.4; filter: grayscale(0.6); }
+
+@keyframes seat-breathe {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(63, 174, 115, 0.45), 0 0 14px -3px rgba(63, 174, 115, 0.55); }
+  50%      { box-shadow: 0 0 0 1px rgba(63, 174, 115, 0.65), 0 0 24px 0px rgba(63, 174, 115, 0.85); }
+}
+
+/* a grove platform (team zone) */
+.ygg-grove {
+  background: linear-gradient(180deg, rgba(20, 32, 24, 0.75), rgba(10, 18, 13, 0.6));
+  border: 1px solid rgba(63, 174, 115, 0.18);
+  backdrop-filter: blur(2px);
+}
+
+/* the trunk / trading core */
+.ygg-trunk {
+  background: linear-gradient(180deg, rgba(42, 32, 22, 0.65), rgba(20, 28, 20, 0.55));
+  border: 1px solid rgba(227, 189, 106, 0.3);
+  box-shadow: inset 0 0 60px -20px rgba(227, 189, 106, 0.25);
+}
+
+.ygg-runes { color: var(--ygg-gold); letter-spacing: 0.25em; }
+
+@keyframes leaf-sway {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-4px) rotate(1.5deg); }
+}
+.leaf-sway { animation: leaf-sway 6s ease-in-out infinite; }
+
+/* seats fidget/bob so the office feels alive (transform only — glow lives on the inner avatar) */
+@keyframes seat-live {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  25% { transform: translateY(-2px) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(1.5deg); }
+  75% { transform: translateY(-1px) rotate(0deg); }
+}
+.seat-live { animation: seat-live 4.5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .seat-live, .leaf-sway, .seat-online, .seat-working, .live-dot { animation: none; }
+}
+
+.ygg-branch { stroke: url(#yggStroke); fill: none; stroke-linecap: round; }
+
+/* ---------- Isometric pixel office (wizard's tree-study) ---------- */
+.pixelated { image-rendering: pixelated; }
+
+/* CSS placeholder room shown until a real /office/room.png is dropped in */
+.iso-room-fallback {
+  background:
+    radial-gradient(circle at 50% 14%, rgba(63, 174, 115, 0.16), transparent 45%),
+    radial-gradient(circle at 10% 90%, rgba(227, 189, 106, 0.14), transparent 42%),
+    radial-gradient(circle at 90% 90%, rgba(227, 189, 106, 0.14), transparent 42%),
+    linear-gradient(180deg, #0b1812 0%, #070f0a 70%, #05090a 100%);
+  background-color: #070f0a;
+}
+.iso-floor {
+  position: absolute;
+  left: 50%; top: 60%;
+  width: 60%; height: 48%;
+  transform: translate(-50%, -50%) rotateX(58deg) rotateZ(45deg);
+  background:
+    repeating-linear-gradient(0deg, rgba(63, 174, 115, 0.16) 0 1px, transparent 1px 38px),
+    repeating-linear-gradient(90deg, rgba(63, 174, 115, 0.16) 0 1px, transparent 1px 38px),
+    rgba(18, 30, 22, 0.55);
+  border: 1px solid rgba(227, 189, 106, 0.28);
+  box-shadow: 0 0 90px -10px rgba(63, 174, 115, 0.3);
+}
+/* warm candle flicker for the wizard ambiance */
+@keyframes candle { 0%,100% { opacity: 0.75; } 45% { opacity: 1; } 70% { opacity: 0.6; } }
+.candle { animation: candle 2.8s ease-in-out infinite; }
+
+.char-shadow { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55)); }
+@keyframes char-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.char-bob { animation: char-bob 3.2s ease-in-out infinite; }

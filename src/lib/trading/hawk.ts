@@ -1,0 +1,121 @@
+// HAWK ×3 — three analysts reason independently, then vote. 2-of-3 agreement
+// in the same direction is required, or the setup is folded.
+
+import { callAgentJSON, type ModelTier } from "@/lib/anthropic";
+import type { ScanResult } from "./scanner";
+
+export interface HawkVote {
+  persona: string;
+  vote: "long" | "short" | "skip";
+  confidence: number; // 0..1
+  reason: string;
+}
+
+export interface ProposedLevels {
+  entry: number;
+  sl: number;
+  tp1: number;
+  tp2: number;
+}
+
+export interface HawkVerdict {
+  agreed: boolean;
+  side: "long" | "short" | null;
+  votes: HawkVote[];
+  levels: ProposedLevels | null;
+  totalCostUsd: number;
+}
+
+const PERSONAS: { persona: string; system: string }[] = [
+  {
+    persona: "trend",
+    system:
+      "You are a trend-following analyst. You favor trading in the direction of the dominant trend (MA alignment, ADX, +DI/-DI). You are skeptical of counter-trend setups. Be concise.",
+  },
+  {
+    persona: "structure",
+    system:
+      "You are a market-structure analyst. You reason from swing highs/lows, support/resistance, and whether price respects key levels. You ignore momentum hype. Be concise.",
+  },
+  {
+    persona: "counter",
+    system:
+      "You are a mean-reversion / counter-trend analyst. You look for exhaustion, overextension (RSI extremes), and fade opportunities. You are wary of chasing. Be concise.",
+  },
+];
+
+const VOTE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    vote: { type: "string", enum: ["long", "short", "skip"] },
+    confidence: { type: "number" },
+    reason: { type: "string" },
+  },
+  required: ["vote", "confidence", "reason"],
+};
+
+function buildPrompt(scan: ScanResult, newsDigest: string): string {
+  const s = scan.snapshot;
+  return [
+    `Symbol ${scan.symbol} on ${scan.timeframe}. Price ${scan.price}.`,
+    `Scanner setup: ${scan.side ?? "none"} (${scan.note}).`,
+    `Indicators: SMA20 ${fmt(s.sma20)}, SMA50 ${fmt(s.sma50)}, RSI ${fmt(s.rsi)}, ADX ${fmt(s.adx)}, +DI ${fmt(s.plusDI)}, -DI ${fmt(s.minusDI)}, MACD hist ${fmt(s.macdHist)}, ATR ${fmt(s.atr)}.`,
+    newsDigest ? `Recent intel: ${newsDigest}` : "",
+    `Decide: long, short, or skip. Return JSON {vote, confidence (0-1), reason (one sentence)}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+const fmt = (n: number | null) => (n == null ? "n/a" : n.toFixed(2));
+
+/** Run the three analysts in parallel and tally a 2-of-3 vote. */
+export async function runHawk(
+  scan: ScanResult,
+  opts: { newsDigest?: string; tier?: ModelTier; atrSlMult?: number; atrTpMult?: number } = {},
+): Promise<HawkVerdict> {
+  if (!scan.side) return { agreed: false, side: null, votes: [], levels: null, totalCostUsd: 0 };
+
+  const prompt = buildPrompt(scan, opts.newsDigest ?? "");
+  const results = await Promise.all(
+    PERSONAS.map((p) =>
+      callAgentJSON<{ vote: HawkVote["vote"]; confidence: number; reason: string }>({
+        tier: opts.tier ?? "sonnet",
+        system: p.system,
+        prompt,
+        maxTokens: 300,
+        jsonSchema: VOTE_SCHEMA,
+      }).then((r) => ({ ...r, persona: p.persona })),
+    ),
+  );
+
+  const votes: HawkVote[] = results.map((r) => ({
+    persona: r.persona,
+    vote: r.data.vote,
+    confidence: clamp01(r.data.confidence),
+    reason: r.data.reason,
+  }));
+  const totalCostUsd = results.reduce((s, r) => s + r.costUsd, 0);
+
+  const longs = votes.filter((v) => v.vote === "long").length;
+  const shorts = votes.filter((v) => v.vote === "short").length;
+  let side: "long" | "short" | null = null;
+  if (longs >= 2) side = "long";
+  else if (shorts >= 2) side = "short";
+
+  const levels = side ? computeLevels(scan, side, opts.atrSlMult ?? 1.5, opts.atrTpMult ?? 2.5) : null;
+
+  return { agreed: side != null, side, votes, levels, totalCostUsd };
+}
+
+function computeLevels(scan: ScanResult, side: "long" | "short", slMult: number, tpMult: number): ProposedLevels {
+  const atr = scan.atr ?? scan.price * 0.005; // fallback 0.5% if ATR missing
+  const entry = scan.price;
+  if (side === "long") {
+    return { entry, sl: entry - slMult * atr, tp1: entry + tpMult * atr, tp2: entry + tpMult * 1.6 * atr };
+  }
+  return { entry, sl: entry + slMult * atr, tp1: entry - tpMult * atr, tp2: entry - tpMult * 1.6 * atr };
+}
+
+const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5);
