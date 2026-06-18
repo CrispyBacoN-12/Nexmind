@@ -27,13 +27,17 @@ test("decideSetup: mirror image → short", () => {
   assert.equal(decideSetup(s).side, "short");
 });
 
-test("decideSetup: weak trend (ADX 22) is rejected", () => {
-  assert.equal(decideSetup({ ...goodLongSnap, adx: 22 }).side, null);
+test("decideSetup: weak trend (ADX 18) is rejected", () => {
+  assert.equal(decideSetup({ ...goodLongSnap, adx: 18 }).side, null);
+  // ADX 22 now passes the relaxed 20 floor.
+  assert.equal(decideSetup({ ...goodLongSnap, adx: 22 }).side, "long");
 });
 
-test("decideSetup: RSI outside the 40-60 pullback band is rejected", () => {
-  assert.equal(decideSetup({ ...goodLongSnap, rsi: 68 }).side, null);
-  assert.equal(decideSetup({ ...goodLongSnap, rsi: 35 }).side, null);
+test("decideSetup: RSI outside the 35-70 pullback band is rejected", () => {
+  assert.equal(decideSetup({ ...goodLongSnap, rsi: 75 }).side, null);
+  assert.equal(decideSetup({ ...goodLongSnap, rsi: 30 }).side, null);
+  // Inside the widened band now passes.
+  assert.equal(decideSetup({ ...goodLongSnap, rsi: 68 }).side, "long");
 });
 
 test("decideSetup: deeply negative MACD blocks the long", () => {

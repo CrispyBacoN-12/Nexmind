@@ -37,34 +37,39 @@ const last = <T,>(arr: (T | null)[]): T | null => {
   return null;
 };
 
+// Setup gate thresholds. Relaxed (2026-06-19) for more frequent day-trade
+// entries: ADX floor 25→20, RSI band 40–60 → 35–70, and Lorentzian downgraded
+// from a hard gate to a confidence annotation. The setup *structure* (trend
+// alignment + DI + MACD) is unchanged.
+const ADX_FLOOR = 20;
+const RSI_LOW = 35;
+const RSI_HIGH = 70;
+
 /**
  * The pure setup decision — shared by the live scanner and the backtester so
  * the two can never drift apart.
- *   long  = uptrend (sma20>sma50, ADX>25, +DI>-DI) + healthy pullback (RSI 40–60) + MACD turning up
+ *   long  = uptrend (sma20>sma50, ADX>20, +DI>-DI) + pullback (RSI 35–70) + MACD turning up
  *   short = mirror image.
- * Confluence: when a Lorentzian Classification state is present in the snapshot,
- * the LC signal AND kernel direction must agree with the rule-based side.
+ * Lorentzian Classification, when present, is reported as a confidence cue
+ * (✓ agrees / — diverges) but no longer blocks the setup.
  */
 export function decideSetup(s: ScanSnapshot): { side: "long" | "short" | null; note: string } {
   const { sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal } = s;
 
-  const trending = adxVal != null && adxVal > 25;
+  const trending = adxVal != null && adxVal > ADX_FLOOR;
   if (trending && s20 != null && s50 != null && r != null && pDI != null && mDI != null) {
     const up = s20 > s50 && pDI > mDI;
     const down = s20 < s50 && mDI > pDI;
     let side: "long" | "short" | null = null;
-    if (up && r >= 40 && r <= 60 && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) side = "long";
-    else if (down && r >= 40 && r <= 60) side = "short";
+    if (up && r >= RSI_LOW && r <= RSI_HIGH && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) side = "long";
+    else if (down && r >= RSI_LOW && r <= RSI_HIGH) side = "short";
 
     if (side) {
       const base = `${side === "long" ? "uptrend" : "downtrend"} pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}`;
       if (s.lc) {
         const lcAgrees =
           side === "long" ? s.lc.signal === 1 && s.lc.kernelBullish : s.lc.signal === -1 && s.lc.kernelBearish;
-        if (!lcAgrees) {
-          return { side: null, note: `${base} · LC disagrees (${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction})` };
-        }
-        return { side, note: `${base} · LC ${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction} ✓` };
+        return { side, note: `${base} · LC ${lcAgrees ? "✓" : "—"} (${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction})` };
       }
       return { side, note: base };
     }
@@ -75,10 +80,10 @@ export function decideSetup(s: ScanSnapshot): { side: "long" | "short" | null; n
 /**
  * Scan one symbol. Returns a directional setup or `side: null` when nothing lines up.
  * Setup logic (intentionally simple, tune later):
- *   long  = uptrend (sma20>sma50, ADX>25, +DI>-DI) + healthy pullback (RSI 40–60) + MACD turning up
+ *   long  = uptrend (sma20>sma50, ADX>20, +DI>-DI) + pullback (RSI 35–70) + MACD turning up
  *   short = mirror image.
- * ADX floor raised 20→25 (2026-06-12): fewer, stronger-trend setups — each one
- * costs 3-4 AI calls, so the scanner gate is the main quota lever.
+ * ADX floor relaxed 25→20 and RSI band widened 40–60 → 35–70 (2026-06-19) for
+ * more frequent day-trade setups; see the thresholds above decideSetup.
  */
 export async function scanSymbol(
   symbol: string,
