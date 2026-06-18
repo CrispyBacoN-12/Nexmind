@@ -14,12 +14,29 @@ export const DEFAULT_WATCHLIST: { symbol: string; label: string }[] = [
   { symbol: "AOT.BK", label: "AOT (SET)" },
 ];
 
-/** Return a portfolio's watchlist, seeding defaults the first time it's empty. */
+// Options portfolios can only trade names with a Yahoo option chain — that rules
+// out futures (GC=F), crypto (BTC-USD), forex (EURUSD=X), indices (^GSPC), and
+// SET stocks. Seed liquid US single-name options instead.
+export const OPTIONS_WATCHLIST: { symbol: string; label: string }[] = [
+  { symbol: "AAPL", label: "Apple" },
+  { symbol: "NVDA", label: "NVIDIA" },
+  { symbol: "MSFT", label: "Microsoft" },
+  { symbol: "TSLA", label: "Tesla" },
+  { symbol: "AMZN", label: "Amazon" },
+  { symbol: "META", label: "Meta" },
+  { symbol: "GOOGL", label: "Alphabet" },
+  { symbol: "AMD", label: "AMD" },
+];
+
+/** Return a portfolio's watchlist, seeding defaults the first time it's empty.
+ *  Options portfolios get an options-tradable (US single-name) seed. */
 export async function getWatchlist(portfolioId: number) {
   const count = await prisma.watchlist.count({ where: { portfolioId } });
   if (count === 0) {
+    const portfolio = await prisma.portfolio.findUnique({ where: { id: portfolioId }, select: { kind: true } });
+    const seed = portfolio?.kind === "options" ? OPTIONS_WATCHLIST : DEFAULT_WATCHLIST;
     await prisma.watchlist.createMany({
-      data: DEFAULT_WATCHLIST.map((w, i) => ({ ...w, sort: i, portfolioId })),
+      data: seed.map((w, i) => ({ ...w, sort: i, portfolioId })),
     });
   }
   return prisma.watchlist.findMany({ where: { portfolioId }, orderBy: { sort: "asc" } });
