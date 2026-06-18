@@ -49,13 +49,20 @@ const OPTIONS_BASE = "https://query2.finance.yahoo.com/v7/finance/options";
  *  without it, returns the nearest expiry's chain plus the full `expiries` list. */
 export async function fetchOptionChain(underlying: string, expiryUnix?: number): Promise<OptionChain> {
   const url = `${OPTIONS_BASE}/${encodeURIComponent(underlying)}${expiryUnix ? `?date=${expiryUnix}` : ""}`;
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-      Accept: "application/json",
-    },
-    next: { revalidate: 60 },
-  });
-  if (!res.ok) throw new Error(`options upstream ${res.status}`);
-  return parseOptionChain(await res.json());
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 15_000);
+  try {
+    const res = await fetch(url, {
+      signal: abort.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        Accept: "application/json",
+      },
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) throw new Error(`options upstream ${res.status}`);
+    return parseOptionChain(await res.json());
+  } finally {
+    clearTimeout(timer);
+  }
 }

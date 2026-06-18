@@ -13,8 +13,9 @@ const mid = (q: { bid: number; ask: number; lastPrice: number }) =>
   q.bid > 0 && q.ask > 0 ? (q.bid + q.ask) / 2 : q.lastPrice;
 
 export async function GET(req: Request) {
-  const portfolioId = Number(new URL(req.url).searchParams.get("portfolioId"));
-  if (!Number.isInteger(portfolioId)) return NextResponse.json({ error: "portfolioId is required" }, { status: 400 });
+  const raw = new URL(req.url).searchParams.get("portfolioId");
+  const portfolioId = Number(raw);
+  if (raw == null || raw === "" || !Number.isInteger(portfolioId)) return NextResponse.json({ error: "portfolioId is required" }, { status: 400 });
   const portfolio = await prisma.portfolio.findUnique({ where: { id: portfolioId } });
   if (!portfolio) return NextResponse.json({ error: "portfolio not found" }, { status: 404 });
   if (!isOptionsKind(portfolio.kind)) return NextResponse.json({ error: "not an options portfolio" }, { status: 409 });
