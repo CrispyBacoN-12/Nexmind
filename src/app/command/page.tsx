@@ -43,6 +43,7 @@ export default function CommandBridge() {
   const [portfolios, setPortfolios] = useState<PortfolioOption[]>([]);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
   const [newName, setNewName] = useState("");
+  const [newKind, setNewKind] = useState("swing");
   const [creating, setCreating] = useState(false);
 
   const loadPortfolios = useCallback(async (selectId?: number) => {
@@ -63,7 +64,7 @@ export default function CommandBridge() {
     setCreating(true);
     try {
       const res = await fetch("/api/portfolios", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, kind: newKind }),
       });
       const created = await res.json();
       setNewName("");
@@ -188,17 +189,28 @@ export default function CommandBridge() {
             ) : (
               <p className="mt-2 text-xs text-(--color-muted)">No portfolio yet — create one below to begin.</p>
             )}
-            <div className="mt-3 flex gap-2">
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && createPortfolio()}
-                placeholder="New portfolio name"
-                className="flex-1 h-9 rounded-md border border-(--color-border) bg-(--color-background) px-3 text-sm focus:outline-none focus:border-(--color-accent)/50"
-              />
-              <Button onClick={createPortfolio} disabled={creating} variant="outline" size="sm">
-                {creating ? "…" : "Create"}
-              </Button>
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && createPortfolio()}
+                  placeholder="New portfolio name"
+                  className="flex-1 h-9 rounded-md border border-(--color-border) bg-(--color-background) px-3 text-sm focus:outline-none focus:border-(--color-accent)/50"
+                />
+                <Button onClick={createPortfolio} disabled={creating} variant="outline" size="sm">
+                  {creating ? "…" : "Create"}
+                </Button>
+              </div>
+              <select
+                value={newKind}
+                onChange={(e) => setNewKind(e.target.value)}
+                className="w-full h-9 rounded-md border border-(--color-border) bg-(--color-background) px-3 text-sm focus:outline-none focus:border-(--color-accent)/50"
+              >
+                <option value="swing">Swing — autonomous trade desk</option>
+                <option value="invest">Invest — long-term, you approve</option>
+                <option value="options">Options — autonomous options desk</option>
+              </select>
             </div>
           </Card>
 
