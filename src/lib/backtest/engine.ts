@@ -10,7 +10,7 @@
 // - One open position per symbol (mirrors the live dedupe rule).
 
 import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
-import { decideSetup, type ScanSnapshot } from "@/lib/trading/scanner";
+import { decideSetup, DEFAULT_THRESHOLDS, type ScanSnapshot, type SetupThresholds } from "@/lib/trading/scanner";
 import { decideAction, type LadderState, type OpenPosition } from "@/lib/trading/positionRules";
 import { lorentzianSeries } from "@/lib/lc/lorentzian";
 
@@ -147,7 +147,7 @@ export function openPosition(side: "long" | "short", entry: number, atrVal: numb
 }
 
 /** Run the rule-based strategy over one symbol's candles. */
-export function backtestCandles(symbol: string, candles: Candle[], lot = 0.1): BacktestResult {
+export function backtestCandles(symbol: string, candles: Candle[], lot = 0.1, thresholds: SetupThresholds = DEFAULT_THRESHOLDS): BacktestResult {
   const snaps = snapshots(candles);
   const trades: SimTrade[] = [];
   let signals = 0;
@@ -167,7 +167,7 @@ export function backtestCandles(symbol: string, candles: Candle[], lot = 0.1): B
     }
 
     // 2) Look for a fresh setup on this bar.
-    const { side } = decideSetup(snaps[i]);
+    const { side } = decideSetup(snaps[i], thresholds);
     if (!side) continue;
     signals++;
 
@@ -176,4 +176,33 @@ export function backtestCandles(symbol: string, candles: Candle[], lot = 0.1): B
   }
 
   return { symbol, bars: candles.length, signals, trades, openAtEnd: open != null };
+}
+
+export interface BacktestSummary {
+  trades: number;
+  wins: number;
+  losses: number;
+  winRate: number;       // %
+  totalPnl: number;
+  avgR: number | null;   // mean R-multiple over trades that have one
+  expectancy: number | null; // avg pnl per trade
+}
+
+/** Reduce closed trades to the headline metrics used to compare configs. */
+export function summarizeBacktest(trades: SimTrade[]): BacktestSummary {
+  const n = trades.length;
+  const wins = trades.filter((t) => t.outcome === "win").length;
+  const losses = trades.filter((t) => t.outcome === "loss").length;
+  const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+  const rs = trades.map((t) => t.rMultiple).filter((r): r is number => r != null);
+  const avgR = rs.length ? rs.reduce((s, r) => s + r, 0) / rs.length : null;
+  return {
+    trades: n,
+    wins,
+    losses,
+    winRate: n ? (wins / n) * 100 : 0,
+    totalPnl,
+    avgR,
+    expectancy: n ? totalPnl / n : null,
+  };
 }

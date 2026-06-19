@@ -40,29 +40,29 @@ const last = <T,>(arr: (T | null)[]): T | null => {
 // Setup gate thresholds. Relaxed (2026-06-19) for more frequent day-trade
 // entries: ADX floor 25→20, RSI band 40–60 → 35–70, and Lorentzian downgraded
 // from a hard gate to a confidence annotation. The setup *structure* (trend
-// alignment + DI + MACD) is unchanged.
-const ADX_FLOOR = 20;
-const RSI_LOW = 35;
-const RSI_HIGH = 70;
+// alignment + DI + MACD) is unchanged. Exposed as a parameter so the backtester
+// can sweep values to find the best fit per symbol/timeframe.
+export interface SetupThresholds { adxFloor: number; rsiLow: number; rsiHigh: number }
+export const DEFAULT_THRESHOLDS: SetupThresholds = { adxFloor: 20, rsiLow: 35, rsiHigh: 70 };
 
 /**
  * The pure setup decision — shared by the live scanner and the backtester so
  * the two can never drift apart.
- *   long  = uptrend (sma20>sma50, ADX>20, +DI>-DI) + pullback (RSI 35–70) + MACD turning up
+ *   long  = uptrend (sma20>sma50, ADX>floor, +DI>-DI) + pullback (RSI band) + MACD turning up
  *   short = mirror image.
  * Lorentzian Classification, when present, is reported as a confidence cue
  * (✓ agrees / — diverges) but no longer blocks the setup.
  */
-export function decideSetup(s: ScanSnapshot): { side: "long" | "short" | null; note: string } {
+export function decideSetup(s: ScanSnapshot, t: SetupThresholds = DEFAULT_THRESHOLDS): { side: "long" | "short" | null; note: string } {
   const { sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal } = s;
 
-  const trending = adxVal != null && adxVal > ADX_FLOOR;
+  const trending = adxVal != null && adxVal > t.adxFloor;
   if (trending && s20 != null && s50 != null && r != null && pDI != null && mDI != null) {
     const up = s20 > s50 && pDI > mDI;
     const down = s20 < s50 && mDI > pDI;
     let side: "long" | "short" | null = null;
-    if (up && r >= RSI_LOW && r <= RSI_HIGH && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) side = "long";
-    else if (down && r >= RSI_LOW && r <= RSI_HIGH) side = "short";
+    if (up && r >= t.rsiLow && r <= t.rsiHigh && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) side = "long";
+    else if (down && r >= t.rsiLow && r <= t.rsiHigh) side = "short";
 
     if (side) {
       const base = `${side === "long" ? "uptrend" : "downtrend"} pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}`;
