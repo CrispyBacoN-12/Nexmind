@@ -6,6 +6,7 @@ import { fmtNumber } from "@/lib/utils";
 
 interface Row {
   symbol: string;
+  strategy?: string;
   interval: string;
   range: string;
   adxFloor: number;
@@ -32,6 +33,13 @@ const TIMEFRAME_CONFIGS = [
   { interval: "1d", range: "1y" },
 ];
 const ADX_CONFIGS = [15, 20, 25].map((adxFloor) => ({ interval: "1h", range: "3mo", adxFloor }));
+// Compare entry strategies head-to-head on the same 1h timeframe.
+const STRATEGY_CONFIGS = [
+  { interval: "1h", range: "3mo" }, // no strategy key → built-in trend-pullback
+  { interval: "1h", range: "3mo", strategy: "ema-cross" },
+  { interval: "1h", range: "3mo", strategy: "orb" },
+  { interval: "1h", range: "3mo", strategy: "fvg" },
+];
 
 function pnlColor(n: number | null | undefined): string {
   if (n == null) return "";
@@ -45,11 +53,11 @@ export default function BacktestLab() {
   const [busy, setBusy] = useState<string>("");
   const [ran, setRan] = useState(false);
 
-  async function run(mode: "timeframe" | "adx") {
+  async function run(mode: "timeframe" | "adx" | "strategy") {
     setBusy(mode);
     setRan(true);
     try {
-      const configs = mode === "timeframe" ? TIMEFRAME_CONFIGS : ADX_CONFIGS;
+      const configs = mode === "timeframe" ? TIMEFRAME_CONFIGS : mode === "adx" ? ADX_CONFIGS : STRATEGY_CONFIGS;
       const res = await fetch("/api/backtest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -88,6 +96,9 @@ export default function BacktestLab() {
           <Button variant="outline" onClick={() => run("adx")} disabled={!!busy}>
             {busy === "adx" ? "Running…" : "Sweep ADX floor (15 / 20 / 25)"}
           </Button>
+          <Button variant="outline" onClick={() => run("strategy")} disabled={!!busy}>
+            {busy === "strategy" ? "Running…" : "Compare strategies (1h)"}
+          </Button>
         </div>
         {busy && <p className="mt-2 text-xs text-(--color-muted)">Fetching candles and replaying the strategy…</p>}
       </Card>
@@ -100,6 +111,7 @@ export default function BacktestLab() {
             <thead>
               <tr className="text-(--color-muted) border-b border-(--color-border)">
                 <th className="text-left py-1 pr-3">Symbol</th>
+                <th className="text-left py-1 pr-3">Strategy</th>
                 <th className="text-left py-1 pr-3">Timeframe</th>
                 <th className="text-right py-1 pr-3">ADX≥</th>
                 <th className="text-right py-1 pr-3">RSI</th>
@@ -117,6 +129,7 @@ export default function BacktestLab() {
                 return (
                   <tr key={i} className={`border-b border-(--color-border)/50 ${best ? "bg-(--color-accent)/10" : ""}`}>
                     <td className="py-1 pr-3 font-semibold">{r.symbol}</td>
+                    <td className="py-1 pr-3 text-(--color-muted)">{r.strategy ?? "—"}</td>
                     <td className="py-1 pr-3">{r.interval} / {r.range}</td>
                     <td className="py-1 pr-3 text-right">{r.adxFloor}</td>
                     <td className="py-1 pr-3 text-right text-(--color-muted)">{r.rsiLow}–{r.rsiHigh}</td>

@@ -146,8 +146,19 @@ export function openPosition(side: "long" | "short", entry: number, atrVal: numb
   };
 }
 
+// An entry rule answers per bar i: take a long/short or stand aside? The default
+// is the built-in trend-pullback (decideSetup); the Backtest Lab passes a
+// pluggable strategy evaluator instead to compare alternatives.
+export type EntryRule = (i: number) => "long" | "short" | null;
+
 /** Run the rule-based strategy over one symbol's candles. */
-export function backtestCandles(symbol: string, candles: Candle[], lot = 0.1, thresholds: SetupThresholds = DEFAULT_THRESHOLDS): BacktestResult {
+export function backtestCandles(
+  symbol: string,
+  candles: Candle[],
+  lot = 0.1,
+  thresholds: SetupThresholds = DEFAULT_THRESHOLDS,
+  entry?: EntryRule,
+): BacktestResult {
   const snaps = snapshots(candles);
   const trades: SimTrade[] = [];
   let signals = 0;
@@ -167,7 +178,7 @@ export function backtestCandles(symbol: string, candles: Candle[], lot = 0.1, th
     }
 
     // 2) Look for a fresh setup on this bar.
-    const { side } = decideSetup(snaps[i], thresholds);
+    const side = entry ? entry(i) : decideSetup(snaps[i], thresholds).side;
     if (!side) continue;
     signals++;
 
