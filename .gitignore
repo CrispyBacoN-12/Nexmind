@@ -52,3 +52,6 @@ dev.db
 
 # local Claude Code config
 /.claude/
+
+# scheduled-scan log
+scripts/scan.log
