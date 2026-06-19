@@ -18,6 +18,22 @@ test("registry exposes base strategies + combos by key", () => {
   assert.equal(getStrategy("nope"), null);
 });
 
+test("Mean Reversion: bounce out of oversold is long, fade out of overbought is short", () => {
+  // Long decline (RSI → oversold) then a rise (RSI crosses back > 30) → expect a long.
+  const down = Array.from({ length: 25 }, (_, i) => 100 - i * 3);
+  const up = Array.from({ length: 10 }, (_, i) => 30 + i * 4);
+  const longBars = [...down, ...up].map((c, i) => bar(i * HOUR, c, c + 1, c - 1, c));
+  const evalLong = getStrategy("mean-rev")!.build(longBars);
+  assert.ok(longBars.map((_, i) => evalLong(i)?.side).includes("long"), "expected a long bounce");
+
+  // Mirror: long rise then a drop → RSI crosses back < 70 → expect a short.
+  const rise = Array.from({ length: 25 }, (_, i) => 40 + i * 3);
+  const drop = Array.from({ length: 10 }, (_, i) => 115 - i * 4);
+  const shortBars = [...rise, ...drop].map((c, i) => bar(i * HOUR, c, c + 1, c - 1, c));
+  const evalShort = getStrategy("mean-rev")!.build(shortBars);
+  assert.ok(shortBars.map((_, i) => evalShort(i)?.side).includes("short"), "expected a short fade");
+});
+
 test("combineStrategies 'any': one member firing triggers, conflict skips", () => {
   // FVG fires on a 3-bar gap; combine it with itself-equivalent for a simple check.
   const gapUp: Candle[] = [

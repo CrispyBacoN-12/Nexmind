@@ -100,6 +100,25 @@ const trendPullback: Strategy = {
   },
 };
 
+/** Mean Reversion — fade extremes by entering on RSI crossing back out of the
+ *  oversold/overbought zones. Contrarian: catches relief bounces in fear (long)
+ *  and pullbacks in greed (short), the opposite of the trend strategies. */
+const meanReversion: Strategy = {
+  key: "mean-rev",
+  label: "Mean Reversion (RSI 30/70)",
+  build(bars) {
+    const r = rsi(bars.map((c) => c.c), 14);
+    return (i) => {
+      if (i < 1) return null;
+      const a = r[i], p = r[i - 1];
+      if (a == null || p == null) return null;
+      if (p <= 30 && a > 30) return { side: "long", note: `RSI bounce from oversold (${a.toFixed(0)})` };
+      if (p >= 70 && a < 70) return { side: "short", note: `RSI fade from overbought (${a.toFixed(0)})` };
+      return null;
+    };
+  },
+};
+
 export type CombineMode = "any" | "vote";
 
 /** Build a meta-strategy that combines members. "any" enters when exactly one
@@ -146,6 +165,7 @@ export const STRATEGIES: Strategy[] = [
   emaCross,
   openingRangeBreakout,
   fairValueGap,
+  meanReversion,
   // Combos of the positive-edge members (EMA Cross excluded — it backtests negative).
   combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any"),
   combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3 }),
