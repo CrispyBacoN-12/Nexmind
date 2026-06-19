@@ -8,7 +8,7 @@ import { scanSymbol, type ScanResult } from "./scanner";
 import { runHawk, type HawkVerdict, type HawkVote, type ProposedLevels } from "./hawk";
 import { runSage, type SageVerdict } from "./sage";
 import { applyIronRules, riskReward, type AccountState } from "./ironRules";
-import { isKillSwitchOn, getMaxOpenPositions, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt } from "@/lib/settings";
+import { isKillSwitchOn, getMaxOpenPositions, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt, getPortfolioStrategy } from "@/lib/settings";
 import { type Interval, type Range } from "@/lib/yahoo";
 import { fetchCandles } from "@/lib/marketData";
 import { dailyReturns, pearsonCorrelation } from "./correlation";
@@ -35,13 +35,14 @@ const DEFAULT_ACCOUNT: AccountState = {
 export async function runTradeTick(
   symbol: string,
   portfolioId: number,
-  opts: { range?: Range; interval?: Interval; lot?: number } = {},
+  opts: { range?: Range; interval?: Interval; lot?: number; strategy?: string } = {},
 ): Promise<TickResult> {
   const steps: TickStep[] = [];
   let costUsd = 0;
 
-  // 1) SCANNER
-  const scan = await scanSymbol(symbol, opts.range, opts.interval);
+  // 1) SCANNER (using the portfolio's chosen entry strategy unless overridden)
+  const strategyKey = opts.strategy ?? (await getPortfolioStrategy(portfolioId));
+  const scan = await scanSymbol(symbol, opts.range, opts.interval, strategyKey);
   symbol = scan.symbol; // carry the symbol forward from the scan result
   steps.push({ stage: "scanner", note: scan.note });
 

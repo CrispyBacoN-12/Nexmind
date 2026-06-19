@@ -29,6 +29,12 @@ export async function getPortfolio(portfolioId: number) {
   return p;
 }
 
+/** The swing entry-strategy key for a portfolio (defaults to trend-pullback).
+ *  Unknown keys are tolerated downstream (scanSymbol falls back to the default). */
+export async function getPortfolioStrategy(portfolioId: number): Promise<string> {
+  return (await getPortfolio(portfolioId)).strategy || "trend-pullback";
+}
+
 export async function isKillSwitchOn(portfolioId: number): Promise<boolean> {
   return (await getPortfolio(portfolioId)).killSwitch;
 }

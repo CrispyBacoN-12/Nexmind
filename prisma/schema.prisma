@@ -86,6 +86,7 @@ model Portfolio {
   rebalanceBandPct Float       @default(5)   // invest portfolio: drift % before TRIM/ADD
   scanInterval     String      @default("1h")  // swing scanner candle interval (5m..1d)
   scanRange        String      @default("3mo") // swing scanner lookback range (1d..1y)
+  strategy         String      @default("trend-pullback") // swing entry strategy key
   killSwitch       Boolean     @default(false)
   killSwitchReason String      @default("")
   sort             Int         @default(0)

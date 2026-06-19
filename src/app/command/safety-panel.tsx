@@ -8,8 +8,18 @@ interface Portfolio {
   killSwitch: boolean; killSwitchReason: string;
   maxOpenPositions: number; startingBalance: number; riskPctPerTrade: number;
   drawdownHaltPct: number; currentDrawdownPct: number;
-  scanInterval: string; scanRange: string;
+  scanInterval: string; scanRange: string; strategy: string;
 }
+
+// Entry strategies selectable for swing portfolios (keys mirror the registry).
+const STRATEGY_OPTIONS: { key: string; label: string }[] = [
+  { key: "trend-pullback", label: "Trend-pullback (default)" },
+  { key: "ema-cross", label: "EMA Cross (9/21)" },
+  { key: "orb", label: "Opening Range Breakout" },
+  { key: "fvg", label: "Fair Value Gap (ICT)" },
+  { key: "combo-or", label: "Combo OR (Trend+ORB+FVG)" },
+  { key: "combo-vote", label: "Combo Vote≥2 (Trend+ORB+FVG)" },
+];
 
 // Scanner timeframe presets (interval|range). Day trade uses short intraday
 // bars; swing/position widen out.
@@ -137,6 +147,20 @@ export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; o
             {TIMEFRAME_PRESETS.map((t) => (
               <option key={t.label} value={`${t.interval}|${t.range}`}>{t.label}</option>
             ))}
+          </select>
+        </div>
+      )}
+      {p.kind === "swing" && (
+        <div className="flex items-center gap-2 mt-2">
+          <label className="text-xs text-(--color-muted)">Entry strategy</label>
+          <select
+            value={p.strategy}
+            disabled={busy}
+            onChange={(e) => patch({ strategy: e.target.value })}
+            className="rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm"
+          >
+            {STRATEGY_OPTIONS.some((s) => s.key === p.strategy) ? null : <option value={p.strategy}>{p.strategy}</option>}
+            {STRATEGY_OPTIONS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
         </div>
       )}

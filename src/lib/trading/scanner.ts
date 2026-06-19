@@ -6,6 +6,7 @@ import { fetchCandles } from "@/lib/marketData";
 import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
 import { findRecentUpLeg } from "@/lib/swings";
 import { lorentzianLast, type LCState } from "@/lib/lc/lorentzian";
+import { getStrategy } from "./strategies";
 
 export interface ScanSnapshot {
   price: number;
@@ -89,6 +90,7 @@ export async function scanSymbol(
   symbol: string,
   range: Range = "3mo", // 3mo of 1h bars (~400) gives the LC classifier real training depth
   interval: Interval = "1h",
+  strategyKey?: string,
 ): Promise<ScanResult> {
   const resp = await fetchCandles(symbol, range, interval);
   const candles = resp.candles;
@@ -113,7 +115,19 @@ export async function scanSymbol(
     lc: lorentzianLast(candles),
   };
 
-  let { side, note } = decideSetup(snapshot);
+  // Entry decision: the chosen registry strategy on the full history, or the
+  // built-in trend-pullback (default). Strategy modules are evaluated at the
+  // latest bar so live entries match what the Backtest Lab measured.
+  let side: "long" | "short" | null;
+  let note: string;
+  const strat = strategyKey && strategyKey !== "trend-pullback" ? getStrategy(strategyKey) : null;
+  if (strat) {
+    const sig = strat.build(candles)(candles.length - 1);
+    side = sig?.side ?? null;
+    note = sig ? `${strat.label}: ${sig.note}` : "no setup";
+  } else {
+    ({ side, note } = decideSetup(snapshot));
+  }
 
   // Annotate with the most recent confirmed up-leg for the structure analyst.
   const leg = findRecentUpLeg(candles, 80, 3);
