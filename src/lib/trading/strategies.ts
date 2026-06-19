@@ -100,20 +100,24 @@ const trendPullback: Strategy = {
   },
 };
 
-/** Mean Reversion — fade extremes by entering on RSI crossing back out of the
- *  oversold/overbought zones. Contrarian: catches relief bounces in fear (long)
- *  and pullbacks in greed (short), the opposite of the trend strategies. */
-const meanReversion: Strategy = {
+/** Dip Buy — long-only mean reversion with a trend filter. Enters when RSI
+ *  bounces back out of oversold *and* price is above its SMA50, i.e. buying a
+ *  pullback inside an uptrend rather than catching a falling knife. The naive
+ *  symmetric RSI-30/70 version backtested negative (knives in BTC downtrends);
+ *  the trend filter + long-only is the fix. */
+const dipBuy: Strategy = {
   key: "mean-rev",
-  label: "Mean Reversion (RSI 30/70)",
+  label: "Dip Buy (RSI + SMA50 trend filter)",
   build(bars) {
-    const r = rsi(bars.map((c) => c.c), 14);
+    const closes = bars.map((c) => c.c);
+    const r = rsi(closes, 14);
+    const s50 = sma(closes, 50);
     return (i) => {
       if (i < 1) return null;
-      const a = r[i], p = r[i - 1];
-      if (a == null || p == null) return null;
-      if (p <= 30 && a > 30) return { side: "long", note: `RSI bounce from oversold (${a.toFixed(0)})` };
-      if (p >= 70 && a < 70) return { side: "short", note: `RSI fade from overbought (${a.toFixed(0)})` };
+      const a = r[i], p = r[i - 1], ma = s50[i];
+      if (a == null || p == null || ma == null) return null;
+      // Shallow pullback turning back up while the longer-term trend is intact.
+      if (p <= 45 && a > 45 && bars[i].c > ma) return { side: "long", note: `dip buy: RSI ${a.toFixed(0)}↑, above SMA50` };
       return null;
     };
   },
@@ -165,7 +169,7 @@ export const STRATEGIES: Strategy[] = [
   emaCross,
   openingRangeBreakout,
   fairValueGap,
-  meanReversion,
+  dipBuy,
   // Combos of the positive-edge members (EMA Cross excluded — it backtests negative).
   combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any"),
   combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3 }),

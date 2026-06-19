@@ -18,20 +18,26 @@ test("registry exposes base strategies + combos by key", () => {
   assert.equal(getStrategy("nope"), null);
 });
 
-test("Mean Reversion: bounce out of oversold is long, fade out of overbought is short", () => {
-  // Long decline (RSI → oversold) then a rise (RSI crosses back > 30) → expect a long.
-  const down = Array.from({ length: 25 }, (_, i) => 100 - i * 3);
-  const up = Array.from({ length: 10 }, (_, i) => 30 + i * 4);
-  const longBars = [...down, ...up].map((c, i) => bar(i * HOUR, c, c + 1, c - 1, c));
-  const evalLong = getStrategy("mean-rev")!.build(longBars);
-  assert.ok(longBars.map((_, i) => evalLong(i)?.side).includes("long"), "expected a long bounce");
+test("Dip Buy: long-only, and the trend filter blocks falling knives below SMA50", () => {
+  // Pure downtrend: deeply oversold but price stays below SMA50 → no entries,
+  // and it must never short (long-only).
+  const downtrend = Array.from({ length: 90 }, (_, i) => 200 - i * 2).map((c, i) => bar(i * HOUR, c, c + 1, c - 1, c));
+  const evalr = getStrategy("mean-rev")!.build(downtrend);
+  const sides = downtrend.map((_, i) => evalr(i)?.side).filter(Boolean);
+  assert.equal(sides.filter((s) => s === "short").length, 0, "must never short");
+  assert.equal(sides.filter((s) => s === "long").length, 0, "no falling-knife longs below SMA50");
+});
 
-  // Mirror: long rise then a drop → RSI crosses back < 70 → expect a short.
-  const rise = Array.from({ length: 25 }, (_, i) => 40 + i * 3);
-  const drop = Array.from({ length: 10 }, (_, i) => 115 - i * 4);
-  const shortBars = [...rise, ...drop].map((c, i) => bar(i * HOUR, c, c + 1, c - 1, c));
-  const evalShort = getStrategy("mean-rev")!.build(shortBars);
-  assert.ok(shortBars.map((_, i) => evalShort(i)?.side).includes("short"), "expected a short fade");
+test("Dip Buy: a pullback inside an uptrend (price above SMA50) fires a long", () => {
+  // 70 bars rising to build a high SMA50, then a sharp dip to push RSI oversold
+  // while price stays above SMA50, then a recovery bar (RSI crosses back up).
+  const up = Array.from({ length: 70 }, (_, i) => 100 + i * 2); // → ~238, SMA50 well below
+  const dip = [232, 224, 216, 208, 200, 196]; // sharp drop pushes RSI down, still > SMA50
+  const rebound = [206, 214]; // RSI crosses back above 35
+  const bars = [...up, ...dip, ...rebound].map((c, i) => bar(i * HOUR, c, c + 1.5, c - 1.5, c));
+  const evalr = getStrategy("mean-rev")!.build(bars);
+  const longs = bars.map((_, i) => evalr(i)?.side).filter((s) => s === "long");
+  assert.ok(longs.length >= 1, "expected at least one dip-buy long");
 });
 
 test("combineStrategies 'any': one member firing triggers, conflict skips", () => {
