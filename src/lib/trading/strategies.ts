@@ -3,7 +3,9 @@
 // signal closes on this bar?" Pure and deterministic so the Backtest Lab can
 // replay and compare them. Exits are still the shared ATR TP-ladder.
 
-import { ema, type Candle } from "@/lib/indicators";
+import { sma, ema, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
+import { decideSetup, type ScanSnapshot } from "./scanner";
+import { lorentzianSeries } from "@/lib/lc/lorentzian";
 
 export interface StrategyResult { side: "long" | "short"; note: string }
 export type StrategyEvaluator = (i: number) => StrategyResult | null;
@@ -74,7 +76,80 @@ const fairValueGap: Strategy = {
   },
 };
 
-export const STRATEGIES: Strategy[] = [emaCross, openingRangeBreakout, fairValueGap];
+/** Trend-pullback — the desk's built-in setup (SMA/ADX/RSI/MACD + Lorentzian),
+ *  wrapped as a registry strategy so it can be compared and combined. */
+const trendPullback: Strategy = {
+  key: "trend-pullback",
+  label: "Trend-pullback",
+  build(bars) {
+    const closes = bars.map((c) => c.c);
+    const s20 = sma(closes, 20), s50 = sma(closes, 50), r = rsi(closes, 14);
+    const { histogram } = macd(closes);
+    const atrArr = atr(bars, 14);
+    const { adx: adxArr, plusDI, minusDI } = adx(bars, 14);
+    const lc = lorentzianSeries(bars);
+    return (i) => {
+      const snap: ScanSnapshot = {
+        price: bars[i].c, sma20: s20[i], sma50: s50[i], rsi: r[i], adx: adxArr[i],
+        plusDI: plusDI[i], minusDI: minusDI[i], macdHist: histogram[i], atr: atrArr[i],
+        lc: { prediction: lc.prediction[i], signal: lc.signal[i], kernelBullish: lc.kernelBullish[i], kernelBearish: lc.kernelBearish[i] },
+      };
+      const { side } = decideSetup(snap);
+      return side ? { side, note: "trend-pullback" } : null;
+    };
+  },
+};
+
+export type CombineMode = "any" | "vote";
+
+/** Build a meta-strategy that combines members. "any" enters when exactly one
+ *  direction triggers this bar (conflicts skip). "vote" needs a fresh trigger
+ *  plus >= minVotes members agreeing on that side within the last `window` bars. */
+export function combineStrategies(
+  key: string, label: string, memberKeys: string[], mode: CombineMode,
+  opts: { minVotes?: number; window?: number } = {},
+): Strategy {
+  const minVotes = opts.minVotes ?? 2;
+  const window = opts.window ?? 3;
+  return {
+    key, label,
+    build(bars) {
+      const evals = memberKeys
+        .map((k) => getStrategy(k))
+        .filter((s): s is Strategy => s != null)
+        .map((s) => s.build(bars));
+      // Precompute each member's per-bar signal once.
+      const sigs = evals.map((ev) => bars.map((_, i) => ev(i)));
+      const activeWithin = (side: "long" | "short", i: number) =>
+        sigs.reduce((n, s) => {
+          for (let j = Math.max(0, i - window + 1); j <= i; j++) if (s[j]?.side === side) return n + 1;
+          return n;
+        }, 0);
+      return (i) => {
+        const at = sigs.map((s) => s[i]);
+        const longTrig = at.some((x) => x?.side === "long");
+        const shortTrig = at.some((x) => x?.side === "short");
+        if (mode === "any") {
+          if (longTrig === shortTrig) return null; // none or conflicting
+          return longTrig ? { side: "long", note: "combo OR long" } : { side: "short", note: "combo OR short" };
+        }
+        if (longTrig && !shortTrig && activeWithin("long", i) >= minVotes) return { side: "long", note: `combo vote long (${activeWithin("long", i)})` };
+        if (shortTrig && !longTrig && activeWithin("short", i) >= minVotes) return { side: "short", note: `combo vote short (${activeWithin("short", i)})` };
+        return null;
+      };
+    },
+  };
+}
+
+export const STRATEGIES: Strategy[] = [
+  trendPullback,
+  emaCross,
+  openingRangeBreakout,
+  fairValueGap,
+  // Combos of the positive-edge members (EMA Cross excluded — it backtests negative).
+  combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any"),
+  combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3 }),
+];
 
 export function getStrategy(key: string): Strategy | null {
   return STRATEGIES.find((s) => s.key === key) ?? null;

@@ -40,6 +40,12 @@ const STRATEGY_CONFIGS = [
   { interval: "1h", range: "3mo", strategy: "orb" },
   { interval: "1h", range: "3mo", strategy: "fvg" },
 ];
+// Combined vs the best single strategies, same 1h timeframe.
+const COMBO_CONFIGS = [
+  { interval: "1h", range: "3mo", strategy: "trend-pullback" },
+  { interval: "1h", range: "3mo", strategy: "combo-or" },
+  { interval: "1h", range: "3mo", strategy: "combo-vote" },
+];
 
 function pnlColor(n: number | null | undefined): string {
   if (n == null) return "";
@@ -53,11 +59,15 @@ export default function BacktestLab() {
   const [busy, setBusy] = useState<string>("");
   const [ran, setRan] = useState(false);
 
-  async function run(mode: "timeframe" | "adx" | "strategy") {
+  async function run(mode: "timeframe" | "adx" | "strategy" | "combo") {
     setBusy(mode);
     setRan(true);
     try {
-      const configs = mode === "timeframe" ? TIMEFRAME_CONFIGS : mode === "adx" ? ADX_CONFIGS : STRATEGY_CONFIGS;
+      const configs =
+        mode === "timeframe" ? TIMEFRAME_CONFIGS
+        : mode === "adx" ? ADX_CONFIGS
+        : mode === "strategy" ? STRATEGY_CONFIGS
+        : COMBO_CONFIGS;
       const res = await fetch("/api/backtest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,6 +108,9 @@ export default function BacktestLab() {
           </Button>
           <Button variant="outline" onClick={() => run("strategy")} disabled={!!busy}>
             {busy === "strategy" ? "Running…" : "Compare strategies (1h)"}
+          </Button>
+          <Button variant="outline" onClick={() => run("combo")} disabled={!!busy}>
+            {busy === "combo" ? "Running…" : "Combined (OR / Vote)"}
           </Button>
         </div>
         {busy && <p className="mt-2 text-xs text-(--color-muted)">Fetching candles and replaying the strategy…</p>}

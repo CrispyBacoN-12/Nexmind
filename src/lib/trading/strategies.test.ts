@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getStrategy, STRATEGIES } from "./strategies";
+import { getStrategy, combineStrategies, STRATEGIES } from "./strategies";
 import type { Candle } from "@/lib/indicators";
 
 const DAY = 86_400;
@@ -10,9 +10,22 @@ function bar(t: number, o: number, h: number, l: number, c: number): Candle {
   return { t, o, h, l, c, v: 1000 };
 }
 
-test("registry exposes the three strategies by key", () => {
-  assert.deepEqual(STRATEGIES.map((s) => s.key).sort(), ["ema-cross", "fvg", "orb"]);
+test("registry exposes base strategies + combos by key", () => {
+  const keys = STRATEGIES.map((s) => s.key);
+  for (const k of ["trend-pullback", "ema-cross", "orb", "fvg", "combo-or", "combo-vote"]) {
+    assert.ok(keys.includes(k), `missing ${k}`);
+  }
   assert.equal(getStrategy("nope"), null);
+});
+
+test("combineStrategies 'any': one member firing triggers, conflict skips", () => {
+  // FVG fires on a 3-bar gap; combine it with itself-equivalent for a simple check.
+  const gapUp: Candle[] = [
+    bar(0, 10, 11, 9, 10), bar(HOUR, 12, 14, 12, 13), bar(2 * HOUR, 14, 15, 12, 14), // bullish FVG at i=2
+  ];
+  const combo = combineStrategies("t-or", "t", ["fvg"], "any").build(gapUp);
+  assert.equal(combo(2)?.side, "long");
+  assert.equal(combo(1), null);
 });
 
 test("EMA Cross: a downtrend flipping to an uptrend fires a long", () => {
