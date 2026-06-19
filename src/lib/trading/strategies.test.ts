@@ -40,6 +40,27 @@ test("Dip Buy: a pullback inside an uptrend (price above SMA50) fires a long", (
   assert.ok(longs.length >= 1, "expected at least one dip-buy long");
 });
 
+test("Rip Sell: short-only, and the trend filter blocks shorts above SMA50", () => {
+  // Pure uptrend: price stays above SMA50 → no shorts, and it must never long.
+  const uptrend = Array.from({ length: 90 }, (_, i) => 100 + i * 2).map((c, i) => bar(i * HOUR, c, c + 1, c - 1, c));
+  const evalr = getStrategy("rip-sell")!.build(uptrend);
+  const sides = uptrend.map((_, i) => evalr(i)?.side).filter(Boolean);
+  assert.equal(sides.filter((s) => s === "long").length, 0, "must never long");
+  assert.equal(sides.filter((s) => s === "short").length, 0, "no shorts above SMA50");
+});
+
+test("Rip Sell: a bounce rolling over inside a downtrend fires a short", () => {
+  // 70 bars falling to build a high SMA50, a sharp bounce to push RSI up, then a
+  // down bar (RSI crosses back below 55) while price stays below SMA50.
+  const down = Array.from({ length: 70 }, (_, i) => 400 - i * 3); // → ~193, SMA50 well above
+  const bounce = [201, 213, 225, 237, 249, 261]; // rally pushes RSI up, still < SMA50
+  const rollover = [251, 239]; // RSI crosses back below 55
+  const bars = [...down, ...bounce, ...rollover].map((c, i) => bar(i * HOUR, c, c + 1.5, c - 1.5, c));
+  const evalr = getStrategy("rip-sell")!.build(bars);
+  const shorts = bars.map((_, i) => evalr(i)?.side).filter((s) => s === "short");
+  assert.ok(shorts.length >= 1, "expected at least one rip-sell short");
+});
+
 test("combineStrategies 'any': one member firing triggers, conflict skips", () => {
   // FVG fires on a 3-bar gap; combine it with itself-equivalent for a simple check.
   const gapUp: Candle[] = [

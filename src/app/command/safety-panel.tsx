@@ -17,7 +17,8 @@ const STRATEGY_OPTIONS: { key: string; label: string }[] = [
   { key: "ema-cross", label: "EMA Cross (9/21)" },
   { key: "orb", label: "Opening Range Breakout" },
   { key: "fvg", label: "Fair Value Gap (ICT)" },
-  { key: "mean-rev", label: "Mean Reversion (RSI 30/70)" },
+  { key: "mean-rev", label: "Dip Buy (RSI + SMA50)" },
+  { key: "rip-sell", label: "Rip Sell (RSI + SMA50)" },
   { key: "combo-or", label: "Combo OR (Trend+ORB+FVG)" },
   { key: "combo-vote", label: "Combo Vote≥2 (Trend+ORB+FVG)" },
 ];

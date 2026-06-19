@@ -123,6 +123,27 @@ const dipBuy: Strategy = {
   },
 };
 
+/** Rip Sell — the short-side mirror of Dip Buy. Shorts a bounce that rolls over
+ *  (RSI rallying to >=55 then turning back down) while price is below SMA50, i.e.
+ *  selling strength inside a downtrend instead of shorting the capitulation low. */
+const ripSell: Strategy = {
+  key: "rip-sell",
+  label: "Rip Sell (RSI + SMA50 downtrend filter)",
+  build(bars) {
+    const closes = bars.map((c) => c.c);
+    const r = rsi(closes, 14);
+    const s50 = sma(closes, 50);
+    return (i) => {
+      if (i < 1) return null;
+      const a = r[i], p = r[i - 1], ma = s50[i];
+      if (a == null || p == null || ma == null) return null;
+      // A bounce losing steam while the longer-term trend is still down.
+      if (p >= 55 && a < 55 && bars[i].c < ma) return { side: "short", note: `rip sell: RSI ${a.toFixed(0)}↓, below SMA50` };
+      return null;
+    };
+  },
+};
+
 export type CombineMode = "any" | "vote";
 
 /** Build a meta-strategy that combines members. "any" enters when exactly one
@@ -170,6 +191,7 @@ export const STRATEGIES: Strategy[] = [
   openingRangeBreakout,
   fairValueGap,
   dipBuy,
+  ripSell,
   // Combos of the positive-edge members (EMA Cross excluded — it backtests negative).
   combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any"),
   combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3 }),
