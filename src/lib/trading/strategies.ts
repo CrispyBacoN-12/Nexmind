@@ -195,6 +195,8 @@ export const STRATEGIES: Strategy[] = [
   // Combos of the positive-edge members (EMA Cross excluded — it backtests negative).
   combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any"),
   combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3 }),
+  // Long + short specialists for crypto (positive-edge members only, ORB dropped).
+  combineStrategies("combo-all", "Combo Vote≥2 (Trend+FVG+Dip+Rip)", ["trend-pullback", "fvg", "mean-rev", "rip-sell"], "vote", { minVotes: 2, window: 3 }),
 ];
 
 export function getStrategy(key: string): Strategy | null {

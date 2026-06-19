@@ -21,6 +21,7 @@ const STRATEGY_OPTIONS: { key: string; label: string }[] = [
   { key: "rip-sell", label: "Rip Sell (RSI + SMA50)" },
   { key: "combo-or", label: "Combo OR (Trend+ORB+FVG)" },
   { key: "combo-vote", label: "Combo Vote≥2 (Trend+ORB+FVG)" },
+  { key: "combo-all", label: "Combo Vote≥2 (Trend+FVG+Dip+Rip)" },
 ];
 
 // Scanner timeframe presets (interval|range). Day trade uses short intraday
