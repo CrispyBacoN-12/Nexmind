@@ -9,7 +9,7 @@ const nav = [
   { href: "/", label: "War Room", icon: Radar },
   { href: "/command", label: "Command Bridge", icon: Terminal },
   { href: "/analyze", label: "AI Analysis", icon: LineChart },
-  { href: "/invest", label: "Long-term Invest", icon: Landmark },
+  { href: "/invest", label: "Stock Advisor", icon: Landmark },
   { href: "/backtest", label: "Backtest Lab", icon: FlaskConical },
   { href: "/build", label: "Builder Studio", icon: Hammer },
   { href: "/roster", label: "Agent Roster", icon: Users },

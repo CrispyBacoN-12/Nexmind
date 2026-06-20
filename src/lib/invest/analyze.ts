@@ -5,6 +5,7 @@
 import { callAgent, callAgentJSON, aiEnabled } from "@/lib/anthropic";
 import { fetchCandles } from "@/lib/marketData";
 import { computeLongTermStats, type LongTermStats } from "./stats";
+import { computeLevels, type TechLevels } from "./levels";
 import { fetchFundamentals, fundamentalsLine, type Fundamentals } from "@/lib/market/fundamentals";
 
 export type Stance = "buy" | "hold" | "avoid";
@@ -27,10 +28,15 @@ export interface InvestResult {
     rating: Verdict;
     entryLow: number | null;
     entryHigh: number | null;
+    support: number | null;
+    resistance: number | null;
+    target: number | null;
+    stopLoss: number | null;
     horizon: string;
     thesis: string[];
     risks: string[];
   };
+  levels: TechLevels; // chart-derived (deterministic) levels
   costUsd: number;
 }
 
@@ -60,6 +66,10 @@ const VERDICT_SCHEMA = {
     rating: { type: "string", enum: ["strong-buy", "buy", "watch", "avoid"] },
     entryLow: { type: "number" },
     entryHigh: { type: "number" },
+    support: { type: "number" },
+    resistance: { type: "number" },
+    target: { type: "number" },
+    stopLoss: { type: "number" },
     horizon: { type: "string" },
     thesis: { type: "array", items: { type: "string" } },
     risks: { type: "array", items: { type: "string" } },
@@ -72,6 +82,7 @@ const fmt = (n: number | null, d = 1) => (n == null ? "n/a" : n.toFixed(d));
 export async function analyzeLongTerm(symbol: string): Promise<InvestResult> {
   const chart = await fetchCandles(symbol, "5y", "1wk");
   const stats = computeLongTermStats(chart.candles);
+  const levels = computeLevels(chart.candles, stats.price);
   const fundamentals = await fetchFundamentals(chart.symbol);
 
   const statsLine =
@@ -97,15 +108,17 @@ export async function analyzeLongTerm(symbol: string): Promise<InvestResult> {
     cost += results.reduce((a, r) => a + r.costUsd, 0);
 
     const v = await callAgentJSON<{
-      rating: Verdict; entryLow?: number; entryHigh?: number; horizon: string; thesis: string[]; risks: string[];
+      rating: Verdict; entryLow?: number; entryHigh?: number; support?: number; resistance?: number;
+      target?: number; stopLoss?: number; horizon: string; thesis: string[]; risks: string[];
     }>({
       tier: "opus",
       system:
         "You chair the investment committee. Synthesize the three analysts into a final long-term verdict. " +
-        "Give an accumulation price zone (entryLow-entryHigh) near sensible technical/valuation levels, a holding horizon, " +
+        "Give an accumulation price zone (entryLow-entryHigh), your read of nearby support and resistance, a price " +
+        "target and a protective stop-loss (all numbers near sensible technical/valuation levels), a holding horizon, " +
         `3-5 thesis bullets and 2-4 key risks. Be decisive and honest — 'watch' and 'avoid' are valid answers. ${THAI}`,
-      prompt: `${chart.symbol}\n${statsLine}\n${fundLine}\nCommittee reads: ${views.map((x) => `${x.persona}=${x.stance}(${Math.round(x.confidence * 100)}%: ${x.reason})`).join("; ")}\nJSON {rating, entryLow, entryHigh, horizon, thesis, risks}.`,
-      maxTokens: 700,
+      prompt: `${chart.symbol}\n${statsLine}\n${fundLine}\nChart levels (reference): support ${fmt(levels.support, 2)}, resistance ${fmt(levels.resistance, 2)}.\nCommittee reads: ${views.map((x) => `${x.persona}=${x.stance}(${Math.round(x.confidence * 100)}%: ${x.reason})`).join("; ")}\nJSON {rating, entryLow, entryHigh, support, resistance, target, stopLoss, horizon, thesis, risks}.`,
+      maxTokens: 800,
       jsonSchema: VERDICT_SCHEMA,
     });
     cost += v.costUsd;
@@ -113,16 +126,20 @@ export async function analyzeLongTerm(symbol: string): Promise<InvestResult> {
       rating: v.data.rating,
       entryLow: num(v.data.entryLow),
       entryHigh: num(v.data.entryHigh),
+      support: num(v.data.support),
+      resistance: num(v.data.resistance),
+      target: num(v.data.target),
+      stopLoss: num(v.data.stopLoss),
       horizon: v.data.horizon,
       thesis: (v.data.thesis ?? []).slice(0, 5),
       risks: (v.data.risks ?? []).slice(0, 4),
     };
   } else {
     views = mockViews(stats);
-    verdict = mockVerdict(stats, views);
+    verdict = mockVerdict(stats, views, levels);
   }
 
-  return { symbol: chart.symbol, price: stats.price, stats, fundamentals, views, verdict, costUsd: cost };
+  return { symbol: chart.symbol, price: stats.price, stats, fundamentals, views, verdict, levels, costUsd: cost };
 }
 
 // ---- helpers ----
@@ -140,7 +157,7 @@ function mockViews(s: LongTermStats): InvestorView[] {
     { persona: "skeptic", stance: aboveMa ? "hold" : "avoid", confidence: 0.5, reason: `weekly RSI ${fmt(s.rsiWeekly)} (mock)` },
   ];
 }
-function mockVerdict(s: LongTermStats, views: InvestorView[]): InvestResult["verdict"] {
+function mockVerdict(s: LongTermStats, views: InvestorView[], levels: TechLevels): InvestResult["verdict"] {
   const buys = views.filter((v) => v.stance === "buy").length;
   const rating: Verdict = buys >= 2 ? "buy" : buys === 1 ? "watch" : "avoid";
   const ma = s.sma40w ?? s.price * 0.9;
@@ -148,6 +165,10 @@ function mockVerdict(s: LongTermStats, views: InvestorView[]): InvestResult["ver
     rating,
     entryLow: Math.min(ma, s.price) * 0.97,
     entryHigh: Math.min(ma * 1.03, s.price),
+    support: levels.support,
+    resistance: levels.resistance,
+    target: levels.target,
+    stopLoss: levels.stop,
     horizon: "1-3 years (mock)",
     thesis: ["[mock] Enable an AI backend (API key or Claude Code CLI) for a real thesis."],
     risks: ["[mock] Mock verdict is rule-based, not researched."],
