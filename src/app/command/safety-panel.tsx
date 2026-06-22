@@ -17,6 +17,7 @@ const UNIVERSE_OPTIONS: { key: string; label: string }[] = [
   { key: "us-mega", label: "Universe: US Mega-cap (12)" },
   { key: "dow30", label: "Universe: Dow 30" },
   { key: "nasdaq100", label: "Universe: NASDAQ-100 (~80)" },
+  { key: "sp500", label: "Universe: S&P 500 (~500)" },
 ];
 
 // Entry strategies selectable for swing portfolios (keys mirror the registry).

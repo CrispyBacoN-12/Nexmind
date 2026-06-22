@@ -148,25 +148,34 @@ export async function fetchAlpacaCandlesBatch(
   const start = new Date(Date.now() - rangeToLookbackMs(range)).toISOString();
   const end = new Date().toISOString();
   const headers = { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret, Accept: "application/json" };
+  const CHUNK = 100; // Alpaca rejects very long symbol lists — chunk the request.
 
-  // Accumulate bars per symbol across pages.
   const merged: Record<string, AlpacaBar[]> = {};
-  let pageToken: string | undefined;
-  do {
-    const params = new URLSearchParams({
-      symbols: symbols.join(","),
-      timeframe: intervalToTimeframe(interval),
-      start, end, feed: "iex", limit: "10000", sort: "asc",
-    });
-    if (pageToken) params.set("page_token", pageToken);
-    const res = await fetch(`${ALPACA_DATA_BASE}/bars?${params}`, { headers, next: { revalidate: 30 } });
-    if (!res.ok) throw new Error(`alpaca batch upstream ${res.status}`);
-    const json = (await res.json()) as { bars?: Record<string, AlpacaBar[]>; next_page_token?: string | null };
-    for (const [sym, bars] of Object.entries(json.bars ?? {})) {
-      (merged[sym] ??= []).push(...(bars ?? []));
+  for (let i = 0; i < symbols.length; i += CHUNK) {
+    const chunk = symbols.slice(i, i + CHUNK);
+    try {
+      let pageToken: string | undefined;
+      do {
+        const params = new URLSearchParams({
+          symbols: chunk.join(","),
+          timeframe: intervalToTimeframe(interval),
+          start, end, feed: "iex", limit: "10000", sort: "asc",
+        });
+        if (pageToken) params.set("page_token", pageToken);
+        const res = await fetch(`${ALPACA_DATA_BASE}/bars?${params}`, { headers, next: { revalidate: 30 } });
+        if (!res.ok) throw new Error(`alpaca batch upstream ${res.status}`);
+        const json = (await res.json()) as { bars?: Record<string, AlpacaBar[]>; next_page_token?: string | null };
+        for (const [sym, bars] of Object.entries(json.bars ?? {})) {
+          (merged[sym] ??= []).push(...(bars ?? []));
+        }
+        pageToken = json.next_page_token ?? undefined;
+      } while (pageToken);
+    } catch (e) {
+      // One bad symbol 400s the whole chunk — skip it; the router fills those
+      // symbols from Yahoo individually instead of losing the entire batch.
+      console.warn(`alpaca batch: chunk ${i / CHUNK} failed (${e instanceof Error ? e.message : e}); those symbols fall back to Yahoo`);
     }
-    pageToken = json.next_page_token ?? undefined;
-  } while (pageToken);
+  }
 
   return parseAlpacaBatch({ bars: merged }, range, interval);
 }
