@@ -26,7 +26,9 @@ export async function fetchCandles(
     try {
       return await fetchAlpacaCandles(symbol, range, interval);
     } catch (e) {
-      console.error(`marketData: Alpaca failed for ${symbol}, falling back to Yahoo —`, e);
+      // Expected for non-equity symbols (futures/crypto/forex) Alpaca's stock feed
+      // doesn't serve — fall back to Yahoo. Log one concise line, not a stack.
+      console.warn(`marketData: Alpaca miss for ${symbol} (${e instanceof Error ? e.message : e}); using Yahoo`);
     }
   }
   return fetchYahooCandles(symbol, range, interval);
