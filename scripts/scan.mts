@@ -8,7 +8,8 @@
 import { prisma } from "@/lib/db";
 import { runTradeTick } from "@/lib/trading/engine";
 import { manageOpenTrades } from "@/lib/trading/manage";
-import { scanSymbol } from "@/lib/trading/scanner";
+import { getStrategy } from "@/lib/trading/strategies";
+import { fetchCandlesBatch } from "@/lib/marketData";
 import { getWatchlist } from "@/lib/trading/watchlist";
 import { UNIVERSES, prepareSymbols } from "@/lib/trading/universe";
 import { getScanTimeframe, getPortfolioStrategy, getPortfolioUniverse, isGlobalTradingHalt } from "@/lib/settings";
@@ -46,17 +47,19 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string) {
   if (remaining <= 0) { log(`#${p.id} ${p.name} full (${open.length}/${p.maxOpenPositions}) — skipped`); return; }
 
   const strategy = await getPortfolioStrategy(p.id);
+  const strat = getStrategy(strategy);
   const symbols = prepareSymbols(uni.symbols, 200).filter((s) => !held.has(s));
 
-  // Cheap pass (no AI): keep only symbols with a fresh setup.
+  // Cheap pass (no AI): batch-fetch candles once, then run the strategy locally.
+  const candleMap = await fetchCandlesBatch(symbols, tf.range, tf.interval);
   const candidates: string[] = [];
   for (const s of symbols) {
-    try {
-      const scan = await scanSymbol(s, tf.range, tf.interval, strategy);
-      if (scan.side) candidates.push(scan.symbol);
-    } catch { /* skip unfetchable symbol */ }
+    const resp = candleMap.get(s);
+    if (!resp || !strat || resp.candles.length < 60) continue;
+    const sig = strat.build(resp.candles)(resp.candles.length - 1);
+    if (sig?.side) candidates.push(resp.symbol);
   }
-  log(`#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${symbols.length} scanned, ${remaining} slot(s) open`);
+  log(`#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${candleMap.size} fetched, ${remaining} slot(s) open`);
 
   // Spend AI only up to the open-slot budget.
   let aiUsed = 0;

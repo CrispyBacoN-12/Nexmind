@@ -64,6 +64,27 @@ export function parseAlpacaBars(
 
 const ALPACA_DATA_BASE = "https://data.alpaca.markets/v2/stocks";
 
+const toCandle = (b: AlpacaBar): Candle => ({
+  t: Math.floor(Date.parse(b.t) / 1000), o: b.o, h: b.h, l: b.l, c: b.c, v: b.v ?? 0,
+});
+
+/** Pure transform of a multi-symbol bars response ({ bars: { SYM: [...] } }) into
+ *  a per-symbol CandleResponse map. Symbols with no bars are omitted. */
+export function parseAlpacaBatch(
+  json: unknown,
+  range: Range,
+  interval: Interval,
+): Map<string, CandleResponse> {
+  const bySym = (json as { bars?: Record<string, AlpacaBar[]> })?.bars ?? {};
+  const out = new Map<string, CandleResponse>();
+  for (const [symbol, bars] of Object.entries(bySym)) {
+    if (!bars || bars.length === 0) continue;
+    const candles = bars.map(toCandle);
+    out.set(symbol, { symbol, range, interval, price: candles.at(-1)?.c, candles });
+  }
+  return out;
+}
+
 /**
  * Fetch candles from Alpaca's IEX (free) feed. Throws when no key is set, on a
  * non-OK response, or when the body has no bars — callers fall back to Yahoo.
@@ -107,4 +128,45 @@ export async function fetchAlpacaCandles(
 
   const json = await res.json();
   return parseAlpacaBars(json, symbol, range, interval);
+}
+
+/**
+ * Fetch candles for many symbols in one (paginated) request — Alpaca's
+ * multi-symbol bars endpoint. Returns a per-symbol CandleResponse map; symbols
+ * with no data are simply absent. Throws when no key is set (caller falls back).
+ */
+export async function fetchAlpacaCandlesBatch(
+  symbols: string[],
+  range: Range = "1mo",
+  interval: Interval = "1d",
+): Promise<Map<string, CandleResponse>> {
+  const key = process.env.ALPACA_KEY;
+  const secret = process.env.ALPACA_SECRET;
+  if (!key || !secret) throw new Error("alpaca: missing ALPACA_KEY / ALPACA_SECRET");
+  if (symbols.length === 0) return new Map();
+
+  const start = new Date(Date.now() - rangeToLookbackMs(range)).toISOString();
+  const end = new Date().toISOString();
+  const headers = { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret, Accept: "application/json" };
+
+  // Accumulate bars per symbol across pages.
+  const merged: Record<string, AlpacaBar[]> = {};
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      symbols: symbols.join(","),
+      timeframe: intervalToTimeframe(interval),
+      start, end, feed: "iex", limit: "10000", sort: "asc",
+    });
+    if (pageToken) params.set("page_token", pageToken);
+    const res = await fetch(`${ALPACA_DATA_BASE}/bars?${params}`, { headers, next: { revalidate: 30 } });
+    if (!res.ok) throw new Error(`alpaca batch upstream ${res.status}`);
+    const json = (await res.json()) as { bars?: Record<string, AlpacaBar[]>; next_page_token?: string | null };
+    for (const [sym, bars] of Object.entries(json.bars ?? {})) {
+      (merged[sym] ??= []).push(...(bars ?? []));
+    }
+    pageToken = json.next_page_token ?? undefined;
+  } while (pageToken);
+
+  return parseAlpacaBatch({ bars: merged }, range, interval);
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { intervalToTimeframe, rangeToLookbackMs, parseAlpacaBars, fetchAlpacaCandles } from "./alpaca";
+import { intervalToTimeframe, rangeToLookbackMs, parseAlpacaBars, parseAlpacaBatch, fetchAlpacaCandles } from "./alpaca";
 
 test("intervalToTimeframe maps every supported interval", () => {
   assert.equal(intervalToTimeframe("5m"), "5Min");
@@ -41,6 +41,25 @@ test("parseAlpacaBars converts bars to Candle[] with unix-second timestamps", ()
 test("parseAlpacaBars throws on empty or missing bars (so the router can fall back)", () => {
   assert.throws(() => parseAlpacaBars({ symbol: "AAPL", bars: [] }, "AAPL", "1d", "5m"));
   assert.throws(() => parseAlpacaBars({ symbol: "AAPL" }, "AAPL", "1d", "5m"));
+});
+
+test("parseAlpacaBatch maps each symbol to a CandleResponse, skipping empties", () => {
+  const json = {
+    bars: {
+      AAPL: [{ t: "2026-06-15T13:30:00Z", o: 1, h: 3, l: 0.5, c: 2, v: 100 }],
+      MSFT: [
+        { t: "2026-06-15T13:30:00Z", o: 10, h: 12, l: 9, c: 11, v: 50 },
+        { t: "2026-06-16T13:30:00Z", o: 11, h: 13, l: 10, c: 12, v: 60 },
+      ],
+      EMPTY: [],
+    },
+  };
+  const map = parseAlpacaBatch(json, "1mo", "1d");
+  assert.equal(map.size, 2, "EMPTY (no bars) is omitted");
+  assert.equal(map.get("AAPL")!.candles.length, 1);
+  assert.equal(map.get("MSFT")!.candles.length, 2);
+  assert.equal(map.get("MSFT")!.price, 12);
+  assert.equal(map.has("EMPTY"), false);
 });
 
 test("fetchAlpacaCandles throws when no API key is configured", async () => {
