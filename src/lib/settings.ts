@@ -35,6 +35,11 @@ export async function getPortfolioStrategy(portfolioId: number): Promise<string>
   return (await getPortfolio(portfolioId)).strategy || "trend-pullback";
 }
 
+/** A swing portfolio's auto-trade universe key ("" = trade the watchlist instead). */
+export async function getPortfolioUniverse(portfolioId: number): Promise<string> {
+  return (await getPortfolio(portfolioId)).universe || "";
+}
+
 export async function isKillSwitchOn(portfolioId: number): Promise<boolean> {
   return (await getPortfolio(portfolioId)).killSwitch;
 }

@@ -8,8 +8,16 @@ interface Portfolio {
   killSwitch: boolean; killSwitchReason: string;
   maxOpenPositions: number; startingBalance: number; riskPctPerTrade: number;
   drawdownHaltPct: number; currentDrawdownPct: number;
-  scanInterval: string; scanRange: string; strategy: string;
+  scanInterval: string; scanRange: string; strategy: string; universe: string;
 }
+
+// Auto-trade source: "" = the portfolio's watchlist, else scan a whole universe.
+const UNIVERSE_OPTIONS: { key: string; label: string }[] = [
+  { key: "", label: "Watchlist (default)" },
+  { key: "us-mega", label: "Universe: US Mega-cap (12)" },
+  { key: "dow30", label: "Universe: Dow 30" },
+  { key: "nasdaq100", label: "Universe: NASDAQ-100 (~80)" },
+];
 
 // Entry strategies selectable for swing portfolios (keys mirror the registry).
 const STRATEGY_OPTIONS: { key: string; label: string }[] = [
@@ -164,6 +172,19 @@ export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; o
           >
             {STRATEGY_OPTIONS.some((s) => s.key === p.strategy) ? null : <option value={p.strategy}>{p.strategy}</option>}
             {STRATEGY_OPTIONS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </div>
+      )}
+      {p.kind === "swing" && (
+        <div className="flex items-center gap-2 mt-2">
+          <label className="text-xs text-(--color-muted)">Auto-trade source</label>
+          <select
+            value={p.universe}
+            disabled={busy}
+            onChange={(e) => patch({ universe: e.target.value })}
+            className="rounded-md bg-(--color-card) border border-(--color-border) px-2 py-1 text-sm"
+          >
+            {UNIVERSE_OPTIONS.map((u) => <option key={u.key} value={u.key}>{u.label}</option>)}
           </select>
         </div>
       )}

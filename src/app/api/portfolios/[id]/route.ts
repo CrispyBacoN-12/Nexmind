@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ALLOWED_RANGES, ALLOWED_INTERVALS } from "@/lib/yahoo";
 import { getStrategy } from "@/lib/trading/strategies";
+import { UNIVERSES } from "@/lib/trading/universe";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const b = (await req.json().catch(() => ({}))) as {
     killSwitch?: boolean; riskPctPerTrade?: number; maxOpenPositions?: number;
     startingBalance?: number; drawdownHaltPct?: number; status?: string; name?: string;
-    scanInterval?: string; scanRange?: string; strategy?: string;
+    scanInterval?: string; scanRange?: string; strategy?: string; universe?: string;
   };
   const data: Record<string, unknown> = {};
   if (typeof b.killSwitch === "boolean") {
@@ -29,6 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (typeof b.scanInterval === "string" && (ALLOWED_INTERVALS as readonly string[]).includes(b.scanInterval)) data.scanInterval = b.scanInterval;
   if (typeof b.scanRange === "string" && (ALLOWED_RANGES as readonly string[]).includes(b.scanRange)) data.scanRange = b.scanRange;
   if (typeof b.strategy === "string" && getStrategy(b.strategy)) data.strategy = b.strategy;
+  if (typeof b.universe === "string" && (b.universe === "" || b.universe in UNIVERSES)) data.universe = b.universe;
 
   const updated = await prisma.portfolio.update({ where: { id: portfolioId }, data });
   return NextResponse.json(updated);

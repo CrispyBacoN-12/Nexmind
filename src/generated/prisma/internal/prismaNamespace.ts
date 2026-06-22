@@ -1573,6 +1573,7 @@ export const PortfolioScalarFieldEnum = {
   scanInterval: 'scanInterval',
   scanRange: 'scanRange',
   strategy: 'strategy',
+  universe: 'universe',
   killSwitch: 'killSwitch',
   killSwitchReason: 'killSwitchReason',
   sort: 'sort',

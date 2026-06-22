@@ -62,6 +62,7 @@ export type PortfolioMinAggregateOutputType = {
   scanInterval: string | null
   scanRange: string | null
   strategy: string | null
+  universe: string | null
   killSwitch: boolean | null
   killSwitchReason: string | null
   sort: number | null
@@ -82,6 +83,7 @@ export type PortfolioMaxAggregateOutputType = {
   scanInterval: string | null
   scanRange: string | null
   strategy: string | null
+  universe: string | null
   killSwitch: boolean | null
   killSwitchReason: string | null
   sort: number | null
@@ -102,6 +104,7 @@ export type PortfolioCountAggregateOutputType = {
   scanInterval: number
   scanRange: number
   strategy: number
+  universe: number
   killSwitch: number
   killSwitchReason: number
   sort: number
@@ -146,6 +149,7 @@ export type PortfolioMinAggregateInputType = {
   scanInterval?: true
   scanRange?: true
   strategy?: true
+  universe?: true
   killSwitch?: true
   killSwitchReason?: true
   sort?: true
@@ -166,6 +170,7 @@ export type PortfolioMaxAggregateInputType = {
   scanInterval?: true
   scanRange?: true
   strategy?: true
+  universe?: true
   killSwitch?: true
   killSwitchReason?: true
   sort?: true
@@ -186,6 +191,7 @@ export type PortfolioCountAggregateInputType = {
   scanInterval?: true
   scanRange?: true
   strategy?: true
+  universe?: true
   killSwitch?: true
   killSwitchReason?: true
   sort?: true
@@ -293,6 +299,7 @@ export type PortfolioGroupByOutputType = {
   scanInterval: string
   scanRange: string
   strategy: string
+  universe: string
   killSwitch: boolean
   killSwitchReason: string
   sort: number
@@ -336,6 +343,7 @@ export type PortfolioWhereInput = {
   scanInterval?: Prisma.StringFilter<"Portfolio"> | string
   scanRange?: Prisma.StringFilter<"Portfolio"> | string
   strategy?: Prisma.StringFilter<"Portfolio"> | string
+  universe?: Prisma.StringFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringFilter<"Portfolio"> | string
   sort?: Prisma.IntFilter<"Portfolio"> | number
@@ -361,6 +369,7 @@ export type PortfolioOrderByWithRelationInput = {
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
+  universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
   sort?: Prisma.SortOrder
@@ -389,6 +398,7 @@ export type PortfolioWhereUniqueInput = Prisma.AtLeast<{
   scanInterval?: Prisma.StringFilter<"Portfolio"> | string
   scanRange?: Prisma.StringFilter<"Portfolio"> | string
   strategy?: Prisma.StringFilter<"Portfolio"> | string
+  universe?: Prisma.StringFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringFilter<"Portfolio"> | string
   sort?: Prisma.IntFilter<"Portfolio"> | number
@@ -414,6 +424,7 @@ export type PortfolioOrderByWithAggregationInput = {
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
+  universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
   sort?: Prisma.SortOrder
@@ -442,6 +453,7 @@ export type PortfolioScalarWhereWithAggregatesInput = {
   scanInterval?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   scanRange?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   strategy?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
+  universe?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolWithAggregatesFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   sort?: Prisma.IntWithAggregatesFilter<"Portfolio"> | number
@@ -461,6 +473,7 @@ export type PortfolioCreateInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -486,6 +499,7 @@ export type PortfolioUncheckedCreateInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -510,6 +524,7 @@ export type PortfolioUpdateInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -535,6 +550,7 @@ export type PortfolioUncheckedUpdateInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -560,6 +576,7 @@ export type PortfolioCreateManyInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -579,6 +596,7 @@ export type PortfolioUpdateManyMutationInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -599,6 +617,7 @@ export type PortfolioUncheckedUpdateManyInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -624,6 +643,7 @@ export type PortfolioCountOrderByAggregateInput = {
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
+  universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
   sort?: Prisma.SortOrder
@@ -655,6 +675,7 @@ export type PortfolioMaxOrderByAggregateInput = {
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
+  universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
   sort?: Prisma.SortOrder
@@ -675,6 +696,7 @@ export type PortfolioMinOrderByAggregateInput = {
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
+  universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
   sort?: Prisma.SortOrder
@@ -779,6 +801,7 @@ export type PortfolioCreateWithoutSignalsInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -803,6 +826,7 @@ export type PortfolioUncheckedCreateWithoutSignalsInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -842,6 +866,7 @@ export type PortfolioUpdateWithoutSignalsInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -866,6 +891,7 @@ export type PortfolioUncheckedUpdateWithoutSignalsInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -889,6 +915,7 @@ export type PortfolioCreateWithoutHoldingsInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -913,6 +940,7 @@ export type PortfolioUncheckedCreateWithoutHoldingsInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -952,6 +980,7 @@ export type PortfolioUpdateWithoutHoldingsInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -976,6 +1005,7 @@ export type PortfolioUncheckedUpdateWithoutHoldingsInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -999,6 +1029,7 @@ export type PortfolioCreateWithoutOptionHoldingsInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -1023,6 +1054,7 @@ export type PortfolioUncheckedCreateWithoutOptionHoldingsInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -1062,6 +1094,7 @@ export type PortfolioUpdateWithoutOptionHoldingsInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1086,6 +1119,7 @@ export type PortfolioUncheckedUpdateWithoutOptionHoldingsInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1109,6 +1143,7 @@ export type PortfolioCreateWithoutTradesInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -1133,6 +1168,7 @@ export type PortfolioUncheckedCreateWithoutTradesInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -1172,6 +1208,7 @@ export type PortfolioUpdateWithoutTradesInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1196,6 +1233,7 @@ export type PortfolioUncheckedUpdateWithoutTradesInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1219,6 +1257,7 @@ export type PortfolioCreateWithoutWatchlistInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -1243,6 +1282,7 @@ export type PortfolioUncheckedCreateWithoutWatchlistInput = {
   scanInterval?: string
   scanRange?: string
   strategy?: string
+  universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
   sort?: number
@@ -1282,6 +1322,7 @@ export type PortfolioUpdateWithoutWatchlistInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1306,6 +1347,7 @@ export type PortfolioUncheckedUpdateWithoutWatchlistInput = {
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
   sort?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1397,6 +1439,7 @@ export type PortfolioSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   scanInterval?: boolean
   scanRange?: boolean
   strategy?: boolean
+  universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
   sort?: boolean
@@ -1423,6 +1466,7 @@ export type PortfolioSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   scanInterval?: boolean
   scanRange?: boolean
   strategy?: boolean
+  universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
   sort?: boolean
@@ -1443,6 +1487,7 @@ export type PortfolioSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   scanInterval?: boolean
   scanRange?: boolean
   strategy?: boolean
+  universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
   sort?: boolean
@@ -1463,13 +1508,14 @@ export type PortfolioSelectScalar = {
   scanInterval?: boolean
   scanRange?: boolean
   strategy?: boolean
+  universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
   sort?: boolean
   createdAt?: boolean
 }
 
-export type PortfolioOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "kind" | "status" | "startingBalance" | "riskPctPerTrade" | "maxOpenPositions" | "drawdownHaltPct" | "cash" | "rebalanceBandPct" | "scanInterval" | "scanRange" | "strategy" | "killSwitch" | "killSwitchReason" | "sort" | "createdAt", ExtArgs["result"]["portfolio"]>
+export type PortfolioOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "kind" | "status" | "startingBalance" | "riskPctPerTrade" | "maxOpenPositions" | "drawdownHaltPct" | "cash" | "rebalanceBandPct" | "scanInterval" | "scanRange" | "strategy" | "universe" | "killSwitch" | "killSwitchReason" | "sort" | "createdAt", ExtArgs["result"]["portfolio"]>
 export type PortfolioInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   trades?: boolean | Prisma.Portfolio$tradesArgs<ExtArgs>
   signals?: boolean | Prisma.Portfolio$signalsArgs<ExtArgs>
@@ -1504,6 +1550,7 @@ export type $PortfolioPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     scanInterval: string
     scanRange: string
     strategy: string
+    universe: string
     killSwitch: boolean
     killSwitchReason: string
     sort: number
@@ -1949,6 +1996,7 @@ export interface PortfolioFieldRefs {
   readonly scanInterval: Prisma.FieldRef<"Portfolio", 'String'>
   readonly scanRange: Prisma.FieldRef<"Portfolio", 'String'>
   readonly strategy: Prisma.FieldRef<"Portfolio", 'String'>
+  readonly universe: Prisma.FieldRef<"Portfolio", 'String'>
   readonly killSwitch: Prisma.FieldRef<"Portfolio", 'Boolean'>
   readonly killSwitchReason: Prisma.FieldRef<"Portfolio", 'String'>
   readonly sort: Prisma.FieldRef<"Portfolio", 'Int'>
