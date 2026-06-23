@@ -153,27 +153,35 @@ export async function fetchAlpacaCandlesBatch(
   const merged: Record<string, AlpacaBar[]> = {};
   for (let i = 0; i < symbols.length; i += CHUNK) {
     const chunk = symbols.slice(i, i + CHUNK);
-    try {
-      let pageToken: string | undefined;
-      do {
-        const params = new URLSearchParams({
-          symbols: chunk.join(","),
-          timeframe: intervalToTimeframe(interval),
-          start, end, feed: "iex", limit: "10000", sort: "asc",
-        });
-        if (pageToken) params.set("page_token", pageToken);
-        const res = await fetch(`${ALPACA_DATA_BASE}/bars?${params}`, { headers, next: { revalidate: 30 } });
-        if (!res.ok) throw new Error(`alpaca batch upstream ${res.status}`);
-        const json = (await res.json()) as { bars?: Record<string, AlpacaBar[]>; next_page_token?: string | null };
-        for (const [sym, bars] of Object.entries(json.bars ?? {})) {
-          (merged[sym] ??= []).push(...(bars ?? []));
+    // Retry once on a transient failure (network/5xx); a 4xx is a bad symbol so
+    // retrying won't help — skip and let the router backfill from Yahoo.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const chunkBars: Record<string, AlpacaBar[]> = {};
+      try {
+        let pageToken: string | undefined;
+        do {
+          const params = new URLSearchParams({
+            symbols: chunk.join(","),
+            timeframe: intervalToTimeframe(interval),
+            start, end, feed: "iex", limit: "10000", sort: "asc",
+          });
+          if (pageToken) params.set("page_token", pageToken);
+          const res = await fetch(`${ALPACA_DATA_BASE}/bars?${params}`, { headers, next: { revalidate: 30 } });
+          if (!res.ok) throw new Error(`alpaca batch upstream ${res.status}`);
+          const json = (await res.json()) as { bars?: Record<string, AlpacaBar[]>; next_page_token?: string | null };
+          for (const [sym, bars] of Object.entries(json.bars ?? {})) (chunkBars[sym] ??= []).push(...(bars ?? []));
+          pageToken = json.next_page_token ?? undefined;
+        } while (pageToken);
+        for (const [sym, bars] of Object.entries(chunkBars)) (merged[sym] ??= []).push(...bars);
+        break; // chunk done
+      } catch (e) {
+        const is4xx = e instanceof Error && /upstream 4\d\d/.test(e.message);
+        if (attempt === 2 || is4xx) {
+          console.warn(`alpaca batch: chunk ${i / CHUNK} failed (${e instanceof Error ? e.message : e}); those symbols fall back to Yahoo`);
+          break;
         }
-        pageToken = json.next_page_token ?? undefined;
-      } while (pageToken);
-    } catch (e) {
-      // One bad symbol 400s the whole chunk — skip it; the router fills those
-      // symbols from Yahoo individually instead of losing the entire batch.
-      console.warn(`alpaca batch: chunk ${i / CHUNK} failed (${e instanceof Error ? e.message : e}); those symbols fall back to Yahoo`);
+        await new Promise((r) => setTimeout(r, 500)); // brief pause before retry
+      }
     }
   }
 
