@@ -9,9 +9,25 @@ export function shouldTryAlpaca(env: { ALPACA_KEY?: string; ALPACA_SECRET?: stri
   return Boolean(env.ALPACA_KEY && env.ALPACA_SECRET);
 }
 
+/** Retry an async fetch once on a transient failure (network blip / 5xx). */
+async function withRetry<T>(fn: () => Promise<T>, attempts = 2, delayMs = 400): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts) await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * Fetch candles from the best available provider. Alpaca first when
  * configured; Yahoo as the fallback (and the only provider when no key is set).
+ * The Yahoo path is retried once so a transient "fetch failed" network blip
+ * doesn't fail the whole scan tick.
  */
 export async function fetchCandles(
   symbol: string,
@@ -31,7 +47,7 @@ export async function fetchCandles(
       console.warn(`marketData: Alpaca miss for ${symbol} (${e instanceof Error ? e.message : e}); using Yahoo`);
     }
   }
-  return fetchYahooCandles(symbol, range, interval);
+  return withRetry(() => fetchYahooCandles(symbol, range, interval));
 }
 
 /**
