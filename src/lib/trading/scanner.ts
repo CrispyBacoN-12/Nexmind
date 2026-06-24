@@ -57,25 +57,42 @@ export const DEFAULT_THRESHOLDS: SetupThresholds = { adxFloor: 20, rsiLow: 35, r
 export function decideSetup(s: ScanSnapshot, t: SetupThresholds = DEFAULT_THRESHOLDS): { side: "long" | "short" | null; note: string } {
   const { sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal } = s;
 
-  const trending = adxVal != null && adxVal > t.adxFloor;
-  if (trending && s20 != null && s50 != null && r != null && pDI != null && mDI != null) {
-    const up = s20 > s50 && pDI > mDI;
-    const down = s20 < s50 && mDI > pDI;
-    let side: "long" | "short" | null = null;
-    if (up && r >= t.rsiLow && r <= t.rsiHigh && (hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) side = "long";
-    else if (down && r >= t.rsiLow && r <= t.rsiHigh) side = "short";
-
-    if (side) {
-      const base = `${side === "long" ? "uptrend" : "downtrend"} pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}`;
-      if (s.lc) {
-        const lcAgrees =
-          side === "long" ? s.lc.signal === 1 && s.lc.kernelBullish : s.lc.signal === -1 && s.lc.kernelBearish;
-        return { side, note: `${base} · LC ${lcAgrees ? "✓" : "—"} (${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction})` };
-      }
-      return { side, note: base };
-    }
+  // Sequential gates — each failure reports the specific reason (for "no setup" logs).
+  if (adxVal == null || s20 == null || s50 == null || r == null || pDI == null || mDI == null) {
+    return { side: null, note: "no setup · insufficient data" };
   }
-  return { side: null, note: "no setup" };
+  if (adxVal <= t.adxFloor) {
+    return { side: null, note: `no setup · weak trend (ADX ${adxVal.toFixed(0)} ≤ ${t.adxFloor})` };
+  }
+  const up = s20 > s50 && pDI > mDI;
+  const down = s20 < s50 && mDI > pDI;
+  if (!up && !down) {
+    return { side: null, note: `no setup · trend not aligned (SMA/DI mixed, ADX ${adxVal.toFixed(0)})` };
+  }
+  if (r < t.rsiLow || r > t.rsiHigh) {
+    return { side: null, note: `no setup · RSI ${r.toFixed(0)} outside ${t.rsiLow}-${t.rsiHigh}` };
+  }
+  if (up && !(hist == null || hist > -Math.abs((atrVal ?? 1) * 0.1))) {
+    return { side: null, note: `no setup · MACD turning down (long blocked, RSI ${r.toFixed(0)})` };
+  }
+
+  const side: "long" | "short" = up ? "long" : "short";
+  const base = `${side === "long" ? "uptrend" : "downtrend"} pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}`;
+  if (s.lc) {
+    const lcAgrees =
+      side === "long" ? s.lc.signal === 1 && s.lc.kernelBullish : s.lc.signal === -1 && s.lc.kernelBearish;
+    return { side, note: `${base} · LC ${lcAgrees ? "✓" : "—"} (${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction})` };
+  }
+  return { side, note: base };
+}
+
+/** One-line indicator context for "no setup" diagnostics on the strategy path. */
+function snapshotDiag(s: ScanSnapshot): string {
+  const parts: string[] = [];
+  if (s.adx != null) parts.push(`ADX ${s.adx.toFixed(0)}`);
+  if (s.rsi != null) parts.push(`RSI ${s.rsi.toFixed(0)}`);
+  if (s.sma50 != null && s.price) parts.push(s.price > s.sma50 ? "above SMA50" : "below SMA50");
+  return parts.join(" · ") || "no data";
 }
 
 /**
@@ -124,7 +141,7 @@ export async function scanSymbol(
   if (strat) {
     const sig = strat.build(candles)(candles.length - 1);
     side = sig?.side ?? null;
-    note = sig ? `${strat.label}: ${sig.note}` : "no setup";
+    note = sig ? `${strat.label}: ${sig.note}` : `no setup · ${strat.label} no signal · ${snapshotDiag(snapshot)}`;
   } else {
     ({ side, note } = decideSetup(snapshot));
   }

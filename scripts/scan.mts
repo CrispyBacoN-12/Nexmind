@@ -28,7 +28,10 @@ async function scanWatchlist(p: Portfolio, tf: TF) {
   for (const w of wl) {
     try {
       const r = await runTradeTick(w.symbol, p.id, { range: tf.range, interval: tf.interval });
-      log(`#${p.id} ${p.name} ${w.symbol} (${tf.interval}/${tf.range}) -> ${r.outcome}${r.tradeId ? ` trade#${r.tradeId}` : ""}`);
+      // On no-setup, log the scanner's reason (ADX/RSI/trend) instead of a bare outcome.
+      const scanNote = r.steps.find((s) => s.stage === "scanner")?.note ?? "";
+      const detail = r.outcome === "no-setup" && scanNote ? scanNote : `${r.outcome}${r.tradeId ? ` trade#${r.tradeId}` : ""}`;
+      log(`#${p.id} ${p.name} ${w.symbol} (${tf.interval}/${tf.range}) -> ${detail}`);
     } catch (e) {
       log(`#${p.id} ${p.name} ${w.symbol} ERROR ${String(e)}`);
     }
