@@ -144,6 +144,51 @@ const ripSell: Strategy = {
   },
 };
 
+/** Bull Flag (Warrior-method momentum continuation, OHLCV-only port). A strong
+ *  impulse "pole" (>=2 ATR over POLE bars) followed by a tight, lower-volume
+ *  pullback "flag", then a green breakout close above the flag high on expanding
+ *  volume. Long-only. Stop sits below the flag low; target ~2R. Note: the skill's
+ *  float/news/intraday-prime-time filters can't be reproduced here — pattern only,
+ *  so backtest before trusting it. */
+const bullFlag: Strategy = {
+  key: "bull-flag",
+  label: "Bull Flag (momentum continuation)",
+  build(bars) {
+    const POLE = 5, FLAG = 3;
+    const atrArr = atr(bars, 14);
+    const volSma = sma(bars.map((b) => b.v), 20);
+    return (i) => {
+      if (i < POLE + FLAG + 1) return null;
+      const a = atrArr[i];
+      if (a == null || a <= 0) return null;
+      const poleS = i - FLAG - POLE, poleE = i - FLAG - 1;
+      const poleRise = bars[poleE].c - bars[poleS].c;
+      if (poleRise < 2 * a) return null; // need a real impulse
+
+      let poleVol = 0;
+      for (let j = poleS; j <= poleE; j++) poleVol += bars[j].v;
+      poleVol /= POLE;
+
+      let flagHigh = -Infinity, flagLow = Infinity, flagVol = 0;
+      for (let j = i - FLAG; j <= i - 1; j++) {
+        flagHigh = Math.max(flagHigh, bars[j].h);
+        flagLow = Math.min(flagLow, bars[j].l);
+        flagVol += bars[j].v;
+      }
+      flagVol /= FLAG;
+
+      if (bars[poleE].c - flagLow > 0.6 * poleRise) return null; // pullback too deep (not a flag)
+      if (flagHigh - flagLow > poleRise) return null;            // flag wider than the pole
+      if (flagVol >= poleVol) return null;                       // healthy flag = lower volume
+
+      const c = bars[i];
+      const vRef = volSma[i] ?? poleVol;
+      if (!(c.c > flagHigh && c.c > c.o && c.v > vRef)) return null; // breakout: green, new high, volume up
+      return { side: "long", note: `bull flag breakout > ${flagHigh.toFixed(2)} (pole +${poleRise.toFixed(2)})` };
+    };
+  },
+};
+
 export type CombineMode = "any" | "vote";
 
 /** Build a meta-strategy that combines members. "any" enters when exactly one
@@ -192,6 +237,7 @@ export const STRATEGIES: Strategy[] = [
   fairValueGap,
   dipBuy,
   ripSell,
+  bullFlag,
   // Combos of the positive-edge members (EMA Cross excluded — it backtests negative).
   combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any"),
   combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3 }),

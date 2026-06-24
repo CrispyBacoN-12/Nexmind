@@ -28,6 +28,7 @@ const STRATEGY_OPTIONS: { key: string; label: string }[] = [
   { key: "fvg", label: "Fair Value Gap (ICT)" },
   { key: "mean-rev", label: "Dip Buy (RSI + SMA50)" },
   { key: "rip-sell", label: "Rip Sell (RSI + SMA50)" },
+  { key: "bull-flag", label: "Bull Flag (momentum)" },
   { key: "combo-or", label: "Combo OR (Trend+ORB+FVG)" },
   { key: "combo-vote", label: "Combo Vote≥2 (Trend+ORB+FVG)" },
   { key: "combo-all", label: "Combo Vote≥2 (Trend+FVG+Dip+Rip)" },

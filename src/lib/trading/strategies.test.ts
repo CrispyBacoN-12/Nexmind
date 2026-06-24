@@ -6,8 +6,8 @@ import type { Candle } from "@/lib/indicators";
 const DAY = 86_400;
 const HOUR = 3600;
 
-function bar(t: number, o: number, h: number, l: number, c: number): Candle {
-  return { t, o, h, l, c, v: 1000 };
+function bar(t: number, o: number, h: number, l: number, c: number, v = 1000): Candle {
+  return { t, o, h, l, c, v };
 }
 
 test("registry exposes base strategies + combos by key", () => {
@@ -59,6 +59,28 @@ test("Rip Sell: a bounce rolling over inside a downtrend fires a short", () => {
   const evalr = getStrategy("rip-sell")!.build(bars);
   const shorts = bars.map((_, i) => evalr(i)?.side).filter((s) => s === "short");
   assert.ok(shorts.length >= 1, "expected at least one rip-sell short");
+});
+
+test("Bull Flag: pole + tight low-vol pullback + volume breakout fires long", () => {
+  const b: Candle[] = [];
+  // 20 flat warmup bars (low volume) for ATR/volume-SMA.
+  for (let i = 0; i < 20; i++) b.push(bar(i * HOUR, 100, 100.5, 99.5, 100, 1000));
+  // Pole: 5 strong green bars 100 -> ~118 on high volume.
+  let p = 100;
+  for (let i = 0; i < 5; i++) { const o = p; p += 3.6; b.push(bar((20 + i) * HOUR, o, p + 0.3, o - 0.3, p, 5000)); }
+  // Flag: 3 small red bars pulling back tightly on LOW volume.
+  let f = p;
+  for (let i = 0; i < 3; i++) { const o = f; f -= 0.8; b.push(bar((25 + i) * HOUR, o, o + 0.2, f - 0.2, f, 1500)); }
+  const flagHigh = Math.max(b[25].h, b[26].h, b[27].h);
+  // Breakout: green bar closing above the flag high on high volume.
+  b.push(bar(28 * HOUR, f, flagHigh + 2, f - 0.2, flagHigh + 1.5, 6000));
+
+  const evalr = getStrategy("bull-flag")!.build(b);
+  assert.equal(evalr(b.length - 1)?.side, "long", "expected a bull-flag breakout long");
+  // A flat, no-pole series must not fire.
+  const flat = Array.from({ length: 30 }, (_, i) => bar(i * HOUR, 100, 100.5, 99.5, 100, 1000));
+  const evalFlat = getStrategy("bull-flag")!.build(flat);
+  assert.ok(flat.every((_, i) => evalFlat(i) === null), "no flag on a flat series");
 });
 
 test("combineStrategies 'any': one member firing triggers, conflict skips", () => {
