@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Radar, Terminal, Users, Network, FileBarChart, Activity, Hammer, LineChart, Landmark, FlaskConical, ScrollText } from "lucide-react";
+import { Radar, Terminal, Users, Network, FileBarChart, Activity, Hammer, LineChart, Landmark, FlaskConical, ScrollText, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -14,6 +14,7 @@ const nav = [
   { href: "/build", label: "Builder Studio", icon: Hammer },
   { href: "/roster", label: "Agent Roster", icon: Users },
   { href: "/graph", label: "Team Graph", icon: Network },
+  { href: "/scoreboard", label: "Scoreboard", icon: Trophy },
   { href: "/activity", label: "Scan Activity", icon: ScrollText },
   { href: "/reports", label: "Reports", icon: FileBarChart },
 ];
