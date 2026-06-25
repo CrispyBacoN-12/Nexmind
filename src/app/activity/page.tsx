@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 interface Row { time: string; msg: string; tone: "executed" | "vetoed" | "quiet" | "error" | "info" }
 
 function classify(msg: string): Row["tone"] {
-  if (/executed|OPEN /.test(msg)) return "executed";
+  if (/executed|OPEN |\bwin\b|TP1 /.test(msg)) return "executed";
+  if (/\bloss\b|ERROR|FATAL|failed/.test(msg)) return "error";
   if (/vetoed|VETO/.test(msg)) return "vetoed";
-  if (/ERROR|FATAL|failed/.test(msg)) return "error";
-  if (/setups|universe=|full \(/.test(msg)) return "info";
+  if (/setups|universe=|full \(|managed \d/.test(msg)) return "info";
   return "quiet"; // no-setup / already-open / no-consensus
 }
 
