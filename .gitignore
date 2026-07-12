@@ -55,3 +55,6 @@ dev.db
 
 # scheduled-scan log
 scripts/scan.log
+
+# Obsidian workspace state (machine-local, not content)
+obsidian-vault/.obsidian/
