@@ -1,21 +1,23 @@
-name: Hourly BTC scan
+name: Swing scan (all desks)
 
-# Vercel Hobby's native cron only runs once per day, but the Bitcoin Desk
-# (portfolio 9) and BTC Rip-Sell Test (portfolio 10) need an hourly scan —
-# same cadence as the old local Windows Task Scheduler job. This workflow
-# is the free substitute: it just hits the deployed cron API route.
+# Vercel Hobby's native cron only runs once per day, but every swing desk
+# (Gold, both BTC desks, Stocks) needs a 15-minute scan — same cadence as
+# the old local bot.ts orchestrator (manage 5m / scan 15m). This workflow
+# is the free substitute: it hits the deployed cron API route with no
+# `ids` filter, so it scans every active swing portfolio automatically
+# (and picks up any new desk without a workflow edit).
 on:
   schedule:
-    - cron: "5 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 jobs:
-  scan-btc:
+  scan-all:
     runs-on: ubuntu-latest
     steps:
       - name: Call scan cron endpoint
         run: |
           curl --fail --silent --show-error \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.NEXMIND_URL }}/api/cron/scan?ids=9,10"
+            "${{ secrets.NEXMIND_URL }}/api/cron/scan"
 

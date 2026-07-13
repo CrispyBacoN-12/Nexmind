@@ -1,14 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/scan?ids=8",
-      "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/cron/scan?ids=11",
-      "schedule": "0 22 * * *"
-    },
-    {
       "path": "/api/cron/options",
       "schedule": "30 22 * * *"
     }
