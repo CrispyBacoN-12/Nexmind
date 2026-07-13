@@ -15,7 +15,7 @@ export interface ProposedLevels {
   entry: number;
   sl: number;
   tp1: number;
-  tp2: number;
+  tp2: number | null; // null = single-target: TP1 is the full exit, no farther partial leg
 }
 
 export interface HawkVerdict {
@@ -73,7 +73,7 @@ const fmt = (n: number | null) => (n == null ? "n/a" : n.toFixed(2));
 /** Run the three analysts in parallel and tally a 2-of-3 vote. */
 export async function runHawk(
   scan: ScanResult,
-  opts: { newsDigest?: string; tier?: ModelTier; atrSlMult?: number; atrTpMult?: number } = {},
+  opts: { newsDigest?: string; tier?: ModelTier; atrSlMult?: number; atrTpMult?: number; singleTarget?: boolean } = {},
 ): Promise<HawkVerdict> {
   if (!scan.side) return { agreed: false, side: null, votes: [], levels: null, totalCostUsd: 0 };
 
@@ -104,18 +104,26 @@ export async function runHawk(
   if (longs >= 2) side = "long";
   else if (shorts >= 2) side = "short";
 
-  const levels = side ? computeLevels(scan, side, opts.atrSlMult ?? 1.5, opts.atrTpMult ?? 2.5) : null;
+  const levels = side
+    ? computeLevels(scan, side, opts.atrSlMult ?? 1.5, opts.atrTpMult ?? 2.5, opts.singleTarget ?? false)
+    : null;
 
   return { agreed: side != null, side, votes, levels, totalCostUsd };
 }
 
-function computeLevels(scan: ScanResult, side: "long" | "short", slMult: number, tpMult: number): ProposedLevels {
+function computeLevels(
+  scan: ScanResult,
+  side: "long" | "short",
+  slMult: number,
+  tpMult: number,
+  singleTarget: boolean,
+): ProposedLevels {
   const atr = scan.atr ?? scan.price * 0.005; // fallback 0.5% if ATR missing
   const entry = scan.price;
   if (side === "long") {
-    return { entry, sl: entry - slMult * atr, tp1: entry + tpMult * atr, tp2: entry + tpMult * 1.6 * atr };
+    return { entry, sl: entry - slMult * atr, tp1: entry + tpMult * atr, tp2: singleTarget ? null : entry + tpMult * 1.6 * atr };
   }
-  return { entry, sl: entry + slMult * atr, tp1: entry - tpMult * atr, tp2: entry - tpMult * 1.6 * atr };
+  return { entry, sl: entry + slMult * atr, tp1: entry - tpMult * atr, tp2: singleTarget ? null : entry - tpMult * 1.6 * atr };
 }
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5);

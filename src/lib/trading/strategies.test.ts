@@ -12,7 +12,7 @@ function bar(t: number, o: number, h: number, l: number, c: number, v = 1000): C
 
 test("registry exposes base strategies + combos by key", () => {
   const keys = STRATEGIES.map((s) => s.key);
-  for (const k of ["trend-pullback", "ema-cross", "orb", "fvg", "combo-or", "combo-vote"]) {
+  for (const k of ["trend-pullback", "ema-cross", "orb", "fvg", "liquidity-sweep", "swing-trend-continuation", "combo-or", "combo-vote"]) {
     assert.ok(keys.includes(k), `missing ${k}`);
   }
   assert.equal(getStrategy("nope"), null);
@@ -143,4 +143,72 @@ test("ORB: daily bars never fire (one bar per day)", () => {
   const bars = [0, 1, 2, 3, 4, 5].map((d) => bar(d * DAY, 100, 110, 90, 100 + d));
   const evalr = getStrategy("orb")!.build(bars);
   assert.ok(bars.every((_, i) => evalr(i) === null));
+});
+
+test("Liquidity Sweep + VWAP Reclaim: a low-sweep that reclaims VWAP with volume/ADX/trend confirmation fires long", () => {
+  // 70-bar uptrend (builds SMA50 + real ADX trend strength), then a shallow
+  // 15-bar pullback (so the "prior 20-bar low" sits close to current price),
+  // then a sweep bar: wicks below the pullback low, closes back up strongly
+  // on 3x average volume.
+  const up = Array.from({ length: 70 }, (_, i) => 100 + i * 1.5).map((c, i) => bar(i * HOUR, c - 0.3, c + 1, c - 1, c, 1000));
+  let p = up[up.length - 1].c;
+  const pullback: Candle[] = [];
+  for (let i = 0; i < 15; i++) { p -= 0.5; pullback.push(bar((70 + i) * HOUR, p + 0.5, p + 1, p - 1, p, 900)); }
+  const lastLow = Math.min(...pullback.map((b) => b.l));
+  const sweep = bar(85 * HOUR, p, p + 3.5, lastLow - 1.5, p + 3, 3000);
+  const bars = [...up, ...pullback, sweep];
+  const evalr = getStrategy("liquidity-sweep")!.build(bars);
+  assert.equal(evalr(85)?.side, "long");
+});
+
+test("Liquidity Sweep + VWAP Reclaim: a high-sweep that rejects VWAP with volume/ADX/trend confirmation fires short", () => {
+  const down = Array.from({ length: 70 }, (_, i) => 300 - i * 1.5).map((c, i) => bar(i * HOUR, c + 0.3, c + 1, c - 1, c, 1000));
+  let p = down[down.length - 1].c;
+  const bounce: Candle[] = [];
+  for (let i = 0; i < 15; i++) { p += 0.5; bounce.push(bar((70 + i) * HOUR, p - 0.5, p + 1, p - 1, p, 900)); }
+  const lastHigh = Math.max(...bounce.map((b) => b.h));
+  const sweep = bar(85 * HOUR, p, lastHigh + 1.5, p - 3.5, p - 3, 3000);
+  const bars = [...down, ...bounce, sweep];
+  const evalr = getStrategy("liquidity-sweep")!.build(bars);
+  assert.equal(evalr(85)?.side, "short");
+});
+
+test("Liquidity Sweep + VWAP Reclaim: a plain hold bar (no sweep) never fires", () => {
+  const bars = Array.from({ length: 25 }, (_, i) => bar(i * HOUR, 100, 100.5, 99.5, 100, 1000));
+  const evalr = getStrategy("liquidity-sweep")!.build(bars);
+  assert.ok(bars.every((_, i) => evalr(i) === null));
+});
+
+test("Swing Trend Continuation: declares a calibrated preferredExit ladder", () => {
+  const strat = getStrategy("swing-trend-continuation")!;
+  assert.equal(strat.preferredExit?.tp1Mult, 1.5);
+  assert.equal(strat.preferredExit?.singleTarget, true);
+  assert.ok(strat.preferredExit?.costs, "expects a real cost model, not NO_COSTS");
+});
+
+test("Swing Trend Continuation: a confirmed uptrend breaking out on volume fires long", () => {
+  // 70 daily bars, steady uptrend (ADX>25, price above weekly VWAP & SMA50),
+  // then a breakout bar closing above the prior 10-bar high on 3x volume,
+  // closing near its own high (positive estimated delta).
+  const up = Array.from({ length: 70 }, (_, i) => 100 + i * 1.5).map((c, i) => bar(i * DAY, c - 0.5, c + 1, c - 1, c, 1000));
+  const priorHigh = up[up.length - 1].h;
+  const breakout = bar(70 * DAY, priorHigh - 0.5, priorHigh + 5, priorHigh - 1, priorHigh + 4, 3000);
+  const bars = [...up, breakout];
+  const evalr = getStrategy("swing-trend-continuation")!.build(bars);
+  assert.equal(evalr(70)?.side, "long");
+});
+
+test("Swing Trend Continuation: a confirmed downtrend breaking down on volume fires short", () => {
+  const down = Array.from({ length: 70 }, (_, i) => 300 - i * 1.5).map((c, i) => bar(i * DAY, c + 0.5, c + 1, c - 1, c, 1000));
+  const priorLow = down[down.length - 1].l;
+  const breakdown = bar(70 * DAY, priorLow + 0.5, priorLow + 1, priorLow - 5, priorLow - 4, 3000);
+  const bars = [...down, breakdown];
+  const evalr = getStrategy("swing-trend-continuation")!.build(bars);
+  assert.equal(evalr(70)?.side, "short");
+});
+
+test("Swing Trend Continuation: a flat/ranging market (ADX below floor) never fires", () => {
+  const bars = Array.from({ length: 80 }, (_, i) => bar(i * DAY, 100, 101, 99, 100 + (i % 2 === 0 ? 0.3 : -0.3), 1000));
+  const evalr = getStrategy("swing-trend-continuation")!.build(bars);
+  assert.ok(bars.every((_, i) => evalr(i) === null), "must stay flat when there's no confirmed trend");
 });

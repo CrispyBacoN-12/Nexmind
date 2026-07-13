@@ -40,7 +40,7 @@ export async function runSage(
   const s = scan.snapshot;
   const prompt = [
     `Proposed ${side} on ${scan.symbol} (${scan.timeframe}).`,
-    `Entry ${levels.entry.toFixed(4)}, SL ${levels.sl.toFixed(4)}, TP1 ${levels.tp1.toFixed(4)}, TP2 ${levels.tp2.toFixed(4)}.`,
+    `Entry ${levels.entry.toFixed(4)}, SL ${levels.sl.toFixed(4)}, TP1 ${levels.tp1.toFixed(4)}, TP2 ${levels.tp2 != null ? levels.tp2.toFixed(4) : "none (single-target — TP1 is the full exit)"}.`,
     `Context: RSI ${fmt(s.rsi)}, ADX ${fmt(s.adx)}, ATR ${fmt(s.atr)}, SMA20 ${fmt(s.sma20)}, SMA50 ${fmt(s.sma50)}.`,
     opts.newsDigest ? `Intel: ${opts.newsDigest}` : "",
     opts.lessons ? `Lessons from past losses: ${opts.lessons}` : "",

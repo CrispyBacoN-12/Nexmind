@@ -1,0 +1,28 @@
+// NEXMIND research-25 "DI-Cross (no ADX filter)" - live on Gold Desk (#8)
+// Port of scripts/dispatch-frequent-run.ts candidate "DI-Cross (no ADX filter)"
+// Validated: GC=F 1h, ~63% win rate, stable both windows (3mo + 1y)
+// Chart: apply to GC=F (or XAUUSD) on the 1H timeframe
+//@version=6
+strategy("NEXMIND DI-Cross Gold (research-25)", overlay=true,
+     process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1)
+
+[diPlus, diMinus, _adx] = ta.dmi(14, 14)
+atrVal = ta.atr(14)
+
+longCross  = diPlus[1] <= diMinus[1] and diPlus > diMinus
+shortCross = diPlus[1] >= diMinus[1] and diPlus < diMinus
+
+if longCross and strategy.position_size == 0
+    slPrice = close - 1.5 * atrVal
+    tpPrice = close + 1.2 * atrVal
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", stop=slPrice, limit=tpPrice)
+
+if shortCross and strategy.position_size == 0
+    slPrice = close + 1.5 * atrVal
+    tpPrice = close - 1.2 * atrVal
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", stop=slPrice, limit=tpPrice)
+
+plot(diPlus, "DI+", color=color.green)
+plot(diMinus, "DI-", color=color.red)

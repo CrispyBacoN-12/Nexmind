@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { backtestCandles, openPosition, stepPosition } from "./engine";
+import { backtestCandles, openPosition, stepPosition, summarizeBacktest, type SimTrade } from "./engine";
 import { decideSetup, type ScanSnapshot } from "@/lib/trading/scanner";
 import type { Candle } from "@/lib/indicators";
 
@@ -132,4 +132,112 @@ test("flat series produces no signals and no trades", () => {
   assert.equal(r.signals, 0);
   assert.equal(r.trades.length, 0);
   assert.equal(r.openAtEnd, false);
+});
+
+// ---- summarizeBacktest: profitFactor / maxDrawdownPct / Sharpe / Sortino ----
+
+function trade(pnl: number, day: number): SimTrade {
+  return {
+    symbol: "TEST", side: "long", entry: 100, exit: 100 + pnl, sl: 97, tp1: 105, tp2: 108,
+    lot: 0.1, outcome: pnl > 0 ? "win" : pnl < 0 ? "loss" : "breakeven", tp1Hit: false,
+    pnl, grossPnl: pnl, rMultiple: null,
+    openedAt: new Date(t0 * 1000),
+    closedAt: new Date((t0 + day * 86400) * 1000),
+  };
+}
+
+test("summarizeBacktest: profitFactor from mixed wins/losses, null with no losses", () => {
+  const mixed = summarizeBacktest([trade(100, 0), trade(50, 1), trade(-30, 2), trade(-20, 3)]);
+  assert.ok(Math.abs((mixed.profitFactor ?? 0) - 3) < 1e-9); // grossWin 150 / grossLoss 50
+
+  const noLosses = summarizeBacktest([trade(100, 0), trade(50, 1)]);
+  assert.equal(noLosses.profitFactor, null);
+});
+
+test("summarizeBacktest: maxDrawdownPct is a positive magnitude", () => {
+  // Equity path (starting balance 1000): 100, 150, 70, -10, 0 → peak 150, trough -10 → drawdown 160 → 16%.
+  const s = summarizeBacktest([trade(100, 0), trade(50, 1), trade(-80, 2), trade(-80, 3), trade(10, 4)], 1000);
+  assert.ok(s.maxDrawdownPct !== null && s.maxDrawdownPct > 0);
+  assert.ok(Math.abs((s.maxDrawdownPct ?? 0) - 16) < 1e-9);
+});
+
+test("summarizeBacktest: Sharpe/Sortino are non-null with enough daily variance, null with too little data", () => {
+  const trades = Array.from({ length: 10 }, (_, i) => trade(i % 2 === 0 ? 40 : -25, i));
+  const s = summarizeBacktest(trades);
+  assert.ok(s.sharpeRatio !== null);
+  assert.ok(s.sortinoRatio !== null);
+
+  const single = summarizeBacktest([trade(50, 0)]);
+  assert.equal(single.sharpeRatio, null);
+  assert.equal(single.sortinoRatio, null);
+});
+
+test("summarizeBacktest: empty trades returns sensible defaults without throwing", () => {
+  const s = summarizeBacktest([]);
+  assert.equal(s.trades, 0);
+  assert.equal(s.wins, 0);
+  assert.equal(s.losses, 0);
+  assert.equal(s.winRate, 0);
+  assert.equal(s.totalPnl, 0);
+  assert.equal(s.avgR, null);
+  assert.equal(s.expectancy, null);
+  assert.equal(s.profitFactor, null);
+  assert.equal(s.maxDrawdownPct, null);
+  assert.equal(s.sharpeRatio, null);
+  assert.equal(s.sortinoRatio, null);
+  assert.equal(s.totalCostsUsd, 0);
+});
+
+// ---- CostModel: slippage + commission ----
+
+test("openPosition with zero costs matches the no-costs call exactly (backward compatible)", () => {
+  const withDefaults = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000));
+  const withExplicitZero = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, {});
+  assert.deepEqual(withDefaults, withExplicitZero);
+});
+
+test("openPosition applies slippageBps against the trader on entry (long fills higher, short fills lower)", () => {
+  const long = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, { slippageBps: 10 });
+  assert.ok(Math.abs(long.entry - 100.1) < 1e-9); // +0.10% of 100
+
+  const short = openPosition("short", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, { slippageBps: 10 });
+  assert.ok(Math.abs(short.entry - 99.9) < 1e-9); // -0.10% of 100
+});
+
+test("stepPosition SL exit: slippage widens the loss, commission subtracts further, grossPnl stays theoretical", () => {
+  const p = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, { slippageBps: 10, commissionBps: 5 });
+  const r = stepPosition(p, bar(1, 99, 96.5)); // touches SL at fillEntry - 3
+  assert.equal(r.status, "closed");
+  if (r.status !== "closed") return;
+  // fillEntry = 100.1, sl = 97.1; exit slips further against the trader: 97.1 * (1 - 0.001) = 97.0029
+  const expectedGross = (97.1 * (1 - 0.001) - 100.1) * 0.2;
+  assert.ok(Math.abs(r.trade.grossPnl - expectedGross) < 1e-9);
+  const notional = 0.2 * 100.1;
+  const expectedCommission = notional * 0.0005;
+  assert.ok(Math.abs(r.trade.pnl - (expectedGross - expectedCommission)) < 1e-9);
+  assert.ok(r.trade.pnl < r.trade.grossPnl); // costs always make net pnl worse, never better
+});
+
+test("backtestCandles: same series nets less profit with a nonzero CostModel than with none", () => {
+  const WARMUP = 60; // mirrors engine.ts's private WARMUP constant — first bar an entry rule can act on
+  const series = Array.from({ length: 200 }, (_, i) => bar(i, 100 + i * 0.3 + 2, 100 + i * 0.3 - 2));
+  const free = backtestCandles("TEST", series, 0.1, undefined, (i) => (i === WARMUP ? "long" : null));
+  const costly = backtestCandles(
+    "TEST", series, 0.1, undefined, (i) => (i === WARMUP ? "long" : null),
+    false, 2.5, { slippageBps: 20, commissionBps: 10 },
+  );
+  assert.equal(free.trades.length, costly.trades.length);
+  if (free.trades.length > 0) {
+    assert.ok(costly.trades[0].pnl < free.trades[0].pnl);
+    assert.equal(free.trades[0].pnl, free.trades[0].grossPnl); // zero-cost: net === gross
+  }
+});
+
+test("summarizeBacktest: totalCostsUsd aggregates grossPnl - pnl drag across trades", () => {
+  const trades: SimTrade[] = [
+    { ...trade(100, 0), grossPnl: 112 },
+    { ...trade(-30, 1), grossPnl: -25 },
+  ];
+  const s = summarizeBacktest(trades);
+  assert.ok(Math.abs(s.totalCostsUsd - 17) < 1e-9); // (112-100) + (-25 - -30) = 12 + 5
 });

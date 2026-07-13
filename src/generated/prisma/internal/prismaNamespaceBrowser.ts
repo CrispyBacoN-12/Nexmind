@@ -63,6 +63,8 @@ export const ModelName = {
   Lesson: 'Lesson',
   Watchlist: 'Watchlist',
   BuildJob: 'BuildJob',
+  ResearchRun: 'ResearchRun',
+  ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
   Setting: 'Setting'
 } as const
@@ -224,6 +226,7 @@ export const TradeScalarFieldEnum = {
   status: 'status',
   outcome: 'outcome',
   pnl: 'pnl',
+  grossPnl: 'grossPnl',
   rMultiple: 'rMultiple',
   hawkVotes: 'hawkVotes',
   sageVerdict: 'sageVerdict',
@@ -290,6 +293,36 @@ export const BuildJobScalarFieldEnum = {
 } as const
 
 export type BuildJobScalarFieldEnum = (typeof BuildJobScalarFieldEnum)[keyof typeof BuildJobScalarFieldEnum]
+
+
+export const ResearchRunScalarFieldEnum = {
+  id: 'id',
+  brief: 'brief',
+  symbol: 'symbol',
+  interval: 'interval',
+  range: 'range',
+  status: 'status',
+  costUsd: 'costUsd',
+  createdAt: 'createdAt',
+  finishedAt: 'finishedAt'
+} as const
+
+export type ResearchRunScalarFieldEnum = (typeof ResearchRunScalarFieldEnum)[keyof typeof ResearchRunScalarFieldEnum]
+
+
+export const ResearchStrategyScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  label: 'label',
+  code: 'code',
+  status: 'status',
+  iterations: 'iterations',
+  backtestSummary: 'backtestSummary',
+  safetyFlag: 'safetyFlag',
+  createdAt: 'createdAt'
+} as const
+
+export type ResearchStrategyScalarFieldEnum = (typeof ResearchStrategyScalarFieldEnum)[keyof typeof ResearchStrategyScalarFieldEnum]
 
 
 export const ReportScalarFieldEnum = {

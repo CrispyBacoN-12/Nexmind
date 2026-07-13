@@ -187,6 +187,9 @@ function SwingBlock({ b }: { b: SwingData }) {
                   </div>
                   <div className="text-right">
                     {t.pnl != null && <div className={`font-semibold tabular-nums ${colorForChange(t.pnl)}`}>{fmtMoney(t.pnl)}</div>}
+                    {t.grossPnl != null && t.pnl != null && Math.abs(t.grossPnl - t.pnl) > 0.005 && (
+                      <div className="text-[11px] text-(--color-muted) font-mono">gross {fmtMoney(t.grossPnl)}</div>
+                    )}
                     <div className="text-[11px] text-(--color-muted) font-mono">{fmtAgo(t.openedAt)}</div>
                   </div>
                 </div>

@@ -7,11 +7,12 @@
 
 import { prisma } from "@/lib/db";
 import { fetchCandles } from "@/lib/marketData";
-import { decideAction, type LadderState } from "./positionRules";
+import { decideAction, applySlippage, type LadderState } from "./positionRules";
 import { generateLesson, type LessonInput } from "./memo";
 import { Prisma, type Trade } from "@/generated/prisma/client";
 import { getCurrentDrawdownPct } from "./circuitBreaker";
 import { isKillSwitchOn, getDrawdownHaltPct } from "@/lib/settings";
+import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 
 // Simplified paper P/L: USD per 1.0 price-point per lot. Real instruments differ
 // (contract sizes, pip values); this keeps the demo consistent and transparent.
@@ -77,33 +78,43 @@ export async function manageOpenTrades(portfolioId: number): Promise<ManageSumma
 
     const log = safeParse<{ stage: string; note: string }[]>(t.decisionLog, []);
 
+    // Closing a long is a sell (fills lower than theoretical); closing a short
+    // is a buy-to-cover (fills higher) — same slippage direction/assumption as
+    // the backtest engine and the entry fill in engine.ts.
+    const exit = applySlippage(t.side === "long" ? "sell" : "buy", action.exit, DEFAULT_COST_MODEL.slippageBps ?? 0);
+
     if (action.kind === "partial-tp1") {
-      const favorable = t.side === "long" ? action.exit - t.entry : t.entry - action.exit;
+      const favorable = t.side === "long" ? exit - t.entry : t.entry - exit;
       const banked = favorable * (t.lot / 2) * POINT_VALUE;
       const next: LadderState = {
         tp1Hit: true,
         partialPnl: (ladder.partialPnl ?? 0) + banked,
         origSl: ladder.origSl ?? t.sl,
       };
-      log.push({ stage: "manage", note: `TP1 partial — half closed at ${action.exit.toFixed(4)}, SL → breakeven` });
+      log.push({ stage: "manage", note: `TP1 partial — half closed at ${exit.toFixed(4)}, SL → breakeven` });
       await prisma.trade.update({
         where: { id: t.id },
         data: { sl: t.entry, stagedTp: JSON.stringify(next), decisionLog: JSON.stringify(log) },
       });
-      partials.push({ id: t.id, symbol: t.symbol, exit: action.exit, bankedPnl: banked });
+      partials.push({ id: t.id, symbol: t.symbol, exit, bankedPnl: banked });
       continue;
     }
 
-    // Full close (win / loss / breakeven).
+    // Full close (win / loss / breakeven). Commission is charged once here,
+    // against notional (lot * entry) — same convention as stepPosition() in
+    // src/lib/backtest/engine.ts, so live and backtested P/L stay comparable.
     const remainingLot = ladder.tp1Hit ? t.lot / 2 : t.lot;
-    const favorable = t.side === "long" ? action.exit - t.entry : t.entry - action.exit;
-    const pnl = (ladder.partialPnl ?? 0) + favorable * remainingLot * POINT_VALUE;
+    const favorable = t.side === "long" ? exit - t.entry : t.entry - exit;
+    const grossPnl = (ladder.partialPnl ?? 0) + favorable * remainingLot * POINT_VALUE;
+    const notional = t.lot * t.entry * POINT_VALUE;
+    const commission = notional * ((DEFAULT_COST_MODEL.commissionBps ?? 0) / 10000);
+    const pnl = grossPnl - commission;
     const risk = Math.abs(t.entry - (ladder.origSl ?? t.sl));
     const rMultiple = risk > 0 ? pnl / (risk * t.lot * POINT_VALUE) : null;
 
     log.push({
       stage: "manage",
-      note: `${action.outcome} — exit ${action.exit.toFixed(4)} (price ${cur.toFixed(4)})${ladder.tp1Hit ? " · incl. TP1 partial" : ""}`,
+      note: `${action.outcome} — exit ${exit.toFixed(4)} (price ${cur.toFixed(4)})${ladder.tp1Hit ? " · incl. TP1 partial" : ""}`,
     });
     await prisma.trade.update({
       where: { id: t.id },
@@ -111,13 +122,14 @@ export async function manageOpenTrades(portfolioId: number): Promise<ManageSumma
         status: "closed",
         outcome: action.outcome,
         pnl,
+        grossPnl,
         rMultiple,
         closedAt: new Date(),
         decisionLog: JSON.stringify(log),
         stagedTp: JSON.stringify(ladder),
       },
     });
-    closed.push({ id: t.id, symbol: t.symbol, outcome: action.outcome, exit: action.exit, price: cur, pnl });
+    closed.push({ id: t.id, symbol: t.symbol, outcome: action.outcome, exit, price: cur, pnl });
 
     if (action.outcome === "loss") {
       await recordLesson(t, { outcome: "loss", exit: action.exit, pnl, rMultiple });

@@ -1,0 +1,30 @@
+// NEXMIND research-30 "DI-Dominance Widening" - live on Gold Trend Desk (#13)
+// Port of scripts/dispatch-gold-trend-run.ts
+// Validated: GC=F 1h/1y, 57.3% win rate, 695 trades/yr, split-half stable
+// Chart: apply to GC=F (or XAUUSD) on the 1H timeframe
+//@version=6
+strategy("NEXMIND DI-Widening Gold (research-30)", overlay=true,
+     process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1)
+
+[diPlus, diMinus, adxVal] = ta.dmi(14, 14)
+atrVal = ta.atr(14)
+
+gap  = math.abs(diPlus - diMinus)
+pGap = math.abs(diPlus[1] - diMinus[1])
+
+longCond  = adxVal >= 20 and diPlus > diMinus and gap > pGap
+shortCond = adxVal >= 20 and diMinus > diPlus and gap > pGap
+
+if longCond and strategy.position_size == 0
+    slPrice = close - 1.5 * atrVal
+    tpPrice = close + 1.2 * atrVal
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", stop=slPrice, limit=tpPrice)
+
+if shortCond and strategy.position_size == 0
+    slPrice = close + 1.5 * atrVal
+    tpPrice = close - 1.2 * atrVal
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", stop=slPrice, limit=tpPrice)
+
+plot(adxVal, "ADX", color=color.orange)

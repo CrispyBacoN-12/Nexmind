@@ -21,6 +21,17 @@ export type PositionAction =
   | { kind: "close"; outcome: "win" | "loss" | "breakeven"; exit: number }
   | { kind: "partial-tp1"; exit: number }; // close half at TP1, move SL to entry
 
+/**
+ * Price the trader actually gets vs. the theoretical level, given round-turn
+ * slippage in bps — always worse for the trader, never better. A "buy" (opening
+ * a long, or buying-to-cover a short) fills higher; a "sell" (opening a short,
+ * or selling out of a long) fills lower.
+ */
+export function applySlippage(action: "buy" | "sell", price: number, slippageBps: number): number {
+  const frac = slippageBps / 10000;
+  return action === "buy" ? price * (1 + frac) : price * (1 - frac);
+}
+
 export function decideAction(t: OpenPosition, ladder: LadderState, price: number): PositionAction {
   const hitUp = (level: number) => (t.side === "long" ? price >= level : price <= level);
   const hitSl = t.side === "long" ? price <= t.sl : price >= t.sl;

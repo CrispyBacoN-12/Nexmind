@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardTitle, Button, Badge } from "@/components/ui";
+import { SECONDARY_PASSES } from "@/lib/trading/secondaryPasses";
 
 interface Item { id: number; symbol: string; label: string | null; enabled: boolean }
-interface ScanRow { symbol: string; outcome: string; costUsd: number; tradeId?: number; error?: string }
+interface ScanRow { symbol: string; outcome: string; costUsd: number; tradeId?: number; error?: string; pass: string }
 
 const outcomeTone: Record<string, "positive" | "warning" | "negative" | "neutral" | "info"> = {
   executed: "positive", vetoed: "warning", "rules-blocked": "warning",
@@ -40,9 +41,23 @@ export function WatchlistPanel({ portfolioId }: { portfolioId: number }) {
     if (scanning) return;
     setScanning(true); setResults(null); setSummary("");
     try {
-      const data = await fetch("/api/scan-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ portfolioId }) }).then((r) => r.json());
-      setResults(data.results ?? []);
-      setSummary(`scanned ${data.scanned} · ${data.executed} executed · cost $${(data.totalCostUsd ?? 0).toFixed(4)}`);
+      const passes = [
+        { body: { portfolioId }, label: "default" },
+        ...SECONDARY_PASSES.filter((sp) => sp.portfolioId === portfolioId).map((sp) => ({
+          body: { portfolioId, strategy: sp.strategy, interval: sp.interval, range: sp.range },
+          label: sp.label,
+        })),
+      ];
+      const all: ScanRow[] = [];
+      let scanned = 0, executed = 0, cost = 0;
+      for (const p of passes) {
+        const data = await fetch("/api/scan-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p.body) }).then((r) => r.json());
+        for (const r of data.results ?? []) all.push({ ...r, pass: p.label });
+        scanned += data.scanned ?? 0; executed += data.executed ?? 0; cost += data.totalCostUsd ?? 0;
+      }
+      setResults(all);
+      const passSummary = passes.length > 1 ? ` across ${passes.length} strategy passes` : "";
+      setSummary(`scanned ${scanned} · ${executed} executed · cost $${cost.toFixed(4)}${passSummary}`);
     } finally { setScanning(false); }
   }
 
@@ -69,12 +84,17 @@ export function WatchlistPanel({ portfolioId }: { portfolioId: number }) {
 
       <div className="flex flex-wrap gap-2">
         {items.map((it) => {
-          const r = results?.find((x) => x.symbol === it.symbol);
+          const rows = results?.filter((x) => x.symbol === it.symbol) ?? [];
+          const multi = rows.length > 1;
           return (
             <span key={it.id} className="inline-flex items-center gap-1.5 rounded-md border border-(--color-border) bg-(--color-card-2) pl-2 pr-1 py-1 text-xs">
               <span className="font-mono">{it.symbol}</span>
               {it.label && <span className="text-(--color-muted)">{it.label}</span>}
-              {r && <Badge tone={outcomeTone[r.outcome] ?? "neutral"}>{r.outcome}</Badge>}
+              {rows.map((r, i) => (
+                <Badge key={i} tone={outcomeTone[r.outcome] ?? "neutral"}>
+                  {multi ? `${r.pass}: ${r.outcome}` : r.outcome}
+                </Badge>
+              ))}
               <button onClick={() => remove(it.id)} className="text-(--color-muted) hover:text-rose-400 px-1" title="remove">×</button>
             </span>
           );

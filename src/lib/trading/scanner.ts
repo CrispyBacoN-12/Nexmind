@@ -3,10 +3,11 @@
 
 import { type Interval, type Range } from "@/lib/yahoo";
 import { fetchCandles } from "@/lib/marketData";
-import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
+import { sma, rsi, macd, atr, adx, bollinger, stochastic, anchoredVWAP, dailyAnchor, type Candle } from "@/lib/indicators";
 import { findRecentUpLeg } from "@/lib/swings";
 import { lorentzianLast, type LCState } from "@/lib/lc/lorentzian";
 import { getStrategy } from "./strategies";
+import { getResearchStrategy } from "@/lib/research/adapter";
 
 export interface ScanSnapshot {
   price: number;
@@ -18,6 +19,16 @@ export interface ScanSnapshot {
   minusDI: number | null;
   macdHist: number | null;
   atr: number | null;
+  /** Bollinger %B: position of price within the 20/2 bands (0 = lower band, 1 = upper band). Optional - only populated by the scanner and research adapter, not every ScanSnapshot builder. */
+  bbPercentB?: number | null;
+  /** Bollinger bandwidth: (upper-lower)/middle - band width relative to price, low = squeeze. */
+  bbWidth?: number | null;
+  /** Stochastic Oscillator %K (fast, smoothed 3). */
+  stochK?: number | null;
+  /** Stochastic Oscillator %D (signal line, %K smoothed 3 more). */
+  stochD?: number | null;
+  /** Deviation of price from session-anchored VWAP, as a fraction (0.01 = 1% above VWAP). */
+  vwapDevPct?: number | null;
   /** Lorentzian Classification state (confluence filter); null when history is too short. */
   lc?: LCState | null;
 }
@@ -126,9 +137,22 @@ export async function scanSymbol(
   const adxVal = last(adxArr);
   const pDI = last(plusDI);
   const mDI = last(minusDI);
+  const { upper: bbUpper, middle: bbMiddle, lower: bbLower } = bollinger(closes, 20, 2);
+  const bbU = last(bbUpper);
+  const bbM = last(bbMiddle);
+  const bbL = last(bbLower);
+  const bbPercentB = bbU != null && bbL != null && bbU !== bbL ? (price - bbL) / (bbU - bbL) : null;
+  const bbWidth = bbU != null && bbL != null && bbM ? (bbU - bbL) / bbM : null;
+  const { k: stochKArr, d: stochDArr } = stochastic(candles, 14, 3, 3);
+  const stochK = last(stochKArr);
+  const stochD = last(stochDArr);
+  const vwapArr = anchoredVWAP(candles, dailyAnchor);
+  const vwap = last(vwapArr);
+  const vwapDevPct = vwap != null && vwap !== 0 ? (price - vwap) / vwap : null;
 
   const snapshot: ScanSnapshot = {
     price, sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal,
+    bbPercentB, bbWidth, stochK, stochD, vwapDevPct,
     lc: lorentzianLast(candles),
   };
 
@@ -137,7 +161,9 @@ export async function scanSymbol(
   // latest bar so live entries match what the Backtest Lab measured.
   let side: "long" | "short" | null;
   let note: string;
-  const strat = strategyKey && strategyKey !== "trend-pullback" ? getStrategy(strategyKey) : null;
+  const strat = strategyKey && strategyKey !== "trend-pullback"
+    ? getStrategy(strategyKey) ?? await getResearchStrategy(strategyKey)
+    : null;
   if (strat) {
     const sig = strat.build(candles)(candles.length - 1);
     side = sig?.side ?? null;

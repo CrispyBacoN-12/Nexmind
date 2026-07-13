@@ -8,11 +8,14 @@ import { scanSymbol, type ScanResult } from "./scanner";
 import { runHawk, type HawkVerdict, type HawkVote, type ProposedLevels } from "./hawk";
 import { runSage, type SageVerdict } from "./sage";
 import { applyIronRules, riskReward, type AccountState } from "./ironRules";
+import { applySlippage } from "./positionRules";
+import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 import { isKillSwitchOn, getMaxOpenPositions, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt, getPortfolioStrategy } from "@/lib/settings";
 import { type Interval, type Range } from "@/lib/yahoo";
 import { fetchCandles } from "@/lib/marketData";
 import { dailyReturns, pearsonCorrelation } from "./correlation";
 import { computeLot } from "./positionSizing";
+import { isResearchStrategyKey } from "@/lib/research/adapter";
 
 export interface TickStep { stage: string; note: string }
 export interface TickResult {
@@ -26,11 +29,26 @@ export interface TickResult {
 const DEFAULT_ACCOUNT: AccountState = {
   dailyLossUsd: 0,
   dailyLossCapUsd: 200,
-  maxLotPerTrade: 0.2,
+  // Safety ceiling only — computeLot() already sizes down to the configured
+  // risk % per trade; this just bounds the worst case (e.g. a very tight ATR).
+  // Was 0.2, which silently truncated position size well below the intended
+  // 1% risk target for every trade; raised so that target is actually reached.
+  maxLotPerTrade: 5,
   maxSpread: 5,
   minRiskReward: 1.5,
   pipValueUsdPerLot: 1,
 };
+
+// Research strategies are validated (win rate, expectancy) against a tight
+// single-target ladder — see runResearch.ts's runBacktest — not the live
+// desk's stretched default. Applying that ladder here is what makes the
+// backtested win rate real for paper trading instead of a research-only
+// artifact. minRiskReward is relaxed to match: the tight ladder's ~0.8:1
+// reward:risk would fail the generic 1.5 floor, but it's exactly what was
+// backtested and approved, so the floor here only guards against a broken 0/negative R:R.
+const RESEARCH_ATR_SL_MULT = 1.5;
+const RESEARCH_ATR_TP_MULT = 1.2;
+const RESEARCH_MIN_RISK_REWARD = 0.5;
 
 export async function runTradeTick(
   symbol: string,
@@ -42,6 +60,7 @@ export async function runTradeTick(
 
   // 1) SCANNER (using the portfolio's chosen entry strategy unless overridden)
   const strategyKey = opts.strategy ?? (await getPortfolioStrategy(portfolioId));
+  const isResearch = isResearchStrategyKey(strategyKey);
   const scan = await scanSymbol(symbol, opts.range, opts.interval, strategyKey);
   symbol = scan.symbol; // carry the symbol forward from the scan result
   steps.push({ stage: "scanner", note: scan.note });
@@ -73,8 +92,13 @@ export async function runTradeTick(
   // 2) HAWK ×3
   const newsDigest = await latestNewsDigest();
   const hawk: HawkVerdict = aiEnabled()
-    ? await runHawk(scan, { newsDigest })
-    : mockHawk(scan);
+    ? await runHawk(scan, {
+        newsDigest,
+        ...(isResearch
+          ? { atrSlMult: RESEARCH_ATR_SL_MULT, atrTpMult: RESEARCH_ATR_TP_MULT, singleTarget: true }
+          : {}),
+      })
+    : mockHawk(scan, isResearch);
   costUsd += hawk.totalCostUsd;
   steps.push({
     stage: "hawk",
@@ -143,6 +167,7 @@ export async function runTradeTick(
   }
   const account: AccountState = {
     ...DEFAULT_ACCOUNT,
+    minRiskReward: isResearch ? RESEARCH_MIN_RISK_REWARD : DEFAULT_ACCOUNT.minRiskReward,
     dailyLossUsd: await todaysRealizedLoss(portfolioId),
     killSwitch: await isKillSwitchOn(portfolioId),
     globalTradingHalt: await isGlobalTradingHalt(),
@@ -166,13 +191,16 @@ export async function runTradeTick(
     return { symbol, outcome: "rules-blocked", steps, costUsd };
   }
 
-  // 5) PAPER EXECUTION
-  steps.push({ stage: "exec", note: `paper fill ${levels.entry.toFixed(4)} · staged TP armed` });
+  // 5) PAPER EXECUTION — filled with the same disclosed slippage assumption
+  // QUANT's research backtests are judged against (DEFAULT_COST_MODEL), so a
+  // strategy's live P/L stays comparable to the numbers that got it approved.
+  const fillEntry = applySlippage(hawk.side === "long" ? "buy" : "sell", levels.entry, DEFAULT_COST_MODEL.slippageBps ?? 0);
+  steps.push({ stage: "exec", note: `paper fill ${fillEntry.toFixed(4)} · staged TP armed` });
   const trade = await prisma.trade.create({
     data: {
       signalId: signal.id, portfolioId,
-      symbol, side: hawk.side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, tp2: levels.tp2,
-      lot, riskReward: riskReward({ symbol, side: hawk.side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, lot }),
+      symbol, side: hawk.side, entry: fillEntry, sl: levels.sl, tp1: levels.tp1, tp2: levels.tp2,
+      lot, riskReward: riskReward({ symbol, side: hawk.side, entry: fillEntry, sl: levels.sl, tp1: levels.tp1, lot }),
       status: "open", ironRulesPassed: true,
       sageVerdict: `approve — ${sage.reason}`,
       hawkVotes: JSON.stringify(hawk.votes),
@@ -218,7 +246,7 @@ async function fetchDailyReturns(symbol: string): Promise<number[] | null> {
 
 // ---- mock path (no API key): deterministic so the pipeline is demoable ----
 
-function mockHawk(scan: ScanResult): HawkVerdict {
+function mockHawk(scan: ScanResult, tightLadder = false): HawkVerdict {
   const side = scan.side!;
   const votes: HawkVote[] = [
     { persona: "trend", vote: side, confidence: 0.7, reason: "trend aligns (mock)" },
@@ -227,10 +255,15 @@ function mockHawk(scan: ScanResult): HawkVerdict {
   ];
   const atr = scan.atr ?? scan.price * 0.005;
   const e = scan.price;
+  // No API key configured -> this mock path is what actually runs. tightLadder
+  // mirrors research strategies' backtest ladder (RESEARCH_ATR_SL_MULT/TP_MULT,
+  // single-target — no tp2) so the validated win rate carries into paper trades.
+  const slMult = tightLadder ? RESEARCH_ATR_SL_MULT : 1.5;
+  const tpMult = tightLadder ? RESEARCH_ATR_TP_MULT : 2.5;
   const levels: ProposedLevels =
     side === "long"
-      ? { entry: e, sl: e - 1.5 * atr, tp1: e + 2.5 * atr, tp2: e + 4 * atr }
-      : { entry: e, sl: e + 1.5 * atr, tp1: e - 2.5 * atr, tp2: e - 4 * atr };
+      ? { entry: e, sl: e - slMult * atr, tp1: e + tpMult * atr, tp2: tightLadder ? null : e + tpMult * 1.6 * atr }
+      : { entry: e, sl: e + slMult * atr, tp1: e - tpMult * atr, tp2: tightLadder ? null : e - tpMult * 1.6 * atr };
   return { agreed: true, side, votes, levels, totalCostUsd: 0 };
 }
 

@@ -396,6 +396,8 @@ export const ModelName = {
   Lesson: 'Lesson',
   Watchlist: 'Watchlist',
   BuildJob: 'BuildJob',
+  ResearchRun: 'ResearchRun',
+  ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
   Setting: 'Setting'
 } as const
@@ -413,7 +415,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "holding" | "optionHolding" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "report" | "setting"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "holding" | "optionHolding" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1305,6 +1307,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ResearchRun: {
+      payload: Prisma.$ResearchRunPayload<ExtArgs>
+      fields: Prisma.ResearchRunFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ResearchRunFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ResearchRunFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>
+        }
+        findFirst: {
+          args: Prisma.ResearchRunFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ResearchRunFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>
+        }
+        findMany: {
+          args: Prisma.ResearchRunFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>[]
+        }
+        create: {
+          args: Prisma.ResearchRunCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>
+        }
+        createMany: {
+          args: Prisma.ResearchRunCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ResearchRunCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>[]
+        }
+        delete: {
+          args: Prisma.ResearchRunDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>
+        }
+        update: {
+          args: Prisma.ResearchRunUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>
+        }
+        deleteMany: {
+          args: Prisma.ResearchRunDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ResearchRunUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ResearchRunUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>[]
+        }
+        upsert: {
+          args: Prisma.ResearchRunUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchRunPayload>
+        }
+        aggregate: {
+          args: Prisma.ResearchRunAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateResearchRun>
+        }
+        groupBy: {
+          args: Prisma.ResearchRunGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ResearchRunGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ResearchRunCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ResearchRunCountAggregateOutputType> | number
+        }
+      }
+    }
+    ResearchStrategy: {
+      payload: Prisma.$ResearchStrategyPayload<ExtArgs>
+      fields: Prisma.ResearchStrategyFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ResearchStrategyFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ResearchStrategyFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>
+        }
+        findFirst: {
+          args: Prisma.ResearchStrategyFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ResearchStrategyFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>
+        }
+        findMany: {
+          args: Prisma.ResearchStrategyFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>[]
+        }
+        create: {
+          args: Prisma.ResearchStrategyCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>
+        }
+        createMany: {
+          args: Prisma.ResearchStrategyCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ResearchStrategyCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>[]
+        }
+        delete: {
+          args: Prisma.ResearchStrategyDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>
+        }
+        update: {
+          args: Prisma.ResearchStrategyUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>
+        }
+        deleteMany: {
+          args: Prisma.ResearchStrategyDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ResearchStrategyUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ResearchStrategyUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>[]
+        }
+        upsert: {
+          args: Prisma.ResearchStrategyUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ResearchStrategyPayload>
+        }
+        aggregate: {
+          args: Prisma.ResearchStrategyAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateResearchStrategy>
+        }
+        groupBy: {
+          args: Prisma.ResearchStrategyGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ResearchStrategyGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ResearchStrategyCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ResearchStrategyCountAggregateOutputType> | number
+        }
+      }
+    }
     Report: {
       payload: Prisma.$ReportPayload<ExtArgs>
       fields: Prisma.ReportFieldRefs
@@ -1633,6 +1783,7 @@ export const TradeScalarFieldEnum = {
   status: 'status',
   outcome: 'outcome',
   pnl: 'pnl',
+  grossPnl: 'grossPnl',
   rMultiple: 'rMultiple',
   hawkVotes: 'hawkVotes',
   sageVerdict: 'sageVerdict',
@@ -1699,6 +1850,36 @@ export const BuildJobScalarFieldEnum = {
 } as const
 
 export type BuildJobScalarFieldEnum = (typeof BuildJobScalarFieldEnum)[keyof typeof BuildJobScalarFieldEnum]
+
+
+export const ResearchRunScalarFieldEnum = {
+  id: 'id',
+  brief: 'brief',
+  symbol: 'symbol',
+  interval: 'interval',
+  range: 'range',
+  status: 'status',
+  costUsd: 'costUsd',
+  createdAt: 'createdAt',
+  finishedAt: 'finishedAt'
+} as const
+
+export type ResearchRunScalarFieldEnum = (typeof ResearchRunScalarFieldEnum)[keyof typeof ResearchRunScalarFieldEnum]
+
+
+export const ResearchStrategyScalarFieldEnum = {
+  id: 'id',
+  runId: 'runId',
+  label: 'label',
+  code: 'code',
+  status: 'status',
+  iterations: 'iterations',
+  backtestSummary: 'backtestSummary',
+  safetyFlag: 'safetyFlag',
+  createdAt: 'createdAt'
+} as const
+
+export type ResearchStrategyScalarFieldEnum = (typeof ResearchStrategyScalarFieldEnum)[keyof typeof ResearchStrategyScalarFieldEnum]
 
 
 export const ReportScalarFieldEnum = {
@@ -1905,6 +2086,8 @@ export type GlobalOmitConfig = {
   lesson?: Prisma.LessonOmit
   watchlist?: Prisma.WatchlistOmit
   buildJob?: Prisma.BuildJobOmit
+  researchRun?: Prisma.ResearchRunOmit
+  researchStrategy?: Prisma.ResearchStrategyOmit
   report?: Prisma.ReportOmit
   setting?: Prisma.SettingOmit
 }

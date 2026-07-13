@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ALLOWED_RANGES, ALLOWED_INTERVALS } from "@/lib/yahoo";
 import { getStrategy } from "@/lib/trading/strategies";
+import { getResearchStrategy } from "@/lib/research/adapter";
 import { UNIVERSES } from "@/lib/trading/universe";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (typeof b.name === "string" && b.name.trim()) data.name = b.name.trim();
   if (typeof b.scanInterval === "string" && (ALLOWED_INTERVALS as readonly string[]).includes(b.scanInterval)) data.scanInterval = b.scanInterval;
   if (typeof b.scanRange === "string" && (ALLOWED_RANGES as readonly string[]).includes(b.scanRange)) data.scanRange = b.scanRange;
-  if (typeof b.strategy === "string" && getStrategy(b.strategy)) data.strategy = b.strategy;
+  if (typeof b.strategy === "string" && (getStrategy(b.strategy) || (await getResearchStrategy(b.strategy)))) data.strategy = b.strategy;
   if (typeof b.universe === "string" && (b.universe === "" || b.universe in UNIVERSES)) data.universe = b.universe;
 
   const updated = await prisma.portfolio.update({ where: { id: portfolioId }, data });

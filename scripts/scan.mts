@@ -9,11 +9,14 @@ import { prisma } from "@/lib/db";
 import { runTradeTick } from "@/lib/trading/engine";
 import { manageOpenTrades } from "@/lib/trading/manage";
 import { getStrategy } from "@/lib/trading/strategies";
+import { getResearchStrategy } from "@/lib/research/adapter";
 import { fetchCandlesBatch } from "@/lib/marketData";
 import { getWatchlist } from "@/lib/trading/watchlist";
 import { UNIVERSES, prepareSymbols } from "@/lib/trading/universe";
 import { getScanTimeframe, getPortfolioStrategy, getPortfolioUniverse, isGlobalTradingHalt } from "@/lib/settings";
 import { isSwingKind, canPortfolioTrade } from "@/lib/portfolioGuards";
+import { SECONDARY_PASSES } from "@/lib/trading/secondaryPasses";
+import type { Interval, Range } from "@/lib/yahoo";
 
 type Portfolio = Awaited<ReturnType<typeof prisma.portfolio.findMany>>[number];
 type TF = Awaited<ReturnType<typeof getScanTimeframe>>;
@@ -22,18 +25,23 @@ const ts = () => new Date().toISOString();
 const log = (m: string) => console.log(`[${ts()}] ${m}`);
 const argIds = process.argv.slice(2).map(Number).filter(Number.isInteger);
 
-/** Watchlist mode: one tick per enabled symbol. */
-async function scanWatchlist(p: Portfolio, tf: TF) {
+/** Watchlist mode: one tick per enabled symbol. An `override` runs a second
+ *  strategy/cadence pass on top of the portfolio's own default — this is how
+ *  two merged desks (e.g. Gold Desk + ex-Gold Trend Desk) share one book. */
+async function scanWatchlist(p: Portfolio, tf: TF, override?: { strategy: string; interval: Interval; range: Range; label: string }) {
   const wl = (await getWatchlist(p.id)).filter((w) => w.enabled);
+  const range = override?.range ?? tf.range;
+  const interval = override?.interval ?? tf.interval;
+  const tag = override ? ` [+${override.label}]` : "";
   for (const w of wl) {
     try {
-      const r = await runTradeTick(w.symbol, p.id, { range: tf.range, interval: tf.interval });
+      const r = await runTradeTick(w.symbol, p.id, { range, interval, strategy: override?.strategy });
       // On no-setup, log the scanner's reason (ADX/RSI/trend) instead of a bare outcome.
       const scanNote = r.steps.find((s) => s.stage === "scanner")?.note ?? "";
       const detail = r.outcome === "no-setup" && scanNote ? scanNote : `${r.outcome}${r.tradeId ? ` trade#${r.tradeId}` : ""}`;
-      log(`#${p.id} ${p.name} ${w.symbol} (${tf.interval}/${tf.range}) -> ${detail}`);
+      log(`#${p.id} ${p.name}${tag} ${w.symbol} (${interval}/${range}) -> ${detail}`);
     } catch (e) {
-      log(`#${p.id} ${p.name} ${w.symbol} ERROR ${String(e)}`);
+      log(`#${p.id} ${p.name}${tag} ${w.symbol} ERROR ${String(e)}`);
     }
   }
 }
@@ -50,7 +58,7 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string) {
   if (remaining <= 0) { log(`#${p.id} ${p.name} full (${open.length}/${p.maxOpenPositions}) — skipped`); return; }
 
   const strategy = await getPortfolioStrategy(p.id);
-  const strat = getStrategy(strategy);
+  const strat = getStrategy(strategy) ?? await getResearchStrategy(strategy);
   const symbols = prepareSymbols(uni.symbols, 200).filter((s) => !held.has(s));
 
   // Cheap pass (no AI): batch-fetch candles once, then run the strategy locally.
@@ -97,6 +105,10 @@ async function main() {
     const universe = await getPortfolioUniverse(p.id);
     if (universe) await scanUniverse(p, tf, universe);
     else await scanWatchlist(p, tf);
+
+    for (const sp of SECONDARY_PASSES.filter((s) => s.portfolioId === p.id)) {
+      await scanWatchlist(p, tf, { strategy: sp.strategy, interval: sp.interval as Interval, range: sp.range as Range, label: sp.label });
+    }
   }
 }
 

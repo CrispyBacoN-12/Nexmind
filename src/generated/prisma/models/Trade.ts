@@ -37,6 +37,7 @@ export type TradeAvgAggregateOutputType = {
   lot: number | null
   riskReward: number | null
   pnl: number | null
+  grossPnl: number | null
   rMultiple: number | null
 }
 
@@ -51,6 +52,7 @@ export type TradeSumAggregateOutputType = {
   lot: number | null
   riskReward: number | null
   pnl: number | null
+  grossPnl: number | null
   rMultiple: number | null
 }
 
@@ -69,6 +71,7 @@ export type TradeMinAggregateOutputType = {
   status: string | null
   outcome: string | null
   pnl: number | null
+  grossPnl: number | null
   rMultiple: number | null
   hawkVotes: string | null
   sageVerdict: string | null
@@ -94,6 +97,7 @@ export type TradeMaxAggregateOutputType = {
   status: string | null
   outcome: string | null
   pnl: number | null
+  grossPnl: number | null
   rMultiple: number | null
   hawkVotes: string | null
   sageVerdict: string | null
@@ -119,6 +123,7 @@ export type TradeCountAggregateOutputType = {
   status: number
   outcome: number
   pnl: number
+  grossPnl: number
   rMultiple: number
   hawkVotes: number
   sageVerdict: number
@@ -142,6 +147,7 @@ export type TradeAvgAggregateInputType = {
   lot?: true
   riskReward?: true
   pnl?: true
+  grossPnl?: true
   rMultiple?: true
 }
 
@@ -156,6 +162,7 @@ export type TradeSumAggregateInputType = {
   lot?: true
   riskReward?: true
   pnl?: true
+  grossPnl?: true
   rMultiple?: true
 }
 
@@ -174,6 +181,7 @@ export type TradeMinAggregateInputType = {
   status?: true
   outcome?: true
   pnl?: true
+  grossPnl?: true
   rMultiple?: true
   hawkVotes?: true
   sageVerdict?: true
@@ -199,6 +207,7 @@ export type TradeMaxAggregateInputType = {
   status?: true
   outcome?: true
   pnl?: true
+  grossPnl?: true
   rMultiple?: true
   hawkVotes?: true
   sageVerdict?: true
@@ -224,6 +233,7 @@ export type TradeCountAggregateInputType = {
   status?: true
   outcome?: true
   pnl?: true
+  grossPnl?: true
   rMultiple?: true
   hawkVotes?: true
   sageVerdict?: true
@@ -336,6 +346,7 @@ export type TradeGroupByOutputType = {
   status: string
   outcome: string | null
   pnl: number | null
+  grossPnl: number | null
   rMultiple: number | null
   hawkVotes: string
   sageVerdict: string | null
@@ -384,6 +395,7 @@ export type TradeWhereInput = {
   status?: Prisma.StringFilter<"Trade"> | string
   outcome?: Prisma.StringNullableFilter<"Trade"> | string | null
   pnl?: Prisma.FloatNullableFilter<"Trade"> | number | null
+  grossPnl?: Prisma.FloatNullableFilter<"Trade"> | number | null
   rMultiple?: Prisma.FloatNullableFilter<"Trade"> | number | null
   hawkVotes?: Prisma.StringFilter<"Trade"> | string
   sageVerdict?: Prisma.StringNullableFilter<"Trade"> | string | null
@@ -411,6 +423,7 @@ export type TradeOrderByWithRelationInput = {
   status?: Prisma.SortOrder
   outcome?: Prisma.SortOrderInput | Prisma.SortOrder
   pnl?: Prisma.SortOrderInput | Prisma.SortOrder
+  grossPnl?: Prisma.SortOrderInput | Prisma.SortOrder
   rMultiple?: Prisma.SortOrderInput | Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -441,6 +454,7 @@ export type TradeWhereUniqueInput = Prisma.AtLeast<{
   status?: Prisma.StringFilter<"Trade"> | string
   outcome?: Prisma.StringNullableFilter<"Trade"> | string | null
   pnl?: Prisma.FloatNullableFilter<"Trade"> | number | null
+  grossPnl?: Prisma.FloatNullableFilter<"Trade"> | number | null
   rMultiple?: Prisma.FloatNullableFilter<"Trade"> | number | null
   hawkVotes?: Prisma.StringFilter<"Trade"> | string
   sageVerdict?: Prisma.StringNullableFilter<"Trade"> | string | null
@@ -468,6 +482,7 @@ export type TradeOrderByWithAggregationInput = {
   status?: Prisma.SortOrder
   outcome?: Prisma.SortOrderInput | Prisma.SortOrder
   pnl?: Prisma.SortOrderInput | Prisma.SortOrder
+  grossPnl?: Prisma.SortOrderInput | Prisma.SortOrder
   rMultiple?: Prisma.SortOrderInput | Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -501,6 +516,7 @@ export type TradeScalarWhereWithAggregatesInput = {
   status?: Prisma.StringWithAggregatesFilter<"Trade"> | string
   outcome?: Prisma.StringNullableWithAggregatesFilter<"Trade"> | string | null
   pnl?: Prisma.FloatNullableWithAggregatesFilter<"Trade"> | number | null
+  grossPnl?: Prisma.FloatNullableWithAggregatesFilter<"Trade"> | number | null
   rMultiple?: Prisma.FloatNullableWithAggregatesFilter<"Trade"> | number | null
   hawkVotes?: Prisma.StringWithAggregatesFilter<"Trade"> | string
   sageVerdict?: Prisma.StringNullableWithAggregatesFilter<"Trade"> | string | null
@@ -523,6 +539,7 @@ export type TradeCreateInput = {
   status?: string
   outcome?: string | null
   pnl?: number | null
+  grossPnl?: number | null
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
@@ -550,6 +567,7 @@ export type TradeUncheckedCreateInput = {
   status?: string
   outcome?: string | null
   pnl?: number | null
+  grossPnl?: number | null
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
@@ -572,6 +590,7 @@ export type TradeUpdateInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -599,6 +618,7 @@ export type TradeUncheckedUpdateInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -624,6 +644,7 @@ export type TradeCreateManyInput = {
   status?: string
   outcome?: string | null
   pnl?: number | null
+  grossPnl?: number | null
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
@@ -646,6 +667,7 @@ export type TradeUpdateManyMutationInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -671,6 +693,7 @@ export type TradeUncheckedUpdateManyInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -711,6 +734,7 @@ export type TradeCountOrderByAggregateInput = {
   status?: Prisma.SortOrder
   outcome?: Prisma.SortOrder
   pnl?: Prisma.SortOrder
+  grossPnl?: Prisma.SortOrder
   rMultiple?: Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrder
@@ -732,6 +756,7 @@ export type TradeAvgOrderByAggregateInput = {
   lot?: Prisma.SortOrder
   riskReward?: Prisma.SortOrder
   pnl?: Prisma.SortOrder
+  grossPnl?: Prisma.SortOrder
   rMultiple?: Prisma.SortOrder
 }
 
@@ -750,6 +775,7 @@ export type TradeMaxOrderByAggregateInput = {
   status?: Prisma.SortOrder
   outcome?: Prisma.SortOrder
   pnl?: Prisma.SortOrder
+  grossPnl?: Prisma.SortOrder
   rMultiple?: Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrder
@@ -775,6 +801,7 @@ export type TradeMinOrderByAggregateInput = {
   status?: Prisma.SortOrder
   outcome?: Prisma.SortOrder
   pnl?: Prisma.SortOrder
+  grossPnl?: Prisma.SortOrder
   rMultiple?: Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrder
@@ -796,6 +823,7 @@ export type TradeSumOrderByAggregateInput = {
   lot?: Prisma.SortOrder
   riskReward?: Prisma.SortOrder
   pnl?: Prisma.SortOrder
+  grossPnl?: Prisma.SortOrder
   rMultiple?: Prisma.SortOrder
 }
 
@@ -893,6 +921,7 @@ export type TradeCreateWithoutSignalInput = {
   status?: string
   outcome?: string | null
   pnl?: number | null
+  grossPnl?: number | null
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
@@ -918,6 +947,7 @@ export type TradeUncheckedCreateWithoutSignalInput = {
   status?: string
   outcome?: string | null
   pnl?: number | null
+  grossPnl?: number | null
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
@@ -956,6 +986,7 @@ export type TradeUpdateWithoutSignalInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -981,6 +1012,7 @@ export type TradeUncheckedUpdateWithoutSignalInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1003,6 +1035,7 @@ export type TradeCreateWithoutPortfolioInput = {
   status?: string
   outcome?: string | null
   pnl?: number | null
+  grossPnl?: number | null
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
@@ -1028,6 +1061,7 @@ export type TradeUncheckedCreateWithoutPortfolioInput = {
   status?: string
   outcome?: string | null
   pnl?: number | null
+  grossPnl?: number | null
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
@@ -1081,6 +1115,7 @@ export type TradeScalarWhereInput = {
   status?: Prisma.StringFilter<"Trade"> | string
   outcome?: Prisma.StringNullableFilter<"Trade"> | string | null
   pnl?: Prisma.FloatNullableFilter<"Trade"> | number | null
+  grossPnl?: Prisma.FloatNullableFilter<"Trade"> | number | null
   rMultiple?: Prisma.FloatNullableFilter<"Trade"> | number | null
   hawkVotes?: Prisma.StringFilter<"Trade"> | string
   sageVerdict?: Prisma.StringNullableFilter<"Trade"> | string | null
@@ -1105,6 +1140,7 @@ export type TradeCreateManyPortfolioInput = {
   status?: string
   outcome?: string | null
   pnl?: number | null
+  grossPnl?: number | null
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
@@ -1127,6 +1163,7 @@ export type TradeUpdateWithoutPortfolioInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1152,6 +1189,7 @@ export type TradeUncheckedUpdateWithoutPortfolioInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1176,6 +1214,7 @@ export type TradeUncheckedUpdateManyWithoutPortfolioInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1203,6 +1242,7 @@ export type TradeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   status?: boolean
   outcome?: boolean
   pnl?: boolean
+  grossPnl?: boolean
   rMultiple?: boolean
   hawkVotes?: boolean
   sageVerdict?: boolean
@@ -1230,6 +1270,7 @@ export type TradeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   status?: boolean
   outcome?: boolean
   pnl?: boolean
+  grossPnl?: boolean
   rMultiple?: boolean
   hawkVotes?: boolean
   sageVerdict?: boolean
@@ -1257,6 +1298,7 @@ export type TradeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   status?: boolean
   outcome?: boolean
   pnl?: boolean
+  grossPnl?: boolean
   rMultiple?: boolean
   hawkVotes?: boolean
   sageVerdict?: boolean
@@ -1284,6 +1326,7 @@ export type TradeSelectScalar = {
   status?: boolean
   outcome?: boolean
   pnl?: boolean
+  grossPnl?: boolean
   rMultiple?: boolean
   hawkVotes?: boolean
   sageVerdict?: boolean
@@ -1294,7 +1337,7 @@ export type TradeSelectScalar = {
   closedAt?: boolean
 }
 
-export type TradeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "portfolioId" | "signalId" | "symbol" | "side" | "entry" | "sl" | "tp1" | "tp2" | "lot" | "riskReward" | "status" | "outcome" | "pnl" | "rMultiple" | "hawkVotes" | "sageVerdict" | "ironRulesPassed" | "decisionLog" | "stagedTp" | "openedAt" | "closedAt", ExtArgs["result"]["trade"]>
+export type TradeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "portfolioId" | "signalId" | "symbol" | "side" | "entry" | "sl" | "tp1" | "tp2" | "lot" | "riskReward" | "status" | "outcome" | "pnl" | "grossPnl" | "rMultiple" | "hawkVotes" | "sageVerdict" | "ironRulesPassed" | "decisionLog" | "stagedTp" | "openedAt" | "closedAt", ExtArgs["result"]["trade"]>
 export type TradeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   portfolio?: boolean | Prisma.PortfolioDefaultArgs<ExtArgs>
   signal?: boolean | Prisma.Trade$signalArgs<ExtArgs>
@@ -1329,6 +1372,7 @@ export type $TradePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     status: string
     outcome: string | null
     pnl: number | null
+    grossPnl: number | null
     rMultiple: number | null
     hawkVotes: string
     sageVerdict: string | null
@@ -1776,6 +1820,7 @@ export interface TradeFieldRefs {
   readonly status: Prisma.FieldRef<"Trade", 'String'>
   readonly outcome: Prisma.FieldRef<"Trade", 'String'>
   readonly pnl: Prisma.FieldRef<"Trade", 'Float'>
+  readonly grossPnl: Prisma.FieldRef<"Trade", 'Float'>
   readonly rMultiple: Prisma.FieldRef<"Trade", 'Float'>
   readonly hawkVotes: Prisma.FieldRef<"Trade", 'String'>
   readonly sageVerdict: Prisma.FieldRef<"Trade", 'String'>

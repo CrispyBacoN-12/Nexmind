@@ -61,6 +61,18 @@ const SP500 = [
   "WEC", "WFC", "WELL", "WST", "WDC", "WY", "WMB", "WTW", "GWW", "WYNN", "XEL", "XYL", "YUM", "ZBRA", "ZBH", "ZTS",
 ];
 
+// Depository/commercial + major investment banks — earnings are rate-cycle and
+// credit-quality driven rather than the trend/momentum patterns the ATR-ladder
+// strategies key off, and the whole group tends to move together on Fed days
+// (correlated risk the pooled backtest doesn't account for). Excluded from
+// screening on request, not the broader GICS Financials sector (insurers,
+// asset managers, exchanges, card networks stay in).
+export const BANK_STOCKS = [
+  "JPM", "BAC", "WFC", "C", "GS", "MS", "USB", "PNC", "TFC", "COF",
+  "BK", "STT", "RF", "HBAN", "KEY", "CFG", "FITB", "MTB", "NTRS", "SCHW",
+  "DFS", "SYF",
+];
+
 export const UNIVERSES: Record<string, Universe> = {
   "us-mega": { label: "US Mega-cap (12)", symbols: MEGA },
   "dow30": { label: "Dow 30", symbols: DOW30 },

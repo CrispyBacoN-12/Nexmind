@@ -149,7 +149,8 @@ model Trade {
   riskReward      Float?
   status          String    @default("open") // open | closed | cancelled
   outcome         String? // win | loss | breakeven
-  pnl             Float? // realized P/L (paper)
+  pnl             Float? // realized P/L (paper), net of slippage/commission
+  grossPnl        Float? // realized P/L before commission (see DEFAULT_COST_MODEL); null while open
   rMultiple       Float? // realized R multiple
   hawkVotes       String   @default("[]") // JSON of the 3 analyst opinions
   sageVerdict     String? // approve | veto + reasoning
@@ -208,6 +209,34 @@ model BuildJob {
   costUsd   Float     @default(0)
   createdAt DateTime  @default(now())
   appliedAt DateTime?
+}
+
+/// A brief given to QUANT: propose novel strategy code, backtest, refine.
+model ResearchRun {
+  id         Int                @id @default(autoincrement())
+  brief      String
+  symbol     String
+  interval   String             @default("1h")
+  range      String             @default("3mo")
+  status     String             @default("running") // running | done | failed
+  costUsd    Float              @default(0)
+  strategies ResearchStrategy[]
+  createdAt  DateTime           @default(now())
+  finishedAt DateTime?
+}
+
+/// One AI-authored strategy candidate — only ever executed inside the vm sandbox.
+model ResearchStrategy {
+  id              Int         @id @default(autoincrement())
+  run             ResearchRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId           Int
+  label           String
+  code            String // AI-generated source, sandbox-only, never require()'d
+  status          String      @default("proposed") // proposed | approved | rejected
+  iterations      String      @default("[]") // JSON: [{ code, backtestSummary, note }]
+  backtestSummary String      @default("{}") // JSON: final summarizeBacktest() result
+  safetyFlag      Boolean     @default(false) // ever failed the deny-list scan
+  createdAt       DateTime    @default(now())
 }
 
 /// Aggregated performance report (daily / weekly / monthly).

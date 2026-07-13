@@ -62,6 +62,7 @@ export const AGENTS: AgentDef[] = [
   { codename: "BLADE", name: "Blade", role: "Trade Executor", team: "Trading", rarity: "rare", modelTier: "haiku", title: "Steel Executor", emoji: "⚔️", motto: "Enter clean, exit by plan.", artifact: "candlewick katana", skills: ["Execution", "Position Sizing"], reportsTo: "HAWK" },
   { codename: "SAGE", name: "Sage", role: "Risk Manager", team: "Trading", rarity: "epic", modelTier: "opus", title: "Balance Keeper", emoji: "🛡️", motto: "The veto that saves the account.", artifact: "risk scale shield", skills: ["Risk Management", "Drawdown", "Veto"], reportsTo: "HAWK" },
   { codename: "AUTO", name: "Auto", role: "Algo Bot", team: "Trading", rarity: "rare", modelTier: "haiku", title: "Eternal Machine", emoji: "🤖", motto: "Rules without emotion.", artifact: "teal cron rings", skills: ["Automation", "Backtest"], reportsTo: "SAGE" },
+  { codename: "QUANT", name: "Quant", role: "Strategy Researcher", team: "Trading", rarity: "epic", modelTier: "sonnet", title: "Edge Seeker", emoji: "🧬", motto: "New logic, sandboxed, backtested, proven.", artifact: "vm containment glyph", skills: ["Strategy Design", "Code-gen", "Backtest"], reportsTo: "SAGE" },
 
   // ---- Finance ----
   { codename: "COIN", name: "Coin", role: "Finance Lead", team: "Finance", rarity: "epic", modelTier: "sonnet", emoji: "💰", skills: ["Finance", "Budget"], reportsTo: "ARIA" },

@@ -78,6 +78,16 @@ export type Watchlist = Prisma.WatchlistModel
  */
 export type BuildJob = Prisma.BuildJobModel
 /**
+ * Model ResearchRun
+ * A brief given to QUANT: propose novel strategy code, backtest, refine.
+ */
+export type ResearchRun = Prisma.ResearchRunModel
+/**
+ * Model ResearchStrategy
+ * One AI-authored strategy candidate — only ever executed inside the vm sandbox.
+ */
+export type ResearchStrategy = Prisma.ResearchStrategyModel
+/**
  * Model Report
  * Aggregated performance report (daily / weekly / monthly).
  */

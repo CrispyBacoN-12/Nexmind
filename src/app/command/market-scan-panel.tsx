@@ -8,12 +8,14 @@ interface ScanResp {
   source?: string; scanned?: number; executed?: number;
   setups?: SetupRow[]; totalCostUsd?: number;
   managed?: { checked: number; closed: number }; error?: string;
+  screenedOut?: number;
 }
 
 const PRESETS = [
   { id: "us-mega", label: "US Mega" },
   { id: "dow30", label: "Dow 30" },
   { id: "nasdaq100", label: "NASDAQ-100" },
+  { id: "sp500", label: "S&P 500 (screened)" },
 ];
 
 const tone: Record<string, "positive" | "warning" | "neutral"> = {
@@ -74,6 +76,7 @@ export function MarketScanPanel({ portfolioId }: { portfolioId: number }) {
           {resp.scanned != null && (
             <p className="text-(--color-accent) font-mono">
               {resp.source}: scanned {resp.scanned} · {resp.executed} executed · cost ${(resp.totalCostUsd ?? 0).toFixed(4)}
+              {resp.screenedOut != null && ` · ${resp.screenedOut} screened out`}
             </p>
           )}
           {resp.setups && resp.setups.length > 0 ? (

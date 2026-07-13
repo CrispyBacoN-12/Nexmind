@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardTitle, Button, Badge, PageHeader, Empty } from "@/components/ui";
 import { fmtNumber } from "@/lib/utils";
+import ResearchPanel from "@/components/research/ResearchPanel";
 
 interface Row {
   symbol: string;
@@ -46,6 +47,15 @@ const COMBO_CONFIGS = [
   { interval: "1h", range: "3mo", strategy: "combo-or" },
   { interval: "1h", range: "3mo", strategy: "combo-vote" },
 ];
+// Chart-pattern / OHLCV-only strategies on gold intraday (no RSI/MACD/ADX).
+const CHART_GOLD_CONFIGS = [
+  { interval: "5m",  range: "1mo", strategy: "trend-pullback" },
+  { interval: "5m",  range: "1mo", strategy: "bull-flag" },
+  { interval: "5m",  range: "1mo", strategy: "vol-spike" },
+  { interval: "15m", range: "1mo", strategy: "trend-pullback" },
+  { interval: "15m", range: "1mo", strategy: "bull-flag" },
+  { interval: "15m", range: "1mo", strategy: "vol-spike" },
+];
 
 function pnlColor(n: number | null | undefined): string {
   if (n == null) return "";
@@ -59,7 +69,7 @@ export default function BacktestLab() {
   const [busy, setBusy] = useState<string>("");
   const [ran, setRan] = useState(false);
 
-  async function run(mode: "timeframe" | "adx" | "strategy" | "combo") {
+  async function run(mode: "timeframe" | "adx" | "strategy" | "combo" | "chart") {
     setBusy(mode);
     setRan(true);
     try {
@@ -67,11 +77,13 @@ export default function BacktestLab() {
         mode === "timeframe" ? TIMEFRAME_CONFIGS
         : mode === "adx" ? ADX_CONFIGS
         : mode === "strategy" ? STRATEGY_CONFIGS
+        : mode === "chart" ? CHART_GOLD_CONFIGS
         : COMBO_CONFIGS;
+      const symbols = mode === "chart" ? ["GC=F"] : SYMBOLS;
       const res = await fetch("/api/backtest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbols: SYMBOLS, configs }),
+        body: JSON.stringify({ symbols, configs }),
       });
       const data = await res.json();
       setRows(data.results ?? []);
@@ -96,6 +108,8 @@ export default function BacktestLab() {
         action={<Badge tone="info">PAPER · RULES ONLY</Badge>}
       />
 
+      <ResearchPanel />
+
       <Card className="mb-5">
         <CardTitle>Run a comparison</CardTitle>
         <p className="text-xs text-(--color-muted) mb-3">Gold (GC=F) + Bitcoin (BTC-USD). Pick what to vary.</p>
@@ -111,6 +125,9 @@ export default function BacktestLab() {
           </Button>
           <Button variant="outline" onClick={() => run("combo")} disabled={!!busy}>
             {busy === "combo" ? "Running…" : "Combined (OR / Vote)"}
+          </Button>
+          <Button variant="outline" onClick={() => run("chart")} disabled={!!busy}>
+            {busy === "chart" ? "Running…" : "Chart patterns — Gold 5m/15m"}
           </Button>
         </div>
         {busy && <p className="mt-2 text-xs text-(--color-muted)">Fetching candles and replaying the strategy…</p>}

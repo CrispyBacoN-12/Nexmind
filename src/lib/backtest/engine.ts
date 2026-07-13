@@ -13,6 +13,7 @@ import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
 import { decideSetup, DEFAULT_THRESHOLDS, type ScanSnapshot, type SetupThresholds } from "@/lib/trading/scanner";
 import { decideAction, type LadderState, type OpenPosition } from "@/lib/trading/positionRules";
 import { lorentzianSeries } from "@/lib/lc/lorentzian";
+import { computeStats } from "@/lib/trading/stats";
 
 // Same constants as the live desk (hawk.computeLevels defaults + manage POINT_VALUE).
 const ATR_SL_MULT = 1.5;
@@ -32,11 +33,34 @@ export interface SimTrade {
   lot: number;
   outcome: "win" | "loss" | "breakeven";
   tp1Hit: boolean;
-  pnl: number;
+  pnl: number; // net of slippage/commission (equals grossPnl when no CostModel is applied)
+  grossPnl: number; // pnl before slippage/commission
   rMultiple: number | null;
   openedAt: Date;
   closedAt: Date;
 }
+
+/**
+ * Trading friction, expressed in basis points so the same model scales across
+ * assets with wildly different price levels (gold ~$2k, BTC ~$60k, stocks ~$100).
+ * Both fields default to 0 (no cost) so every existing caller of openPosition/
+ * stepPosition/backtestCandles is unaffected unless it opts in.
+ */
+export interface CostModel {
+  slippageBps?: number; // price-worse-than-theoretical on every fill (entry, partial exit, final exit)
+  commissionBps?: number; // round-turn commission, applied once per closed trade against notional (lot * entry)
+}
+
+const NO_COSTS: CostModel = {};
+
+// Shared disclosed cost assumption for every paper-money path in the app (QUANT
+// research backtests and the live paper desk alike): calibrated to a real MT5
+// Raw/ECN gold account (the broker type this desk actually trades through) —
+// ~$0.10/oz spread + ~$7/lot round-turn commission, padded 2x for safety.
+// Previously this was a generic crypto/CFD taker-fee guess (5bps/10bps) that
+// overstated real gold trading costs by roughly an order of magnitude; every
+// consumer imports this one constant, so all paper P/L stays judged consistently.
+export const DEFAULT_COST_MODEL: CostModel = { slippageBps: 0.5, commissionBps: 1 };
 
 export interface BacktestResult {
   symbol: string;
@@ -76,10 +100,11 @@ function snapshots(candles: Candle[]): ScanSnapshot[] {
 }
 
 export interface SimPosition extends OpenPosition {
-  tp2: number;
+  tp2: number | null; // null = single-target mode: TP1 is the full exit, no partial/breakeven leg
   lot: number;
   openedAt: Date;
   ladder: LadderState;
+  costs: CostModel;
 }
 
 export type StepResult = { status: "open" } | { status: "closed"; trade: Omit<SimTrade, "symbol"> };
@@ -96,8 +121,16 @@ export function stepPosition(pos: SimPosition, bar: Candle): StepResult {
   let action = decideAction(pos, pos.ladder, adverse);
   if (action.kind === "hold") action = decideAction(pos, pos.ladder, favorable);
 
+  // Closing a long is a sell (fills lower than theoretical); closing a short is
+  // a buy-to-cover (fills higher). Always worse for the trader, on both the
+  // TP1 partial leg and the final exit.
+  const slipFrac = (pos.costs.slippageBps ?? 0) / 10000;
+  const fillExit = (theoretical: number) =>
+    pos.side === "long" ? theoretical * (1 - slipFrac) : theoretical * (1 + slipFrac);
+
   if (action.kind === "partial-tp1") {
-    const favorableMove = pos.side === "long" ? action.exit - pos.entry : pos.entry - action.exit;
+    const exit = fillExit(action.exit);
+    const favorableMove = pos.side === "long" ? exit - pos.entry : pos.entry - exit;
     pos.ladder = {
       tp1Hit: true,
       partialPnl: favorableMove * (pos.lot / 2) * POINT_VALUE,
@@ -108,23 +141,28 @@ export function stepPosition(pos: SimPosition, bar: Candle): StepResult {
   }
 
   if (action.kind === "close") {
+    const exit = fillExit(action.exit);
     const remainingLot = pos.ladder.tp1Hit ? pos.lot / 2 : pos.lot;
-    const favorableMove = pos.side === "long" ? action.exit - pos.entry : pos.entry - action.exit;
-    const pnl = (pos.ladder.partialPnl ?? 0) + favorableMove * remainingLot * POINT_VALUE;
+    const favorableMove = pos.side === "long" ? exit - pos.entry : pos.entry - exit;
+    const grossPnl = (pos.ladder.partialPnl ?? 0) + favorableMove * remainingLot * POINT_VALUE;
+    const notional = pos.lot * pos.entry * POINT_VALUE;
+    const commission = notional * ((pos.costs.commissionBps ?? 0) / 10000);
+    const pnl = grossPnl - commission;
     const risk = Math.abs(pos.entry - (pos.ladder.origSl ?? pos.sl));
     return {
       status: "closed",
       trade: {
         side: pos.side,
         entry: pos.entry,
-        exit: action.exit,
+        exit,
         sl: pos.ladder.origSl ?? pos.sl,
         tp1: pos.tp1,
-        tp2: pos.tp2,
+        tp2: pos.tp2 ?? pos.tp1,
         lot: pos.lot,
         outcome: action.outcome,
         tp1Hit: pos.ladder.tp1Hit ?? false,
         pnl,
+        grossPnl,
         rMultiple: risk > 0 ? pnl / (risk * pos.lot * POINT_VALUE) : null,
         openedAt: pos.openedAt,
         closedAt: new Date(bar.t * 1000),
@@ -135,14 +173,32 @@ export function stepPosition(pos: SimPosition, bar: Candle): StepResult {
   return { status: "open" };
 }
 
-/** Build a position the way the live desk does: ATR-multiple levels off the entry. */
-export function openPosition(side: "long" | "short", entry: number, atrVal: number, lot: number, openedAt: Date): SimPosition {
+/**
+ * Build a position the way the live desk does: ATR-multiple levels off the entry.
+ * `singleTarget` makes TP1 the sole/full exit (tp2 null) instead of a partial
+ * leg toward a farther TP2 — see positionRules.decideAction, which already
+ * treats a null tp2 as "close full position, outcome win" on TP1 touch.
+ */
+export function openPosition(
+  side: "long" | "short",
+  entry: number,
+  atrVal: number,
+  lot: number,
+  openedAt: Date,
+  singleTarget = false,
+  tp1Mult = ATR_TP_MULT,
+  costs: CostModel = NO_COSTS,
+): SimPosition {
   const dir = side === "long" ? 1 : -1;
+  // Buying (long) fills higher than the signal price, selling (short) fills
+  // lower — always worse for the trader. SL/TP are ATR-multiples off the
+  // actual fill, same as a live bracket order placed right after the fill.
+  const fillEntry = entry * (1 + dir * (costs.slippageBps ?? 0) / 10000);
   return {
-    side, entry, lot, openedAt, ladder: {},
-    sl: entry - dir * ATR_SL_MULT * atrVal,
-    tp1: entry + dir * ATR_TP_MULT * atrVal,
-    tp2: entry + dir * ATR_TP_MULT * TP2_FACTOR * atrVal,
+    side, entry: fillEntry, lot, openedAt, ladder: {}, costs,
+    sl: fillEntry - dir * ATR_SL_MULT * atrVal,
+    tp1: fillEntry + dir * tp1Mult * atrVal,
+    tp2: singleTarget ? null : fillEntry + dir * tp1Mult * TP2_FACTOR * atrVal,
   };
 }
 
@@ -158,6 +214,9 @@ export function backtestCandles(
   lot = 0.1,
   thresholds: SetupThresholds = DEFAULT_THRESHOLDS,
   entry?: EntryRule,
+  singleTarget = false,
+  tp1Mult = ATR_TP_MULT,
+  costs: CostModel = NO_COSTS,
 ): BacktestResult {
   const snaps = snapshots(candles);
   const trades: SimTrade[] = [];
@@ -183,7 +242,7 @@ export function backtestCandles(
     signals++;
 
     const a = snaps[i].atr ?? bar.c * 0.005;
-    open = openPosition(side, bar.c, a, lot, new Date(bar.t * 1000));
+    open = openPosition(side, bar.c, a, lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs);
   }
 
   return { symbol, bars: candles.length, signals, trades, openAtEnd: open != null };
@@ -197,16 +256,34 @@ export interface BacktestSummary {
   totalPnl: number;
   avgR: number | null;   // mean R-multiple over trades that have one
   expectancy: number | null; // avg pnl per trade
+  profitFactor: number | null;   // gross win $ / gross loss $; null if no losing trades (undefined ratio)
+  maxDrawdownPct: number | null; // largest peak-to-trough on the equity curve, as a positive % of startingBalance
+  sharpeRatio: number | null;    // annualized, based on daily P/L (same math as the live-reporting path)
+  sortinoRatio: number | null;   // annualized, based on daily P/L, downside deviation only
+  totalCostsUsd: number;         // sum of grossPnl - pnl across all trades; 0 when no CostModel was applied
 }
 
 /** Reduce closed trades to the headline metrics used to compare configs. */
-export function summarizeBacktest(trades: SimTrade[]): BacktestSummary {
+export function summarizeBacktest(trades: SimTrade[], startingBalance = 10000): BacktestSummary {
   const n = trades.length;
   const wins = trades.filter((t) => t.outcome === "win").length;
   const losses = trades.filter((t) => t.outcome === "loss").length;
   const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
   const rs = trades.map((t) => t.rMultiple).filter((r): r is number => r != null);
   const avgR = rs.length ? rs.reduce((s, r) => s + r, 0) / rs.length : null;
+
+  const grossWin = trades.reduce((s, t) => s + Math.max(t.pnl, 0), 0);
+  const grossLoss = trades.reduce((s, t) => s + Math.max(-t.pnl, 0), 0);
+  const profitFactor = grossLoss > 0 ? grossWin / grossLoss : null;
+  const totalCostsUsd = trades.reduce((s, t) => s + (t.grossPnl - t.pnl), 0);
+
+  // Reuses the same equity-curve/Sharpe/Sortino math as the live-reporting
+  // path (trading/stats.ts) so backtest and live numbers are directly
+  // comparable. computeStats returns maxDrawdownPct as a negative number;
+  // flipped to a positive magnitude here to match the montecarlo.ts /
+  // circuitBreaker.ts convention used elsewhere in this codebase.
+  const perf = computeStats(trades, startingBalance);
+
   return {
     trades: n,
     wins,
@@ -215,5 +292,10 @@ export function summarizeBacktest(trades: SimTrade[]): BacktestSummary {
     totalPnl,
     avgR,
     expectancy: n ? totalPnl / n : null,
+    profitFactor,
+    maxDrawdownPct: perf.maxDrawdownPct == null ? null : Math.abs(perf.maxDrawdownPct),
+    sharpeRatio: perf.sharpeRatio,
+    sortinoRatio: perf.sortinoRatio,
+    totalCostsUsd,
   };
 }

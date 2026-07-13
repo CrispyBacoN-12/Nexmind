@@ -3,6 +3,7 @@ import { fetchCandles } from "@/lib/marketData";
 import { backtestCandles, summarizeBacktest } from "@/lib/backtest/engine";
 import { DEFAULT_THRESHOLDS } from "@/lib/trading/scanner";
 import { getStrategy } from "@/lib/trading/strategies";
+import { getResearchStrategy } from "@/lib/research/adapter";
 import { ALLOWED_RANGES, ALLOWED_INTERVALS, type Range, type Interval } from "@/lib/yahoo";
 
 export const dynamic = "force-dynamic";
@@ -36,13 +37,14 @@ export async function POST(req: Request) {
         rsiLow: num(c.rsiLow, DEFAULT_THRESHOLDS.rsiLow),
         rsiHigh: num(c.rsiHigh, DEFAULT_THRESHOLDS.rsiHigh),
       };
-      const strat = typeof c.strategy === "string" ? getStrategy(c.strategy) : null;
+      const strat = typeof c.strategy === "string" ? getStrategy(c.strategy) ?? await getResearchStrategy(c.strategy) : null;
       const stratLabel = strat ? strat.label : "Trend-pullback";
       try {
         const resp = await fetchCandles(sym, range, interval);
         const evalr = strat ? strat.build(resp.candles) : null;
         const entry = evalr ? (i: number) => evalr(i)?.side ?? null : undefined;
-        const bt = backtestCandles(resp.symbol, resp.candles, 0.1, thresholds, entry);
+        const exit = strat?.preferredExit;
+        const bt = backtestCandles(resp.symbol, resp.candles, 0.1, thresholds, entry, exit?.singleTarget, exit?.tp1Mult, exit?.costs);
         const summary = summarizeBacktest(bt.trades);
         results.push({ symbol: resp.symbol, interval, range, strategy: stratLabel, ...thresholds, bars: bt.bars, signals: bt.signals, ...summary });
       } catch (e) {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decideAction, type OpenPosition } from "./positionRules";
+import { decideAction, applySlippage, type OpenPosition } from "./positionRules";
 
 const long: OpenPosition = { side: "long", entry: 100, sl: 95, tp1: 110, tp2: 120 };
 const short: OpenPosition = { side: "short", entry: 100, sl: 105, tp1: 90, tp2: 80 };
@@ -37,4 +37,16 @@ test("after partial: breakeven SL closes the rest as breakeven", () => {
 
 test("after partial: holds between breakeven and TP2", () => {
   assert.deepEqual(decideAction({ ...long, sl: 100 }, { tp1Hit: true }, 115), { kind: "hold" });
+});
+
+// ---- applySlippage ----
+
+test("applySlippage: zero bps returns the theoretical price exactly", () => {
+  assert.equal(applySlippage("buy", 100, 0), 100);
+  assert.equal(applySlippage("sell", 100, 0), 100);
+});
+
+test("applySlippage: buy fills higher, sell fills lower — always worse for the trader", () => {
+  assert.ok(Math.abs(applySlippage("buy", 100, 10) - 100.1) < 1e-9);
+  assert.ok(Math.abs(applySlippage("sell", 100, 10) - 99.9) < 1e-9);
 });

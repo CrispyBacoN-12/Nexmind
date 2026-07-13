@@ -1,0 +1,30 @@
+// NEXMIND research-29 "RSI-50 Momentum Cross (weekly)" - live on US Stocks Desk (#11)
+// Port of scripts/dispatch-stocks-weekly-run.ts
+// Validated: 49-stock sp500 sample, 1wk/5y, 64.2% win rate, split-half stable
+// Chart: apply to any individual stock, set chart timeframe to WEEKLY (1W)
+//@version=6
+strategy("NEXMIND RSI50 Weekly (research-29)", overlay=true,
+     process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1)
+
+[_diPlus, _diMinus, adxVal] = ta.dmi(14, 14)
+rsiVal = ta.rsi(close, 14)
+sma50  = ta.sma(close, 50)
+atrVal = ta.atr(14)
+
+longCond  = adxVal >= 20 and rsiVal[1] <= 50 and rsiVal > 50 and close > sma50
+shortCond = adxVal >= 20 and rsiVal[1] >= 50 and rsiVal < 50 and close < sma50
+
+if longCond and strategy.position_size == 0
+    slPrice = close - 1.5 * atrVal
+    tpPrice = close + 1.2 * atrVal
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", stop=slPrice, limit=tpPrice)
+
+if shortCond and strategy.position_size == 0
+    slPrice = close + 1.5 * atrVal
+    tpPrice = close - 1.2 * atrVal
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", stop=slPrice, limit=tpPrice)
+
+plot(rsiVal, "RSI", color=color.blue)
+plot(sma50, "SMA50", color=color.purple)
