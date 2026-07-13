@@ -13,6 +13,7 @@ async function main() {
   const candidates = [
     {
       label: "MACD Hist Flip + Trend Filter (sma20 vs sma50)",
+      rationale: brief,
       code: `
 var i = bars.length - 1;
 if (i < 1) return null;
@@ -26,7 +27,7 @@ return null;
   ];
 
   const run = await runResearch(brief, "GC=F", "1h", "1y", candidates);
-  console.log(`Dispatched research run: ${run.id}`);
+  console.log(`Dispatched research run: ${run.runId}`);
   console.log(JSON.stringify(run, null, 2));
 }
 

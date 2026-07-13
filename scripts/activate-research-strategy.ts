@@ -13,7 +13,7 @@ const STRATEGY_KEY = "research-25"; // DI-Cross (no ADX filter), run #9
 async function main() {
   const portfolio = await prisma.portfolio.findUnique({ where: { id: PORTFOLIO_ID } });
   if (!portfolio) throw new Error(`portfolio ${PORTFOLIO_ID} not found`);
-  console.log(`Portfolio: ${portfolio.name} (symbol=${portfolio.symbol ?? "n/a"}, current strategy=${portfolio.strategy})`);
+  console.log(`Portfolio: ${portfolio.name} (current strategy=${portfolio.strategy})`);
 
   const strat = await getResearchStrategy(STRATEGY_KEY);
   if (!strat) throw new Error(`${STRATEGY_KEY} did not resolve via getResearchStrategy — is it approved?`);

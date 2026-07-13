@@ -12,7 +12,6 @@ async function main() {
     console.log(`status: ${r.status}`);
     console.log(`symbol/interval: ${r.run.symbol} ${r.run.interval}`);
     console.log(`safetyFlag: ${r.safetyFlag}`);
-    console.log(`rationale: ${r.rationale}`);
   }
 }
 
