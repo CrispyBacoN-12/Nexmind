@@ -2,10 +2,11 @@
 // without an API key. Run with `npm run db:seed`.
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaNeon } from "@prisma/adapter-neon";
 import { AGENTS } from "../src/lib/agents/registry";
 
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./dev.db" });
+if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required (Postgres connection string)");
+const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {

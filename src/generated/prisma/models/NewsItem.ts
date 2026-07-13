@@ -1113,6 +1113,7 @@ export type NewsItemCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * The data used to create many NewsItems.
    */
   data: Prisma.NewsItemCreateManyInput | Prisma.NewsItemCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1131,6 +1132,7 @@ export type NewsItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extens
    * The data used to create many NewsItems.
    */
   data: Prisma.NewsItemCreateManyInput | Prisma.NewsItemCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**

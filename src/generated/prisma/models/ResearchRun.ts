@@ -1299,6 +1299,7 @@ export type ResearchRunCreateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * The data used to create many ResearchRuns.
    */
   data: Prisma.ResearchRunCreateManyInput | Prisma.ResearchRunCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1317,6 +1318,7 @@ export type ResearchRunCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Ext
    * The data used to create many ResearchRuns.
    */
   data: Prisma.ResearchRunCreateManyInput | Prisma.ResearchRunCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**

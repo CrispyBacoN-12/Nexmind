@@ -1227,6 +1227,7 @@ export type ReportCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many Reports.
    */
   data: Prisma.ReportCreateManyInput | Prisma.ReportCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1245,6 +1246,7 @@ export type ReportCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many Reports.
    */
   data: Prisma.ReportCreateManyInput | Prisma.ReportCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**

@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 /// One member of the AI guild (Secretary, analysts, risk, dev/design teams…).

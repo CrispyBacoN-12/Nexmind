@@ -642,6 +642,7 @@ export type OptionHoldingCreateOrConnectWithoutPortfolioInput = {
 
 export type OptionHoldingCreateManyPortfolioInputEnvelope = {
   data: Prisma.OptionHoldingCreateManyPortfolioInput | Prisma.OptionHoldingCreateManyPortfolioInput[]
+  skipDuplicates?: boolean
 }
 
 export type OptionHoldingUpsertWithWhereUniqueWithoutPortfolioInput = {
@@ -1508,6 +1509,7 @@ export type OptionHoldingCreateManyArgs<ExtArgs extends runtime.Types.Extensions
    * The data used to create many OptionHoldings.
    */
   data: Prisma.OptionHoldingCreateManyInput | Prisma.OptionHoldingCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1526,6 +1528,7 @@ export type OptionHoldingCreateManyAndReturnArgs<ExtArgs extends runtime.Types.E
    * The data used to create many OptionHoldings.
    */
   data: Prisma.OptionHoldingCreateManyInput | Prisma.OptionHoldingCreateManyInput[]
+  skipDuplicates?: boolean
   /**
    * Choose, which related nodes to fetch as well
    */

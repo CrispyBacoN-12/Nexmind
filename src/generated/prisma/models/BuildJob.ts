@@ -1203,6 +1203,7 @@ export type BuildJobCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * The data used to create many BuildJobs.
    */
   data: Prisma.BuildJobCreateManyInput | Prisma.BuildJobCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1221,6 +1222,7 @@ export type BuildJobCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extens
    * The data used to create many BuildJobs.
    */
   data: Prisma.BuildJobCreateManyInput | Prisma.BuildJobCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**

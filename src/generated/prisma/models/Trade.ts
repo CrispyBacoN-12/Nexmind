@@ -1079,6 +1079,7 @@ export type TradeCreateOrConnectWithoutPortfolioInput = {
 
 export type TradeCreateManyPortfolioInputEnvelope = {
   data: Prisma.TradeCreateManyPortfolioInput | Prisma.TradeCreateManyPortfolioInput[]
+  skipDuplicates?: boolean
 }
 
 export type TradeUpsertWithWhereUniqueWithoutPortfolioInput = {
@@ -2063,6 +2064,7 @@ export type TradeCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * The data used to create many Trades.
    */
   data: Prisma.TradeCreateManyInput | Prisma.TradeCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -2081,6 +2083,7 @@ export type TradeCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many Trades.
    */
   data: Prisma.TradeCreateManyInput | Prisma.TradeCreateManyInput[]
+  skipDuplicates?: boolean
   /**
    * Choose, which related nodes to fetch as well
    */

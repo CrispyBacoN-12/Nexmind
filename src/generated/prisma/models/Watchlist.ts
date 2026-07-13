@@ -486,6 +486,7 @@ export type WatchlistCreateOrConnectWithoutPortfolioInput = {
 
 export type WatchlistCreateManyPortfolioInputEnvelope = {
   data: Prisma.WatchlistCreateManyPortfolioInput | Prisma.WatchlistCreateManyPortfolioInput[]
+  skipDuplicates?: boolean
 }
 
 export type WatchlistUpsertWithWhereUniqueWithoutPortfolioInput = {
@@ -1286,6 +1287,7 @@ export type WatchlistCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * The data used to create many Watchlists.
    */
   data: Prisma.WatchlistCreateManyInput | Prisma.WatchlistCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1304,6 +1306,7 @@ export type WatchlistCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Exten
    * The data used to create many Watchlists.
    */
   data: Prisma.WatchlistCreateManyInput | Prisma.WatchlistCreateManyInput[]
+  skipDuplicates?: boolean
   /**
    * Choose, which related nodes to fetch as well
    */

@@ -1035,6 +1035,7 @@ export type LessonCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many Lessons.
    */
   data: Prisma.LessonCreateManyInput | Prisma.LessonCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1053,6 +1054,7 @@ export type LessonCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many Lessons.
    */
   data: Prisma.LessonCreateManyInput | Prisma.LessonCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**

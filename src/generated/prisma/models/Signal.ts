@@ -620,6 +620,7 @@ export type SignalCreateOrConnectWithoutPortfolioInput = {
 
 export type SignalCreateManyPortfolioInputEnvelope = {
   data: Prisma.SignalCreateManyPortfolioInput | Prisma.SignalCreateManyPortfolioInput[]
+  skipDuplicates?: boolean
 }
 
 export type SignalUpsertWithWhereUniqueWithoutPortfolioInput = {
@@ -1540,6 +1541,7 @@ export type SignalCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many Signals.
    */
   data: Prisma.SignalCreateManyInput | Prisma.SignalCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1558,6 +1560,7 @@ export type SignalCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many Signals.
    */
   data: Prisma.SignalCreateManyInput | Prisma.SignalCreateManyInput[]
+  skipDuplicates?: boolean
   /**
    * Choose, which related nodes to fetch as well
    */

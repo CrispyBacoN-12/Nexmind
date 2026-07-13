@@ -582,6 +582,7 @@ export type PipelineStepCreateOrConnectWithoutPipelineInput = {
 
 export type PipelineStepCreateManyPipelineInputEnvelope = {
   data: Prisma.PipelineStepCreateManyPipelineInput | Prisma.PipelineStepCreateManyPipelineInput[]
+  skipDuplicates?: boolean
 }
 
 export type PipelineStepUpsertWithWhereUniqueWithoutPipelineInput = {
@@ -1426,6 +1427,7 @@ export type PipelineStepCreateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * The data used to create many PipelineSteps.
    */
   data: Prisma.PipelineStepCreateManyInput | Prisma.PipelineStepCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1444,6 +1446,7 @@ export type PipelineStepCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Ex
    * The data used to create many PipelineSteps.
    */
   data: Prisma.PipelineStepCreateManyInput | Prisma.PipelineStepCreateManyInput[]
+  skipDuplicates?: boolean
   /**
    * Choose, which related nodes to fetch as well
    */

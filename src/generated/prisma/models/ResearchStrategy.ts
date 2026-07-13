@@ -522,6 +522,7 @@ export type ResearchStrategyCreateOrConnectWithoutRunInput = {
 
 export type ResearchStrategyCreateManyRunInputEnvelope = {
   data: Prisma.ResearchStrategyCreateManyRunInput | Prisma.ResearchStrategyCreateManyRunInput[]
+  skipDuplicates?: boolean
 }
 
 export type ResearchStrategyUpsertWithWhereUniqueWithoutRunInput = {
@@ -1344,6 +1345,7 @@ export type ResearchStrategyCreateManyArgs<ExtArgs extends runtime.Types.Extensi
    * The data used to create many ResearchStrategies.
    */
   data: Prisma.ResearchStrategyCreateManyInput | Prisma.ResearchStrategyCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1362,6 +1364,7 @@ export type ResearchStrategyCreateManyAndReturnArgs<ExtArgs extends runtime.Type
    * The data used to create many ResearchStrategies.
    */
   data: Prisma.ResearchStrategyCreateManyInput | Prisma.ResearchStrategyCreateManyInput[]
+  skipDuplicates?: boolean
   /**
    * Choose, which related nodes to fetch as well
    */

@@ -1247,6 +1247,7 @@ export type PipelineCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * The data used to create many Pipelines.
    */
   data: Prisma.PipelineCreateManyInput | Prisma.PipelineCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1265,6 +1266,7 @@ export type PipelineCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extens
    * The data used to create many Pipelines.
    */
   data: Prisma.PipelineCreateManyInput | Prisma.PipelineCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**

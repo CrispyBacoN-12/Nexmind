@@ -2235,6 +2235,7 @@ export type PortfolioCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * The data used to create many Portfolios.
    */
   data: Prisma.PortfolioCreateManyInput | Prisma.PortfolioCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -2253,6 +2254,7 @@ export type PortfolioCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Exten
    * The data used to create many Portfolios.
    */
   data: Prisma.PortfolioCreateManyInput | Prisma.PortfolioCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**

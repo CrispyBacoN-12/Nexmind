@@ -1,0 +1,20 @@
+name: Hourly BTC scan
+
+# Vercel Hobby's native cron only runs once per day, but the Bitcoin Desk
+# (portfolio 9) and BTC Rip-Sell Test (portfolio 10) need an hourly scan —
+# same cadence as the old local Windows Task Scheduler job. This workflow
+# is the free substitute: it just hits the deployed cron API route.
+on:
+  schedule:
+    - cron: "5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  scan-btc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call scan cron endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.NEXMIND_URL }}/api/cron/scan?ids=9,10"

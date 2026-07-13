@@ -56,5 +56,8 @@ dev.db
 # scheduled-scan log
 scripts/scan.log
 
+# one-time sqlite->postgres data export (contains full trade/portfolio data)
+scripts/sqlite-export.json
+
 # Obsidian workspace state (machine-local, not content)
 obsidian-vault/.obsidian/
