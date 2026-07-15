@@ -8,6 +8,10 @@ import {
 } from "@/lib/indicators";
 import { decideSetup, type ScanSnapshot } from "./scanner";
 import { lorentzianSeries } from "@/lib/lc/lorentzian";
+import {
+  isHammer, isShootingStar, isBullishEngulfing, isBearishEngulfing, isPiercingLine, isDarkCloudCover,
+  isMorningStar, isEveningStar, isThreeWhiteSoldiers, isThreeBlackCrows,
+} from "./candlestickPatterns";
 // Type-only: scanner.ts (imported below via getStrategy in combineStrategies)
 // is also imported by engine.ts, so a runtime import of engine.ts's
 // DEFAULT_COST_MODEL here would create a circular require. The value is
@@ -333,6 +337,102 @@ const swingTrendContinuation: Strategy = {
   },
 };
 
+/** Hammer — small body near the top of the range with a long lower wick,
+ *  after a downtrend. Classic single-candle bullish reversal. */
+const hammer: Strategy = {
+  key: "hammer",
+  label: "Hammer",
+  build(bars) {
+    return (i) => (isHammer(bars, i) ? { side: "long", note: "hammer reversal" } : null);
+  },
+};
+
+/** Shooting Star — mirror of Hammer: small body near the bottom of the
+ *  range with a long upper wick, after an uptrend. */
+const shootingStar: Strategy = {
+  key: "shooting-star",
+  label: "Shooting Star",
+  build(bars) {
+    return (i) => (isShootingStar(bars, i) ? { side: "short", note: "shooting star reversal" } : null);
+  },
+};
+
+/** Bullish Engulfing — a bullish candle's body fully engulfs the prior
+ *  bearish candle's body, after a downtrend. */
+const bullishEngulfing: Strategy = {
+  key: "bullish-engulfing",
+  label: "Bullish Engulfing",
+  build(bars) {
+    return (i) => (isBullishEngulfing(bars, i) ? { side: "long", note: "bullish engulfing" } : null);
+  },
+};
+
+/** Bearish Engulfing — mirror of Bullish Engulfing, after an uptrend. */
+const bearishEngulfing: Strategy = {
+  key: "bearish-engulfing",
+  label: "Bearish Engulfing",
+  build(bars) {
+    return (i) => (isBearishEngulfing(bars, i) ? { side: "short", note: "bearish engulfing" } : null);
+  },
+};
+
+/** Piercing Line — a bullish candle gaps down then closes back above the
+ *  prior bearish candle's midpoint, after a downtrend. */
+const piercingLine: Strategy = {
+  key: "piercing-line",
+  label: "Piercing Line",
+  build(bars) {
+    return (i) => (isPiercingLine(bars, i) ? { side: "long", note: "piercing line" } : null);
+  },
+};
+
+/** Dark Cloud Cover — mirror of Piercing Line, after an uptrend. */
+const darkCloudCover: Strategy = {
+  key: "dark-cloud-cover",
+  label: "Dark Cloud Cover",
+  build(bars) {
+    return (i) => (isDarkCloudCover(bars, i) ? { side: "short", note: "dark cloud cover" } : null);
+  },
+};
+
+/** Morning Star — bearish candle, small gapped star, bullish candle closing
+ *  back into the first candle's body, after a downtrend. */
+const morningStar: Strategy = {
+  key: "morning-star",
+  label: "Morning Star",
+  build(bars) {
+    return (i) => (isMorningStar(bars, i) ? { side: "long", note: "morning star" } : null);
+  },
+};
+
+/** Evening Star — mirror of Morning Star, after an uptrend. */
+const eveningStar: Strategy = {
+  key: "evening-star",
+  label: "Evening Star",
+  build(bars) {
+    return (i) => (isEveningStar(bars, i) ? { side: "short", note: "evening star" } : null);
+  },
+};
+
+/** Three White Soldiers — three consecutive strong bullish candles, each
+ *  closing higher, after a downtrend. */
+const threeWhiteSoldiers: Strategy = {
+  key: "three-white-soldiers",
+  label: "Three White Soldiers",
+  build(bars) {
+    return (i) => (isThreeWhiteSoldiers(bars, i) ? { side: "long", note: "three white soldiers" } : null);
+  },
+};
+
+/** Three Black Crows — mirror of Three White Soldiers, after an uptrend. */
+const threeBlackCrows: Strategy = {
+  key: "three-black-crows",
+  label: "Three Black Crows",
+  build(bars) {
+    return (i) => (isThreeBlackCrows(bars, i) ? { side: "short", note: "three black crows" } : null);
+  },
+};
+
 export type CombineMode = "any" | "vote";
 
 /** Build a meta-strategy that combines members. "any" enters when exactly one
@@ -385,6 +485,16 @@ export const STRATEGIES: Strategy[] = [
   volSpike,
   liquiditySweep,
   swingTrendContinuation,
+  hammer,
+  shootingStar,
+  bullishEngulfing,
+  bearishEngulfing,
+  piercingLine,
+  darkCloudCover,
+  morningStar,
+  eveningStar,
+  threeWhiteSoldiers,
+  threeBlackCrows,
   // Combos of the positive-edge members (EMA Cross excluded — it backtests negative).
   combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any"),
   combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3 }),
@@ -404,6 +514,17 @@ export const STRATEGIES: Strategy[] = [
   // backtest negative or near-silent (1 signal/5y) on daily gold bars.
   { ...combineStrategies("combo-gold", "Gold Multi-Strategy Vote≥2 (Trend Cont.+Pullback+Dip Buy)", ["swing-trend-continuation", "trend-pullback", "mean-rev"], "vote", { minVotes: 2, window: 3 }),
     preferredExit: swingTrendContinuation.preferredExit },
+  // Candlestick reversal patterns (pure OHLCV + trend filter) — "any" fires
+  // when exactly one member pattern triggers this bar.
+  combineStrategies(
+    "candlestick-any",
+    "Candlestick Pattern (Any)",
+    [
+      "hammer", "bullish-engulfing", "piercing-line", "morning-star", "three-white-soldiers",
+      "shooting-star", "bearish-engulfing", "dark-cloud-cover", "evening-star", "three-black-crows",
+    ],
+    "any",
+  ),
 ];
 
 export function getStrategy(key: string): Strategy | null {
