@@ -338,84 +338,124 @@ const swingTrendContinuation: Strategy = {
 };
 
 /** Hammer — small body near the top of the range with a long lower wick,
- *  after a downtrend. Classic single-candle bullish reversal. */
+ *  after a downtrend. Classic single-candle bullish reversal.
+ *  Research trail: tp1Mult sweep {1,1.5,2,2.5,3} x singleTarget {true,false}
+ *  on GC=F+BTC-USD 1h/3mo (DEFAULT_COST_MODEL) picked tp1=1.0/single over the
+ *  engine default (tp1=2.5/ladder): mean avgR -0.666 -> -0.225 across 27
+ *  trades. Still a net loser after tuning — the exit isn't the problem, the
+ *  entry has weak edge on its own (see candlestick-any combo backtest notes). */
 const hammer: Strategy = {
   key: "hammer",
   label: "Hammer",
+  preferredExit: { tp1Mult: 1.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
     return (i) => (isHammer(bars, i) ? { side: "long", note: "hammer reversal" } : null);
   },
 };
 
 /** Shooting Star — mirror of Hammer: small body near the bottom of the
- *  range with a long upper wick, after an uptrend. */
+ *  range with a long upper wick, after an uptrend.
+ *  Research trail: same sweep as Hammer picked tp1=3.0/ladder: mean avgR
+ *  0.285 -> 0.388 across 13 trades (only 2 on GC=F — thin sample, treat as
+ *  directional not conclusive). */
 const shootingStar: Strategy = {
   key: "shooting-star",
   label: "Shooting Star",
+  preferredExit: { tp1Mult: 3.0, singleTarget: false, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
     return (i) => (isShootingStar(bars, i) ? { side: "short", note: "shooting star reversal" } : null);
   },
 };
 
 /** Bullish Engulfing — a bullish candle's body fully engulfs the prior
- *  bearish candle's body, after a downtrend. */
+ *  bearish candle's body, after a downtrend.
+ *  Research trail: same sweep picked tp1=2.0/single: mean avgR -0.304 ->
+ *  -0.158 across 68 trades. Still net negative after tuning, worst on
+ *  BTC-USD — weak entry edge, not an exit problem. */
 const bullishEngulfing: Strategy = {
   key: "bullish-engulfing",
   label: "Bullish Engulfing",
+  preferredExit: { tp1Mult: 2.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
     return (i) => (isBullishEngulfing(bars, i) ? { side: "long", note: "bullish engulfing" } : null);
   },
 };
 
-/** Bearish Engulfing — mirror of Bullish Engulfing, after an uptrend. */
+/** Bearish Engulfing — mirror of Bullish Engulfing, after an uptrend.
+ *  Research trail: same sweep picked tp1=3.0/ladder: mean avgR 0.030 ->
+ *  0.172 across 71 trades, the largest sample of the ten patterns and
+ *  positive on GC=F specifically (avgR 0.405) — the strongest single
+ *  pattern in this batch. */
 const bearishEngulfing: Strategy = {
   key: "bearish-engulfing",
   label: "Bearish Engulfing",
+  preferredExit: { tp1Mult: 3.0, singleTarget: false, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
     return (i) => (isBearishEngulfing(bars, i) ? { side: "short", note: "bearish engulfing" } : null);
   },
 };
 
 /** Piercing Line — a bullish candle gaps down then closes back above the
- *  prior bearish candle's midpoint, after a downtrend. */
+ *  prior bearish candle's midpoint, after a downtrend.
+ *  Research trail: same sweep picked tp1=1.0/single: mean avgR -0.415 ->
+ *  -0.096 across 42 trades. Still net negative after tuning. */
 const piercingLine: Strategy = {
   key: "piercing-line",
   label: "Piercing Line",
+  preferredExit: { tp1Mult: 1.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
     return (i) => (isPiercingLine(bars, i) ? { side: "long", note: "piercing line" } : null);
   },
 };
 
-/** Dark Cloud Cover — mirror of Piercing Line, after an uptrend. */
+/** Dark Cloud Cover — mirror of Piercing Line, after an uptrend.
+ *  Research trail: same sweep picked tp1=3.0/ladder: mean avgR 0.086 ->
+ *  0.275 across 25 trades, positive on both symbols. */
 const darkCloudCover: Strategy = {
   key: "dark-cloud-cover",
   label: "Dark Cloud Cover",
+  preferredExit: { tp1Mult: 3.0, singleTarget: false, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
     return (i) => (isDarkCloudCover(bars, i) ? { side: "short", note: "dark cloud cover" } : null);
   },
 };
 
 /** Morning Star — bearish candle, small gapped star, bullish candle closing
- *  back into the first candle's body, after a downtrend. */
+ *  back into the first candle's body, after a downtrend.
+ *  Research trail: same sweep picked tp1=2.0/single: mean avgR 0.199 ->
+ *  0.925 across only 11 trades (2 on GC=F) — the biggest jump of the batch,
+ *  but the smallest sample too. Low confidence; revisit once more history
+ *  accumulates. */
 const morningStar: Strategy = {
   key: "morning-star",
   label: "Morning Star",
+  preferredExit: { tp1Mult: 2.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
     return (i) => (isMorningStar(bars, i) ? { side: "long", note: "morning star" } : null);
   },
 };
 
-/** Evening Star — mirror of Morning Star, after an uptrend. */
+/** Evening Star — mirror of Morning Star, after an uptrend.
+ *  Research trail: same sweep picked tp1=1.0/ladder: mean avgR -0.759 ->
+ *  -0.125 across 10 trades. Still net negative after tuning; smallest
+ *  sample tier along with Morning Star and Three White/Black — treat as
+ *  directional. */
 const eveningStar: Strategy = {
   key: "evening-star",
   label: "Evening Star",
+  preferredExit: { tp1Mult: 1.0, singleTarget: false, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
     return (i) => (isEveningStar(bars, i) ? { side: "short", note: "evening star" } : null);
   },
 };
 
 /** Three White Soldiers — three consecutive strong bullish candles, each
- *  closing higher, after a downtrend. */
+ *  closing higher, after a downtrend.
+ *  Research trail: fired only once across both symbols in the 1h/3mo sweep
+ *  window — nowhere near enough trades to calibrate an exit without
+ *  overfitting a single data point. Left on the engine default (tp1=2.5
+ *  ladder, no costs) deliberately; revisit once this pattern has fired
+ *  more often in the dataset. */
 const threeWhiteSoldiers: Strategy = {
   key: "three-white-soldiers",
   label: "Three White Soldiers",
@@ -424,7 +464,10 @@ const threeWhiteSoldiers: Strategy = {
   },
 };
 
-/** Three Black Crows — mirror of Three White Soldiers, after an uptrend. */
+/** Three Black Crows — mirror of Three White Soldiers, after an uptrend.
+ *  Research trail: same story as Three White Soldiers — only 2 trades
+ *  total in the sweep window, both losses. Too sparse to calibrate; left
+ *  on the engine default rather than tuning to noise. */
 const threeBlackCrows: Strategy = {
   key: "three-black-crows",
   label: "Three Black Crows",
@@ -516,13 +559,31 @@ export const STRATEGIES: Strategy[] = [
     preferredExit: swingTrendContinuation.preferredExit },
   // Candlestick reversal patterns (pure OHLCV + trend filter) — "any" fires
   // when exactly one member pattern triggers this bar.
+  //
+  // Membership curated 2026-07-16 from the 1h/3mo GC=F + BTC-USD sweep that
+  // set each pattern's preferredExit above. Combining all 10 unconditionally
+  // let the losers drag the winners under: hammer, bullish-engulfing,
+  // piercing-line, shooting-star, and evening-star all ran net-negative avgR
+  // on both symbols even after their own exit tuning (bullish-engulfing especially,
+  // n=31/37 — large enough sample to trust, not noise). three-white-soldiers
+  // and three-black-crows were dropped too, same "too sparse to trust"
+  // reasoning as their missing preferredExit above (1 and 2 trades total in
+  // the sweep window). Kept: dark-cloud-cover, bearish-engulfing, and
+  // morning-star — the only three that came out net-positive (or breakeven)
+  // post-tuning on both symbols.
+  //
+  // Caveat: this is one 3-month window on two symbols — revisit membership
+  // once more history is available rather than treating this cut as final.
+  //
+  // Deliberately no preferredExit on the combo itself: even among these 3
+  // survivors, dark-cloud-cover/bearish-engulfing (tp1=3.0/ladder) and
+  // morning-star (tp1=2.0/single) disagree, and the engine picks an exit
+  // ladder per strategy, not per signal — a combo can't inherit whichever
+  // member fired on a given bar. Backtests against the engine default.
   combineStrategies(
     "candlestick-any",
     "Candlestick Pattern (Any)",
-    [
-      "hammer", "bullish-engulfing", "piercing-line", "morning-star", "three-white-soldiers",
-      "shooting-star", "bearish-engulfing", "dark-cloud-cover", "evening-star", "three-black-crows",
-    ],
+    ["dark-cloud-cover", "bearish-engulfing", "morning-star"],
     "any",
   ),
 ];

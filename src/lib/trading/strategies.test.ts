@@ -280,9 +280,40 @@ test("Three Black Crows strategy: getStrategy resolves and fires short", () => {
   assert.equal(getStrategy("three-black-crows")!.build(bars)(17)?.side, "short");
 });
 
+test("candlestick patterns: high-sample patterns declare a calibrated preferredExit", () => {
+  const expected: Record<string, { tp1Mult: number; singleTarget: boolean }> = {
+    hammer: { tp1Mult: 1.0, singleTarget: true },
+    "shooting-star": { tp1Mult: 3.0, singleTarget: false },
+    "bullish-engulfing": { tp1Mult: 2.0, singleTarget: true },
+    "bearish-engulfing": { tp1Mult: 3.0, singleTarget: false },
+    "piercing-line": { tp1Mult: 1.0, singleTarget: true },
+    "dark-cloud-cover": { tp1Mult: 3.0, singleTarget: false },
+    "morning-star": { tp1Mult: 2.0, singleTarget: true },
+    "evening-star": { tp1Mult: 1.0, singleTarget: false },
+  };
+  for (const [key, exit] of Object.entries(expected)) {
+    const strat = getStrategy(key)!;
+    assert.equal(strat.preferredExit?.tp1Mult, exit.tp1Mult, `${key} tp1Mult`);
+    assert.equal(strat.preferredExit?.singleTarget, exit.singleTarget, `${key} singleTarget`);
+    assert.ok(strat.preferredExit?.costs, `${key} expects a real cost model, not NO_COSTS`);
+  }
+});
+
+test("candlestick patterns: too-sparse-to-calibrate patterns and the combo stay on the engine default", () => {
+  for (const key of ["three-white-soldiers", "three-black-crows", "candlestick-any"]) {
+    assert.equal(getStrategy(key)!.preferredExit, undefined, `${key} should not have a preferredExit`);
+  }
+});
+
 test("candlestick-any combo: fires when exactly one member pattern triggers", () => {
+  const bars = [...CANDLE_UP, bar(15 * HOUR, 100, 111, 99, 110), bar(16 * HOUR, 112, 113, 102, 103)]; // Dark Cloud Cover fixture
+  assert.equal(getStrategy("candlestick-any")!.build(bars)(16)?.side, "short");
+});
+
+test("candlestick-any combo: dropped members (e.g. hammer) no longer trigger it", () => {
   const bars = [...CANDLE_DOWN, bar(15 * HOUR, 100, 101.2, 95, 101)]; // Hammer fixture
-  assert.equal(getStrategy("candlestick-any")!.build(bars)(15)?.side, "long");
+  assert.equal(getStrategy("hammer")!.build(bars)(15)?.side, "long", "sanity: hammer itself still fires");
+  assert.equal(getStrategy("candlestick-any")!.build(bars)(15), null, "but combo dropped hammer during curation");
 });
 
 test("registry exposes all 10 candlestick patterns + the combo by key", () => {

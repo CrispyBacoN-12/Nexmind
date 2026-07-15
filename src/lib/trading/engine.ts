@@ -50,6 +50,33 @@ const RESEARCH_ATR_SL_MULT = 1.5;
 const RESEARCH_ATR_TP_MULT = 1.2;
 const RESEARCH_MIN_RISK_REWARD = 0.5;
 
+type ExitOverride = { atrSlMult?: number; atrTpMult?: number; singleTarget?: boolean };
+
+// Built-in strategies tuned via the Backtest Lab (scan.preferredExit) take
+// priority over the research ladder — both exist to make live paper trading
+// match whatever was actually validated offline, rather than falling back to
+// the generic desk default (1.5 SL / 2.5 TP with a trailing tp2).
+export function resolveExitOverride(scan: ScanResult, isResearch: boolean): ExitOverride {
+  if (scan.preferredExit) {
+    return { atrTpMult: scan.preferredExit.tp1Mult, singleTarget: scan.preferredExit.singleTarget };
+  }
+  if (isResearch) {
+    return { atrSlMult: RESEARCH_ATR_SL_MULT, atrTpMult: RESEARCH_ATR_TP_MULT, singleTarget: true };
+  }
+  return {};
+}
+
+// SL is fixed at 1.5x ATR everywhere the exit ladder is computed (mockHawk,
+// hawk.ts's computeLevels), so a tuned tp1Mult's achievable R:R is tp1Mult/1.5.
+// morning-star (tp1Mult=2.0) lands at ~1.33, below the generic 1.5 floor — this
+// only lowers the floor to match a strategy's own tuned ladder, never raises it.
+export function minRiskRewardFor(scan: ScanResult, isResearch: boolean): number {
+  if (scan.preferredExit) {
+    return Math.min(DEFAULT_ACCOUNT.minRiskReward, scan.preferredExit.tp1Mult / 1.5);
+  }
+  return isResearch ? RESEARCH_MIN_RISK_REWARD : DEFAULT_ACCOUNT.minRiskReward;
+}
+
 export async function runTradeTick(
   symbol: string,
   portfolioId: number,
@@ -91,14 +118,10 @@ export async function runTradeTick(
 
   // 2) HAWK ×3
   const newsDigest = await latestNewsDigest();
+  const exitOverride = resolveExitOverride(scan, isResearch);
   const hawk: HawkVerdict = aiEnabled()
-    ? await runHawk(scan, {
-        newsDigest,
-        ...(isResearch
-          ? { atrSlMult: RESEARCH_ATR_SL_MULT, atrTpMult: RESEARCH_ATR_TP_MULT, singleTarget: true }
-          : {}),
-      })
-    : mockHawk(scan, isResearch);
+    ? await runHawk(scan, { newsDigest, ...exitOverride })
+    : mockHawk(scan, exitOverride);
   costUsd += hawk.totalCostUsd;
   steps.push({
     stage: "hawk",
@@ -167,7 +190,7 @@ export async function runTradeTick(
   }
   const account: AccountState = {
     ...DEFAULT_ACCOUNT,
-    minRiskReward: isResearch ? RESEARCH_MIN_RISK_REWARD : DEFAULT_ACCOUNT.minRiskReward,
+    minRiskReward: minRiskRewardFor(scan, isResearch),
     dailyLossUsd: await todaysRealizedLoss(portfolioId),
     killSwitch: await isKillSwitchOn(portfolioId),
     globalTradingHalt: await isGlobalTradingHalt(),
@@ -246,7 +269,7 @@ async function fetchDailyReturns(symbol: string): Promise<number[] | null> {
 
 // ---- mock path (no API key): deterministic so the pipeline is demoable ----
 
-function mockHawk(scan: ScanResult, tightLadder = false): HawkVerdict {
+function mockHawk(scan: ScanResult, exit: ExitOverride): HawkVerdict {
   const side = scan.side!;
   const votes: HawkVote[] = [
     { persona: "trend", vote: side, confidence: 0.7, reason: "trend aligns (mock)" },
@@ -255,15 +278,17 @@ function mockHawk(scan: ScanResult, tightLadder = false): HawkVerdict {
   ];
   const atr = scan.atr ?? scan.price * 0.005;
   const e = scan.price;
-  // No API key configured -> this mock path is what actually runs. tightLadder
-  // mirrors research strategies' backtest ladder (RESEARCH_ATR_SL_MULT/TP_MULT,
-  // single-target — no tp2) so the validated win rate carries into paper trades.
-  const slMult = tightLadder ? RESEARCH_ATR_SL_MULT : 1.5;
-  const tpMult = tightLadder ? RESEARCH_ATR_TP_MULT : 2.5;
+  // No API key configured -> this mock path is what actually runs. Defaults
+  // mirror hawk.ts's own computeLevels() so the mock and real-AI paths agree;
+  // exit overrides (research ladder or a strategy's tuned preferredExit) win
+  // when present so the validated win rate carries into paper trades.
+  const slMult = exit.atrSlMult ?? 1.5;
+  const tpMult = exit.atrTpMult ?? 2.5;
+  const singleTarget = exit.singleTarget ?? false;
   const levels: ProposedLevels =
     side === "long"
-      ? { entry: e, sl: e - slMult * atr, tp1: e + tpMult * atr, tp2: tightLadder ? null : e + tpMult * 1.6 * atr }
-      : { entry: e, sl: e + slMult * atr, tp1: e - tpMult * atr, tp2: tightLadder ? null : e - tpMult * 1.6 * atr };
+      ? { entry: e, sl: e - slMult * atr, tp1: e + tpMult * atr, tp2: singleTarget ? null : e + tpMult * 1.6 * atr }
+      : { entry: e, sl: e + slMult * atr, tp1: e - tpMult * atr, tp2: singleTarget ? null : e - tpMult * 1.6 * atr };
   return { agreed: true, side, votes, levels, totalCostUsd: 0 };
 }
 

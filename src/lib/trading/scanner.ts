@@ -6,7 +6,7 @@ import { fetchCandles } from "@/lib/marketData";
 import { sma, rsi, macd, atr, adx, bollinger, stochastic, anchoredVWAP, dailyAnchor, type Candle } from "@/lib/indicators";
 import { findRecentUpLeg } from "@/lib/swings";
 import { lorentzianLast, type LCState } from "@/lib/lc/lorentzian";
-import { getStrategy } from "./strategies";
+import { getStrategy, type Strategy } from "./strategies";
 import { getResearchStrategy } from "@/lib/research/adapter";
 
 export interface ScanSnapshot {
@@ -42,6 +42,8 @@ export interface ScanResult {
   snapshot: ScanSnapshot;
   note: string;
   candles: Candle[]; // recent tail, for the analysts
+  /** Exit ladder tuned for the firing strategy (Backtest Lab), when it has one. */
+  preferredExit?: Strategy["preferredExit"];
 }
 
 const last = <T,>(arr: (T | null)[]): T | null => {
@@ -185,5 +187,6 @@ export async function scanSymbol(
     snapshot,
     note,
     candles: candles.slice(-60),
+    preferredExit: strat?.preferredExit,
   };
 }
