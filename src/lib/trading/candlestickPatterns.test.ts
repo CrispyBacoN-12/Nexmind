@@ -4,6 +4,7 @@ import type { Candle } from "@/lib/indicators";
 import {
   priorTrend, isHammer, isShootingStar,
   isBullishEngulfing, isBearishEngulfing, isPiercingLine, isDarkCloudCover,
+  isMorningStar, isEveningStar, isThreeWhiteSoldiers, isThreeBlackCrows,
 } from "./candlestickPatterns";
 
 const HOUR = 3600;
@@ -100,4 +101,44 @@ test("Dark Cloud Cover: gap-up close back below the prior body's midpoint after 
 test("Dark Cloud Cover: same shape after a downtrend does not fire (trend filter)", () => {
   const bars = [...DOWN, bar(15 * HOUR, 100, 111, 99, 110), bar(16 * HOUR, 112, 113, 102, 103)];
   assert.equal(isDarkCloudCover(bars, 16), false);
+});
+
+test("Morning Star: bearish + small gapped star + bullish close above midpoint after a downtrend fires", () => {
+  const bars = [...DOWN, bar(15 * HOUR, 130, 131, 119, 120), bar(16 * HOUR, 115, 116, 113, 114), bar(17 * HOUR, 116, 128, 115, 127)];
+  assert.equal(isMorningStar(bars, 17), true);
+});
+
+test("Morning Star: same shape after an uptrend does not fire (trend filter)", () => {
+  const bars = [...UP, bar(15 * HOUR, 130, 131, 119, 120), bar(16 * HOUR, 115, 116, 113, 114), bar(17 * HOUR, 116, 128, 115, 127)];
+  assert.equal(isMorningStar(bars, 17), false);
+});
+
+test("Evening Star: bullish + small gapped star + bearish close below midpoint after an uptrend fires", () => {
+  const bars = [...UP, bar(15 * HOUR, 100, 111, 99, 110), bar(16 * HOUR, 115, 117, 114, 116), bar(17 * HOUR, 114, 115, 102, 103)];
+  assert.equal(isEveningStar(bars, 17), true);
+});
+
+test("Evening Star: same shape after a downtrend does not fire (trend filter)", () => {
+  const bars = [...DOWN, bar(15 * HOUR, 100, 111, 99, 110), bar(16 * HOUR, 115, 117, 114, 116), bar(17 * HOUR, 114, 115, 102, 103)];
+  assert.equal(isEveningStar(bars, 17), false);
+});
+
+test("Three White Soldiers: three rising bullish closes, each opening inside the prior body, after a downtrend fires", () => {
+  const bars = [...DOWN, bar(15 * HOUR, 100, 106, 99, 105), bar(16 * HOUR, 102, 111.5, 101, 110), bar(17 * HOUR, 105, 118, 104, 116)];
+  assert.equal(isThreeWhiteSoldiers(bars, 17), true);
+});
+
+test("Three White Soldiers: same shape after an uptrend does not fire (trend filter)", () => {
+  const bars = [...UP, bar(15 * HOUR, 100, 106, 99, 105), bar(16 * HOUR, 102, 111.5, 101, 110), bar(17 * HOUR, 105, 118, 104, 116)];
+  assert.equal(isThreeWhiteSoldiers(bars, 17), false);
+});
+
+test("Three Black Crows: three falling bearish closes, each opening inside the prior body, after an uptrend fires", () => {
+  const bars = [...UP, bar(15 * HOUR, 105, 106, 99, 100), bar(16 * HOUR, 103, 104, 93, 95), bar(17 * HOUR, 100, 101, 86, 89)];
+  assert.equal(isThreeBlackCrows(bars, 17), true);
+});
+
+test("Three Black Crows: same shape after a downtrend does not fire (trend filter)", () => {
+  const bars = [...DOWN, bar(15 * HOUR, 105, 106, 99, 100), bar(16 * HOUR, 103, 104, 93, 95), bar(17 * HOUR, 100, 101, 86, 89)];
+  assert.equal(isThreeBlackCrows(bars, 17), false);
 });

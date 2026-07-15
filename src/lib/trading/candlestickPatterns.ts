@@ -111,3 +111,67 @@ export function isDarkCloudCover(bars: Candle[], i: number): boolean {
   if (cur.c >= prevMid || cur.c <= prev.o) return false;
   return priorTrend(bars, i - 2, 10) === "up";
 }
+
+/** Long bearish candle, a small-bodied "star" that gaps below its body, then
+ *  a bullish candle closing back above the first candle's midpoint, after a
+ *  downtrend. */
+export function isMorningStar(bars: Candle[], i: number): boolean {
+  if (i < 2) return false;
+  const first = bars[i - 2], star = bars[i - 1], third = bars[i];
+  if (!isBearishCandle(first) || !isBullishCandle(third)) return false;
+  const firstBody = bodySize(first);
+  if (firstBody <= 0) return false;
+  if (bodySize(star) > 0.5 * firstBody) return false;
+  if (Math.max(star.o, star.c) >= Math.min(first.o, first.c)) return false;
+  if (third.c <= (first.o + first.c) / 2) return false;
+  return priorTrend(bars, i - 3, 10) === "down";
+}
+
+/** Mirror of Morning Star: long bullish candle, a small-bodied star gapping
+ *  above its body, then a bearish candle closing back below the first
+ *  candle's midpoint, after an uptrend. */
+export function isEveningStar(bars: Candle[], i: number): boolean {
+  if (i < 2) return false;
+  const first = bars[i - 2], star = bars[i - 1], third = bars[i];
+  if (!isBullishCandle(first) || !isBearishCandle(third)) return false;
+  const firstBody = bodySize(first);
+  if (firstBody <= 0) return false;
+  if (bodySize(star) > 0.5 * firstBody) return false;
+  if (Math.min(star.o, star.c) <= Math.max(first.o, first.c)) return false;
+  if (third.c >= (first.o + first.c) / 2) return false;
+  return priorTrend(bars, i - 3, 10) === "up";
+}
+
+/** Three consecutive bullish candles, each closing higher than the last,
+ *  each opening inside the previous candle's body, each with a small upper
+ *  wick (strong closes near the high), after a downtrend. */
+export function isThreeWhiteSoldiers(bars: Candle[], i: number): boolean {
+  if (i < 2) return false;
+  const [a, b, c] = [bars[i - 2], bars[i - 1], bars[i]];
+  for (const k of [a, b, c]) {
+    if (!isBullishCandle(k)) return false;
+    const body = bodySize(k);
+    if (body <= 0 || upperWick(k) > 0.3 * body) return false;
+  }
+  if (!(b.c > a.c && c.c > b.c)) return false;
+  if (!(b.o > a.o && b.o < a.c)) return false;
+  if (!(c.o > b.o && c.o < b.c)) return false;
+  return priorTrend(bars, i - 3, 10) === "down";
+}
+
+/** Mirror of Three White Soldiers: three consecutive bearish candles, each
+ *  closing lower, each opening inside the previous candle's body, each with
+ *  a small lower wick, after an uptrend. */
+export function isThreeBlackCrows(bars: Candle[], i: number): boolean {
+  if (i < 2) return false;
+  const [a, b, c] = [bars[i - 2], bars[i - 1], bars[i]];
+  for (const k of [a, b, c]) {
+    if (!isBearishCandle(k)) return false;
+    const body = bodySize(k);
+    if (body <= 0 || lowerWick(k) > 0.3 * body) return false;
+  }
+  if (!(b.c < a.c && c.c < b.c)) return false;
+  if (!(b.o < a.o && b.o > a.c)) return false;
+  if (!(c.o < b.o && c.o > b.c)) return false;
+  return priorTrend(bars, i - 3, 10) === "up";
+}
