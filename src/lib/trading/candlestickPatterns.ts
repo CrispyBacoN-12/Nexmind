@@ -60,3 +60,54 @@ export function isShootingStar(bars: Candle[], i: number): boolean {
   if (lowerWick(c) > 0.3 * body) return false;
   return priorTrend(bars, i - 1, 10) === "up";
 }
+
+/** Bearish candle followed by a bullish candle whose body fully engulfs it
+ *  (opens at/below the prior close, closes at/above the prior open), after
+ *  a downtrend. */
+export function isBullishEngulfing(bars: Candle[], i: number): boolean {
+  if (i < 1) return false;
+  const prev = bars[i - 1], cur = bars[i];
+  if (!isBearishCandle(prev) || !isBullishCandle(cur)) return false;
+  if (cur.o > prev.c || cur.c < prev.o) return false;
+  if (bodySize(cur) <= bodySize(prev)) return false;
+  return priorTrend(bars, i - 2, 10) === "down";
+}
+
+/** Mirror of Bullish Engulfing: bullish candle followed by a bearish candle
+ *  that engulfs it, after an uptrend. */
+export function isBearishEngulfing(bars: Candle[], i: number): boolean {
+  if (i < 1) return false;
+  const prev = bars[i - 1], cur = bars[i];
+  if (!isBullishCandle(prev) || !isBearishCandle(cur)) return false;
+  if (cur.o < prev.c || cur.c > prev.o) return false;
+  if (bodySize(cur) <= bodySize(prev)) return false;
+  return priorTrend(bars, i - 2, 10) === "up";
+}
+
+/** Long bearish candle, then a bullish candle that gaps down (opens at/below
+ *  the prior close) and closes above the prior body's midpoint but below the
+ *  prior open — a partial, not full, engulf — after a downtrend. */
+export function isPiercingLine(bars: Candle[], i: number): boolean {
+  if (i < 1) return false;
+  const prev = bars[i - 1], cur = bars[i];
+  if (!isBearishCandle(prev) || !isBullishCandle(cur)) return false;
+  if (bodySize(prev) <= 0) return false;
+  const prevMid = (prev.o + prev.c) / 2;
+  if (cur.o > prev.c) return false;
+  if (cur.c <= prevMid || cur.c >= prev.o) return false;
+  return priorTrend(bars, i - 2, 10) === "down";
+}
+
+/** Mirror of Piercing Line: long bullish candle, then a bearish candle that
+ *  gaps up and closes below the prior body's midpoint but above the prior
+ *  open, after an uptrend. */
+export function isDarkCloudCover(bars: Candle[], i: number): boolean {
+  if (i < 1) return false;
+  const prev = bars[i - 1], cur = bars[i];
+  if (!isBullishCandle(prev) || !isBearishCandle(cur)) return false;
+  if (bodySize(prev) <= 0) return false;
+  const prevMid = (prev.o + prev.c) / 2;
+  if (cur.o < prev.c) return false;
+  if (cur.c >= prevMid || cur.c <= prev.o) return false;
+  return priorTrend(bars, i - 2, 10) === "up";
+}
