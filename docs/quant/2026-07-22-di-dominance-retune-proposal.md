@@ -103,6 +103,53 @@ Wins where it counts (survives 2025-07 regime that sank DI; bigger up-magnitude)
 
 **Correction to an earlier claim:** the DI-only rule does not "die" on GLD — on the same GLD walk-forward it is weakly positive in 6/6 blocks, but at avgR ~+0.01–0.02 (below the meaningful PF>1.05 bar). Precise statement: DI on GLD is *break-even/below-threshold*, not clearly losing. The strict sweep's "0/120 robust on GLD" was about clearing PF>1.05, which this break-even edge doesn't.
 
+## Weighted voting (tested, does NOT help) + combo-gold small-sample warning
+
+`scripts/sweep-weighted-vote-gcf.mts` tested whether giving combo members
+UNEQUAL vote weights beats the current equal-vote≥2 (`combineStrategies` counts
+1 per member). Members = combo-gold's three (swing-trend-continuation,
+trend-pullback, mean-rev) + the MACD+trend rule as a 4th. Swept 903
+weight/threshold combos, train/test split:
+
+- **1h GC=F 2y:** 0/903 weighted configs beat the equal-vote baseline OOS.
+- **1d GC=F 5y (combo-gold's real cadence):** 0/903 beat it either.
+
+**Conclusion: weighting the votes adds nothing.** Equal voting already captures
+whatever edge the members share; unequal weights just reshuffle without
+improving out-of-sample. The current equal-vote design is not leaving money on
+the table here.
+
+**Red flag surfaced — combo-gold is small-sample.** On its own daily cadence the
+equal-vote≥2 baseline makes only **~10 train / ~8 test trades over 5 years**
+(TEST showed 8 trades, 100% win — an unfalsifiable number). combo-gold's
+headline "PF 3.25 / 72% win" rests on ~18 trades total; it is statistically
+meaningless, the same small-sample trap as the candlestick family and
+research-100. vote≥2-of-3 on daily gold is simply too restrictive to fire enough
+times to trust. This *raises* the relative standing of the MACD+trend rule,
+which fires hundreds of trades on 1h — a trustworthy statistical regime.
+
+## Indicator + candlestick confluence (tested, does NOT help)
+
+`scripts/confluence-indicator-candle-gcf.mts` (trend context) and
+`scripts/confluence-meanrev-candle-gcf.mts` (mean-reversion context) tested
+using an indicator to set direction/zone, then requiring a candlestick pattern
+to confirm the entry bar. Both fail to produce a trustworthy edge:
+
+- **Trend + candle:** the candle gate collapses trades 265 → 4–20. Cells with
+  eye-catching PF (1.99, 2.39) have only 4–7 trades — mirages. Cells that keep
+  enough trades (looser trend context) don't beat the MACD+trend baseline.
+- **Mean-reversion + candle:** the principled pairing (candles ARE reversal
+  signals). Positive-OOS cells appear (RSI+candle PF 1.45/48tr, BB+candle PF
+  1.98/15tr) but every one has a strongly NEGATIVE train half — the inverted
+  split is the tell: the candle gate carves out a small subset that happened to
+  win in the test window, not a stable edge. Zone-alone is negative; the "lift"
+  is overfitting, not confirmation.
+
+**Candlestick verdict (all three forms tested): no reliable predictive value on
+gold 1h** — standalone (overfit, earlier), as trend confirmation (sample
+destruction), or as reversal confirmation (inverted-split flukes). The best
+strategy of the whole pass, MACD+trend+widening, uses no candlesticks.
+
 ## Honest expectations / caveats
 
 - **The edge is thin.** PF ~1.05 and avgR ~+0.05R in good periods. This is a real but marginal edge, not a transformation. Re-tuning improves the *size* of the win, not the *frequency* of winning periods.
