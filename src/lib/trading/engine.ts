@@ -72,9 +72,9 @@ export function resolveExitOverride(scan: ScanResult, isResearch: boolean): Exit
 // only lowers the floor to match a strategy's own tuned ladder, never raises it.
 export function minRiskRewardFor(scan: ScanResult, isResearch: boolean): number {
   if (scan.preferredExit) {
-    return Math.min(DEFAULT_ACCOUNT.minRiskReward, scan.preferredExit.tp1Mult / 1.5);
+    return Math.min(DEFAULT_ACCOUNT.minRiskReward ?? 1.5, scan.preferredExit.tp1Mult / 1.5);
   }
-  return isResearch ? RESEARCH_MIN_RISK_REWARD : DEFAULT_ACCOUNT.minRiskReward;
+  return isResearch ? RESEARCH_MIN_RISK_REWARD : (DEFAULT_ACCOUNT.minRiskReward ?? 1.5);
 }
 
 export async function runTradeTick(
