@@ -337,6 +337,54 @@ const swingTrendContinuation: Strategy = {
   },
 };
 
+/** MACD-sign + SMA20/50 trend agreement, gated by DI-gap widening and a
+ *  sma50-slope regime filter (only trade with the higher-timeframe slope).
+ *  Research trail: discovered via scripts/walkforward-macd-trend-gcf.mts as
+ *  the strongest candidate of the whole quant pass on GC=F 1h — beats the
+ *  retuned DI-Dominance rule on walk-forward (5/6 blocks positive vs 4/6) and
+ *  survives the 2025-07 regime that sinks DI. A separate mechanism
+ *  (break-of-structure + trend, scripts/walkforward-bos-trend-gcf.mts) finds
+ *  the same edge and fails the same 2024-11 block, pointing at a regime
+ *  problem rather than a bad entry rule. scripts/regime-filter-macd-trend-gcf.mts
+ *  then swept principled regime filters (ADX, Kaufman ER, sma50 slope, ATR
+ *  band) on top of this base: sma50-slope alignment was the only one that
+ *  helped consistently (totR 39.8 -> 50.9, +28%, worst block -0.15R -> -0.07R)
+ *  rather than merely patching one adverse block, while keeping 5/6 positive
+ *  blocks. See docs/quant/2026-07-22-di-dominance-retune-proposal.md.
+ *  GC=F-only: the same edge does not clear the bar on GLD (gold ETF,
+ *  RTH-gappy bars) — keep this off gold ETFs.
+ *  Added here as a selectable, backtest-validated strategy; not yet wired
+ *  into any live desk's active strategy key (Portfolio.strategy / combo-gold
+ *  membership) — that activation is a separate decision. */
+const SMA50_SLOPE_LOOKBACK = 10;
+const macdTrendSma50Regime: Strategy = {
+  key: "macd-trend-sma50-regime",
+  label: "MACD+Trend + SMA50-Slope Regime (Gold)",
+  preferredExit: { tp1Mult: 2.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
+  build(bars) {
+    const closes = bars.map((c) => c.c);
+    const s20 = sma(closes, 20), s50 = sma(closes, 50);
+    const { histogram } = macd(closes);
+    const { plusDI, minusDI } = adx(bars, 14);
+    return (i) => {
+      if (i < 1 || i < SMA50_SLOPE_LOOKBACK) return null;
+      if (plusDI[i] == null || minusDI[i] == null || plusDI[i - 1] == null || minusDI[i - 1] == null) return null;
+      const gap = Math.abs(plusDI[i]! - minusDI[i]!);
+      const pGap = Math.abs(plusDI[i - 1]! - minusDI[i - 1]!);
+      if (gap <= pGap) return null; // DI-gap widening gate
+      if (histogram[i] == null || s20[i] == null || s50[i] == null || s50[i - SMA50_SLOPE_LOOKBACK] == null) return null;
+      const slopeUp = s50[i]! > s50[i - SMA50_SLOPE_LOOKBACK]!;
+      if (histogram[i]! > 0 && s20[i]! > s50[i]! && slopeUp) {
+        return { side: "long", note: "MACD+ & uptrend agree, DI widening, sma50 rising" };
+      }
+      if (histogram[i]! < 0 && s20[i]! < s50[i]! && !slopeUp) {
+        return { side: "short", note: "MACD- & downtrend agree, DI widening, sma50 falling" };
+      }
+      return null;
+    };
+  },
+};
+
 /** Hammer — small body near the top of the range with a long lower wick,
  *  after a downtrend. Classic single-candle bullish reversal.
  *  Research trail: tp1Mult sweep {1,1.5,2,2.5,3} x singleTarget {true,false}
@@ -528,6 +576,7 @@ export const STRATEGIES: Strategy[] = [
   volSpike,
   liquiditySweep,
   swingTrendContinuation,
+  macdTrendSma50Regime,
   hammer,
   shootingStar,
   bullishEngulfing,
