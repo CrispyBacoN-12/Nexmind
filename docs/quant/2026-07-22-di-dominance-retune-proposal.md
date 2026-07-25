@@ -150,6 +150,60 @@ gold 1h** — standalone (overfit, earlier), as trend confirmation (sample
 destruction), or as reversal confirmation (inverted-split flukes). The best
 strategy of the whole pass, MACD+trend+widening, uses no candlesticks.
 
+## Market flow (structure vs money) — tested
+
+`scripts/flow-structure-money-gcf.mts` + `scripts/walkforward-bos-trend-gcf.mts`
+compared two "flow" families vs the MACD+trend baseline (true order flow needs
+tick/L2 data we don't have — not tested).
+
+- **Money/volume flow (CMF, OBV, + trend): NOT trustworthy.** Both show the
+  inverted-split signature — negative in-sample, positive OOS (CMF PF 0.94→1.12,
+  OBV 0.96→1.07). Volume-based flow carries no stable edge on gold 1h.
+- **Market-structure flow (break-of-structure off swing pivots):** BOS raw is
+  dead (PF ~0.96); BOS + trend filter is a GENUINE trustworthy edge — positive
+  both halves (TEST PF 1.24 on 106 trades, > baseline 1.11), walk-forward 4/6.
+  BUT it is slightly weaker than MACD+trend (4/6 vs 5/6) and largely REDUNDANT:
+  both lose the same 2024-11 block, both are trend-following. Not additive alpha.
+
+**Meta-insight:** two independent mechanisms — an indicator (MACD+trend) and pure
+price structure (BOS+trend) — both find a positive-both-halves trend edge on gold
+1h. That mutual corroboration is the strongest evidence yet that the thin gold
+trend edge is REAL, not a tool artifact. And both failing the same 2024-11 block
+confirms the weak point is a REGIME, not the entry rule — so the real lever for
+improvement is a regime filter, not a better entry.
+
+## Regime filter — sma50 alignment helps (the real lever)
+
+Both trend mechanisms lose the same 2024-11 block, so the weak point is a regime.
+`scripts/regime-filter-macd-trend-gcf.mts` walk-forwards principled regime
+filters on the MACD+trend base (totR = sum of avgR*trades across 6 blocks):
+
+| filter | pos blocks | totR | 2024-11 |
+|---|---|---|---|
+| none (base) | 5/6 | 39.8 | −0.15 |
+| ADX≥20 | 4/6 | 30.9 | −0.13 |
+| ADX≥25 | 4/6 | 8.8 | −0.19 |
+| ER≥0.30 | 5/6 | 30.6 | −0.13 |
+| ER≥0.40 | 4/6 | 26.5 | — |
+| **sma50 slope alignment** | **5/6** | **50.9** | **−0.07** |
+| ATR band | 4/6 | 50.1 | −0.11 |
+
+**sma50-slope alignment wins** (only trade long when sma50 is rising over the last
+~10 bars, short when falling): totR 39.8 → 50.9 (+28%), keeps 5/6 positive blocks,
+halves the 2024-11 loss, and keeps ~90-108 trades/block. Fewer trades + higher
+totR = it filters out low-quality counter-slow-trend entries. Crucially it helps
+*across* blocks, not just patching 2024-11 — the bar for a non-overfit filter.
+The classic trend-strength filters (ADX, ER) all HURT — the lever here is
+higher-timeframe alignment, not trend strength.
+
+Caveats: no filter turns 2024-11 positive (that regime was genuinely bad for gold
+trend-following — only halved). Still 2y/6-block evidence; the filter was chosen a
+priori (not sweep-picked) so overfit risk is lower, but validate on more history
+before betting size. Still a thin edge overall (PF ~1.1-1.2).
+
+**Refined leading candidate:** MACD+trend+widening **+ sma50-slope alignment**,
+TP=2.0×ATR, on GC=F.
+
 ## Honest expectations / caveats
 
 - **The edge is thin.** PF ~1.05 and avgR ~+0.05R in good periods. This is a real but marginal edge, not a transformation. Re-tuning improves the *size* of the win, not the *frequency* of winning periods.
