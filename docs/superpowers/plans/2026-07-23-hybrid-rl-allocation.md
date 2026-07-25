@@ -64,6 +64,37 @@ conversation's context.
 
 ---
 
+**2026-07-25 — `proxyConfidence` exact-antisymmetry test assertion, resolved by SaladPak.**
+
+Task 5's brief (`rl-task-5-brief.md`, Step 5) specified a test asserting
+`long.proxyConfidence === -short.proxyConfidence` for identical (non-mirrored) indicator
+readings with only `side` flipped. Against Task 1's actual, already-committed, already-reviewed
+`rlProxyConfidence.ts` (commit `c670f31`), this assertion is mathematically false whenever the
+raw indicators favor one side: `rsiConviction`/`diConviction` are each `clamp01`'d per side before
+averaging with the side-independent `trendStrength` term, so the side that disagrees with the raw
+indicators clamps its conviction terms to 0 instead of going negative — breaking exact negation.
+Hand-verified for the brief's own fixture (`adx=30, rsi=60, plusDI=25, minusDI=10`):
+`trendStrength=0.5` (side-independent); long: `(0.5+0.2+0.3)/3=0.333`; short:
+`(0.5+0+0)/3=0.167`. Exact antisymmetry only holds in the degenerate all-neutral case
+(`rsi=50`, `plusDI=minusDI`, `adx=adxFloor`), which is not a meaningful test of anything.
+
+**Resolution: the test is changed to assert sign polarity instead of exact negation** —
+`long.proxyConfidence > 0` and `short.proxyConfidence < 0` — which still confirms the thing the
+test exists to catch (that `buildRLState` forwards `side` into `proxyConfidence` rather than
+hardcoding `"long"`), without asserting an invariant the formula was never designed to satisfy.
+`rlProxyConfidence.ts` itself is deliberately left unchanged: `rl/gold-sizer.onnx` (Task 3) is
+already trained against its current output, via Task 2's dataset builder using this exact formula
+to label real historical rows. Changing the formula now — even to "fix" this asymmetry — would
+alter `proxyConfidence`'s value for ordinary (non-edge-case) indicator combinations broadly, not
+just this pathological identical-indicator-flip scenario, silently invalidating the trained
+model's learned relationship to that feature (the same train/inference mismatch class as the
+Decision Log entry above). Retraining is out of scope for Task 5 (shadow-mode wiring only).
+
+No changes to Task 1–4 or Task 6 result from this. See `rl-task-5-report.md` for the full
+derivation and `engine.test.ts`'s inline comment on the corrected test.
+
+---
+
 ## File Structure
 
 - `src/lib/trading/rlProxyConfidence.ts` (new) — pure function producing the -1..1 signed proxy confidence label used only for offline training-data generation.
