@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-3
-status: proposed
+status: rejected
 symbol: "BTC-USD"
 timeframe: "1h"
 tags: [strategy, research, sma, rsi, adx, di, macd]
@@ -55,4 +55,4 @@ return null;
 
 ## Live status
 
-Proposed candidate, not yet reviewed. From research run #1.
+Rejected after review - not live. From research run #1.

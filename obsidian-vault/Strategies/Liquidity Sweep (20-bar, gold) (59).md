@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-59
-status: proposed
+status: rejected
 symbol: "GC=F"
 timeframe: "1h"
 tags: [strategy, research, liquidity-sweep, gold]
@@ -40,4 +40,4 @@ return null;
 
 ## Live status
 
-Proposed candidate, not yet reviewed. From research run #32.
+Rejected after review - not live. From research run #32.

@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-41
-status: proposed
+status: rejected
 symbol: "GC=F"
 timeframe: "15m"
 tags: [strategy, research, sma, rsi, adx, di, macd, gold]
@@ -23,4 +23,4 @@ const n = bars.length; const bar = bars[n-1]; const snap = snaps[n-1]; const pre
 
 ## Live status
 
-Proposed candidate, not yet reviewed. From research run #18.
+Rejected after review - not live. From research run #18.

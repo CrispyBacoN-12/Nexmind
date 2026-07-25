@@ -10,6 +10,7 @@ import { compileStrategy, SandboxSafetyError } from "./sandbox";
 import { computeSnapshots } from "./adapter";
 import { proposeCandidates, refineCandidate, fixUnsafeCode, type Candidate } from "./propose";
 import { exportStrategyNote } from "@/lib/obsidian/export";
+import { autoReviewStatus } from "./autoReview";
 
 export const MAX_CANDIDATES = 3;
 export const MAX_REFINEMENT_ROUNDS = 2;
@@ -32,7 +33,7 @@ async function runOneCandidate(
 ): Promise<{
   label: string;
   code: string;
-  status: "proposed" | "rejected";
+  status: "approved" | "rejected";
   iterations: Iteration[];
   backtestSummary: BacktestSummary;
   safetyFlag: boolean;
@@ -102,7 +103,15 @@ async function runOneCandidate(
     iterations.push({ code, note: refined.note, backtestSummary: summary });
   }
 
-  return { label: candidate.label, code, status: "proposed", iterations, backtestSummary: summary, safetyFlag, costUsd };
+  return {
+    label: candidate.label,
+    code,
+    status: autoReviewStatus(summary, safetyFlag),
+    iterations,
+    backtestSummary: summary,
+    safetyFlag,
+    costUsd,
+  };
 }
 
 export async function runResearch(

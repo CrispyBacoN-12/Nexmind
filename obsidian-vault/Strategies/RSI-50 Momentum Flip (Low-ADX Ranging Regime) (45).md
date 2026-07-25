@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-45
-status: proposed
+status: rejected
 symbol: "GC=F"
 timeframe: "1d"
 tags: [strategy, research, rsi, adx, macd, gold]
@@ -50,4 +50,4 @@ return null;
 
 ## Live status
 
-Proposed candidate, not yet reviewed. From research run #20.
+Rejected after review - not live. From research run #20.

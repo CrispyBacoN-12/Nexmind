@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-14
-status: proposed
+status: approved
 symbol: "GC=F"
 timeframe: "1h"
 tags: [strategy, research, di, macd, gold]
@@ -35,4 +35,4 @@ return null;
 
 ## Live status
 
-Proposed candidate, not yet reviewed. From research run #5.
+Approved - available as `research-14` if assigned to a portfolio's strategy key. From research run #5.

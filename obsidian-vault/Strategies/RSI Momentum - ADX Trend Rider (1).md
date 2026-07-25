@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-1
-status: proposed
+status: approved
 symbol: "BTC-USD"
 timeframe: "1h"
 tags: [strategy, research, rsi, adx, di, macd]
@@ -61,4 +61,4 @@ return null;
 
 ## Live status
 
-Proposed candidate, not yet reviewed. From research run #1.
+Approved - available as `research-1` if assigned to a portfolio's strategy key. From research run #1.

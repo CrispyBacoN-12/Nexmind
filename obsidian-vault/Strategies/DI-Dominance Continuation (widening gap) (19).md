@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-19
-status: proposed
+status: approved
 symbol: "GC=F"
 timeframe: "1h"
 tags: [strategy, research, adx, di, gold]
@@ -32,4 +32,4 @@ return null;
 
 ## Live status
 
-Proposed candidate, not yet reviewed. From research run #7.
+Approved - available as `research-19` if assigned to a portfolio's strategy key. From research run #7.
