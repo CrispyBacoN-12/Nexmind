@@ -187,38 +187,38 @@ function SwingBlock({ b }: { b: SwingData }) {
                   </div>
                   <div className="text-right">
                     {t.pnl != null && <div className={`font-semibold tabular-nums ${colorForChange(t.pnl)}`}>{fmtMoney(t.pnl)}</div>}
-                    {t.grossPnl != null && t.pnl != null && Math.abs(t.grossPnl - t.pnl) > 0.005 && (
-                      <div className="text-[11px] text-(--color-muted) font-mono">gross {fmtMoney(t.grossPnl)}</div>
-                    )}
                     <div className="text-[11px] text-(--color-muted) font-mono">{fmtAgo(t.openedAt)}</div>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono text-(--color-muted)">
-                  <span>entry {fmtNumber(t.entry, 4)}</span>
-                  <span className="text-rose-400/80">SL {fmtNumber(t.sl, 4)}</span>
-                  <span className="text-emerald-400/80">TP1 {fmtNumber(t.tp1, 4)}</span>
-                  <span>R:R {t.riskReward ?? "—"}</span>
-                </div>
-                {votes.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {votes.map((v, i) => (
-                      <span key={i} className="text-[11px] rounded bg-(--color-card-2) border border-(--color-border) px-2 py-0.5">
-                        <span className="text-(--color-accent-2)">{v.persona}</span> · {v.vote}
-                      </span>
-                    ))}
+                <details className="mt-2">
+                  <summary className="text-[11px] text-(--color-muted) cursor-pointer hover:text-(--color-foreground)">trade detail</summary>
+                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono text-(--color-muted)">
+                    <span>entry {fmtNumber(t.entry, 4)}</span>
+                    <span className="text-rose-400/80">SL {fmtNumber(t.sl, 4)}</span>
+                    <span className="text-emerald-400/80">TP1 {fmtNumber(t.tp1, 4)}</span>
+                    <span>R:R {t.riskReward ?? "—"}</span>
                   </div>
-                )}
-                {t.sageVerdict && <p className="mt-2 text-xs text-amber-300/80">🛡️ SAGE: {t.sageVerdict}</p>}
-                {log.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="text-[11px] text-(--color-muted) cursor-pointer hover:text-(--color-foreground)">decision trail ({log.length})</summary>
-                    <ol className="mt-1 space-y-0.5 text-[11px] font-mono text-(--color-muted)">
+                  {t.grossPnl != null && t.pnl != null && Math.abs(t.grossPnl - t.pnl) > 0.005 && (
+                    <div className="mt-1 text-[11px] text-(--color-muted) font-mono">gross {fmtMoney(t.grossPnl)}</div>
+                  )}
+                  {votes.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {votes.map((v, i) => (
+                        <span key={i} className="text-[11px] rounded bg-(--color-card-2) border border-(--color-border) px-2 py-0.5">
+                          <span className="text-(--color-accent-2)">{v.persona}</span> · {v.vote}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {t.sageVerdict && <p className="mt-2 text-xs text-amber-300/80">🛡️ SAGE: {t.sageVerdict}</p>}
+                  {log.length > 0 && (
+                    <ol className="mt-2 space-y-0.5 text-[11px] font-mono text-(--color-muted)">
                       {log.map((s, i) => (
                         <li key={i}><span className="text-(--color-accent)">{s.stage}</span> → {s.note}</li>
                       ))}
                     </ol>
-                  </details>
-                )}
+                  )}
+                </details>
               </Card>
             );
           })}
@@ -231,7 +231,10 @@ function SwingBlock({ b }: { b: SwingData }) {
                 </div>
                 <span className="text-[11px] text-(--color-muted) font-mono">{fmtAgo(s.createdAt)}</span>
               </div>
-              <p className="mt-2 text-xs text-rose-300/80">{s.note}</p>
+              <details className="mt-2">
+                <summary className="text-[11px] text-rose-300/70 cursor-pointer hover:text-rose-300">why</summary>
+                <p className="mt-1 text-xs text-rose-300/80">{s.note}</p>
+              </details>
             </Card>
           ))}
         </div>
