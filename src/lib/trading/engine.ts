@@ -16,8 +16,11 @@ import { fetchCandles } from "@/lib/marketData";
 import { dailyReturns, pearsonCorrelation } from "./correlation";
 import { computeLot } from "./positionSizing";
 import { isResearchStrategyKey } from "@/lib/research/adapter";
+import { sizeWithRL, type RLState } from "./rlSizer";
+import { proxyConfidence } from "./rlProxyConfidence";
+import { getCurrentDrawdownPct, getCurrentEquity } from "./circuitBreaker";
 
-export interface TickStep { stage: string; note: string }
+export interface TickStep { stage: string; note: string; data?: Record<string, unknown> }
 export interface TickResult {
   symbol: string;
   outcome: "no-setup" | "already-open" | "no-consensus" | "vetoed" | "rules-blocked" | "executed";
@@ -75,6 +78,40 @@ export function minRiskRewardFor(scan: ScanResult, isResearch: boolean): number 
     return Math.min(DEFAULT_ACCOUNT.minRiskReward ?? 1.5, scan.preferredExit.tp1Mult / 1.5);
   }
   return isResearch ? RESEARCH_MIN_RISK_REWARD : (DEFAULT_ACCOUNT.minRiskReward ?? 1.5);
+}
+
+/**
+ * Live-side state features for the shadow-mode RL sizer. exposurePct/cashPct/
+ * drawdownPct are defined identically to Task 2's offline dataset builder —
+ * continuous riskUsd/balance exposure and peak-equity drawdown — NOT the
+ * discrete openPositions/maxOpenPositions slot fraction or
+ * dailyLossUsd/dailyLossCapUsd gate fraction this file's AccountState uses for
+ * Iron Rules (a different concept — gate thresholds, not an equity curve).
+ * Feeding the model a differently-defined feature at inference than it saw in
+ * training would silently make that feature meaningless to the learned
+ * policy. See docs/superpowers/plans/2026-07-23-hybrid-rl-allocation.md's
+ * Decision Log (resolved by SaladPak, 2026-07-25) for the full rationale.
+ */
+export function buildRLState(
+  scan: ScanResult,
+  side: "long" | "short",
+  riskUsd: number,
+  balance: number,
+  drawdownPct: number,
+): RLState {
+  const exposurePct = balance > 0 ? riskUsd / balance : 0;
+  return {
+    proxyConfidence: proxyConfidence({
+      adx: scan.snapshot.adx, rsi: scan.snapshot.rsi,
+      plusDI: scan.snapshot.plusDI, minusDI: scan.snapshot.minusDI, side,
+    }),
+    atr: scan.atr,
+    adx: scan.snapshot.adx,
+    bbWidth: scan.snapshot.bbWidth ?? null,
+    exposurePct,
+    cashPct: 1 - exposurePct,
+    drawdownPct,
+  };
 }
 
 export async function runTradeTick(
@@ -150,6 +187,16 @@ export async function runTradeTick(
 
   // 4) IRON RULES
   const levels = sage.adjusted;
+  const account: AccountState = {
+    ...DEFAULT_ACCOUNT,
+    minRiskReward: minRiskRewardFor(scan, isResearch),
+    dailyLossUsd: await todaysRealizedLoss(portfolioId),
+    killSwitch: await isKillSwitchOn(portfolioId),
+    globalTradingHalt: await isGlobalTradingHalt(),
+    openPositions: await prisma.trade.count({ where: { status: "open", portfolioId } }),
+    maxOpenPositions: await getMaxOpenPositions(portfolioId),
+  };
+
   let lot: number;
   if (opts.lot != null) {
     lot = opts.lot;
@@ -187,16 +234,30 @@ export async function runTradeTick(
     });
     lot = sizing.lot;
     steps.push({ stage: "sizing", note: sizing.reasoning });
+
+    // Shadow mode: gold desk only, purely additive logging — never affects `lot`.
+    if (symbol === "GC=F") {
+      const [balance, drawdownPctRaw] = await Promise.all([
+        getCurrentEquity(portfolioId),
+        getCurrentDrawdownPct(portfolioId),
+      ]);
+      const rlState = buildRLState(scan, hawk.side, riskUsd, balance, drawdownPctRaw / 100);
+      const rl = await sizeWithRL(rlState, {
+        entry: levels.entry, sl: levels.sl, riskUsd,
+        maxLotPerTrade: DEFAULT_ACCOUNT.maxLotPerTrade, minLot: 0.01,
+      });
+      if (rl.available) {
+        const rlNote = rl.vetoed
+          ? "RL would skip this trade (below min lot)"
+          : `RL would size ${rl.lot} lot (weight ${rl.weight.toFixed(2)})`;
+        steps.push({
+          stage: "rl-shadow",
+          note: `${rlNote} vs actual ${lot}`,
+          data: { rlWeight: rl.weight, rlLot: rl.lot, vetoed: rl.vetoed, actualLot: lot },
+        });
+      }
+    }
   }
-  const account: AccountState = {
-    ...DEFAULT_ACCOUNT,
-    minRiskReward: minRiskRewardFor(scan, isResearch),
-    dailyLossUsd: await todaysRealizedLoss(portfolioId),
-    killSwitch: await isKillSwitchOn(portfolioId),
-    globalTradingHalt: await isGlobalTradingHalt(),
-    openPositions: await prisma.trade.count({ where: { status: "open", portfolioId } }),
-    maxOpenPositions: await getMaxOpenPositions(portfolioId),
-  };
   const verdict = applyIronRules(
     { symbol, side: hawk.side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, lot },
     account,

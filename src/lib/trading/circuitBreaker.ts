@@ -28,3 +28,22 @@ export async function getCurrentDrawdownPct(portfolioId: number): Promise<number
   });
   return currentDrawdownPct(closed.map((t) => ({ ...t, pnl: t.pnl ?? 0 })), startingBalance);
 }
+
+/** Current equity: startingBalance plus cumulative realized P/L, in chronological order. No peak-tracking (see currentDrawdownPct for that). */
+export function currentEquity(closed: ClosedTrade[], startingBalance: number): number {
+  const ordered = [...closed].sort((a, b) => (a.closedAt?.getTime() ?? 0) - (b.closedAt?.getTime() ?? 0));
+  let equity = startingBalance;
+  for (const t of ordered) equity += t.pnl ?? 0;
+  return equity;
+}
+
+/** Loads a portfolio's closed trades and computes its current equity. */
+export async function getCurrentEquity(portfolioId: number): Promise<number> {
+  const startingBalance = await getStartingBalance(portfolioId);
+  const closed = await prisma.trade.findMany({
+    where: { status: "closed", portfolioId },
+    orderBy: { closedAt: "asc" },
+    select: { pnl: true, rMultiple: true, outcome: true, closedAt: true },
+  });
+  return currentEquity(closed.map((t) => ({ ...t, pnl: t.pnl ?? 0 })), startingBalance);
+}

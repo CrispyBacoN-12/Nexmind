@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { currentDrawdownPct } from "./circuitBreaker";
+import { currentDrawdownPct, currentEquity } from "./circuitBreaker";
 import type { ClosedTrade } from "./stats";
 
 function trade(pnl: number, day: string): ClosedTrade {
@@ -58,5 +58,26 @@ test("currentDrawdownPct: does not mutate the input array", () => {
   const closed = [trade(-50, "2026-06-02"), trade(100, "2026-06-01")];
   const before = closed.map((t) => ({ ...t }));
   currentDrawdownPct(closed, 1000);
+  assert.deepEqual(closed, before);
+});
+
+test("currentEquity: empty input returns startingBalance", () => {
+  assert.equal(currentEquity([], 10000), 10000);
+});
+
+test("currentEquity: sums realized pnl onto startingBalance in chronological order", () => {
+  const closed = [trade(100, "2026-06-01"), trade(-40, "2026-06-02")];
+  assert.equal(currentEquity(closed, 1000), 1060);
+});
+
+test("currentEquity: trades with identical closedAt are still summed correctly regardless of order", () => {
+  const closed = [trade(-50, "2026-06-01"), trade(100, "2026-06-01")];
+  assert.equal(currentEquity(closed, 1000), 1050);
+});
+
+test("currentEquity: does not mutate the input array", () => {
+  const closed = [trade(-50, "2026-06-02"), trade(100, "2026-06-01")];
+  const before = closed.map((t) => ({ ...t }));
+  currentEquity(closed, 1000);
   assert.deepEqual(closed, before);
 });

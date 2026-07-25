@@ -1,7 +1,7 @@
 import "dotenv/config"; // engine.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveExitOverride, minRiskRewardFor } from "./engine";
+import { resolveExitOverride, minRiskRewardFor, buildRLState } from "./engine";
 import type { ScanResult, ScanSnapshot } from "./scanner";
 
 const snapshot: ScanSnapshot = {
@@ -46,4 +46,44 @@ test("minRiskRewardFor: research ladder floor applies when there's no preferredE
 
 test("minRiskRewardFor: default floor applies for a plain built-in strategy", () => {
   assert.equal(minRiskRewardFor(scan(), false), 1.5);
+});
+
+test("buildRLState: exposurePct is riskUsd/balance (continuous) — matches Task 2's training-data definition", () => {
+  const s = scan({ snapshot: { ...snapshot, adx: 30, rsi: 60, plusDI: 25, minusDI: 10 } });
+  const state = buildRLState(s, "long", 100, 10000, 0);
+  assert.equal(state.exposurePct, 0.01); // 100 / 10000
+  assert.equal(state.cashPct, 0.99);
+});
+
+test("buildRLState: drawdownPct passes through the caller-computed equity-peak fraction unchanged", () => {
+  const state = buildRLState(scan(), "long", 100, 10000, 0.05);
+  assert.equal(state.drawdownPct, 0.05);
+});
+
+test("buildRLState: carries atr/adx/bbWidth straight from the scan result", () => {
+  const s = scan({ atr: 3.2, snapshot: { ...snapshot, adx: 22, bbWidth: 0.015 } });
+  const state = buildRLState(s, "long", 100, 10000, 0);
+  assert.equal(state.atr, 3.2);
+  assert.equal(state.adx, 22);
+  assert.equal(state.bbWidth, 0.015);
+});
+
+test("buildRLState: proxyConfidence polarity follows side on identical indicators", () => {
+  // Not exact negation: proxyConfidence's rsi/DI conviction terms clamp negative
+  // support to 0 (rlProxyConfidence.ts), so magnitude(long) != magnitude(short)
+  // whenever indicators favor one side, as they do here (rsi>50, plusDI>minusDI).
+  // The invariant that actually holds — and that this test exists to confirm
+  // buildRLState wires `side` through instead of hardcoding "long" — is sign
+  // polarity: long is always >=0, short is always <=0.
+  const s = scan({ snapshot: { ...snapshot, adx: 30, rsi: 60, plusDI: 25, minusDI: 10 } });
+  const long = buildRLState(s, "long", 100, 10000, 0);
+  const short = buildRLState(s, "short", 100, 10000, 0);
+  assert.ok(long.proxyConfidence > 0);
+  assert.ok(short.proxyConfidence < 0);
+});
+
+test("buildRLState: zero/negative balance doesn't divide by zero", () => {
+  const state = buildRLState(scan(), "long", 100, 0, 0);
+  assert.equal(state.exposurePct, 0);
+  assert.equal(state.cashPct, 1);
 });
