@@ -102,32 +102,43 @@ export async function fetchAlpacaCandles(
 
   const start = new Date(Date.now() - rangeToLookbackMs(range)).toISOString();
   const end = new Date().toISOString();
-  const params = new URLSearchParams({
-    timeframe: intervalToTimeframe(interval),
-    start,
-    end,
-    feed: "iex",
-    limit: "10000",
-    sort: "asc",
-  });
-  const url = `${ALPACA_DATA_BASE}/${encodeURIComponent(symbol)}/bars?${params}`;
+  const headers = {
+    "APCA-API-KEY-ID": key,
+    "APCA-API-SECRET-KEY": secret,
+    Accept: "application/json",
+  };
 
-  const res = await fetch(url, {
-    headers: {
-      "APCA-API-KEY-ID": key,
-      "APCA-API-SECRET-KEY": secret,
-      Accept: "application/json",
-    },
-    // Match the Yahoo fetcher's short cache window to bound request volume.
-    next: { revalidate: 30 },
-  });
+  // Alpaca caps each page at `limit` bars and returns a next_page_token when
+  // more remain. Follow the token to the end so long ranges (multi-year 1h)
+  // come back complete instead of truncated at the first page.
+  const allBars: AlpacaBar[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      timeframe: intervalToTimeframe(interval),
+      start,
+      end,
+      feed: "iex",
+      limit: "10000",
+      sort: "asc",
+    });
+    if (pageToken) params.set("page_token", pageToken);
+    const url = `${ALPACA_DATA_BASE}/${encodeURIComponent(symbol)}/bars?${params}`;
 
-  if (!res.ok) {
-    throw new Error(`alpaca upstream ${res.status}`);
-  }
+    const res = await fetch(url, {
+      headers,
+      // Match the Yahoo fetcher's short cache window to bound request volume.
+      next: { revalidate: 30 },
+    });
+    if (!res.ok) {
+      throw new Error(`alpaca upstream ${res.status}`);
+    }
+    const json = (await res.json()) as { bars?: AlpacaBar[]; next_page_token?: string | null };
+    if (json.bars) allBars.push(...json.bars);
+    pageToken = json.next_page_token ?? undefined;
+  } while (pageToken);
 
-  const json = await res.json();
-  return parseAlpacaBars(json, symbol, range, interval);
+  return parseAlpacaBars({ bars: allBars }, symbol, range, interval);
 }
 
 /**

@@ -134,12 +134,16 @@ validator — all already resolve any `STRATEGIES` member by key.
 
 ### 3. `src/app/backtest/page.tsx` (additions)
 
-Add the 10 pattern keys (and `candlestick-any`) to the existing
-`STRATEGY_CONFIGS` / `COMBO_CONFIGS` literal arrays, following the exact
-`{ key, label }` shape already used for `liquidity-sweep` and `combo-or`,
-so they appear as selectable comparison rows in the Backtest Lab UI. No
-other file in `src/app` needs changes (no dedicated strategy-picker page
-exists today).
+The Backtest Lab's comparison arrays are `{ interval, range, strategy }`
+config rows (e.g. `CHART_GOLD_CONFIGS`), not a `{ key, label }` strategy
+catalog — each array is one comparison button's scenario list. Follow that
+convention: add a new `CANDLESTICK_CONFIGS` array (one row per pattern key
+plus `candlestick-any`, same `{ interval: "1h", range: "3mo", strategy }`
+shape as `STRATEGY_CONFIGS`), a `"candlestick"` branch in `run()`'s mode
+ternary (mirrors the existing `"chart"` branch), and a new comparison
+button ("Candlestick patterns (1h)"), reusing the existing results table
+verbatim — no table/column changes needed. No other file in `src/app`
+needs changes (no dedicated strategy-picker page exists today).
 
 ## Testing
 

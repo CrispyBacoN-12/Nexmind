@@ -212,3 +212,117 @@ test("Swing Trend Continuation: a flat/ranging market (ADX below floor) never fi
   const evalr = getStrategy("swing-trend-continuation")!.build(bars);
   assert.ok(bars.every((_, i) => evalr(i) === null), "must stay flat when there's no confirmed trend");
 });
+
+function downtrendPrefix(n: number, startClose: number, step: number): Candle[] {
+  return Array.from({ length: n }, (_, k) => {
+    const c = startClose - k * step;
+    return bar(k * HOUR, c + step * 0.3, c + 1, c - 1, c);
+  });
+}
+
+function uptrendPrefix(n: number, startClose: number, step: number): Candle[] {
+  return Array.from({ length: n }, (_, k) => {
+    const c = startClose + k * step;
+    return bar(k * HOUR, c - step * 0.3, c + 1, c - 1, c);
+  });
+}
+
+const CANDLE_DOWN = downtrendPrefix(15, 200, 3);
+const CANDLE_UP = uptrendPrefix(15, 100, 3);
+
+test("Hammer strategy: getStrategy resolves and fires long", () => {
+  const bars = [...CANDLE_DOWN, bar(15 * HOUR, 100, 101.2, 95, 101)];
+  assert.equal(getStrategy("hammer")!.build(bars)(15)?.side, "long");
+});
+
+test("Shooting Star strategy: getStrategy resolves and fires short", () => {
+  const bars = [...CANDLE_UP, bar(15 * HOUR, 100, 105, 98.8, 99)];
+  assert.equal(getStrategy("shooting-star")!.build(bars)(15)?.side, "short");
+});
+
+test("Bullish Engulfing strategy: getStrategy resolves and fires long", () => {
+  const bars = [...CANDLE_DOWN, bar(15 * HOUR, 110, 111, 104, 105), bar(16 * HOUR, 104, 113, 103, 112)];
+  assert.equal(getStrategy("bullish-engulfing")!.build(bars)(16)?.side, "long");
+});
+
+test("Bearish Engulfing strategy: getStrategy resolves and fires short", () => {
+  const bars = [...CANDLE_UP, bar(15 * HOUR, 100, 106, 99, 105), bar(16 * HOUR, 106, 107, 91, 92)];
+  assert.equal(getStrategy("bearish-engulfing")!.build(bars)(16)?.side, "short");
+});
+
+test("Piercing Line strategy: getStrategy resolves and fires long", () => {
+  const bars = [...CANDLE_DOWN, bar(15 * HOUR, 120, 121, 109, 110), bar(16 * HOUR, 108, 118, 107, 117)];
+  assert.equal(getStrategy("piercing-line")!.build(bars)(16)?.side, "long");
+});
+
+test("Dark Cloud Cover strategy: getStrategy resolves and fires short", () => {
+  const bars = [...CANDLE_UP, bar(15 * HOUR, 100, 111, 99, 110), bar(16 * HOUR, 112, 113, 102, 103)];
+  assert.equal(getStrategy("dark-cloud-cover")!.build(bars)(16)?.side, "short");
+});
+
+test("Morning Star strategy: getStrategy resolves and fires long", () => {
+  const bars = [...CANDLE_DOWN, bar(15 * HOUR, 130, 131, 119, 120), bar(16 * HOUR, 115, 116, 113, 114), bar(17 * HOUR, 116, 128, 115, 127)];
+  assert.equal(getStrategy("morning-star")!.build(bars)(17)?.side, "long");
+});
+
+test("Evening Star strategy: getStrategy resolves and fires short", () => {
+  const bars = [...CANDLE_UP, bar(15 * HOUR, 100, 111, 99, 110), bar(16 * HOUR, 115, 117, 114, 116), bar(17 * HOUR, 114, 115, 102, 103)];
+  assert.equal(getStrategy("evening-star")!.build(bars)(17)?.side, "short");
+});
+
+test("Three White Soldiers strategy: getStrategy resolves and fires long", () => {
+  const bars = [...CANDLE_DOWN, bar(15 * HOUR, 100, 106, 99, 105), bar(16 * HOUR, 102, 111.5, 101, 110), bar(17 * HOUR, 105, 118, 104, 116)];
+  assert.equal(getStrategy("three-white-soldiers")!.build(bars)(17)?.side, "long");
+});
+
+test("Three Black Crows strategy: getStrategy resolves and fires short", () => {
+  const bars = [...CANDLE_UP, bar(15 * HOUR, 105, 106, 99, 100), bar(16 * HOUR, 103, 104, 93, 95), bar(17 * HOUR, 100, 101, 86, 89)];
+  assert.equal(getStrategy("three-black-crows")!.build(bars)(17)?.side, "short");
+});
+
+test("candlestick patterns: high-sample patterns declare a calibrated preferredExit", () => {
+  const expected: Record<string, { tp1Mult: number; singleTarget: boolean }> = {
+    hammer: { tp1Mult: 1.0, singleTarget: true },
+    "shooting-star": { tp1Mult: 3.0, singleTarget: false },
+    "bullish-engulfing": { tp1Mult: 2.0, singleTarget: true },
+    "bearish-engulfing": { tp1Mult: 3.0, singleTarget: false },
+    "piercing-line": { tp1Mult: 1.0, singleTarget: true },
+    "dark-cloud-cover": { tp1Mult: 3.0, singleTarget: false },
+    "morning-star": { tp1Mult: 2.0, singleTarget: true },
+    "evening-star": { tp1Mult: 1.0, singleTarget: false },
+  };
+  for (const [key, exit] of Object.entries(expected)) {
+    const strat = getStrategy(key)!;
+    assert.equal(strat.preferredExit?.tp1Mult, exit.tp1Mult, `${key} tp1Mult`);
+    assert.equal(strat.preferredExit?.singleTarget, exit.singleTarget, `${key} singleTarget`);
+    assert.ok(strat.preferredExit?.costs, `${key} expects a real cost model, not NO_COSTS`);
+  }
+});
+
+test("candlestick patterns: too-sparse-to-calibrate patterns and the combo stay on the engine default", () => {
+  for (const key of ["three-white-soldiers", "three-black-crows", "candlestick-any"]) {
+    assert.equal(getStrategy(key)!.preferredExit, undefined, `${key} should not have a preferredExit`);
+  }
+});
+
+test("candlestick-any combo: fires when exactly one member pattern triggers", () => {
+  const bars = [...CANDLE_UP, bar(15 * HOUR, 100, 111, 99, 110), bar(16 * HOUR, 112, 113, 102, 103)]; // Dark Cloud Cover fixture
+  assert.equal(getStrategy("candlestick-any")!.build(bars)(16)?.side, "short");
+});
+
+test("candlestick-any combo: dropped members (e.g. hammer) no longer trigger it", () => {
+  const bars = [...CANDLE_DOWN, bar(15 * HOUR, 100, 101.2, 95, 101)]; // Hammer fixture
+  assert.equal(getStrategy("hammer")!.build(bars)(15)?.side, "long", "sanity: hammer itself still fires");
+  assert.equal(getStrategy("candlestick-any")!.build(bars)(15), null, "but combo dropped hammer during curation");
+});
+
+test("registry exposes all 10 candlestick patterns + the combo by key", () => {
+  const keys = STRATEGIES.map((s) => s.key);
+  for (const k of [
+    "hammer", "shooting-star", "bullish-engulfing", "bearish-engulfing",
+    "piercing-line", "dark-cloud-cover", "morning-star", "evening-star",
+    "three-white-soldiers", "three-black-crows", "candlestick-any",
+  ]) {
+    assert.ok(keys.includes(k), `missing ${k}`);
+  }
+});

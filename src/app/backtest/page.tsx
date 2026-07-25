@@ -56,6 +56,21 @@ const CHART_GOLD_CONFIGS = [
   { interval: "15m", range: "1mo", strategy: "bull-flag" },
   { interval: "15m", range: "1mo", strategy: "vol-spike" },
 ];
+// Candlestick reversal patterns (pure OHLCV, trend-filtered) — same 1h
+// timeframe as the strategy/combo comparisons above.
+const CANDLESTICK_CONFIGS = [
+  { interval: "1h", range: "3mo", strategy: "hammer" },
+  { interval: "1h", range: "3mo", strategy: "shooting-star" },
+  { interval: "1h", range: "3mo", strategy: "bullish-engulfing" },
+  { interval: "1h", range: "3mo", strategy: "bearish-engulfing" },
+  { interval: "1h", range: "3mo", strategy: "piercing-line" },
+  { interval: "1h", range: "3mo", strategy: "dark-cloud-cover" },
+  { interval: "1h", range: "3mo", strategy: "morning-star" },
+  { interval: "1h", range: "3mo", strategy: "evening-star" },
+  { interval: "1h", range: "3mo", strategy: "three-white-soldiers" },
+  { interval: "1h", range: "3mo", strategy: "three-black-crows" },
+  { interval: "1h", range: "3mo", strategy: "candlestick-any" },
+];
 
 function pnlColor(n: number | null | undefined): string {
   if (n == null) return "";
@@ -69,7 +84,7 @@ export default function BacktestLab() {
   const [busy, setBusy] = useState<string>("");
   const [ran, setRan] = useState(false);
 
-  async function run(mode: "timeframe" | "adx" | "strategy" | "combo" | "chart") {
+  async function run(mode: "timeframe" | "adx" | "strategy" | "combo" | "chart" | "candlestick") {
     setBusy(mode);
     setRan(true);
     try {
@@ -78,6 +93,7 @@ export default function BacktestLab() {
         : mode === "adx" ? ADX_CONFIGS
         : mode === "strategy" ? STRATEGY_CONFIGS
         : mode === "chart" ? CHART_GOLD_CONFIGS
+        : mode === "candlestick" ? CANDLESTICK_CONFIGS
         : COMBO_CONFIGS;
       const symbols = mode === "chart" ? ["GC=F"] : SYMBOLS;
       const res = await fetch("/api/backtest", {
@@ -128,6 +144,9 @@ export default function BacktestLab() {
           </Button>
           <Button variant="outline" onClick={() => run("chart")} disabled={!!busy}>
             {busy === "chart" ? "Running…" : "Chart patterns — Gold 5m/15m"}
+          </Button>
+          <Button variant="outline" onClick={() => run("candlestick")} disabled={!!busy}>
+            {busy === "candlestick" ? "Running…" : "Candlestick patterns (1h)"}
           </Button>
         </div>
         {busy && <p className="mt-2 text-xs text-(--color-muted)">Fetching candles and replaying the strategy…</p>}
