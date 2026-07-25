@@ -202,7 +202,8 @@ After SAGE approves and `computeLot()` produces the real `lot` (unchanged), when
 `portfolioId` is the gold desk:
 
 ```ts
-const rl = sizeWithRL(buildRLState(scan, portfolio), { entry: levels.entry, sl: levels.sl, riskUsd, maxLotPerTrade, minLot });
+const rlState = buildRLState(scan, hawk.side, riskUsd, balance, drawdownPct);
+const rl = await sizeWithRL(rlState, { entry: levels.entry, sl: levels.sl, riskUsd, maxLotPerTrade, minLot });
 if (rl.available) {
   const rlNote = rl.vetoed ? "RL would skip this trade (below min lot)" : `RL would size ${rl.lot} lot (weight ${rl.weight.toFixed(2)})`;
   steps.push({ stage: "rl-shadow", note: `${rlNote} vs actual ${lot}` });
@@ -212,6 +213,17 @@ if (rl.available) {
 No behavior changes: the real trade still uses `computeLot()`'s `lot`, and Iron Rules validates
 only that. This is purely additive logging via the existing `TickStep` decision-trail mechanism —
 no new DB table needed.
+
+**`buildRLState`'s signature (resolved 2026-07-25, see the implementation plan's Decision Log):**
+takes `riskUsd`/`balance`/`drawdownPct` directly rather than a portfolio/`AccountState` object.
+`exposurePct = riskUsd / balance` and `drawdownPct` is the caller-computed peak-equity fraction —
+matching this component's own `exposurePct`/`drawdownPct` definition above (Component 2:
+"running simulated drawdown from peak balance") exactly, not a discrete open-positions-slot or
+daily-loss-cap fraction. `balance` and `drawdownPct` are sourced from `circuitBreaker.ts`'s
+`getCurrentEquity`/`getCurrentDrawdownPct` (the latter already existed for the circuit breaker;
+`getCurrentEquity` is a new sibling added in the same file, same query/fold pattern) — no new
+live equity-curve tracker needed, since realized-trade P/L already gives an equivalent to Task 2's
+simulated running balance.
 
 ### 6. Shadow-mode review script (`scripts/rl/compare-shadow-sizing.ts`)
 
