@@ -64,3 +64,7 @@ scripts/sqlite-export.json
 
 # Obsidian workspace state (machine-local, not content)
 obsidian-vault/.obsidian/
+
+# graphify local build cache (regenerated; graph.json itself is tracked)
+graphify-out/cache/
+graphify-out/.graphify_root
