@@ -1,0 +1,36 @@
+name: CI
+
+# Runs on every push and PR: typecheck + unit tests are a hard gate (both are
+# clean right now - 262/262 passing). Lint is report-only for now - the
+# codebase already had ~120 pre-existing lint errors before this workflow was
+# added, unrelated to any single change, so blocking on it here would just be
+# permanent red X's until that backlog gets cleaned up separately.
+#
+# Tests don't need a real database: src/lib/db.ts only requires DATABASE_URL
+# to be a non-empty string to construct the Prisma client, and no test in the
+# suite executes a real query against it - a dummy connection string is
+# enough (verified locally: full suite passes with a fake Postgres URL).
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
+          ANTHROPIC_API_KEY: sk-ant-dummy
+      - name: Lint (non-blocking)
+        run: npm run lint
+        continue-on-error: true
