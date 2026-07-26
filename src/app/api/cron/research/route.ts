@@ -11,6 +11,7 @@
 // Auth: requires `Authorization: Bearer $CRON_SECRET`, same as /api/cron/scan.
 import { runScheduledResearchRound } from "@/lib/research/scheduledResearch";
 import { assertCronAuth } from "@/lib/cronAuth";
+import { sendDiscordNotification } from "@/lib/notify/discord";
 import type { Interval, Range } from "@/lib/yahoo";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export async function GET(req: Request) {
     const lines = await runScheduledResearchRound(override);
     return Response.json({ ok: true, lines });
   } catch (e) {
+    await sendDiscordNotification(`/api/cron/research failed: ${String(e)}`, "critical");
     return Response.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

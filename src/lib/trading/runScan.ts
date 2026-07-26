@@ -5,15 +5,17 @@
 // has a `universe` set — auto-trade across that universe.
 import { prisma } from "@/lib/db";
 import { runTradeTick } from "@/lib/trading/engine";
-import { manageOpenTrades } from "@/lib/trading/manage";
+import { manageOpenTrades, type ManageSummary } from "@/lib/trading/manage";
 import { getStrategy } from "@/lib/trading/strategies";
 import { getResearchStrategy } from "@/lib/research/adapter";
 import { fetchCandlesBatch } from "@/lib/marketData";
 import { getWatchlist } from "@/lib/trading/watchlist";
 import { UNIVERSES, prepareSymbols } from "@/lib/trading/universe";
-import { getScanTimeframe, getPortfolioStrategy, getPortfolioUniverse, isGlobalTradingHalt } from "@/lib/settings";
+import { getScanTimeframe, getPortfolioStrategy, getPortfolioUniverse, isGlobalTradingHalt, getDrawdownHaltPct, getSetting, setSetting } from "@/lib/settings";
 import { isSwingKind, canPortfolioTrade } from "@/lib/portfolioGuards";
 import { SECONDARY_PASSES } from "@/lib/trading/secondaryPasses";
+import { getCurrentDrawdownPct } from "@/lib/trading/circuitBreaker";
+import { sendDiscordNotification } from "@/lib/notify/discord";
 import type { Interval, Range } from "@/lib/yahoo";
 
 type Portfolio = Awaited<ReturnType<typeof prisma.portfolio.findMany>>[number];
@@ -33,6 +35,7 @@ async function scanWatchlist(p: Portfolio, tf: TF, log: (m: string) => void, ove
       const scanNote = r.steps.find((s) => s.stage === "scanner")?.note ?? "";
       const detail = r.outcome === "no-setup" && scanNote ? scanNote : `${r.outcome}${r.tradeId ? ` trade#${r.tradeId}` : ""}`;
       log(`#${p.id} ${p.name}${tag} ${w.symbol} (${interval}/${range}) -> ${detail}`);
+      if (r.outcome === "executed" && r.tradeId) await notifyTradeOpened(p.name, w.symbol, r.tradeId);
     } catch (e) {
       log(`#${p.id} ${p.name}${tag} ${w.symbol} ERROR ${String(e)}`);
     }
@@ -66,6 +69,7 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: 
     try {
       const r = await runTradeTick(s, p.id, { range: tf.range, interval: tf.interval });
       log(`#${p.id} ${p.name} ${s} -> ${r.outcome}${r.tradeId ? ` trade#${r.tradeId}` : ""}`);
+      if (r.outcome === "executed" && r.tradeId) await notifyTradeOpened(p.name, s, r.tradeId);
     } catch (e) {
       log(`#${p.id} ${p.name} ${s} ERROR ${String(e)}`);
     }
@@ -90,7 +94,10 @@ export async function runScheduledScan(ids?: number[]): Promise<string[]> {
       log(`#${p.id} ${p.name} skipped (kind=${p.kind}, status=${p.status})`);
       continue;
     }
-    await manageOpenTrades(p.id);
+    const managed = await manageOpenTrades(p.id);
+    await notifyClosedTrades(p.name, managed);
+    await checkDrawdownAlert(p.id, p.name);
+
     const tf = await getScanTimeframe(p.id);
     const universe = await getPortfolioUniverse(p.id);
     if (universe) await scanUniverse(p, tf, universe, log);
@@ -101,4 +108,50 @@ export async function runScheduledScan(ids?: number[]): Promise<string[]> {
     }
   }
   return lines;
+}
+
+// ---- notifications ----
+
+async function notifyTradeOpened(portfolioName: string, symbol: string, tradeId: number): Promise<void> {
+  const t = await prisma.trade.findUnique({ where: { id: tradeId }, select: { side: true, entry: true, sl: true, tp1: true, lot: true } });
+  if (!t) return;
+  await sendDiscordNotification(
+    `**${portfolioName}** opened ${t.side.toUpperCase()} ${symbol} @ ${t.entry.toFixed(4)} · SL ${t.sl.toFixed(4)} · TP1 ${t.tp1.toFixed(4)} · ${t.lot} lot (trade#${tradeId})`,
+    "info",
+  );
+}
+
+async function notifyClosedTrades(portfolioName: string, managed: ManageSummary): Promise<void> {
+  for (const c of managed.closed) {
+    const level = c.outcome === "loss" ? "warning" : "info";
+    const sign = c.pnl >= 0 ? "+" : "";
+    await sendDiscordNotification(
+      `**${portfolioName}** closed ${c.symbol} — ${c.outcome} @ ${c.exit.toFixed(4)} (${sign}${c.pnl.toFixed(2)}) (trade#${c.id})`,
+      level,
+    );
+  }
+}
+
+/** Notifies once on the transition into a drawdown breach (vs the portfolio's
+ *  own drawdownHaltPct), and once again on recovery — not on every scan tick
+ *  while still in breach. State tracked via a per-portfolio Setting key since
+ *  there's no other persistent per-portfolio scratch space for this. */
+async function checkDrawdownAlert(portfolioId: number, portfolioName: string): Promise<void> {
+  const [pct, haltPct, wasBreached] = await Promise.all([
+    getCurrentDrawdownPct(portfolioId),
+    getDrawdownHaltPct(portfolioId),
+    getSetting(`drawdownBreach:${portfolioId}`, "false"),
+  ]);
+  const isBreached = pct >= haltPct;
+  if (isBreached === (wasBreached === "true")) return;
+
+  await setSetting(`drawdownBreach:${portfolioId}`, String(isBreached));
+  if (isBreached) {
+    await sendDiscordNotification(
+      `**${portfolioName}** drawdown ${pct.toFixed(1)}% has crossed its ${haltPct}% halt threshold`,
+      "critical",
+    );
+  } else {
+    await sendDiscordNotification(`**${portfolioName}** drawdown ${pct.toFixed(1)}% has recovered below its ${haltPct}% threshold`, "info");
+  }
 }

@@ -5,6 +5,7 @@
 // Auth: requires `Authorization: Bearer $CRON_SECRET`.
 import { runScheduledOptions } from "@/lib/options/runScheduled";
 import { assertCronAuth } from "@/lib/cronAuth";
+import { sendDiscordNotification } from "@/lib/notify/discord";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -18,6 +19,11 @@ export async function GET(req: Request) {
     ? idsParam.split(",").map(Number).filter(Number.isInteger)
     : undefined;
 
-  const lines = await runScheduledOptions(ids);
-  return Response.json({ ok: true, ids: ids ?? "all-active-options", lines });
+  try {
+    const lines = await runScheduledOptions(ids);
+    return Response.json({ ok: true, ids: ids ?? "all-active-options", lines });
+  } catch (e) {
+    await sendDiscordNotification(`/api/cron/options failed: ${String(e)}`, "critical");
+    return Response.json({ ok: false, error: String(e) }, { status: 500 });
+  }
 }
