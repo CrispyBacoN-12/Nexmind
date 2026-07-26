@@ -1,0 +1,27 @@
+name: AI research round (daily)
+
+# Automates kicking off the research loop (propose -> in-sample backtest ->
+# auto-review) so nobody has to remember to run scripts/run-research-round.mts
+# by hand. Rotates through src/lib/research/scheduledResearch.ts's fixed
+# (symbol, mechanism angle) list, one entry per day.
+#
+# Deliberately once/day, not on the scan cadence (every 15 min): each round
+# makes real Anthropic API calls (propose + up to 2 refinement rounds per
+# candidate, cost-capped per candidate but not free), and new candidates still
+# need a human to run scripts/approve-strategy.ts's blind test gate and port
+# the code into strategies.ts by hand — this workflow only keeps the
+# candidate pipeline fed, it does not deploy anything on its own.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  research-round:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call research cron endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.NEXMIND_URL }}/api/cron/research"
