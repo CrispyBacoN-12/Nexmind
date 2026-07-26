@@ -39,16 +39,14 @@ async function scanWatchlist(p: Portfolio, tf: TF, log: (m: string) => void, ove
   }
 }
 
-/** Universe mode: cheap Scanner pre-filter, then spend AI only on as many
- *  candidates as there are open slots (maxOpenPositions − currently open). */
+/** Universe mode: cheap Scanner pre-filter, then spend AI on every setup found
+ *  (no cap on concurrent open positions). */
 async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: string) => void) {
   const uni = UNIVERSES[universeKey];
   if (!uni) { log(`#${p.id} ${p.name} unknown universe "${universeKey}" — skipped`); return; }
 
   const open = await prisma.trade.findMany({ where: { status: "open", portfolioId: p.id }, select: { symbol: true } });
   const held = new Set(open.map((t) => t.symbol));
-  const remaining = p.maxOpenPositions - open.length;
-  if (remaining <= 0) { log(`#${p.id} ${p.name} full (${open.length}/${p.maxOpenPositions}) — skipped`); return; }
 
   const strategy = await getPortfolioStrategy(p.id);
   const strat = getStrategy(strategy) ?? await getResearchStrategy(strategy);
@@ -62,16 +60,11 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: 
     const sig = strat.build(resp.candles)(resp.candles.length - 1);
     if (sig?.side) candidates.push(resp.symbol);
   }
-  log(`#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${candleMap.size} fetched, ${remaining} slot(s) open`);
+  log(`#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${candleMap.size} fetched`);
 
-  let aiUsed = 0;
-  let heldCount = open.length;
   for (const s of candidates) {
-    if (aiUsed >= remaining || heldCount >= p.maxOpenPositions) break;
-    aiUsed++;
     try {
       const r = await runTradeTick(s, p.id, { range: tf.range, interval: tf.interval });
-      if (r.outcome === "executed") heldCount++;
       log(`#${p.id} ${p.name} ${s} -> ${r.outcome}${r.tradeId ? ` trade#${r.tradeId}` : ""}`);
     } catch (e) {
       log(`#${p.id} ${p.name} ${s} ERROR ${String(e)}`);

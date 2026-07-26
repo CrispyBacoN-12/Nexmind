@@ -33,7 +33,7 @@ console.log("riskReward (reward:risk):", rr.toFixed(3));
 
 const verdict = applyIronRules(
   { symbol: "GC=F", side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, lot: sizing.lot },
-  { dailyLossUsd: 0, dailyLossCapUsd: 200, maxLotPerTrade: MAX_LOT_PER_TRADE, maxSpread: 5, minRiskReward: RESEARCH_MIN_RISK_REWARD, pipValueUsdPerLot: 1 },
+  { maxLotPerTrade: MAX_LOT_PER_TRADE, maxSpread: 5, minRiskReward: RESEARCH_MIN_RISK_REWARD },
 );
 console.log("ironRules verdict:", verdict);
 console.log("actual $ risked:", (Math.abs(levels.entry - levels.sl) * sizing.lot).toFixed(2), "(target was $" + riskUsd.toFixed(2) + ")");
@@ -42,7 +42,7 @@ console.log("actual $ risked:", (Math.abs(levels.entry - levels.sl) * sizing.lot
 const oldSizing = computeLot({ entry: levels.entry, sl: levels.sl, riskUsd, maxLotPerTrade: 0.2, avgCorrelation: null });
 const oldVerdict = applyIronRules(
   { symbol: "GC=F", side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, lot: oldSizing.lot },
-  { dailyLossUsd: 0, dailyLossCapUsd: 200, maxLotPerTrade: 0.2, maxSpread: 5, minRiskReward: 1.5, pipValueUsdPerLot: 1 },
+  { maxLotPerTrade: 0.2, maxSpread: 5, minRiskReward: 1.5 },
 );
 console.log("\n--- before the fix, for comparison ---");
 console.log("old lot:", oldSizing.lot, "old $ risked:", (Math.abs(levels.entry - levels.sl) * oldSizing.lot).toFixed(2));

@@ -10,7 +10,7 @@ import { runSage, type SageVerdict } from "./sage";
 import { applyIronRules, riskReward, type AccountState } from "./ironRules";
 import { applySlippage } from "./positionRules";
 import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
-import { isKillSwitchOn, getMaxOpenPositions, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt, getPortfolioStrategy } from "@/lib/settings";
+import { isKillSwitchOn, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt, getPortfolioStrategy } from "@/lib/settings";
 import { type Interval, type Range } from "@/lib/yahoo";
 import { fetchCandles } from "@/lib/marketData";
 import { dailyReturns, pearsonCorrelation } from "./correlation";
@@ -30,8 +30,6 @@ export interface TickResult {
 }
 
 const DEFAULT_ACCOUNT: AccountState = {
-  dailyLossUsd: 0,
-  dailyLossCapUsd: 200,
   // Safety ceiling only — computeLot() already sizes down to the configured
   // risk % per trade; this just bounds the worst case (e.g. a very tight ATR).
   // Was 0.2, which silently truncated position size well below the intended
@@ -39,7 +37,6 @@ const DEFAULT_ACCOUNT: AccountState = {
   maxLotPerTrade: 5,
   maxSpread: 5,
   minRiskReward: 1.5,
-  pipValueUsdPerLot: 1,
 };
 
 // Research strategies are validated (win rate, expectancy) against a tight
@@ -83,10 +80,8 @@ export function minRiskRewardFor(scan: ScanResult, isResearch: boolean): number 
 /**
  * Live-side state features for the shadow-mode RL sizer. exposurePct/cashPct/
  * drawdownPct are defined identically to Task 2's offline dataset builder —
- * continuous riskUsd/balance exposure and peak-equity drawdown — NOT the
- * discrete openPositions/maxOpenPositions slot fraction or
- * dailyLossUsd/dailyLossCapUsd gate fraction this file's AccountState uses for
- * Iron Rules (a different concept — gate thresholds, not an equity curve).
+ * continuous riskUsd/balance exposure and peak-equity drawdown — a different
+ * concept from Iron Rules' gate thresholds (an equity curve, not a gate).
  * Feeding the model a differently-defined feature at inference than it saw in
  * training would silently make that feature meaningless to the learned
  * policy. See docs/superpowers/plans/2026-07-23-hybrid-rl-allocation.md's
@@ -190,11 +185,8 @@ export async function runTradeTick(
   const account: AccountState = {
     ...DEFAULT_ACCOUNT,
     minRiskReward: minRiskRewardFor(scan, isResearch),
-    dailyLossUsd: await todaysRealizedLoss(portfolioId),
     killSwitch: await isKillSwitchOn(portfolioId),
     globalTradingHalt: await isGlobalTradingHalt(),
-    openPositions: await prisma.trade.count({ where: { status: "open", portfolioId } }),
-    maxOpenPositions: await getMaxOpenPositions(portfolioId),
   };
 
   let lot: number;
@@ -309,13 +301,6 @@ async function latestNewsDigest(): Promise<string> {
 async function latestLessons(): Promise<string> {
   const lessons = await prisma.lesson.findMany({ orderBy: { createdAt: "desc" }, take: 5 });
   return lessons.map((l) => l.text).join("; ");
-}
-
-async function todaysRealizedLoss(portfolioId: number): Promise<number> {
-  const start = new Date(); start.setHours(0, 0, 0, 0);
-  const closed = await prisma.trade.findMany({ where: { status: "closed", closedAt: { gte: start }, portfolioId } });
-  const loss = closed.reduce((s, t) => s + Math.min(0, t.pnl ?? 0), 0);
-  return Math.abs(loss);
 }
 
 /** Daily returns for correlation, or null if the candle fetch fails. */

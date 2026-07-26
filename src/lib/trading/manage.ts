@@ -10,8 +10,6 @@ import { fetchCandles } from "@/lib/marketData";
 import { decideAction, applySlippage, type LadderState } from "./positionRules";
 import { generateLesson, type LessonInput } from "./memo";
 import { Prisma, type Trade } from "@/generated/prisma/client";
-import { getCurrentDrawdownPct } from "./circuitBreaker";
-import { isKillSwitchOn, getDrawdownHaltPct } from "@/lib/settings";
 import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 
 // Simplified paper P/L: USD per 1.0 price-point per lot. Real instruments differ
@@ -133,23 +131,6 @@ export async function manageOpenTrades(portfolioId: number): Promise<ManageSumma
 
     if (action.outcome === "loss") {
       await recordLesson(t, { outcome: "loss", exit: action.exit, pnl, rMultiple });
-    }
-  }
-
-  const killSwitchOn = await isKillSwitchOn(portfolioId);
-  if (!killSwitchOn) {
-    const [haltPct, dd] = await Promise.all([
-      getDrawdownHaltPct(portfolioId),
-      getCurrentDrawdownPct(portfolioId),
-    ]);
-    if (dd >= haltPct) {
-      await prisma.portfolio.update({
-        where: { id: portfolioId },
-        data: {
-          killSwitch: true,
-          killSwitchReason: `Auto-halted: drawdown -${dd.toFixed(1)}% exceeded ${haltPct}% limit at ${new Date().toISOString()}`,
-        },
-      });
     }
   }
 

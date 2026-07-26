@@ -68,7 +68,7 @@ async function main() {
   const rr = riskReward({ symbol, side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, lot: sizing.lot });
   const verdict = applyIronRules(
     { symbol, side, entry: levels.entry, sl: levels.sl, tp1: levels.tp1, lot: sizing.lot },
-    { dailyLossUsd: 0, dailyLossCapUsd: 200, maxLotPerTrade: MAX_LOT_PER_TRADE, maxSpread: 5, minRiskReward: RESEARCH_MIN_RISK_REWARD, pipValueUsdPerLot: 1 },
+    { maxLotPerTrade: MAX_LOT_PER_TRADE, maxSpread: 5, minRiskReward: RESEARCH_MIN_RISK_REWARD },
   );
   console.log(`\nR:R = ${rr.toFixed(2)}   Iron Rules: ${verdict.passed ? "PASSED — trade would execute" : "BLOCKED: " + verdict.failures.join("; ")}`);
 

@@ -12,12 +12,9 @@ export interface ProposedTrade {
 }
 
 export interface AccountState {
-  dailyLossUsd: number; // realized loss so far today (positive number)
-  dailyLossCapUsd: number; // hard floor
   maxLotPerTrade: number;
   maxSpread?: number; // max acceptable spread in price units
   minRiskReward?: number; // R:R floor (default 1.5)
-  pipValueUsdPerLot?: number; // for estimating worst-case loss; default 1
   killSwitch?: boolean; // per-portfolio halt — blocks every new trade
   globalTradingHalt?: boolean; // manual global emergency brake — blocks all portfolios
   openPositions?: number; // current open trade count
@@ -67,18 +64,6 @@ export function applyIronRules(t: ProposedTrade, acc: AccountState): IronVerdict
 
   if (t.lot <= 0) failures.push("lot size must be positive");
   if (t.lot > acc.maxLotPerTrade) failures.push(`lot ${t.lot} exceeds max ${acc.maxLotPerTrade}`);
-
-  // Worst-case loss for this trade = distance to SL × pip value × lot.
-  const slDistance = Math.abs(t.entry - t.sl);
-  const pipValue = acc.pipValueUsdPerLot ?? 1;
-  const worstCaseLoss = slDistance * pipValue * t.lot;
-  if (acc.dailyLossUsd + worstCaseLoss > acc.dailyLossCapUsd) {
-    failures.push(
-      `would breach daily loss cap (used ${acc.dailyLossUsd.toFixed(2)} + risk ${worstCaseLoss.toFixed(2)} > ${acc.dailyLossCapUsd})`,
-    );
-  }
-
-  if (acc.dailyLossUsd >= acc.dailyLossCapUsd) failures.push("daily loss cap already reached — no new trades");
 
   return { passed: failures.length === 0, riskReward: rr, failures };
 }

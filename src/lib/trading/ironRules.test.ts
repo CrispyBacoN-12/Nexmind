@@ -3,12 +3,9 @@ import assert from "node:assert/strict";
 import { applyIronRules, riskReward, type ProposedTrade, type AccountState } from "./ironRules";
 
 const baseAcc: AccountState = {
-  dailyLossUsd: 0,
-  dailyLossCapUsd: 200,
   maxLotPerTrade: 0.5,
   maxSpread: 0.5,
   minRiskReward: 1.5,
-  pipValueUsdPerLot: 1,
 };
 
 const goodLong: ProposedTrade = { symbol: "XAUUSD", side: "long", entry: 2350, sl: 2340, tp1: 2370, lot: 0.1, spread: 0.2 };
@@ -48,13 +45,6 @@ test("wide spread is rejected", () => {
   assert.ok(v.failures.some((f) => /spread/.test(f)));
 });
 
-test("daily loss cap blocks new risk", () => {
-  // worst-case = 10 SL distance × 0.1 lot × 1 pipValue = 1.0; 199.5 + 1.0 > 200 cap.
-  const v = applyIronRules(goodLong, { ...baseAcc, dailyLossUsd: 199.5 });
-  assert.equal(v.passed, false);
-  assert.ok(v.failures.some((f) => /daily loss cap/.test(f)));
-});
-
 test("kill switch blocks all new trades", () => {
   const v = applyIronRules(goodLong, { ...baseAcc, killSwitch: true });
   assert.equal(v.passed, false);
@@ -75,8 +65,7 @@ test("below the position cap still passes", () => {
 test("applyIronRules: global trading halt blocks every new trade", () => {
   const t = { symbol: "AAPL", side: "long" as const, entry: 100, sl: 98, tp1: 106, lot: 0.1 };
   const acc = {
-    dailyLossUsd: 0, dailyLossCapUsd: 200, maxLotPerTrade: 0.2,
-    minRiskReward: 1.5, pipValueUsdPerLot: 1, globalTradingHalt: true,
+    maxLotPerTrade: 0.2, minRiskReward: 1.5, globalTradingHalt: true,
   };
   const v = applyIronRules(t, acc);
   assert.equal(v.passed, false);
