@@ -52,6 +52,11 @@ jobs:
         run: |
           curl -fsSL https://claude.ai/install.sh | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Verify Claude Code CLI is on PATH
+        # hasCli() in anthropic.ts swallows a missing/broken CLI and silently
+        # falls back to the mock path — the exact failure mode this workflow
+        # exists to fix. Fail the job loudly here instead of degrading quietly.
+        run: claude --version
       - name: Run scheduled scan
         run: node --import tsx scripts/scan.mts
 
