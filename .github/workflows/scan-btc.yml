@@ -32,6 +32,15 @@ on:
 jobs:
   scan-all:
     runs-on: ubuntu-latest
+    env:
+      # DATABASE_URL must be present from the first step: `npm ci` runs the
+      # `postinstall: prisma generate` script, and prisma.config.ts throws if
+      # DATABASE_URL is unset, even though generate doesn't connect to it.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
+      ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,10 +54,4 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Run scheduled scan
         run: node --import tsx scripts/scan.mts
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
-          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
 
