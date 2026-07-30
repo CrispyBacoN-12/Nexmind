@@ -1,11 +1,29 @@
 name: Swing scan (all desks)
 
-# Vercel Hobby's native cron only runs once per day, but every swing desk
-# (Gold, both BTC desks, Stocks) needs a 15-minute scan — same cadence as
-# the old local bot.ts orchestrator (manage 5m / scan 15m). This workflow
-# is the free substitute: it hits the deployed cron API route with no
-# `ids` filter, so it scans every active swing portfolio automatically
-# (and picks up any new desk without a workflow edit).
+# Runs the real trade-tick pipeline (SCANNER -> HAWK -> SAGE -> IRON RULES)
+# every 15 minutes for every active swing portfolio, same cadence as the old
+# local bot.ts orchestrator. Vercel Hobby's native cron only runs once a day,
+# so this workflow is the substitute cadence — but unlike the old version,
+# it does NOT call the Vercel-deployed API route. It checks out the repo and
+# runs scripts/scan.mts directly on the runner, because Vercel's serverless
+# functions can't host a `claude login` session and this repo has no paid
+# ANTHROPIC_API_KEY — Vercel-side scans fall back to a deterministic mock
+# instead of real HAWK/SAGE votes. GitHub Actions' ubuntu-latest runner *can*
+# run the Claude Code CLI, authenticated per-run via a subscription token
+# from `claude setup-token` (see CLAUDE_CODE_OAUTH_TOKEN below) — no paid API
+# key, no always-on machine.
+#
+# One-time setup:
+#   1. Run `claude setup-token` locally (uses your Claude subscription login)
+#      and copy the printed token.
+#   2. Add repo secrets (Settings -> Secrets and variables -> Actions):
+#      - CLAUDE_CODE_OAUTH_TOKEN: the token from step 1
+#      - DATABASE_URL: same Neon connection string Vercel uses
+#      - DISCORD_WEBHOOK_URL, ALPACA_KEY, ALPACA_SECRET: optional, same
+#        values as Vercel's env if you want notifications / Alpaca candles
+#   3. The token is not tied to this workflow's schedule — if it ever
+#      expires or is revoked, re-run `claude setup-token` and update the
+#      secret.
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -15,9 +33,22 @@ jobs:
   scan-all:
     runs-on: ubuntu-latest
     steps:
-      - name: Call scan cron endpoint
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Claude Code CLI
         run: |
-          curl --fail --silent --show-error \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.NEXMIND_URL }}/api/cron/scan"
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Run scheduled scan
+        run: node --import tsx scripts/scan.mts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
+          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
 

@@ -6,6 +6,13 @@
 //   1. ANTHROPIC_API_KEY set  → Anthropic SDK (pay per token)
 //   2. Claude Code CLI found  → `claude -p` headless (subscription auth)
 //   3. neither                → aiEnabled() false, callers use their mock paths
+//
+// CLAUDE_CODE_OAUTH_TOKEN (optional): a token from `claude setup-token`, for
+// ephemeral runners (e.g. GitHub Actions) that have no persisted `claude
+// login` session. Injected as ANTHROPIC_API_KEY into the *spawned CLI child
+// only* — never into this process's own env — so the resolution order above
+// still picks path 2 (CLI) instead of misrouting to path 1 (direct SDK,
+// which would reject a setup-token value as an invalid API key).
 
 import Anthropic from "@anthropic-ai/sdk";
 import { spawn, spawnSync } from "node:child_process";
@@ -82,6 +89,9 @@ async function callAgentCli(opts: CallOptions): Promise<AgentResult> {
       const child = spawn(`claude -p --output-format json --model ${tier}`, {
         shell: true,
         windowsHide: true,
+        env: process.env.CLAUDE_CODE_OAUTH_TOKEN
+          ? { ...process.env, ANTHROPIC_API_KEY: process.env.CLAUDE_CODE_OAUTH_TOKEN }
+          : process.env,
       });
       let out = "";
       let err = "";
