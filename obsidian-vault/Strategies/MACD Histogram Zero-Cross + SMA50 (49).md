@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-49
-status: approved
+status: rejected
 symbol: "GC=F"
 timeframe: "1h"
 tags: [strategy, research, sma, macd, zero-cross, gold]
@@ -30,4 +30,4 @@ return null;
 
 ## Live status
 
-Approved - available as `research-49` if assigned to a portfolio's strategy key. From research run #22.
+Rejected after review - not live. From research run #22.

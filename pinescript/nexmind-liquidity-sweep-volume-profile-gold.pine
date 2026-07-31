@@ -1,0 +1,226 @@
+// Liquidity Sweep + Volume Profile + SMA50 trend filter, on top of the
+// "Liquidity Sweep" family (research-59..64/71/72), all of which failed
+// standalone (PF 0.77-1.13, see Liquidity-Sweep-Strategy.pine). Standalone
+// sweep logic can't tell a genuine stop-hunt-reversal from a random wick using
+// price alone, so this version adds two pieces price-only logic is blind to:
+//
+//   1. Volume spike on the sweep bar (a real stop-hunt clears out resting
+//      orders -- that shows up as a volume burst; a random wick usually doesn't).
+//   2. The swept level sits OUTSIDE a rolling volume-profile Value Area (below
+//      VAL for a long sweep, above VAH for a short sweep) -- i.e. it swept into
+//      a genuinely thin/low-liquidity zone, not just an arbitrary N-bar extreme.
+//
+// TradingView real-feed iteration log (GC=F, 1h, 2025-07-25 to 2026-08-01, 51
+// bars of history w/ date filter), Long & Short, all filters on, Fixed TP
+// (1.5/1.2x ATR): -15% PnL. Switched Exit Mode to ATR Trailing Stop (1.0/1.0x
+// ATR): -7.37%, PF 0.752 -- better but still net negative, and PF<1 showed the
+// problem was entries, not just exits. Cut to Long Only (shorts were fighting
+// the period's gold uptrend): -2.25%, PF 0.877, 36 trades -- closer but still
+// sub-1 PF. Widened SL to 2.0x ATR + Trail Offset to 1.75x ATR (wider room for
+// winners to run, now that entries are heavily filtered): +13.25% PnL, PF
+// 1.652, 34 trades, max DD 8.31%. Sensitivity-checked the neighborhood (SL
+// 1.8-2.2 / Trail 1.5-2.0x ATR) -- PF stayed >1 across the whole range (just
+// lower, e.g. ~+5% at Trail=1.5), confirming a genuine robust region rather
+// than one lucky point.
+//
+// Defaults below are now set to the validated combo: Long Only, Exit Mode =
+// ATR Trailing Stop, SL = 2.0x ATR, Trail Activation = 1.0x ATR, Trail Offset
+// = 1.75x ATR. Still only 34-36 trades total -- treat as a promising forward
+// (paper-trade) candidate, not a confirmed edge. Recommended before live use:
+// let it run forward a few more weeks and watch whether PF and win rate hold.
+
+//@version=5
+strategy('Liquidity Sweep + Volume Profile (new candidate) Strategy', overlay=true, precision=6,
+     initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.05,
+     slippage=1,
+     process_orders_on_close=true,
+     max_boxes_count=500,
+     max_labels_count=500)
+
+//****************************************************************************//
+// Inputs
+
+grp_sweep = 'Liquidity Sweep Settings'
+lookback = input.int(title='Lookback Bars (sweep level + profile window)', defval=20, minval=5, group=grp_sweep)
+
+grp_vol = 'Volume Confirmation'
+useVolumeFilter = input.bool(title='Require volume spike on sweep bar', defval=true, group=grp_vol)
+volSpikeMult    = input.float(title='  Volume spike multiple (x avg of prior N bars)', defval=1.5, minval=1.0, step=0.1, group=grp_vol)
+
+grp_vp = 'Volume Profile (rolling, over Lookback Bars)'
+useValueAreaFilter = input.bool(title='Require swept level outside Value Area', defval=true, group=grp_vp)
+numBins        = input.int(title='  Price Bins', defval=24, minval=8, maxval=100, group=grp_vp)
+valueAreaPct   = input.float(title='  Value Area %', defval=0.70, minval=0.5, maxval=0.95, step=0.05, group=grp_vp)
+showProfileLevels = input.bool(title='  Plot POC / VAH / VAL', defval=true, group=grp_vp)
+
+grp_filt = 'Optional Trend Filter'
+useSma50Filter = input.bool(title='Trend-alignment filter: close vs SMA50 (research-62)', defval=true, group=grp_filt)
+
+grp_strat = 'Strategy Settings'
+tradeDirection = input.string(title='Trade Direction', options=['Long Only', 'Short Only', 'Long & Short'], defval='Long Only', group=grp_strat)
+exitMode       = input.string(title='Exit Mode', options=['Fixed TP', 'ATR Trailing Stop'], defval='ATR Trailing Stop', group=grp_strat)
+slAtrMult      = input.float(title='Stop Loss (x ATR)', defval=2.0, minval=0.1, step=0.1, group=grp_strat)
+tpAtrMult      = input.float(title='Take Profit (x ATR) -- used when Exit Mode = Fixed TP', defval=1.2, minval=0.1, step=0.1, group=grp_strat)
+trailActivateAtrMult = input.float(title='Trail Activation (x ATR) -- used when Exit Mode = ATR Trailing Stop', defval=1.0, minval=0.1, step=0.1, group=grp_strat)
+trailOffsetAtrMult   = input.float(title='Trail Offset (x ATR) -- used when Exit Mode = ATR Trailing Stop', defval=1.75, minval=0.1, step=0.1, group=grp_strat)
+atrLength      = input.int(title='ATR Length', defval=14, group=grp_strat)
+riskPerc       = input.float(title='Risk per Trade (% of equity)', defval=1.0, minval=0.01, step=0.1, group=grp_strat) / 100
+
+grp_date = 'Backtest Date Range'
+useDateFilter = input.bool(title='Filter by Date Range', defval=false, group=grp_date)
+startDate     = input.time(title='Start Date', defval=timestamp('2018-01-01T00:00:00'), group=grp_date)
+endDate       = input.time(title='End Date', defval=timestamp('2069-01-01T00:00:00'), group=grp_date)
+
+inDateRange = not useDateFilter or (time >= startDate and time <= endDate)
+
+//****************************************************************************//
+// Liquidity Sweep level (prior N-bar high/low)
+
+atrVal = ta.atr(atrLength)
+sma50  = ta.sma(close, 50)
+
+hi = ta.highest(high[1], lookback)
+lo = ta.lowest(low[1], lookback)
+
+rawLong  = low < lo and close > lo
+rawShort = high > hi and close < hi
+
+//****************************************************************************//
+// Volume spike confirmation: current bar's volume vs the average of the prior
+// N bars (excludes the current bar so a spike can't inflate its own baseline)
+
+avgVolPrior = ta.sma(volume[1], lookback)
+volSpike = volume > avgVolPrior * volSpikeMult
+passVolume = not useVolumeFilter or volSpike
+
+//****************************************************************************//
+// Rolling Volume Profile over the last `lookback` bars: bins the [lo,hi] range,
+// accumulates each bar's volume into its typical-price bin, finds POC then
+// expands outward to build the Value Area (VAH/VAL).
+
+var float[] binVol = array.new_float(numBins, 0.0)
+array.fill(binVol, 0.0)
+
+profRangeHigh = ta.highest(high, lookback)
+profRangeLow  = ta.lowest(low, lookback)
+binSize = (profRangeHigh - profRangeLow) / numBins
+
+if binSize > 0
+    for k = 0 to lookback - 1
+        typicalPrice = (high[k] + low[k] + close[k]) / 3
+        binIdx = int(math.min(numBins - 1, math.max(0, math.floor((typicalPrice - profRangeLow) / binSize))))
+        array.set(binVol, binIdx, array.get(binVol, binIdx) + volume[k])
+
+pocIdx = 0
+maxVol = array.get(binVol, 0)
+for b = 1 to numBins - 1
+    v = array.get(binVol, b)
+    if v > maxVol
+        maxVol := v
+        pocIdx := b
+
+totalVol = array.sum(binVol)
+vaVol = maxVol
+loIdx = pocIdx
+hiIdx = pocIdx
+maxIter = numBins
+iter = 0
+while vaVol < totalVol * valueAreaPct and (loIdx > 0 or hiIdx < numBins - 1) and iter < maxIter
+    volBelow = loIdx > 0 ? array.get(binVol, loIdx - 1) : -1.0
+    volAbove = hiIdx < numBins - 1 ? array.get(binVol, hiIdx + 1) : -1.0
+    if volAbove >= volBelow and hiIdx < numBins - 1
+        hiIdx := hiIdx + 1
+        vaVol := vaVol + array.get(binVol, hiIdx)
+    else if loIdx > 0
+        loIdx := loIdx - 1
+        vaVol := vaVol + array.get(binVol, loIdx)
+    iter := iter + 1
+
+pocPrice = binSize > 0 ? profRangeLow + (pocIdx + 0.5) * binSize : na
+vah = binSize > 0 ? profRangeLow + (hiIdx + 1) * binSize : na
+val = binSize > 0 ? profRangeLow + loIdx * binSize : na
+
+plot(showProfileLevels ? pocPrice : na, title='POC', color=color.new(color.yellow, 0), style=plot.style_circles)
+plot(showProfileLevels ? vah : na, title='VAH', color=color.new(color.aqua, 40))
+plot(showProfileLevels ? val : na, title='VAL', color=color.new(color.aqua, 40))
+
+// Swept level must sit outside the Value Area: the low that got swept (long)
+// below VAL, or the high that got swept (short) above VAH.
+passValueArea = not useValueAreaFilter or (rawLong ? lo < val : rawShort ? hi > vah : false)
+passSma50 = not useSma50Filter or (rawLong ? close > sma50 : rawShort ? close < sma50 : false)
+
+longCond  = rawLong and passVolume and passValueArea and passSma50
+shortCond = rawShort and passVolume and passValueArea and passSma50
+
+plot(hi, title='Prior N-bar High', color=color.new(color.red, 60))
+plot(lo, title='Prior N-bar Low', color=color.new(color.green, 60))
+plotshape(longCond, style=shape.triangleup, title='Sweep Long', location=location.belowbar, color=color.new(color.green, 0), size=size.tiny)
+plotshape(shortCond, style=shape.triangledown, title='Sweep Short', location=location.abovebar, color=color.new(color.red, 0), size=size.tiny)
+
+//****************************************************************************//
+// Position sizing: risk riskPerc% of current equity, sized off the ATR stop distance
+
+stopDistance = atrVal * slAtrMult
+riskAmount = strategy.equity * riskPerc
+qty = stopDistance > 0 ? riskAmount / stopDistance : na
+
+allowLong  = tradeDirection == 'Long Only' or tradeDirection == 'Long & Short'
+allowShort = tradeDirection == 'Short Only' or tradeDirection == 'Long & Short'
+
+//****************************************************************************//
+// Strategy Execution
+
+if inDateRange
+    if longCond and allowLong
+        strategy.entry('Long', strategy.long, qty=qty)
+    if shortCond and allowShort
+        strategy.entry('Short', strategy.short, qty=qty)
+
+    if strategy.position_size > 0
+        longEntry = strategy.position_avg_price
+        if exitMode == 'Fixed TP'
+            strategy.exit('Long SL/TP', 'Long', stop=longEntry - atrVal * slAtrMult, limit=longEntry + atrVal * tpAtrMult)
+        else
+            trailPoints = atrVal * trailActivateAtrMult / syminfo.mintick
+            trailOffset = atrVal * trailOffsetAtrMult / syminfo.mintick
+            strategy.exit('Long Trail', 'Long', stop=longEntry - atrVal * slAtrMult, trail_points=trailPoints, trail_offset=trailOffset)
+    if strategy.position_size < 0
+        shortEntry = strategy.position_avg_price
+        if exitMode == 'Fixed TP'
+            strategy.exit('Short SL/TP', 'Short', stop=shortEntry + atrVal * slAtrMult, limit=shortEntry - atrVal * tpAtrMult)
+        else
+            trailPoints = atrVal * trailActivateAtrMult / syminfo.mintick
+            trailOffset = atrVal * trailOffsetAtrMult / syminfo.mintick
+            strategy.exit('Short Trail', 'Short', stop=shortEntry + atrVal * slAtrMult, trail_points=trailPoints, trail_offset=trailOffset)
+
+if not inDateRange
+    strategy.close_all(comment='Out of date range')
+
+//****************************************************************************//
+// Losing Trade Highlighter
+// TradingView's "List of Trades" tab has no win/loss filter, so this draws
+// directly on the chart -- a box spanning entry->exit price/time plus a P&L
+// label, for losing trades only by default.
+
+grp_viz = 'Losing Trade Highlighter'
+showLosses = input.bool(true, title='Highlight losing trades', group=grp_viz)
+showWins   = input.bool(false, title='Also highlight winning trades', group=grp_viz)
+
+if barstate.islast
+    for i = 0 to strategy.closedtrades - 1
+        tradeProfit = strategy.closedtrades.profit(i)
+        isLoss = tradeProfit < 0
+        if (isLoss and showLosses) or (not isLoss and showWins)
+            entryBar   = strategy.closedtrades.entry_bar_index(i)
+            exitBar    = strategy.closedtrades.exit_bar_index(i)
+            entryPrice = strategy.closedtrades.entry_price(i)
+            exitPrice  = strategy.closedtrades.exit_price(i)
+            boxColor   = isLoss ? color.red : color.green
+            box.new(left=entryBar, top=math.max(entryPrice, exitPrice), right=exitBar, bottom=math.min(entryPrice, exitPrice),
+             border_color=boxColor, bgcolor=color.new(boxColor, 85))
+            label.new(x=exitBar, y=exitPrice,
+             text=(isLoss ? '-' : '+') + str.tostring(math.abs(tradeProfit), '#.##') + ' ' + syminfo.currency,
+             style=exitPrice > entryPrice ? label.style_label_down : label.style_label_up,
+             color=boxColor, textcolor=color.white, size=size.small)
