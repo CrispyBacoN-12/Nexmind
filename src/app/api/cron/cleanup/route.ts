@@ -4,6 +4,7 @@
 // since this is maintenance, not time-sensitive like the scan/research crons.
 // Auth: requires `Authorization: Bearer $CRON_SECRET`, same as the other cron routes.
 import { deleteOldSignals } from "@/lib/maintenance/cleanupSignals";
+import { deleteOldScanLogs } from "@/lib/maintenance/cleanupScanLog";
 import { assertCronAuth } from "@/lib/cronAuth";
 import { sendDiscordNotification } from "@/lib/notify/discord";
 
@@ -18,12 +19,14 @@ export async function GET(req: Request) {
   const days = daysParam ? Number(daysParam) : undefined;
 
   try {
-    const result = await deleteOldSignals(days);
+    const signals = await deleteOldSignals(days);
+    const scanLogs = await deleteOldScanLogs();
     await sendDiscordNotification(
-      `Signal cleanup: deleted ${result.deletedCount} rows older than ${result.cutoff.toISOString().slice(0, 10)}`,
+      `Cleanup: deleted ${signals.deletedCount} signals older than ${signals.cutoff.toISOString().slice(0, 10)}, ` +
+        `${scanLogs.deletedCount} scan-log rows older than ${scanLogs.cutoff.toISOString().slice(0, 10)}`,
       "info",
     );
-    return Response.json({ ok: true, ...result });
+    return Response.json({ ok: true, signals, scanLogs });
   } catch (e) {
     await sendDiscordNotification(`/api/cron/cleanup failed: ${String(e)}`, "critical");
     return Response.json({ ok: false, error: String(e) }, { status: 500 });

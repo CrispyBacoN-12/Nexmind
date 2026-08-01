@@ -399,7 +399,8 @@ export const ModelName = {
   ResearchRun: 'ResearchRun',
   ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
-  Setting: 'Setting'
+  Setting: 'Setting',
+  ScanLog: 'ScanLog'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -415,7 +416,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "holding" | "optionHolding" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "holding" | "optionHolding" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1603,6 +1604,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ScanLog: {
+      payload: Prisma.$ScanLogPayload<ExtArgs>
+      fields: Prisma.ScanLogFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ScanLogFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ScanLogFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>
+        }
+        findFirst: {
+          args: Prisma.ScanLogFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ScanLogFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>
+        }
+        findMany: {
+          args: Prisma.ScanLogFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>[]
+        }
+        create: {
+          args: Prisma.ScanLogCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>
+        }
+        createMany: {
+          args: Prisma.ScanLogCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ScanLogCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>[]
+        }
+        delete: {
+          args: Prisma.ScanLogDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>
+        }
+        update: {
+          args: Prisma.ScanLogUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>
+        }
+        deleteMany: {
+          args: Prisma.ScanLogDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ScanLogUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ScanLogUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>[]
+        }
+        upsert: {
+          args: Prisma.ScanLogUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScanLogPayload>
+        }
+        aggregate: {
+          args: Prisma.ScanLogAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateScanLog>
+        }
+        groupBy: {
+          args: Prisma.ScanLogGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScanLogGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ScanLogCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScanLogCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1911,6 +1986,15 @@ export const SettingScalarFieldEnum = {
 export type SettingScalarFieldEnum = (typeof SettingScalarFieldEnum)[keyof typeof SettingScalarFieldEnum]
 
 
+export const ScanLogScalarFieldEnum = {
+  id: 'id',
+  message: 'message',
+  createdAt: 'createdAt'
+} as const
+
+export type ScanLogScalarFieldEnum = (typeof ScanLogScalarFieldEnum)[keyof typeof ScanLogScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2129,6 +2213,7 @@ export type GlobalOmitConfig = {
   researchStrategy?: Prisma.ResearchStrategyOmit
   report?: Prisma.ReportOmit
   setting?: Prisma.SettingOmit
+  scanLog?: Prisma.ScanLogOmit
 }
 
 /* Types for Logging */

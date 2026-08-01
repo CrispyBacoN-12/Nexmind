@@ -97,3 +97,11 @@ export type Report = Prisma.ReportModel
  * App-wide key-value settings (kill switch, limits, cached intel).
  */
 export type Setting = Prisma.SettingModel
+/**
+ * Model ScanLog
+ * One line from a scheduled scan/manage run. Persisted to Postgres (not a
+ * local file) because production scans run on GitHub Actions runners and
+ * Vercel serverless functions — neither shares a filesystem with the other,
+ * or with the deployed web app that renders the Activity page.
+ */
+export type ScanLog = Prisma.ScanLogModel

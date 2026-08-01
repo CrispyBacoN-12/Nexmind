@@ -77,17 +77,19 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: 
 }
 
 /** Runs the scheduled scan for `ids` (or every active swing portfolio when
- *  omitted). Returns the log lines instead of writing to a file, so both the
- *  CLI script and the cron API routes can surface them their own way. */
+ *  omitted). Returns the log lines AND persists them to the ScanLog table —
+ *  scans run on GitHub Actions runners and Vercel serverless functions, which
+ *  share no filesystem with each other or with the app that renders the
+ *  Activity page, so a shared Postgres row is the only durable option. */
 export async function runScheduledScan(ids?: number[]): Promise<string[]> {
   const lines: string[] = [];
   const log = (m: string) => lines.push(`[${new Date().toISOString()}] ${m}`);
 
-  if (await isGlobalTradingHalt()) { log("global trading halt is ON — skipping scan"); return lines; }
+  if (await isGlobalTradingHalt()) { log("global trading halt is ON — skipping scan"); return persistAndReturn(lines); }
   const portfolios = await prisma.portfolio.findMany({
     where: ids && ids.length ? { id: { in: ids } } : { status: "active", kind: "swing" },
   });
-  if (portfolios.length === 0) { log("no matching portfolios"); return lines; }
+  if (portfolios.length === 0) { log("no matching portfolios"); return persistAndReturn(lines); }
 
   for (const p of portfolios) {
     if (!isSwingKind(p.kind) || !canPortfolioTrade(p.status)) {
@@ -106,6 +108,13 @@ export async function runScheduledScan(ids?: number[]): Promise<string[]> {
     for (const sp of SECONDARY_PASSES.filter((s) => s.portfolioId === p.id)) {
       await scanWatchlist(p, tf, log, { strategy: sp.strategy, interval: sp.interval as Interval, range: sp.range as Range, label: sp.label });
     }
+  }
+  return persistAndReturn(lines);
+}
+
+async function persistAndReturn(lines: string[]): Promise<string[]> {
+  if (lines.length > 0) {
+    await prisma.scanLog.createMany({ data: lines.map((message) => ({ message })) });
   }
   return lines;
 }

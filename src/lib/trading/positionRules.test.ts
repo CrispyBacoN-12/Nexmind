@@ -68,17 +68,17 @@ test("trail: arms once activateDist is cleared and ratchets to extreme - offsetD
 
 test("trail: never loosens — a pullback that doesn't set a new extreme holds", () => {
   // Caller has already persisted sl=103 / extreme=106 from the prior tick.
-  assert.deepEqual(decideAction({ ...longTrail, sl: 103 }, { trail: longTrail.trail, trailExtreme: 106 }, 104), { kind: "hold" });
-  assert.deepEqual(decideAction({ ...shortTrail, sl: 97 }, { trail: shortTrail.trail, trailExtreme: 94 }, 96), { kind: "hold" });
+  assert.deepEqual(decideAction({ ...longTrail, sl: 103 }, { trail: longTrail.trail ?? undefined, trailExtreme: 106 }, 104), { kind: "hold" });
+  assert.deepEqual(decideAction({ ...shortTrail, sl: 97 }, { trail: shortTrail.trail ?? undefined, trailExtreme: 94 }, 96), { kind: "hold" });
 });
 
 test("trail: price hitting the ratcheted stop closes as a win (stop is past entry)", () => {
   assert.deepEqual(
-    decideAction({ ...longTrail, sl: 103 }, { trail: longTrail.trail, trailExtreme: 106 }, 102),
+    decideAction({ ...longTrail, sl: 103 }, { trail: longTrail.trail ?? undefined, trailExtreme: 106 }, 102),
     { kind: "close", outcome: "win", exit: 103 },
   );
   assert.deepEqual(
-    decideAction({ ...shortTrail, sl: 97 }, { trail: shortTrail.trail, trailExtreme: 94 }, 98),
+    decideAction({ ...shortTrail, sl: 97 }, { trail: shortTrail.trail ?? undefined, trailExtreme: 94 }, 98),
     { kind: "close", outcome: "win", exit: 97 },
   );
 });

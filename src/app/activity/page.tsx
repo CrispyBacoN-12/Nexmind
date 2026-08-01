@@ -1,5 +1,4 @@
-import { readFile } from "fs/promises";
-import path from "path";
+import { prisma } from "@/lib/db";
 import { Card, CardTitle, Badge, PageHeader, Empty } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -23,21 +22,18 @@ const toneClass: Record<Row["tone"], string> = {
 };
 
 async function readLog(maxLines = 150): Promise<Row[]> {
-  let text: string;
-  try {
-    text = await readFile(path.join(process.cwd(), "scripts", "scan.log"), "utf8");
-  } catch {
-    return [];
-  }
-  const rows: Row[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const m = line.match(/^\[(.+?)\]\s*(.*)$/); // only timestamped scan events
-    if (!m) continue;
-    const t = new Date(m[1]);
-    const time = isNaN(t.getTime()) ? m[1] : t.toLocaleString("en-GB", { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
-    rows.push({ time, msg: m[2], tone: classify(m[2]) });
-  }
-  return rows.slice(-maxLines).reverse(); // newest first
+  const entries = await prisma.scanLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: maxLines,
+  });
+  return entries.map((e) => {
+    const msg = e.message.replace(/^\[.+?\]\s*/, ""); // strip the redundant embedded ISO timestamp
+    return {
+      time: e.createdAt.toLocaleString("en-GB", { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
+      msg,
+      tone: classify(msg),
+    };
+  });
 }
 
 export default async function ActivityPage() {
@@ -54,7 +50,7 @@ export default async function ActivityPage() {
       />
 
       {rows.length === 0 ? (
-        <Empty title="No scan activity yet" hint="The scheduler writes to scripts/scan.log on each run." />
+        <Empty title="No scan activity yet" hint="The scheduler writes a ScanLog row on each run." />
       ) : (
         <>
           <div className="flex gap-2 mb-4 text-xs">
@@ -79,7 +75,7 @@ export default async function ActivityPage() {
         </>
       )}
 
-      <p className="mt-3 text-[11px] text-(--color-muted)">Source: scripts/scan.log · System lines (data-provider fallbacks) are hidden.</p>
+      <p className="mt-3 text-[11px] text-(--color-muted)">Source: ScanLog table · System lines (data-provider fallbacks) are hidden.</p>
     </div>
   );
 }

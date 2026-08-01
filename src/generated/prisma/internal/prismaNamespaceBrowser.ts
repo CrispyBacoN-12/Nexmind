@@ -66,7 +66,8 @@ export const ModelName = {
   ResearchRun: 'ResearchRun',
   ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
-  Setting: 'Setting'
+  Setting: 'Setting',
+  ScanLog: 'ScanLog'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -352,6 +353,15 @@ export const SettingScalarFieldEnum = {
 } as const
 
 export type SettingScalarFieldEnum = (typeof SettingScalarFieldEnum)[keyof typeof SettingScalarFieldEnum]
+
+
+export const ScanLogScalarFieldEnum = {
+  id: 'id',
+  message: 'message',
+  createdAt: 'createdAt'
+} as const
+
+export type ScanLogScalarFieldEnum = (typeof ScanLogScalarFieldEnum)[keyof typeof ScanLogScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -260,3 +260,15 @@ model Setting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+/// One line from a scheduled scan/manage run. Persisted to Postgres (not a
+/// local file) because production scans run on GitHub Actions runners and
+/// Vercel serverless functions — neither shares a filesystem with the other,
+/// or with the deployed web app that renders the Activity page.
+model ScanLog {
+  id        Int      @id @default(autoincrement())
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
