@@ -233,6 +233,76 @@ test("backtestCandles: same series nets less profit with a nonzero CostModel tha
   }
 });
 
+// ---- trailing stop: openPosition / stepPosition ----
+
+test("openPosition with slMult + trail computes ATR-scaled sl and trail distances, sets origSl", () => {
+  const p = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), true, 3.5, {}, 2.0, { activateMult: 1, offsetMult: 1.75 });
+  assert.equal(p.sl, 96); // 100 - 2.0*2
+  assert.deepEqual(p.trail, { activateDist: 2, offsetDist: 3.5 }); // 1*2, 1.75*2
+  assert.equal(p.ladder.origSl, 96);
+});
+
+function freshLongTrail() {
+  // sl=96, trail activateDist=2, offsetDist=3.5
+  return openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), true, 3.5, {}, 2.0, { activateMult: 1, offsetMult: 1.75 });
+}
+
+test("trailing position: quiet bar below activation just tracks the extreme, stays open", () => {
+  const p = freshLongTrail();
+  const r = stepPosition(p, bar(1, 101, 100.5));
+  assert.deepEqual(r, { status: "open" });
+  assert.equal(p.sl, 96); // not armed yet
+  assert.equal(p.ladder.trailExtreme, 101);
+});
+
+test("trailing position: a bar that gaps entirely above the prior extreme still ratchets off the TRUE bar high, not the low", () => {
+  // Regression: the adverse (low) call alone would compute extreme=101 (only
+  // from the low) and short-circuit before ever seeing the bar's real high of
+  // 106, silently under-ratcheting the trail.
+  const p = freshLongTrail();
+  const r = stepPosition(p, bar(1, 106, 101)); // low 101 already clears the prior extreme (entry 100)
+  assert.deepEqual(r, { status: "open" });
+  assert.equal(p.ladder.trailExtreme, 106); // must use the bar's high, not its low
+  assert.equal(p.sl, 106 - 3.5); // armed: 106 favorable move (6) >= activateDist (2)
+});
+
+test("trailing position: SL hit before ever arming books a loss", () => {
+  const p = freshLongTrail();
+  const r = stepPosition(p, bar(1, 99, 95));
+  assert.equal(r.status, "closed");
+  if (r.status === "closed") {
+    assert.equal(r.trade.outcome, "loss");
+    assert.equal(r.trade.exit, 96);
+    assert.equal(r.trade.sl, 96); // origSl preserved for R-multiple math
+  }
+});
+
+test("trailing position: arms, ratchets across bars, then closes at the trailed stop as a win", () => {
+  const p = freshLongTrail();
+  assert.deepEqual(stepPosition(p, bar(1, 106, 104)), { status: "open" }); // arms: extreme 106, sl -> 102.5
+  assert.equal(p.sl, 102.5);
+  assert.deepEqual(stepPosition(p, bar(2, 105, 103)), { status: "open" }); // no new extreme, sl unchanged
+  assert.equal(p.sl, 102.5);
+  const r = stepPosition(p, bar(3, 103, 102)); // drops through the trailed stop
+  assert.equal(r.status, "closed");
+  if (r.status === "closed") {
+    assert.equal(r.trade.outcome, "win");
+    assert.equal(r.trade.exit, 102.5);
+    assert.equal(r.trade.sl, 96); // origSl, not the ratcheted stop — true initial risk
+    assert.ok(Math.abs((r.trade.rMultiple ?? 0) - (102.5 - 100) / (100 - 96)) < 1e-9);
+  }
+});
+
+test("backtestCandles threads slMult/trail through to opened positions", () => {
+  const WARMUP = 60;
+  const series = Array.from({ length: 200 }, (_, i) => bar(i, 100 + i * 0.3 + 2, 100 + i * 0.3 - 2));
+  const r = backtestCandles(
+    "TEST", series, 0.1, undefined, (i) => (i === WARMUP ? "long" : null),
+    true, 3.5, {}, 2.0, { activateMult: 1, offsetMult: 1.75 },
+  );
+  assert.ok(r.trades.length > 0 || r.openAtEnd); // trending series should trail rather than SL out
+});
+
 test("summarizeBacktest: totalCostsUsd aggregates grossPnl - pnl drag across trades", () => {
   const trades: SimTrade[] = [
     { ...trade(100, 0), grossPnl: 112 },

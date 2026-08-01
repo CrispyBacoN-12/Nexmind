@@ -12,7 +12,7 @@ function bar(t: number, o: number, h: number, l: number, c: number, v = 1000): C
 
 test("registry exposes base strategies + combos by key", () => {
   const keys = STRATEGIES.map((s) => s.key);
-  for (const k of ["trend-pullback", "ema-cross", "orb", "fvg", "liquidity-sweep", "swing-trend-continuation", "combo-or", "combo-vote"]) {
+  for (const k of ["trend-pullback", "ema-cross", "orb", "fvg", "liquidity-sweep", "liquidity-sweep-volume-profile-sma50", "swing-trend-continuation", "combo-or", "combo-vote"]) {
     assert.ok(keys.includes(k), `missing ${k}`);
   }
   assert.equal(getStrategy("nope"), null);
@@ -177,6 +177,47 @@ test("Liquidity Sweep + VWAP Reclaim: a plain hold bar (no sweep) never fires", 
   const bars = Array.from({ length: 25 }, (_, i) => bar(i * HOUR, 100, 100.5, 99.5, 100, 1000));
   const evalr = getStrategy("liquidity-sweep")!.build(bars);
   assert.ok(bars.every((_, i) => evalr(i) === null));
+});
+
+test("Liquidity Sweep + Volume Profile + SMA50: a confirmed low-sweep outside the value area fires long", () => {
+  // Same shape as the VWAP-reclaim sweep fixture: 70-bar uptrend (SMA50 +
+  // trend), a shallow 15-bar pullback, then a sweep bar wicking below the
+  // pullback low on 3x+ volume and closing back above SMA50.
+  const up = Array.from({ length: 70 }, (_, i) => 100 + i * 1.5).map((c, i) => bar(i * HOUR, c - 0.3, c + 1, c - 1, c, 1000));
+  let p = up[up.length - 1].c;
+  const pullback: Candle[] = [];
+  for (let i = 0; i < 15; i++) { p -= 0.5; pullback.push(bar((70 + i) * HOUR, p + 0.5, p + 1, p - 1, p, 900)); }
+  const lastLow = Math.min(...pullback.map((b) => b.l));
+  const sweep = bar(85 * HOUR, p, p + 3.5, lastLow - 1.5, p + 3, 3000);
+  const bars = [...up, ...pullback, sweep];
+  const evalr = getStrategy("liquidity-sweep-volume-profile-sma50")!.build(bars);
+  assert.equal(evalr(85)?.side, "long");
+});
+
+test("Liquidity Sweep + Volume Profile + SMA50: long-only — a mirror-image high-sweep never fires short", () => {
+  const down = Array.from({ length: 70 }, (_, i) => 300 - i * 1.5).map((c, i) => bar(i * HOUR, c + 0.3, c + 1, c - 1, c, 1000));
+  let p = down[down.length - 1].c;
+  const bounce: Candle[] = [];
+  for (let i = 0; i < 15; i++) { p += 0.5; bounce.push(bar((70 + i) * HOUR, p - 0.5, p + 1, p - 1, p, 900)); }
+  const lastHigh = Math.max(...bounce.map((b) => b.h));
+  const sweep = bar(85 * HOUR, p, lastHigh + 1.5, p - 3.5, p - 3, 3000);
+  const bars = [...down, ...bounce, sweep];
+  const evalr = getStrategy("liquidity-sweep-volume-profile-sma50")!.build(bars);
+  assert.equal(evalr(85), null, "must never short — the validated config was long-only");
+});
+
+test("Liquidity Sweep + Volume Profile + SMA50: a flat series with no sweep never fires", () => {
+  const bars = Array.from({ length: 90 }, (_, i) => bar(i * HOUR, 100, 100.5, 99.5, 100, 1000));
+  const evalr = getStrategy("liquidity-sweep-volume-profile-sma50")!.build(bars);
+  assert.ok(bars.every((_, i) => evalr(i) === null));
+});
+
+test("Liquidity Sweep + Volume Profile + SMA50: declares the validated ATR-trail preferredExit", () => {
+  const strat = getStrategy("liquidity-sweep-volume-profile-sma50")!;
+  assert.equal(strat.preferredExit?.slMult, 2.0);
+  assert.deepEqual(strat.preferredExit?.trail, { activateMult: 1.0, offsetMult: 1.75 });
+  assert.equal(strat.preferredExit?.singleTarget, true);
+  assert.ok(strat.preferredExit?.costs, "expects a real cost model, not NO_COSTS");
 });
 
 test("Swing Trend Continuation: declares a calibrated preferredExit ladder", () => {

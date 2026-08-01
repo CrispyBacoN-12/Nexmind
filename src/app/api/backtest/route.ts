@@ -44,7 +44,10 @@ export async function POST(req: Request) {
         const evalr = strat ? strat.build(resp.candles) : null;
         const entry = evalr ? (i: number) => evalr(i)?.side ?? null : undefined;
         const exit = strat?.preferredExit;
-        const bt = backtestCandles(resp.symbol, resp.candles, 0.1, thresholds, entry, exit?.singleTarget, exit?.tp1Mult, exit?.costs);
+        const bt = backtestCandles(
+          resp.symbol, resp.candles, 0.1, thresholds, entry, exit?.singleTarget, exit?.tp1Mult, exit?.costs,
+          exit?.slMult, exit?.trail,
+        );
         const summary = summarizeBacktest(bt.trades);
         results.push({ symbol: resp.symbol, interval, range, strategy: stratLabel, ...thresholds, bars: bt.bars, signals: bt.signals, ...summary });
       } catch (e) {

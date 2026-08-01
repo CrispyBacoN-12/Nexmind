@@ -4,7 +4,8 @@
 // replay and compare them. Exits are still the shared ATR TP-ladder.
 
 import {
-  sma, ema, rsi, macd, atr, adx, anchoredVWAP, dailyAnchor, weeklyAnchor, detectLiquiditySweep, estimatedDelta, type Candle,
+  sma, ema, rsi, macd, atr, adx, anchoredVWAP, dailyAnchor, weeklyAnchor, detectLiquiditySweep, estimatedDelta,
+  volumeProfile, type Candle,
 } from "@/lib/indicators";
 import { decideSetup, type ScanSnapshot } from "./scanner";
 import { lorentzianSeries } from "@/lib/lc/lorentzian";
@@ -24,11 +25,20 @@ export interface Strategy {
   key: string;
   label: string;
   build(bars: Candle[]): StrategyEvaluator;
-  /** Backtest engine defaults (tp1Mult=2.5, singleTarget=false, no costs) suit
-   *  the desk's original intraday strategies. A strategy calibrated against a
-   *  different exit ladder or a real cost model declares its own here so the
-   *  Backtest Lab reports the numbers it was actually validated against. */
-  preferredExit?: { tp1Mult: number; singleTarget: boolean; costs?: CostModel };
+  /** Backtest engine defaults (tp1Mult=2.5, singleTarget=false, slMult=1.5, no
+   *  trail, no costs) suit the desk's original intraday strategies. A strategy
+   *  calibrated against a different exit ladder or a real cost model declares
+   *  its own here so the Backtest Lab reports the numbers it was actually
+   *  validated against. `trail`, when set, REPLACES tp1/tp2 targeting with an
+   *  ATR trailing stop (see positionRules.decideAction) — tp1Mult still needs
+   *  a value in that case purely as a nominal R:R figure for the Iron Rules gate. */
+  preferredExit?: {
+    tp1Mult: number;
+    singleTarget: boolean;
+    costs?: CostModel;
+    slMult?: number;
+    trail?: { activateMult: number; offsetMult: number };
+  };
 }
 
 /** EMA Cross — fast EMA(9) crossing the slow EMA(21). */
@@ -278,6 +288,52 @@ const liquiditySweep: Strategy = {
         return { side: "short", note: `liquidity sweep > ${sweep.sweptLevel.toFixed(2)}, rejected VWAP ${v.toFixed(2)}, below SMA50, ADX ${adxVal.toFixed(0)}` };
       }
       return null;
+    };
+  },
+};
+
+/** Liquidity Sweep + Volume Profile + SMA50 (Long Only, ATR Trail). TradingView-
+ *  validated Pine strategy ported to this engine: a 20-bar liquidity sweep whose
+ *  swept level sits below the 20-bar Volume Profile's value-area-low (sweep took
+ *  out a level outside where volume actually traded, not just noise inside the
+ *  value area), elevated volume (>= 1.5x the PRIOR 20-bar average — Pine's
+ *  sma(volume[1], 20), hence indexing the volume SMA at i-1, not i) confirming
+ *  real participation, and price back above SMA50 for trend agreement. Long only
+ *  — the validated TradingView config never traded shorts. Exit is a real ATR
+ *  trailing stop (see preferredExit.trail), not a fixed TP ladder; tp1Mult below
+ *  is a nominal figure only, needed for the Trade schema's non-nullable tp1
+ *  column and the Iron Rules R:R gate (see engine.ts's minRiskRewardFor) — it is
+ *  not where the strategy actually exits.
+ *  Validated (TradingView Strategy Tester, GC=F, Jan 2025-Aug 2026): 34 trades,
+ *  41.18% win rate, PF 1.645, +13.12% PnL, max DD 7.67%. */
+const SWEEP_VP_LOOKBACK = 20;
+const liquiditySweepVolumeProfileGold: Strategy = {
+  key: "liquidity-sweep-volume-profile-sma50",
+  label: "Liquidity Sweep + Volume Profile + SMA50 (Long Only, ATR Trail)",
+  preferredExit: {
+    tp1Mult: 3.5,
+    singleTarget: true,
+    slMult: 2.0,
+    trail: { activateMult: 1.0, offsetMult: 1.75 },
+    costs: { slippageBps: 0.5, commissionBps: 1 },
+  },
+  build(bars) {
+    const s50 = sma(bars.map((c) => c.c), 50);
+    const volSma = sma(bars.map((c) => c.v), 20);
+    return (i) => {
+      const sweep = detectLiquiditySweep(bars, i, SWEEP_VP_LOOKBACK);
+      if (!sweep || sweep.side !== "long") return null;
+      const ma = s50[i];
+      const avgVolPrior = volSma[i - 1] ?? null;
+      if (ma == null || avgVolPrior == null || avgVolPrior <= 0) return null;
+      if (bars[i].v <= avgVolPrior * 1.5) return null;
+      if (bars[i].c <= ma) return null;
+      const vp = volumeProfile(bars, i, SWEEP_VP_LOOKBACK, 24, 0.7);
+      if (!vp || !(sweep.sweptLevel < vp.val)) return null;
+      return {
+        side: "long",
+        note: `liquidity sweep < ${sweep.sweptLevel.toFixed(2)} outside VAL ${vp.val.toFixed(2)}, vol ${(bars[i].v / avgVolPrior).toFixed(1)}x, above SMA50`,
+      };
     };
   },
 };
@@ -575,6 +631,7 @@ export const STRATEGIES: Strategy[] = [
   bullFlag,
   volSpike,
   liquiditySweep,
+  liquiditySweepVolumeProfileGold,
   swingTrendContinuation,
   macdTrendSma50Regime,
   hammer,

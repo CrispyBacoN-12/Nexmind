@@ -11,7 +11,7 @@
 
 import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
 import { decideSetup, DEFAULT_THRESHOLDS, type ScanSnapshot, type SetupThresholds } from "@/lib/trading/scanner";
-import { decideAction, type LadderState, type OpenPosition } from "@/lib/trading/positionRules";
+import { decideAction, type LadderState, type OpenPosition, type TrailConfig } from "@/lib/trading/positionRules";
 import { lorentzianSeries } from "@/lib/lc/lorentzian";
 import { computeStats } from "@/lib/trading/stats";
 
@@ -119,7 +119,23 @@ export function stepPosition(pos: SimPosition, bar: Candle): StepResult {
   const favorable = pos.side === "long" ? bar.h : bar.l;
 
   let action = decideAction(pos, pos.ladder, adverse);
-  if (action.kind === "hold") action = decideAction(pos, pos.ladder, favorable);
+  // A trailing position's adverse call can itself return "trail-update" (not
+  // just "hold") whenever the bar's worse-of-the-two price is still favorable
+  // vs. the prior extreme (e.g. the whole bar gapped up on a long) — that must
+  // still fall through to the favorable check below, or the bar's TRUE best
+  // price (and thus the correct ratchet) is silently never applied. Unlike
+  // "hold", a "close"/"partial-tp1" from the adverse check is a resolved,
+  // intentionally-pessimistic outcome and must NOT be overridden by rechecking
+  // the favorable price.
+  if (action.kind === "hold" || action.kind === "trail-update") action = decideAction(pos, pos.ladder, favorable);
+
+  // Ratchet: still open, no fill involved — just persist the tightened SL and
+  // the new best-price-since-entry so the next bar's decideAction call sees it.
+  if (action.kind === "trail-update") {
+    pos.sl = action.sl;
+    pos.ladder = { ...pos.ladder, trailExtreme: action.extreme };
+    return { status: "open" };
+  }
 
   // Closing a long is a sell (fills lower than theoretical); closing a short is
   // a buy-to-cover (fills higher). Always worse for the trader, on both the
@@ -188,15 +204,23 @@ export function openPosition(
   singleTarget = false,
   tp1Mult = ATR_TP_MULT,
   costs: CostModel = NO_COSTS,
+  slMult = ATR_SL_MULT,
+  trailMult?: { activateMult: number; offsetMult: number },
 ): SimPosition {
   const dir = side === "long" ? 1 : -1;
   // Buying (long) fills higher than the signal price, selling (short) fills
   // lower — always worse for the trader. SL/TP are ATR-multiples off the
   // actual fill, same as a live bracket order placed right after the fill.
   const fillEntry = entry * (1 + dir * (costs.slippageBps ?? 0) / 10000);
+  const sl = fillEntry - dir * slMult * atrVal;
+  const trail: TrailConfig | null = trailMult
+    ? { activateDist: trailMult.activateMult * atrVal, offsetDist: trailMult.offsetMult * atrVal }
+    : null;
   return {
-    side, entry: fillEntry, lot, openedAt, ladder: {}, costs,
-    sl: fillEntry - dir * ATR_SL_MULT * atrVal,
+    side, entry: fillEntry, lot, openedAt, costs, sl, trail,
+    // origSl anchors R-multiple math to the true initial risk once a trailing
+    // stop ratchets sl away from where it opened (mirrors the breakeven-move case).
+    ladder: trail ? { origSl: sl } : {},
     tp1: fillEntry + dir * tp1Mult * atrVal,
     tp2: singleTarget ? null : fillEntry + dir * tp1Mult * TP2_FACTOR * atrVal,
   };
@@ -217,6 +241,8 @@ export function backtestCandles(
   singleTarget = false,
   tp1Mult = ATR_TP_MULT,
   costs: CostModel = NO_COSTS,
+  slMult = ATR_SL_MULT,
+  trail?: { activateMult: number; offsetMult: number },
 ): BacktestResult {
   const snaps = snapshots(candles);
   const trades: SimTrade[] = [];
@@ -242,7 +268,7 @@ export function backtestCandles(
     signals++;
 
     const a = snaps[i].atr ?? bar.c * 0.005;
-    open = openPosition(side, bar.c, a, lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs);
+    open = openPosition(side, bar.c, a, lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs, slMult, trail);
   }
 
   return { symbol, bars: candles.length, signals, trades, openAtEnd: open != null };

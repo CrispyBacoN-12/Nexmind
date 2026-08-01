@@ -25,6 +25,17 @@ test("resolveExitOverride: falls back to the research ladder when there's no pre
   assert.deepEqual(resolveExitOverride(s, true), { atrSlMult: 1.5, atrTpMult: 1.2, singleTarget: true });
 });
 
+test("resolveExitOverride: threads slMult + trail through from a trailing-stop strategy's preferredExit", () => {
+  const s = scan({
+    preferredExit: {
+      tp1Mult: 3.5, singleTarget: true, slMult: 2.0, trail: { activateMult: 1.0, offsetMult: 1.75 },
+    },
+  });
+  assert.deepEqual(resolveExitOverride(s, false), {
+    atrTpMult: 3.5, singleTarget: true, atrSlMult: 2.0, trail: { activateMult: 1.0, offsetMult: 1.75 },
+  });
+});
+
 test("resolveExitOverride: no override for a plain built-in strategy with no preferredExit", () => {
   const s = scan();
   assert.deepEqual(resolveExitOverride(s, false), {});

@@ -50,3 +50,40 @@ test("applySlippage: buy fills higher, sell fills lower — always worse for the
   assert.ok(Math.abs(applySlippage("buy", 100, 10) - 100.1) < 1e-9);
   assert.ok(Math.abs(applySlippage("sell", 100, 10) - 99.9) < 1e-9);
 });
+
+// ---- trailing stop ----
+
+const longTrail: OpenPosition = { ...long, trail: { activateDist: 5, offsetDist: 3 } };
+const shortTrail: OpenPosition = { ...short, trail: { activateDist: 5, offsetDist: 3 } };
+
+test("trail: favorable move before activation just records the new extreme, stop unchanged", () => {
+  assert.deepEqual(decideAction(longTrail, {}, 103), { kind: "trail-update", sl: 95, extreme: 103 });
+  assert.deepEqual(decideAction(shortTrail, {}, 97), { kind: "trail-update", sl: 105, extreme: 97 });
+});
+
+test("trail: arms once activateDist is cleared and ratchets to extreme - offsetDist", () => {
+  assert.deepEqual(decideAction(longTrail, {}, 106), { kind: "trail-update", sl: 103, extreme: 106 });
+  assert.deepEqual(decideAction(shortTrail, {}, 94), { kind: "trail-update", sl: 97, extreme: 94 });
+});
+
+test("trail: never loosens — a pullback that doesn't set a new extreme holds", () => {
+  // Caller has already persisted sl=103 / extreme=106 from the prior tick.
+  assert.deepEqual(decideAction({ ...longTrail, sl: 103 }, { trail: longTrail.trail, trailExtreme: 106 }, 104), { kind: "hold" });
+  assert.deepEqual(decideAction({ ...shortTrail, sl: 97 }, { trail: shortTrail.trail, trailExtreme: 94 }, 96), { kind: "hold" });
+});
+
+test("trail: price hitting the ratcheted stop closes as a win (stop is past entry)", () => {
+  assert.deepEqual(
+    decideAction({ ...longTrail, sl: 103 }, { trail: longTrail.trail, trailExtreme: 106 }, 102),
+    { kind: "close", outcome: "win", exit: 103 },
+  );
+  assert.deepEqual(
+    decideAction({ ...shortTrail, sl: 97 }, { trail: shortTrail.trail, trailExtreme: 94 }, 98),
+    { kind: "close", outcome: "win", exit: 97 },
+  );
+});
+
+test("trail: price hitting the original hard SL before ever activating closes as a loss", () => {
+  assert.deepEqual(decideAction(longTrail, {}, 94), { kind: "close", outcome: "loss", exit: 95 });
+  assert.deepEqual(decideAction(shortTrail, {}, 106), { kind: "close", outcome: "loss", exit: 105 });
+});

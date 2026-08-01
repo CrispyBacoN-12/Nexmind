@@ -16,6 +16,9 @@ export interface ProposedLevels {
   sl: number;
   tp1: number;
   tp2: number | null; // null = single-target: TP1 is the full exit, no farther partial leg
+  /** ATR trailing stop, in price distances off entry — present only when the
+   *  firing strategy's preferredExit declares one (replaces the tp1/tp2 ladder). */
+  trail?: { activateDist: number; offsetDist: number } | null;
 }
 
 export interface HawkVerdict {
@@ -73,7 +76,14 @@ const fmt = (n: number | null) => (n == null ? "n/a" : n.toFixed(2));
 /** Run the three analysts in parallel and tally a 2-of-3 vote. */
 export async function runHawk(
   scan: ScanResult,
-  opts: { newsDigest?: string; tier?: ModelTier; atrSlMult?: number; atrTpMult?: number; singleTarget?: boolean } = {},
+  opts: {
+    newsDigest?: string;
+    tier?: ModelTier;
+    atrSlMult?: number;
+    atrTpMult?: number;
+    singleTarget?: boolean;
+    trail?: { activateMult: number; offsetMult: number };
+  } = {},
 ): Promise<HawkVerdict> {
   if (!scan.side) return { agreed: false, side: null, votes: [], levels: null, totalCostUsd: 0 };
 
@@ -105,7 +115,7 @@ export async function runHawk(
   else if (shorts >= 2) side = "short";
 
   const levels = side
-    ? computeLevels(scan, side, opts.atrSlMult ?? 1.5, opts.atrTpMult ?? 2.5, opts.singleTarget ?? false)
+    ? computeLevels(scan, side, opts.atrSlMult ?? 1.5, opts.atrTpMult ?? 2.5, opts.singleTarget ?? false, opts.trail)
     : null;
 
   return { agreed: side != null, side, votes, levels, totalCostUsd };
@@ -117,13 +127,15 @@ function computeLevels(
   slMult: number,
   tpMult: number,
   singleTarget: boolean,
+  trailMult?: { activateMult: number; offsetMult: number },
 ): ProposedLevels {
   const atr = scan.atr ?? scan.price * 0.005; // fallback 0.5% if ATR missing
   const entry = scan.price;
+  const trail = trailMult ? { activateDist: trailMult.activateMult * atr, offsetDist: trailMult.offsetMult * atr } : null;
   if (side === "long") {
-    return { entry, sl: entry - slMult * atr, tp1: entry + tpMult * atr, tp2: singleTarget ? null : entry + tpMult * 1.6 * atr };
+    return { entry, sl: entry - slMult * atr, tp1: entry + tpMult * atr, tp2: singleTarget ? null : entry + tpMult * 1.6 * atr, trail };
   }
-  return { entry, sl: entry + slMult * atr, tp1: entry - tpMult * atr, tp2: singleTarget ? null : entry - tpMult * 1.6 * atr };
+  return { entry, sl: entry + slMult * atr, tp1: entry - tpMult * atr, tp2: singleTarget ? null : entry - tpMult * 1.6 * atr, trail };
 }
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5);

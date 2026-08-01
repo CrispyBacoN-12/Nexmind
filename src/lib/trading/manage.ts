@@ -68,10 +68,20 @@ export async function manageOpenTrades(portfolioId: number): Promise<ManageSumma
 
     const ladder = safeParse<LadderState>(t.stagedTp, {});
     const action = decideAction(
-      { side: t.side as "long" | "short", entry: t.entry, sl: t.sl, tp1: t.tp1, tp2: t.tp2 },
+      { side: t.side as "long" | "short", entry: t.entry, sl: t.sl, tp1: t.tp1, tp2: t.tp2, trail: ladder.trail },
       ladder,
       cur,
     );
+
+    // Still open — ratchet the SL and record the new best-price-since-entry,
+    // no fill/log entry involved (mirrors the backtest engine's stepPosition).
+    if (action.kind === "trail-update") {
+      await prisma.trade.update({
+        where: { id: t.id },
+        data: { sl: action.sl, stagedTp: JSON.stringify({ ...ladder, trailExtreme: action.extreme }) },
+      });
+      continue;
+    }
     if (action.kind === "hold") continue;
 
     const log = safeParse<{ stage: string; note: string }[]>(t.decisionLog, []);

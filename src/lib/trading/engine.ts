@@ -50,7 +50,12 @@ const RESEARCH_ATR_SL_MULT = 1.5;
 const RESEARCH_ATR_TP_MULT = 1.2;
 const RESEARCH_MIN_RISK_REWARD = 0.5;
 
-type ExitOverride = { atrSlMult?: number; atrTpMult?: number; singleTarget?: boolean };
+type ExitOverride = {
+  atrSlMult?: number;
+  atrTpMult?: number;
+  singleTarget?: boolean;
+  trail?: { activateMult: number; offsetMult: number };
+};
 
 // Built-in strategies tuned via the Backtest Lab (scan.preferredExit) take
 // priority over the research ladder — both exist to make live paper trading
@@ -58,7 +63,12 @@ type ExitOverride = { atrSlMult?: number; atrTpMult?: number; singleTarget?: boo
 // the generic desk default (1.5 SL / 2.5 TP with a trailing tp2).
 export function resolveExitOverride(scan: ScanResult, isResearch: boolean): ExitOverride {
   if (scan.preferredExit) {
-    return { atrTpMult: scan.preferredExit.tp1Mult, singleTarget: scan.preferredExit.singleTarget };
+    return {
+      atrTpMult: scan.preferredExit.tp1Mult,
+      singleTarget: scan.preferredExit.singleTarget,
+      ...(scan.preferredExit.slMult != null ? { atrSlMult: scan.preferredExit.slMult } : {}),
+      ...(scan.preferredExit.trail ? { trail: scan.preferredExit.trail } : {}),
+    };
   }
   if (isResearch) {
     return { atrSlMult: RESEARCH_ATR_SL_MULT, atrTpMult: RESEARCH_ATR_TP_MULT, singleTarget: true };
@@ -281,7 +291,15 @@ export async function runTradeTick(
       sageVerdict: `approve — ${sage.reason}`,
       hawkVotes: JSON.stringify(hawk.votes),
       decisionLog: JSON.stringify(steps),
-      stagedTp: JSON.stringify({ tp1Hit: false, slToBreakeven: false }),
+      stagedTp: JSON.stringify({
+        tp1Hit: false,
+        slToBreakeven: false,
+        // No dedicated Trade column for a trailing stop's static config — carried
+        // here so manage.ts can reconstruct it on every subsequent tick. origSl
+        // anchors R-multiple math to the true initial risk once ticks start
+        // ratcheting the Trade row's `sl` column away from where it opened.
+        ...(levels.trail ? { trail: levels.trail, origSl: levels.sl } : {}),
+      }),
     },
   });
   await prisma.signal.update({ where: { id: signal.id }, data: { status: "executed" } });
@@ -331,10 +349,11 @@ function mockHawk(scan: ScanResult, exit: ExitOverride): HawkVerdict {
   const slMult = exit.atrSlMult ?? 1.5;
   const tpMult = exit.atrTpMult ?? 2.5;
   const singleTarget = exit.singleTarget ?? false;
+  const trail = exit.trail ? { activateDist: exit.trail.activateMult * atr, offsetDist: exit.trail.offsetMult * atr } : null;
   const levels: ProposedLevels =
     side === "long"
-      ? { entry: e, sl: e - slMult * atr, tp1: e + tpMult * atr, tp2: singleTarget ? null : e + tpMult * 1.6 * atr }
-      : { entry: e, sl: e + slMult * atr, tp1: e - tpMult * atr, tp2: singleTarget ? null : e - tpMult * 1.6 * atr };
+      ? { entry: e, sl: e - slMult * atr, tp1: e + tpMult * atr, tp2: singleTarget ? null : e + tpMult * 1.6 * atr, trail }
+      : { entry: e, sl: e + slMult * atr, tp1: e - tpMult * atr, tp2: singleTarget ? null : e - tpMult * 1.6 * atr, trail };
   return { agreed: true, side, votes, levels, totalCostUsd: 0 };
 }
 

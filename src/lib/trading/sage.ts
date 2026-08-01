@@ -62,6 +62,7 @@ export async function runSage(
     sl: validAdjust(r.data.sl, levels.sl, side, "sl", levels.entry),
     tp1: validAdjust(r.data.tp1, levels.tp1, side, "tp", levels.entry),
     tp2: levels.tp2,
+    trail: levels.trail,
   };
 
   return { approved: r.data.approved, reason: r.data.reason, adjusted, costUsd: r.costUsd };
