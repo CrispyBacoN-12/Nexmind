@@ -3,7 +3,13 @@
 // Backed by a persistent WebullTickerCache row (not an in-memory Map), since
 // tickerId is effectively static per symbol but the exec-stage hook and the
 // polling cron are fresh, short-lived processes that share no memory.
-import { prisma } from "@/lib/db";
+//
+// `@/lib/db` is imported lazily (not at module scope) so that merely
+// importing this module — which happens on every marketData.ts import, i.e.
+// nearly everywhere — doesn't force a live DATABASE_URL. Without Webull
+// configured, symbol/candle fetches never reach getTickerId, so the DB
+// should stay untouched, matching "falls back to Alpaca/Yahoo exactly as
+// today" when WEBULL_APP_KEY/WEBULL_APP_SECRET are unset.
 import { signedFetch } from "./auth";
 
 const DATA_HOST = () => process.env.WEBULL_BASE_URL || "https://quotes-api.webullbroker.com"; // confirm host against the live API reference
@@ -24,6 +30,7 @@ export function parseTickerIdResponse(json: unknown, symbol: string): number {
 /** Resolves symbol -> Webull tickerId. Checks the DB cache first; on a miss,
  *  calls Webull's symbol-search endpoint and upserts the result. */
 export async function getTickerId(symbol: string): Promise<number> {
+  const { prisma } = await import("@/lib/db");
   const cached = await prisma.webullTickerCache.findUnique({ where: { symbol } });
   if (cached) return cached.tickerId;
 
