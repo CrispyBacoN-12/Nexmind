@@ -10,7 +10,7 @@ import { runSage, type SageVerdict } from "./sage";
 import { applyIronRules, riskReward, type AccountState } from "./ironRules";
 import { applySlippage } from "./positionRules";
 import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
-import { isKillSwitchOn, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt, getPortfolioStrategy } from "@/lib/settings";
+import { isKillSwitchOn, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt, getPortfolioStrategy, isWebullShadowEnabled } from "@/lib/settings";
 import { type Interval, type Range } from "@/lib/yahoo";
 import { fetchCandles } from "@/lib/marketData";
 import { dailyReturns, pearsonCorrelation } from "./correlation";
@@ -19,6 +19,9 @@ import { isResearchStrategyKey } from "@/lib/research/adapter";
 import { sizeWithRL, type RLState } from "./rlSizer";
 import { proxyConfidence } from "./rlProxyConfidence";
 import { getCurrentDrawdownPct, getCurrentEquity } from "./circuitBreaker";
+import { placeWebullBracketOrder } from "@/lib/webull/paperTrade";
+import { createShadowOrder } from "@/lib/webull/shadowOrderStore";
+import { sendDiscordNotification } from "@/lib/notify/discord";
 
 export interface TickStep { stage: string; note: string; data?: Record<string, unknown> }
 export interface TickResult {
@@ -238,7 +241,7 @@ export async function runTradeTick(
     steps.push({ stage: "sizing", note: sizing.reasoning });
 
     // Shadow mode: gold desk only, purely additive logging — never affects `lot`.
-    if (symbol === "GC=F") {
+    if (symbol === "XAUUSD" || symbol === "GC=F") {
       const [balance, drawdownPctRaw] = await Promise.all([
         getCurrentEquity(portfolioId),
         getCurrentDrawdownPct(portfolioId),
@@ -304,6 +307,20 @@ export async function runTradeTick(
   });
   await prisma.signal.update({ where: { id: signal.id }, data: { status: "executed" } });
 
+  // Phase 2: risk-free shadow order into Webull's PaperTrade, purely
+  // observational — awaited so it completes before this short-lived process
+  // exits, but never throws into this path and never alters `trade`/`steps`
+  // beyond appending its own note.
+  if (await isWebullShadowEnabled(portfolioId)) {
+    const shadowNote = await placeWebullShadow(trade.id, symbol, hawk.side, lot, fillEntry, levels.sl, levels.tp1);
+    steps.push({ stage: "webull-shadow", note: shadowNote });
+    // decisionLog was already written inside prisma.trade.create above, but
+    // trade.id (needed for WebullShadowOrder.tradeId) didn't exist until that
+    // call resolved — so the webull-shadow step can only be appended now, via
+    // a follow-up update.
+    await prisma.trade.update({ where: { id: trade.id }, data: { decisionLog: JSON.stringify(steps) } });
+  }
+
   return { symbol, outcome: "executed", steps, tradeId: trade.id, costUsd };
 }
 
@@ -328,6 +345,53 @@ async function fetchDailyReturns(symbol: string): Promise<number[] | null> {
     return dailyReturns(resp.candles);
   } catch {
     return null;
+  }
+}
+
+/** Places the Webull shadow order for a just-created Trade, never throwing —
+ *  a Webull outage/rate-limit/auth failure must never affect the real
+ *  (simulated) Trade. Returns the note appended to decisionLog. */
+async function placeWebullShadow(
+  tradeId: number, symbol: string, side: "long" | "short", qty: number, entry: number, sl: number, tp: number,
+): Promise<string> {
+  try {
+    const result = await placeWebullBracketOrder({
+      symbol, side, qty, entry, sl, tp,
+      accountId: process.env.WEBULL_PAPER_ACCOUNT_ID ?? "",
+    });
+
+    if (result.kind === "skipped") {
+      return `skipped: ${result.reason === "outside-rth" ? "outside RTH" : "qty < 1 share"}`;
+    }
+
+    if (result.kind === "error") {
+      // INSUFFICIENT_FUNDS is expected once the PaperTrade account's simulated
+      // buying power is used up by repeated shadow orders — log it but don't
+      // spam Discord; any other failure (bad/revoked key, outage) still alerts.
+      if (/insufficient.?funds/i.test(result.message)) {
+        console.log(`[webull-shadow] insufficient funds for ${symbol} (trade#${tradeId})`);
+      } else {
+        await sendDiscordNotification(`Webull shadow order failed for ${symbol} (trade#${tradeId}): ${result.message}`, "warning");
+      }
+      return `error: ${result.message}`;
+    }
+
+    try {
+      await createShadowOrder(tradeId, result.parentOrderId, result.slOrderId, result.tpOrderId);
+      return `placed: parentOrderId=${result.parentOrderId}`;
+    } catch (dbErr) {
+      // Orphan-order mitigation: Webull placed the order but the DB write
+      // failed — log everything needed for a human to find/cancel it by hand
+      // in the Webull UI, since no row will track it.
+      await sendDiscordNotification(
+        `Webull shadow order placed for ${symbol} (trade#${tradeId}) but the DB write failed — ` +
+          `parentOrderId=${result.parentOrderId} slOrderId=${result.slOrderId ?? "?"} tpOrderId=${result.tpOrderId ?? "?"}: ${String(dbErr)}`,
+        "critical",
+      );
+      return `orphaned: parentOrderId=${result.parentOrderId} (DB write failed: ${String(dbErr)})`;
+    }
+  } catch (e) {
+    return `error: ${e instanceof Error ? e.message : String(e)}`;
   }
 }
 
