@@ -1,0 +1,33 @@
+name: Webull shadow-order poll
+
+# Lightweight cron for the risk-free Webull PaperTrade shadow orders placed
+# by the exec-stage hook (see engine.ts / docs/superpowers/specs/2026-08-14-
+# webull-data-provider-and-papertrade-shadow-design.md). Every 20 minutes
+# during (a generous window around) US market hours — GitHub Actions cron
+# schedules are not exact and commonly slip late, so polling logic compares
+# against each row's own timestamps rather than assuming a fixed cadence.
+# No-op (0 rows checked) when WEBULL_APP_KEY isn't set as a repo secret.
+on:
+  schedule:
+    - cron: "*/20 13-21 * * 1-5" # 13:00-21:59 UTC ~= 09:00-17:59 ET, weekdays
+  workflow_dispatch: {}
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      WEBULL_APP_KEY: ${{ secrets.WEBULL_APP_KEY }}
+      WEBULL_APP_SECRET: ${{ secrets.WEBULL_APP_SECRET }}
+      WEBULL_PAPER_BASE_URL: ${{ secrets.WEBULL_PAPER_BASE_URL }}
+      WEBULL_PAPER_ACCOUNT_ID: ${{ secrets.WEBULL_PAPER_ACCOUNT_ID }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Poll Webull shadow orders
+        run: node --import tsx scripts/poll-webull-shadow-orders.mts
