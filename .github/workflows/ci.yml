@@ -10,6 +10,11 @@ name: CI
 # to be a non-empty string to construct the Prisma client, and no test in the
 # suite executes a real query against it - a dummy connection string is
 # enough (verified locally: full suite passes with a fake Postgres URL).
+#
+# DATABASE_URL has to be set job-wide, not just for the Test step: `npm ci`
+# runs the `postinstall` script (`prisma generate`), which loads
+# prisma.config.ts - and that file throws if DATABASE_URL is unset. Without
+# this, npm ci itself fails before Typecheck/Test/Lint ever run.
 on:
   push:
   pull_request:
@@ -17,6 +22,9 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
+      ANTHROPIC_API_KEY: sk-ant-dummy
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,9 +36,6 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm test
-        env:
-          DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
-          ANTHROPIC_API_KEY: sk-ant-dummy
       - name: Lint (non-blocking)
         run: npm run lint
         continue-on-error: true
