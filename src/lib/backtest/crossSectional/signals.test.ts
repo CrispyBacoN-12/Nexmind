@@ -124,3 +124,71 @@ test("rankScore: the rsi2 measure ranks the more oversold symbol lower", () => {
 test("rankScore returns null before the lookback window is available", () => {
   assert.equal(rankScore(buildSeries(flatSeries(250, 100)), 1, baseCfg), null);
 });
+
+// --- Interior lookahead ---
+//
+// The guarantee these three tests carry is *not* "appending bars to the end of
+// the file changes nothing". A day loop cannot read past the end of its own
+// array, so that check is free and proves nothing. The shape that can actually
+// exist is an interior read at `i + 1`: a value dated bar i that was computed
+// from bar i+1, which sits harmlessly inside the array on every day but the
+// last. The only way to detect it is to rewrite bar i+1 **in place** and check
+// that nothing dated i moved.
+
+/** Rewrite bar `p` and everything after it into a wildly different path. */
+function rewriteFrom(candles: Candle[], p: number): Candle[] {
+  return candles.map((c, i) =>
+    i < p ? c : { ...c, o: 5_000, h: 6_000, l: 4_000, c: 5_000, v: 1 },
+  );
+}
+
+const strictCfg: CsConfig = { ...baseCfg, requireAboveSma200: true, maxSingleDayMovePct: 15 };
+
+test("every buildSeries value dated bar i is computed from bars <= i", () => {
+  const P = 250;
+  const base = risingSeries(260, 100);
+  const a = buildSeries(base);
+  const b = buildSeries(rewriteFrom(base, P));
+
+  const arrays = ["atr", "sma200", "sma5", "rsi2", "dollarVol20", "maxMovePct20"] as const;
+  for (const key of arrays) {
+    for (let i = 0; i < P; i++) {
+      assert.equal(a[key][i], b[key][i], `${key}[${i}] moved when bar ${P} was rewritten`);
+    }
+  }
+  // Guard against the whole check passing vacuously: the rewrite must be large
+  // enough that the same values AT and after P do move.
+  assert.notEqual(a.atr[P], b.atr[P]);
+  assert.notEqual(a.maxMovePct20[P], b.maxMovePct20[P]);
+});
+
+test("isEligible and rankScore at bar i cannot see bar i + 1", () => {
+  const P = 250;
+  const base = risingSeries(260, 100);
+  const a = buildSeries(base);
+  const b = buildSeries(rewriteFrom(base, P));
+
+  // Every filter on, so a lookahead in any one of them has something to break.
+  assert.equal(isEligible(a, P - 1, strictCfg), true, "fixture must be eligible, or the check is vacuous");
+  for (let i = P - 5; i < P; i++) {
+    assert.equal(isEligible(a, i, strictCfg), isEligible(b, i, strictCfg), `isEligible(${i}) moved`);
+    assert.equal(rankScore(a, i, baseCfg), rankScore(b, i, baseCfg), `rankScore(${i}) moved`);
+    assert.equal(
+      rankScore(a, i, { ...baseCfg, measure: "rsi2" }),
+      rankScore(b, i, { ...baseCfg, measure: "rsi2" }),
+      `rankScore rsi2 (${i}) moved`,
+    );
+  }
+  // Vacuity guard: reading one bar later really would have changed the answer.
+  assert.equal(isEligible(b, P, strictCfg), false);
+  assert.notEqual(rankScore(a, P, baseCfg), rankScore(b, P, baseCfg));
+});
+
+test("the warm-up cutoff is exactly 200 bars: index 199 is refused, index 200 is allowed", () => {
+  // Nothing else in this fixture objects at either index, so the boundary is
+  // the only thing under test. sma200 first exists at index 199, so index 200
+  // is the first bar at which every input is available.
+  const s = buildSeries(flatSeries(250, 100));
+  assert.equal(isEligible(s, 199, baseCfg), false);
+  assert.equal(isEligible(s, 200, baseCfg), true);
+});
