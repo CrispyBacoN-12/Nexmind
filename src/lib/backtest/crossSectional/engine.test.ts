@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { crossSectionalBacktest } from "./engine";
+import { buildSeries } from "./signals";
 import type { CsConfig } from "./types";
 import type { Candle } from "@/lib/indicators";
 
@@ -173,4 +174,183 @@ test("an empty universe returns an empty result rather than throwing", () => {
   assert.equal(res.trades.length, 0);
   assert.equal(res.equityCurve.length, 0);
   assert.equal(res.summary.trades, 0);
+});
+
+// --- Fix round 1 regression tests (C1, C2, and the rest of the review) ---
+
+test("point-in-time sizing: a still-open position's TODAY close cannot influence a new entry's size on the same day (C1 regression)", () => {
+  const holdCfg: CsConfig = { ...cfg, slots: 2, holdDays: 200 };
+
+  const aClosesBase = risingBase(260);
+  aClosesBase[220] -= 8; // AAA dips and enters; holdDays is huge so it stays open throughout
+  const bCloses = risingBase(260);
+  bCloses[254] -= 8; // BBB dips; its entry fills at day 256's open (bar index 255)
+
+  // BBB's entry fill day is bar index 255 (day 256). Perturb ONLY AAA's close on
+  // that exact day; sizing must be based on yesterday's mark, so this must have
+  // zero effect on BBB's share count.
+  const build = (aaaCloseOnFillDay: number) => {
+    const a = [...aClosesBase];
+    a[255] = aaaCloseOnFillDay;
+    return new Map<string, Candle[]>([["AAA", series(a)], ["BBB", series(bCloses)]]);
+  };
+
+  const baseline = crossSectionalBacktest(build(aClosesBase[255]), holdCfg);
+  const perturbed = crossSectionalBacktest(build(500), holdCfg);
+
+  const b1 = baseline.trades.find((t) => t.symbol === "BBB");
+  const b2 = perturbed.trades.find((t) => t.symbol === "BBB");
+  assert.ok(b1 && b2, "BBB should have entered in both runs");
+  assert.equal(b1!.shares, b2!.shares);
+});
+
+test("slots fill to capacity and each position gets an equal share of equity", () => {
+  const slotsCfg: CsConfig = { ...cfg, slots: 3 };
+  const dip = (amount: number) => {
+    const c = risingBase(260);
+    c[254] -= amount;
+    return c;
+  };
+  const bars = new Map<string, Candle[]>([
+    ["AAA", series(dip(4))],
+    ["BBB", series(dip(6))],
+    ["CCC", series(dip(8))],
+  ]);
+  const res = crossSectionalBacktest(bars, slotsCfg);
+
+  const entries = res.trades.filter((t) => t.entryT === 256 * DAY);
+  assert.equal(entries.length, 3);
+  const target = slotsCfg.capital / 3;
+  for (const t of entries) {
+    const notional = t.shares * t.entry;
+    assert.ok(Math.abs(notional - target) / target < 0.01, `notional ${notional} not within 1% of ${target}`);
+  }
+});
+
+test("an appreciating held position does not block a later slot from filling (C1 regression)", () => {
+  const slotsCfg: CsConfig = { ...cfg, slots: 2, holdDays: 200 };
+
+  const aCloses = risingBase(260);
+  aCloses[220] -= 8; // AAA dips and enters
+  // AAA then rallies hard, so its mark-to-market grows well past capital/2 while held.
+  for (let i = 221; i < 260; i++) aCloses[i] = aCloses[220] * (1 + 0.01 * (i - 220));
+
+  const bCloses = risingBase(260);
+  bCloses[254] -= 8; // BBB dips mid-hold, well after AAA's rally is underway
+
+  const bars = new Map<string, Candle[]>([["AAA", series(aCloses)], ["BBB", series(bCloses)]]);
+  const res = crossSectionalBacktest(bars, slotsCfg);
+
+  const bbbEntry = res.trades.find((t) => t.symbol === "BBB");
+  assert.ok(bbbEntry, "BBB's entry should still fill even though AAA's book has appreciated");
+});
+
+test("cash conservation: final equity equals capital plus total realized pnl", () => {
+  const closes = risingBase(260);
+  closes[254] -= 8;
+  const costedCfg: CsConfig = { ...cfg, costs: { slippageBps: 0.5, commissionBps: 1 } };
+  const res = crossSectionalBacktest(new Map([["AAA", series(closes)]]), costedCfg);
+
+  const finalEquity = res.equityCurve[res.equityCurve.length - 1].equity;
+  assert.ok(Math.abs(finalEquity - (costedCfg.capital + res.summary.totalPnl)) < 1e-6);
+});
+
+test("a symbol that keeps qualifying while held is not entered twice (no re-entry while open)", () => {
+  const manySlots: CsConfig = { ...cfg, slots: 3, holdDays: 5 };
+  const closes = risingBase(260);
+  // From bar 220 on, keep declining so the symbol would re-qualify as a
+  // candidate on every day it is checked, including while it is held.
+  for (let i = 220; i < 260; i++) closes[i] = closes[219] - (i - 219) * 2;
+
+  const res = crossSectionalBacktest(new Map([["AAA", series(closes)]]), manySlots);
+  assert.ok(res.equityCurve.every((p) => p.positions <= 1));
+});
+
+test("exitOnSma5 exits early with reason sma5 when the close recrosses above SMA5", () => {
+  const closes = risingBase(260);
+  closes[254] -= 8;
+  const res = crossSectionalBacktest(new Map([["AAA", series(closes)]]), { ...cfg, exitOnSma5: true });
+  assert.equal(res.trades[0].reason, "sma5");
+  assert.ok(res.trades[0].daysHeld < cfg.holdDays);
+});
+
+test("stop fill price: a low that pierces the stop without a gap fills at the stop, not the low", () => {
+  const closes = risingBase(260);
+  closes[254] -= 8;
+  const candles = series(closes);
+  const s = buildSeries(candles);
+  const entryIdx = 255; // bar the entry fills on (day 256's open)
+  // Mirrors the engine's own I1 fix: the stop is sized off the bar BEFORE entry.
+  const expectedStop = candles[entryIdx].o - 2 * s.atr[entryIdx - 1]!;
+
+  const withPierce = candles.map((c, i) =>
+    i === 256 ? { ...c, o: expectedStop + 3, h: expectedStop + 4, l: expectedStop - 5, c: expectedStop - 4 } : c,
+  );
+  const res = crossSectionalBacktest(new Map([["AAA", withPierce]]), { ...cfg, stopAtrMult: 2 });
+  const stopped = res.trades.find((t) => t.reason === "stop");
+  assert.ok(stopped);
+  assert.equal(stopped!.exit, expectedStop);
+});
+
+test("stop fill price: an open that gaps below the stop fills at the open, not the stop", () => {
+  const closes = risingBase(260);
+  closes[254] -= 8;
+  const candles = series(closes);
+  const s = buildSeries(candles);
+  const entryIdx = 255;
+  const expectedStop = candles[entryIdx].o - 2 * s.atr[entryIdx - 1]!;
+  const gapOpen = expectedStop - 10;
+
+  const withGap = candles.map((c, i) =>
+    i === 256 ? { ...c, o: gapOpen, h: gapOpen + 1, l: gapOpen - 5, c: gapOpen - 3 } : c,
+  );
+  const res = crossSectionalBacktest(new Map([["AAA", withGap]]), { ...cfg, stopAtrMult: 2 });
+  const stopped = res.trades.find((t) => t.reason === "stop");
+  assert.ok(stopped);
+  assert.equal(stopped!.exit, gapOpen);
+});
+
+test("commission is charged once per trade, not on both legs", () => {
+  const closes = risingBase(260);
+  closes[254] -= 8;
+  const bars = new Map<string, Candle[]>([["AAA", series(closes)]]);
+  const commissionBps = 10;
+
+  const free = crossSectionalBacktest(bars, cfg);
+  const costed = crossSectionalBacktest(bars, { ...cfg, costs: { slippageBps: 0, commissionBps } });
+
+  const notional = free.trades[0].shares * free.trades[0].entry;
+  const expectedCommission = notional * (commissionBps / 10_000);
+  assert.ok(Math.abs(free.trades[0].pnl - costed.trades[0].pnl - expectedCommission) < 1e-6);
+});
+
+test("running the same input twice produces byte-identical trades (determinism)", () => {
+  const closes = risingBase(260);
+  closes[254] -= 8;
+  const bars = new Map<string, Candle[]>([["AAA", series(closes)]]);
+
+  const r1 = crossSectionalBacktest(bars, cfg);
+  const r2 = crossSectionalBacktest(bars, cfg);
+  assert.deepEqual(r1.trades, r2.trades);
+});
+
+test("a symbol that stops trading mid-hold is force-closed at its last known price, not held forever (C2 regression)", () => {
+  const aCloses = risingBase(260);
+  aCloses[220] -= 8; // dip, causing entry
+  // Crash hard after entry, then the symbol stops producing bars altogether.
+  for (let i = 221; i < 235; i++) aCloses[i] = aCloses[220] * (1 - 0.05 * (i - 220));
+  const aCandles = series(aCloses).slice(0, 235); // last AAA bar is day 235
+
+  // BBB supplies bars through the full window, so the universe's last day (260)
+  // is well past AAA's delisting on day 235.
+  const bCloses = risingBase(260);
+  const bCandles = series(bCloses);
+
+  const holdCfg: CsConfig = { ...cfg, holdDays: 200 }; // still open when the bars stop
+  const res = crossSectionalBacktest(new Map([["AAA", aCandles], ["BBB", bCandles]]), holdCfg);
+
+  const aaaTrade = res.trades.find((t) => t.symbol === "AAA");
+  assert.ok(aaaTrade, "the delisted position must still be reported as a closed trade, not silently dropped");
+  assert.equal(aaaTrade!.reason, "end-of-data");
+  assert.ok(aaaTrade!.pnl < 0, "the crash before delisting must show up as a loss, not be erased");
 });

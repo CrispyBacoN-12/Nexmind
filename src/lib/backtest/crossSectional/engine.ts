@@ -29,6 +29,10 @@ interface OpenPos {
   riskPerShare: number | null;
   barsHeld: number;
   exitQueued: ExitReason | null; // decided at a close, filled at the next open
+  /** Last close observed for this symbol. Used to mark/close positions whose
+   *  symbol has stopped producing bars (delisting, long halt) instead of
+   *  silently freezing them at cost. */
+  lastPrice: number;
 }
 
 const bps = (v: number | undefined) => (v ?? 0) / 10_000;
@@ -70,17 +74,18 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
 
   const idxOf = (symbol: string, day: number) => aligned.index.get(symbol)?.get(day);
 
-  /** Cash plus every open position valued at today's close. */
+  /** Cash plus every open position valued at today's close (or its last known
+   *  price, for a symbol that has stopped producing bars). */
   const markToMarket = (day: number) => {
     let total = cash;
     for (const pos of open.values()) {
       const i = idxOf(pos.symbol, day);
-      total += i == null ? pos.allocated : seriesBySymbol.get(pos.symbol)!.candles[i].c * pos.shares;
+      total += i == null ? pos.lastPrice * pos.shares : seriesBySymbol.get(pos.symbol)!.candles[i].c * pos.shares;
     }
     return total;
   };
 
-  const closeTrade = (pos: OpenPos, day: number, price: number, reason: ExitReason) => {
+  const closeTrade = (pos: OpenPos, exitT: number, price: number, reason: ExitReason) => {
     const exitPrice = price * slipOut;
     const gross = (price - pos.rawEntry) * pos.shares;
     const commissionUsd = pos.rawEntry * pos.shares * commission;
@@ -89,7 +94,7 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
     trades.push({
       symbol: pos.symbol,
       entryT: pos.entryT,
-      exitT: day * 86_400,
+      exitT,
       entry: pos.entryPrice,
       exit: exitPrice,
       shares: pos.shares,
@@ -112,35 +117,46 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
       if (!pos.exitQueued) continue;
       const i = idxOf(pos.symbol, day);
       if (i == null) continue; // no bar today (halt); try again tomorrow
-      closeTrade(pos, day, seriesBySymbol.get(pos.symbol)!.candles[i].o, pos.exitQueued);
+      const bar = seriesBySymbol.get(pos.symbol)!.candles[i];
+      closeTrade(pos, bar.t, bar.o, pos.exitQueued);
     }
 
     // --- 2. Fill entries queued at yesterday's close, at today's open ---
-    // Size off total equity, not cash. Sizing off cash would shrink each
-    // successive allocation geometrically as the book fills up, so the fifth
-    // slot would get a fraction of the first — silently un-equal weighting.
-    const equityForSizing = markToMarket(day);
+    // Size off yesterday's closing equity, not today's mark (today's close
+    // hasn't happened yet when this fill occurs, so sizing off it would be
+    // lookahead) and not cash (that would shrink each successive allocation
+    // geometrically as the book fills up, so the fifth slot would get a
+    // fraction of the first — silently un-equal weighting). Allocation is
+    // then capped at cash on hand, never skipped: see the comment below.
+    const equityForSizing = d === 0 ? cfg.capital : equityCurve[d - 1].equity;
     for (const symbol of pending) {
       if (open.size >= cfg.slots || open.has(symbol)) continue;
       const s = seriesBySymbol.get(symbol);
       const i = idxOf(symbol, day);
       if (!s || i == null) continue;
 
-      const allocated = equityForSizing / cfg.slots;
-      if (allocated <= 0 || allocated > cash) continue; // never allocate cash we don't hold
+      // No margin: a slot gets its equal share, or whatever cash is left, never
+      // more. Skipping the fill instead (the previous behaviour) made `slots`
+      // near-inert — once the held book appreciated, equity/slots exceeded cash
+      // and every remaining slot was silently dropped.
+      const allocated = Math.min(equityForSizing / cfg.slots, cash);
+      if (!(allocated > 0)) continue; // also rejects NaN
 
       const raw = s.candles[i].o;
       const fill = raw * slipIn;
-      if (fill <= 0) continue;
+      if (!Number.isFinite(fill) || fill <= 0) continue;
 
-      const a = s.atr[i];
+      // The stop is sized off the bar *before* the entry bar: at the moment of
+      // the open fill, today's own high/low are not yet known, so using today's
+      // ATR (which folds in today's range) would be lookahead.
+      const a = i > 0 ? s.atr[i - 1] : null;
       const riskPerShare = cfg.stopAtrMult != null && a != null ? cfg.stopAtrMult * a : null;
 
       const shares = allocated / fill;
       cash -= allocated;
       open.set(symbol, {
         symbol,
-        entryT: day * 86_400,
+        entryT: s.candles[i].t,
         entryPrice: fill,
         rawEntry: raw,
         shares,
@@ -149,6 +165,7 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
         riskPerShare,
         barsHeld: 0,
         exitQueued: null,
+        lastPrice: raw,
       });
     }
     pending = [];
@@ -162,7 +179,7 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
       const bar = s.candles[i];
       if (bar.l <= pos.stop) {
         // A gap through the stop fills at the open — an honest bad fill.
-        closeTrade(pos, day, Math.min(bar.o, pos.stop), "stop");
+        closeTrade(pos, bar.t, Math.min(bar.o, pos.stop), "stop");
       }
     }
 
@@ -171,6 +188,7 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
       const s = seriesBySymbol.get(pos.symbol)!;
       const i = idxOf(pos.symbol, day);
       if (i == null) continue;
+      pos.lastPrice = s.candles[i].c;
       pos.barsHeld += 1;
 
       if (pos.barsHeld >= cfg.holdDays) {
@@ -184,6 +202,10 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
     }
 
     // --- 5. Rank today's eligible set and queue tomorrow's entries ---
+    // freeSlots counts a position that already has exitQueued set as still
+    // open today, so that slot idles for one extra day rather than being
+    // backfilled before its exit has actually filled. That's conservative
+    // capital allocation, not lookahead.
     const freeSlots = cfg.slots - open.size;
     if (!isLastDay && freeSlots > 0 && regimeOpen(cfg, spy, spy ? idxOf(cfg.regimeSymbol, day) : undefined)) {
       const candidates: { symbol: string; score: number }[] = [];
@@ -199,22 +221,29 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
         if (cfg.maxRankScore != null && score > cfg.maxRankScore) continue;
         candidates.push({ symbol, score });
       }
-      candidates.sort((a, b) => (a.score === b.score ? a.symbol.localeCompare(b.symbol) : a.score - b.score));
+      // Codepoint order, matching `tradable.sort()` above — not locale-sensitive.
+      candidates.sort((a, b) => (a.score === b.score ? (a.symbol < b.symbol ? -1 : 1) : a.score - b.score));
       pending = candidates.slice(0, freeSlots).map((c) => c.symbol);
     }
 
-    // --- 6. Mark to market ---
-    equityCurve.push({ t: day * 86_400, equity: markToMarket(day), positions: open.size });
-
-    // --- 7. Force-close anything still open on the final day ---
+    // --- 6. Force-close anything still open on the final day ---
     if (isLastDay) {
       for (const pos of [...open.values()]) {
         const s = seriesBySymbol.get(pos.symbol)!;
         const i = idxOf(pos.symbol, day);
-        if (i == null) continue;
-        closeTrade(pos, day, s.candles[i].c, "end-of-data");
+        // A symbol that stopped trading mid-hold (delisting, long halt) has no
+        // bar today. Closing it at its last known price is the whole point:
+        // leaving it open would erase the loss, which is exactly the
+        // survivorship bias this strategy family is most vulnerable to.
+        closeTrade(pos, i == null ? day * 86_400 : s.candles[i].t, i == null ? pos.lastPrice : s.candles[i].c, "end-of-data");
       }
     }
+
+    // --- 7. Mark to market ---
+    // Runs after the force-close above so the final point reflects the closed
+    // book (positions: 0, equity net of the last exit's costs), which is what
+    // summary.cagrPct reads.
+    equityCurve.push({ t: day * 86_400, equity: markToMarket(day), positions: open.size });
   }
 
   return { trades, equityCurve, summary: summarizeCrossSectional(trades, equityCurve, cfg.capital) };
