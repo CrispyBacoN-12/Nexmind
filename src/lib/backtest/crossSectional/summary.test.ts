@@ -67,3 +67,19 @@ test("an empty curve yields null CAGR and null drawdown rather than NaN", () => 
   assert.equal(s.maxDrawdownPct, null);
   assert.equal(s.timeInMarketPct, 0);
 });
+
+test("empty trade list yields safe values for all trade-derived metrics, not NaN", () => {
+  const s = summarizeCrossSectional([], curve([100], [0]), 100);
+  assert.equal(s.trades, 0);
+  assert.equal(s.wins, 0);
+  assert.equal(s.winRate, 0);
+  assert.equal(s.totalPnl, 0);
+  assert.equal(s.profitFactor, null);
+  assert.equal(s.avgR, null);
+  assert.equal(s.avgRetPct, null);
+});
+
+test("zero capital yields null CAGR, not Infinity or NaN", () => {
+  const s = summarizeCrossSectional([], curve([100, 150], [1, 1]), 0);
+  assert.equal(s.cagrPct, null);
+});
