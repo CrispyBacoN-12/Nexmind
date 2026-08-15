@@ -1,3 +1,4 @@
+import "dotenv/config"; // engine.ts -> trading/scanner.ts -> research/adapter.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { backtestCandles, openPosition, stepPosition, summarizeBacktest, type SimTrade } from "./engine";
