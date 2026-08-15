@@ -65,6 +65,7 @@ export type PortfolioMinAggregateOutputType = {
   universe: string | null
   killSwitch: boolean | null
   killSwitchReason: string | null
+  webullShadowEnabled: boolean | null
   sort: number | null
   createdAt: Date | null
 }
@@ -86,6 +87,7 @@ export type PortfolioMaxAggregateOutputType = {
   universe: string | null
   killSwitch: boolean | null
   killSwitchReason: string | null
+  webullShadowEnabled: boolean | null
   sort: number | null
   createdAt: Date | null
 }
@@ -107,6 +109,7 @@ export type PortfolioCountAggregateOutputType = {
   universe: number
   killSwitch: number
   killSwitchReason: number
+  webullShadowEnabled: number
   sort: number
   createdAt: number
   _all: number
@@ -152,6 +155,7 @@ export type PortfolioMinAggregateInputType = {
   universe?: true
   killSwitch?: true
   killSwitchReason?: true
+  webullShadowEnabled?: true
   sort?: true
   createdAt?: true
 }
@@ -173,6 +177,7 @@ export type PortfolioMaxAggregateInputType = {
   universe?: true
   killSwitch?: true
   killSwitchReason?: true
+  webullShadowEnabled?: true
   sort?: true
   createdAt?: true
 }
@@ -194,6 +199,7 @@ export type PortfolioCountAggregateInputType = {
   universe?: true
   killSwitch?: true
   killSwitchReason?: true
+  webullShadowEnabled?: true
   sort?: true
   createdAt?: true
   _all?: true
@@ -302,6 +308,7 @@ export type PortfolioGroupByOutputType = {
   universe: string
   killSwitch: boolean
   killSwitchReason: string
+  webullShadowEnabled: boolean
   sort: number
   createdAt: Date
   _count: PortfolioCountAggregateOutputType | null
@@ -346,6 +353,7 @@ export type PortfolioWhereInput = {
   universe?: Prisma.StringFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringFilter<"Portfolio"> | string
+  webullShadowEnabled?: Prisma.BoolFilter<"Portfolio"> | boolean
   sort?: Prisma.IntFilter<"Portfolio"> | number
   createdAt?: Prisma.DateTimeFilter<"Portfolio"> | Date | string
   trades?: Prisma.TradeListRelationFilter
@@ -372,6 +380,7 @@ export type PortfolioOrderByWithRelationInput = {
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
+  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   trades?: Prisma.TradeOrderByRelationAggregateInput
@@ -401,6 +410,7 @@ export type PortfolioWhereUniqueInput = Prisma.AtLeast<{
   universe?: Prisma.StringFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringFilter<"Portfolio"> | string
+  webullShadowEnabled?: Prisma.BoolFilter<"Portfolio"> | boolean
   sort?: Prisma.IntFilter<"Portfolio"> | number
   createdAt?: Prisma.DateTimeFilter<"Portfolio"> | Date | string
   trades?: Prisma.TradeListRelationFilter
@@ -427,6 +437,7 @@ export type PortfolioOrderByWithAggregationInput = {
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
+  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.PortfolioCountOrderByAggregateInput
@@ -456,6 +467,7 @@ export type PortfolioScalarWhereWithAggregatesInput = {
   universe?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolWithAggregatesFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
+  webullShadowEnabled?: Prisma.BoolWithAggregatesFilter<"Portfolio"> | boolean
   sort?: Prisma.IntWithAggregatesFilter<"Portfolio"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Portfolio"> | Date | string
 }
@@ -476,6 +488,7 @@ export type PortfolioCreateInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
@@ -502,6 +515,7 @@ export type PortfolioUncheckedCreateInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
@@ -527,6 +541,7 @@ export type PortfolioUpdateInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
@@ -553,6 +568,7 @@ export type PortfolioUncheckedUpdateInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
@@ -579,6 +595,7 @@ export type PortfolioCreateManyInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
 }
@@ -599,6 +616,7 @@ export type PortfolioUpdateManyMutationInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -620,6 +638,7 @@ export type PortfolioUncheckedUpdateManyInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -646,6 +665,7 @@ export type PortfolioCountOrderByAggregateInput = {
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
+  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -678,6 +698,7 @@ export type PortfolioMaxOrderByAggregateInput = {
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
+  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -699,6 +720,7 @@ export type PortfolioMinOrderByAggregateInput = {
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
+  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -804,6 +826,7 @@ export type PortfolioCreateWithoutSignalsInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
@@ -829,6 +852,7 @@ export type PortfolioUncheckedCreateWithoutSignalsInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
@@ -869,6 +893,7 @@ export type PortfolioUpdateWithoutSignalsInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
@@ -894,6 +919,7 @@ export type PortfolioUncheckedUpdateWithoutSignalsInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
@@ -918,6 +944,7 @@ export type PortfolioCreateWithoutHoldingsInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
@@ -943,6 +970,7 @@ export type PortfolioUncheckedCreateWithoutHoldingsInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
@@ -983,6 +1011,7 @@ export type PortfolioUpdateWithoutHoldingsInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
@@ -1008,6 +1037,7 @@ export type PortfolioUncheckedUpdateWithoutHoldingsInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
@@ -1032,6 +1062,7 @@ export type PortfolioCreateWithoutOptionHoldingsInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
@@ -1057,6 +1088,7 @@ export type PortfolioUncheckedCreateWithoutOptionHoldingsInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
@@ -1097,6 +1129,7 @@ export type PortfolioUpdateWithoutOptionHoldingsInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
@@ -1122,6 +1155,7 @@ export type PortfolioUncheckedUpdateWithoutOptionHoldingsInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
@@ -1146,6 +1180,7 @@ export type PortfolioCreateWithoutTradesInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
@@ -1171,6 +1206,7 @@ export type PortfolioUncheckedCreateWithoutTradesInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
@@ -1211,6 +1247,7 @@ export type PortfolioUpdateWithoutTradesInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
@@ -1236,6 +1273,7 @@ export type PortfolioUncheckedUpdateWithoutTradesInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
@@ -1260,6 +1298,7 @@ export type PortfolioCreateWithoutWatchlistInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
@@ -1285,6 +1324,7 @@ export type PortfolioUncheckedCreateWithoutWatchlistInput = {
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
+  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
@@ -1325,6 +1365,7 @@ export type PortfolioUpdateWithoutWatchlistInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
@@ -1350,6 +1391,7 @@ export type PortfolioUncheckedUpdateWithoutWatchlistInput = {
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
@@ -1442,6 +1484,7 @@ export type PortfolioSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
+  webullShadowEnabled?: boolean
   sort?: boolean
   createdAt?: boolean
   trades?: boolean | Prisma.Portfolio$tradesArgs<ExtArgs>
@@ -1469,6 +1512,7 @@ export type PortfolioSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
+  webullShadowEnabled?: boolean
   sort?: boolean
   createdAt?: boolean
 }, ExtArgs["result"]["portfolio"]>
@@ -1490,6 +1534,7 @@ export type PortfolioSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
+  webullShadowEnabled?: boolean
   sort?: boolean
   createdAt?: boolean
 }, ExtArgs["result"]["portfolio"]>
@@ -1511,11 +1556,12 @@ export type PortfolioSelectScalar = {
   universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
+  webullShadowEnabled?: boolean
   sort?: boolean
   createdAt?: boolean
 }
 
-export type PortfolioOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "kind" | "status" | "startingBalance" | "riskPctPerTrade" | "maxOpenPositions" | "drawdownHaltPct" | "cash" | "rebalanceBandPct" | "scanInterval" | "scanRange" | "strategy" | "universe" | "killSwitch" | "killSwitchReason" | "sort" | "createdAt", ExtArgs["result"]["portfolio"]>
+export type PortfolioOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "kind" | "status" | "startingBalance" | "riskPctPerTrade" | "maxOpenPositions" | "drawdownHaltPct" | "cash" | "rebalanceBandPct" | "scanInterval" | "scanRange" | "strategy" | "universe" | "killSwitch" | "killSwitchReason" | "webullShadowEnabled" | "sort" | "createdAt", ExtArgs["result"]["portfolio"]>
 export type PortfolioInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   trades?: boolean | Prisma.Portfolio$tradesArgs<ExtArgs>
   signals?: boolean | Prisma.Portfolio$signalsArgs<ExtArgs>
@@ -1553,6 +1599,7 @@ export type $PortfolioPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     universe: string
     killSwitch: boolean
     killSwitchReason: string
+    webullShadowEnabled: boolean
     sort: number
     createdAt: Date
   }, ExtArgs["result"]["portfolio"]>
@@ -1999,6 +2046,7 @@ export interface PortfolioFieldRefs {
   readonly universe: Prisma.FieldRef<"Portfolio", 'String'>
   readonly killSwitch: Prisma.FieldRef<"Portfolio", 'Boolean'>
   readonly killSwitchReason: Prisma.FieldRef<"Portfolio", 'String'>
+  readonly webullShadowEnabled: Prisma.FieldRef<"Portfolio", 'Boolean'>
   readonly sort: Prisma.FieldRef<"Portfolio", 'Int'>
   readonly createdAt: Prisma.FieldRef<"Portfolio", 'DateTime'>
 }

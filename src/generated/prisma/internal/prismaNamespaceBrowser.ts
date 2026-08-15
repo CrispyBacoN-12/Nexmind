@@ -67,7 +67,9 @@ export const ModelName = {
   ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
   Setting: 'Setting',
-  ScanLog: 'ScanLog'
+  ScanLog: 'ScanLog',
+  WebullShadowOrder: 'WebullShadowOrder',
+  WebullTickerCache: 'WebullTickerCache'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -173,6 +175,7 @@ export const PortfolioScalarFieldEnum = {
   universe: 'universe',
   killSwitch: 'killSwitch',
   killSwitchReason: 'killSwitchReason',
+  webullShadowEnabled: 'webullShadowEnabled',
   sort: 'sort',
   createdAt: 'createdAt'
 } as const
@@ -362,6 +365,36 @@ export const ScanLogScalarFieldEnum = {
 } as const
 
 export type ScanLogScalarFieldEnum = (typeof ScanLogScalarFieldEnum)[keyof typeof ScanLogScalarFieldEnum]
+
+
+export const WebullShadowOrderScalarFieldEnum = {
+  id: 'id',
+  tradeId: 'tradeId',
+  parentOrderId: 'parentOrderId',
+  slOrderId: 'slOrderId',
+  tpOrderId: 'tpOrderId',
+  status: 'status',
+  entryFillPrice: 'entryFillPrice',
+  entryFilledQty: 'entryFilledQty',
+  entryFilledAt: 'entryFilledAt',
+  exitPrice: 'exitPrice',
+  exitReason: 'exitReason',
+  exitFilledQty: 'exitFilledQty',
+  closedAt: 'closedAt',
+  lastError: 'lastError',
+  createdAt: 'createdAt'
+} as const
+
+export type WebullShadowOrderScalarFieldEnum = (typeof WebullShadowOrderScalarFieldEnum)[keyof typeof WebullShadowOrderScalarFieldEnum]
+
+
+export const WebullTickerCacheScalarFieldEnum = {
+  symbol: 'symbol',
+  tickerId: 'tickerId',
+  updatedAt: 'updatedAt'
+} as const
+
+export type WebullTickerCacheScalarFieldEnum = (typeof WebullTickerCacheScalarFieldEnum)[keyof typeof WebullTickerCacheScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -406,6 +406,7 @@ export type TradeWhereInput = {
   closedAt?: Prisma.DateTimeNullableFilter<"Trade"> | Date | string | null
   portfolio?: Prisma.XOR<Prisma.PortfolioScalarRelationFilter, Prisma.PortfolioWhereInput>
   signal?: Prisma.XOR<Prisma.SignalNullableScalarRelationFilter, Prisma.SignalWhereInput> | null
+  webullShadowOrder?: Prisma.XOR<Prisma.WebullShadowOrderNullableScalarRelationFilter, Prisma.WebullShadowOrderWhereInput> | null
 }
 
 export type TradeOrderByWithRelationInput = {
@@ -434,6 +435,7 @@ export type TradeOrderByWithRelationInput = {
   closedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   portfolio?: Prisma.PortfolioOrderByWithRelationInput
   signal?: Prisma.SignalOrderByWithRelationInput
+  webullShadowOrder?: Prisma.WebullShadowOrderOrderByWithRelationInput
 }
 
 export type TradeWhereUniqueInput = Prisma.AtLeast<{
@@ -465,6 +467,7 @@ export type TradeWhereUniqueInput = Prisma.AtLeast<{
   closedAt?: Prisma.DateTimeNullableFilter<"Trade"> | Date | string | null
   portfolio?: Prisma.XOR<Prisma.PortfolioScalarRelationFilter, Prisma.PortfolioWhereInput>
   signal?: Prisma.XOR<Prisma.SignalNullableScalarRelationFilter, Prisma.SignalWhereInput> | null
+  webullShadowOrder?: Prisma.XOR<Prisma.WebullShadowOrderNullableScalarRelationFilter, Prisma.WebullShadowOrderWhereInput> | null
 }, "id" | "signalId">
 
 export type TradeOrderByWithAggregationInput = {
@@ -550,6 +553,7 @@ export type TradeCreateInput = {
   closedAt?: Date | string | null
   portfolio: Prisma.PortfolioCreateNestedOneWithoutTradesInput
   signal?: Prisma.SignalCreateNestedOneWithoutTradeInput
+  webullShadowOrder?: Prisma.WebullShadowOrderCreateNestedOneWithoutTradeInput
 }
 
 export type TradeUncheckedCreateInput = {
@@ -576,6 +580,7 @@ export type TradeUncheckedCreateInput = {
   stagedTp?: string
   openedAt?: Date | string
   closedAt?: Date | string | null
+  webullShadowOrder?: Prisma.WebullShadowOrderUncheckedCreateNestedOneWithoutTradeInput
 }
 
 export type TradeUpdateInput = {
@@ -601,6 +606,7 @@ export type TradeUpdateInput = {
   closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   portfolio?: Prisma.PortfolioUpdateOneRequiredWithoutTradesNestedInput
   signal?: Prisma.SignalUpdateOneWithoutTradeNestedInput
+  webullShadowOrder?: Prisma.WebullShadowOrderUpdateOneWithoutTradeNestedInput
 }
 
 export type TradeUncheckedUpdateInput = {
@@ -627,6 +633,7 @@ export type TradeUncheckedUpdateInput = {
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
   openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  webullShadowOrder?: Prisma.WebullShadowOrderUncheckedUpdateOneWithoutTradeNestedInput
 }
 
 export type TradeCreateManyInput = {
@@ -827,6 +834,11 @@ export type TradeSumOrderByAggregateInput = {
   rMultiple?: Prisma.SortOrder
 }
 
+export type TradeScalarRelationFilter = {
+  is?: Prisma.TradeWhereInput
+  isNot?: Prisma.TradeWhereInput
+}
+
 export type TradeCreateNestedOneWithoutSignalInput = {
   create?: Prisma.XOR<Prisma.TradeCreateWithoutSignalInput, Prisma.TradeUncheckedCreateWithoutSignalInput>
   connectOrCreate?: Prisma.TradeCreateOrConnectWithoutSignalInput
@@ -909,6 +921,20 @@ export type NullableIntFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type TradeCreateNestedOneWithoutWebullShadowOrderInput = {
+  create?: Prisma.XOR<Prisma.TradeCreateWithoutWebullShadowOrderInput, Prisma.TradeUncheckedCreateWithoutWebullShadowOrderInput>
+  connectOrCreate?: Prisma.TradeCreateOrConnectWithoutWebullShadowOrderInput
+  connect?: Prisma.TradeWhereUniqueInput
+}
+
+export type TradeUpdateOneRequiredWithoutWebullShadowOrderNestedInput = {
+  create?: Prisma.XOR<Prisma.TradeCreateWithoutWebullShadowOrderInput, Prisma.TradeUncheckedCreateWithoutWebullShadowOrderInput>
+  connectOrCreate?: Prisma.TradeCreateOrConnectWithoutWebullShadowOrderInput
+  upsert?: Prisma.TradeUpsertWithoutWebullShadowOrderInput
+  connect?: Prisma.TradeWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TradeUpdateToOneWithWhereWithoutWebullShadowOrderInput, Prisma.TradeUpdateWithoutWebullShadowOrderInput>, Prisma.TradeUncheckedUpdateWithoutWebullShadowOrderInput>
+}
+
 export type TradeCreateWithoutSignalInput = {
   symbol: string
   side: string
@@ -931,6 +957,7 @@ export type TradeCreateWithoutSignalInput = {
   openedAt?: Date | string
   closedAt?: Date | string | null
   portfolio: Prisma.PortfolioCreateNestedOneWithoutTradesInput
+  webullShadowOrder?: Prisma.WebullShadowOrderCreateNestedOneWithoutTradeInput
 }
 
 export type TradeUncheckedCreateWithoutSignalInput = {
@@ -956,6 +983,7 @@ export type TradeUncheckedCreateWithoutSignalInput = {
   stagedTp?: string
   openedAt?: Date | string
   closedAt?: Date | string | null
+  webullShadowOrder?: Prisma.WebullShadowOrderUncheckedCreateNestedOneWithoutTradeInput
 }
 
 export type TradeCreateOrConnectWithoutSignalInput = {
@@ -996,6 +1024,7 @@ export type TradeUpdateWithoutSignalInput = {
   openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   portfolio?: Prisma.PortfolioUpdateOneRequiredWithoutTradesNestedInput
+  webullShadowOrder?: Prisma.WebullShadowOrderUpdateOneWithoutTradeNestedInput
 }
 
 export type TradeUncheckedUpdateWithoutSignalInput = {
@@ -1021,6 +1050,7 @@ export type TradeUncheckedUpdateWithoutSignalInput = {
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
   openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  webullShadowOrder?: Prisma.WebullShadowOrderUncheckedUpdateOneWithoutTradeNestedInput
 }
 
 export type TradeCreateWithoutPortfolioInput = {
@@ -1045,6 +1075,7 @@ export type TradeCreateWithoutPortfolioInput = {
   openedAt?: Date | string
   closedAt?: Date | string | null
   signal?: Prisma.SignalCreateNestedOneWithoutTradeInput
+  webullShadowOrder?: Prisma.WebullShadowOrderCreateNestedOneWithoutTradeInput
 }
 
 export type TradeUncheckedCreateWithoutPortfolioInput = {
@@ -1070,6 +1101,7 @@ export type TradeUncheckedCreateWithoutPortfolioInput = {
   stagedTp?: string
   openedAt?: Date | string
   closedAt?: Date | string | null
+  webullShadowOrder?: Prisma.WebullShadowOrderUncheckedCreateNestedOneWithoutTradeInput
 }
 
 export type TradeCreateOrConnectWithoutPortfolioInput = {
@@ -1127,6 +1159,124 @@ export type TradeScalarWhereInput = {
   closedAt?: Prisma.DateTimeNullableFilter<"Trade"> | Date | string | null
 }
 
+export type TradeCreateWithoutWebullShadowOrderInput = {
+  symbol: string
+  side: string
+  entry: number
+  sl: number
+  tp1: number
+  tp2?: number | null
+  lot: number
+  riskReward?: number | null
+  status?: string
+  outcome?: string | null
+  pnl?: number | null
+  grossPnl?: number | null
+  rMultiple?: number | null
+  hawkVotes?: string
+  sageVerdict?: string | null
+  ironRulesPassed?: boolean
+  decisionLog?: string
+  stagedTp?: string
+  openedAt?: Date | string
+  closedAt?: Date | string | null
+  portfolio: Prisma.PortfolioCreateNestedOneWithoutTradesInput
+  signal?: Prisma.SignalCreateNestedOneWithoutTradeInput
+}
+
+export type TradeUncheckedCreateWithoutWebullShadowOrderInput = {
+  id?: number
+  portfolioId: number
+  signalId?: number | null
+  symbol: string
+  side: string
+  entry: number
+  sl: number
+  tp1: number
+  tp2?: number | null
+  lot: number
+  riskReward?: number | null
+  status?: string
+  outcome?: string | null
+  pnl?: number | null
+  grossPnl?: number | null
+  rMultiple?: number | null
+  hawkVotes?: string
+  sageVerdict?: string | null
+  ironRulesPassed?: boolean
+  decisionLog?: string
+  stagedTp?: string
+  openedAt?: Date | string
+  closedAt?: Date | string | null
+}
+
+export type TradeCreateOrConnectWithoutWebullShadowOrderInput = {
+  where: Prisma.TradeWhereUniqueInput
+  create: Prisma.XOR<Prisma.TradeCreateWithoutWebullShadowOrderInput, Prisma.TradeUncheckedCreateWithoutWebullShadowOrderInput>
+}
+
+export type TradeUpsertWithoutWebullShadowOrderInput = {
+  update: Prisma.XOR<Prisma.TradeUpdateWithoutWebullShadowOrderInput, Prisma.TradeUncheckedUpdateWithoutWebullShadowOrderInput>
+  create: Prisma.XOR<Prisma.TradeCreateWithoutWebullShadowOrderInput, Prisma.TradeUncheckedCreateWithoutWebullShadowOrderInput>
+  where?: Prisma.TradeWhereInput
+}
+
+export type TradeUpdateToOneWithWhereWithoutWebullShadowOrderInput = {
+  where?: Prisma.TradeWhereInput
+  data: Prisma.XOR<Prisma.TradeUpdateWithoutWebullShadowOrderInput, Prisma.TradeUncheckedUpdateWithoutWebullShadowOrderInput>
+}
+
+export type TradeUpdateWithoutWebullShadowOrderInput = {
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  side?: Prisma.StringFieldUpdateOperationsInput | string
+  entry?: Prisma.FloatFieldUpdateOperationsInput | number
+  sl?: Prisma.FloatFieldUpdateOperationsInput | number
+  tp1?: Prisma.FloatFieldUpdateOperationsInput | number
+  tp2?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  lot?: Prisma.FloatFieldUpdateOperationsInput | number
+  riskReward?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
+  sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
+  stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  portfolio?: Prisma.PortfolioUpdateOneRequiredWithoutTradesNestedInput
+  signal?: Prisma.SignalUpdateOneWithoutTradeNestedInput
+}
+
+export type TradeUncheckedUpdateWithoutWebullShadowOrderInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  portfolioId?: Prisma.IntFieldUpdateOperationsInput | number
+  signalId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  side?: Prisma.StringFieldUpdateOperationsInput | string
+  entry?: Prisma.FloatFieldUpdateOperationsInput | number
+  sl?: Prisma.FloatFieldUpdateOperationsInput | number
+  tp1?: Prisma.FloatFieldUpdateOperationsInput | number
+  tp2?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  lot?: Prisma.FloatFieldUpdateOperationsInput | number
+  riskReward?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  outcome?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  grossPnl?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
+  sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
+  stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+}
+
 export type TradeCreateManyPortfolioInput = {
   id?: number
   signalId?: number | null
@@ -1174,6 +1324,7 @@ export type TradeUpdateWithoutPortfolioInput = {
   openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   signal?: Prisma.SignalUpdateOneWithoutTradeNestedInput
+  webullShadowOrder?: Prisma.WebullShadowOrderUpdateOneWithoutTradeNestedInput
 }
 
 export type TradeUncheckedUpdateWithoutPortfolioInput = {
@@ -1199,6 +1350,7 @@ export type TradeUncheckedUpdateWithoutPortfolioInput = {
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
   openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  webullShadowOrder?: Prisma.WebullShadowOrderUncheckedUpdateOneWithoutTradeNestedInput
 }
 
 export type TradeUncheckedUpdateManyWithoutPortfolioInput = {
@@ -1254,6 +1406,7 @@ export type TradeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   closedAt?: boolean
   portfolio?: boolean | Prisma.PortfolioDefaultArgs<ExtArgs>
   signal?: boolean | Prisma.Trade$signalArgs<ExtArgs>
+  webullShadowOrder?: boolean | Prisma.Trade$webullShadowOrderArgs<ExtArgs>
 }, ExtArgs["result"]["trade"]>
 
 export type TradeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1342,6 +1495,7 @@ export type TradeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = ru
 export type TradeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   portfolio?: boolean | Prisma.PortfolioDefaultArgs<ExtArgs>
   signal?: boolean | Prisma.Trade$signalArgs<ExtArgs>
+  webullShadowOrder?: boolean | Prisma.Trade$webullShadowOrderArgs<ExtArgs>
 }
 export type TradeIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   portfolio?: boolean | Prisma.PortfolioDefaultArgs<ExtArgs>
@@ -1357,6 +1511,7 @@ export type $TradePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   objects: {
     portfolio: Prisma.$PortfolioPayload<ExtArgs>
     signal: Prisma.$SignalPayload<ExtArgs> | null
+    webullShadowOrder: Prisma.$WebullShadowOrderPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
@@ -1778,6 +1933,7 @@ export interface Prisma__TradeClient<T, Null = never, ExtArgs extends runtime.Ty
   readonly [Symbol.toStringTag]: "PrismaPromise"
   portfolio<T extends Prisma.PortfolioDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PortfolioDefaultArgs<ExtArgs>>): Prisma.Prisma__PortfolioClient<runtime.Types.Result.GetResult<Prisma.$PortfolioPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   signal<T extends Prisma.Trade$signalArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Trade$signalArgs<ExtArgs>>): Prisma.Prisma__SignalClient<runtime.Types.Result.GetResult<Prisma.$SignalPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  webullShadowOrder<T extends Prisma.Trade$webullShadowOrderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Trade$webullShadowOrderArgs<ExtArgs>>): Prisma.Prisma__WebullShadowOrderClient<runtime.Types.Result.GetResult<Prisma.$WebullShadowOrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2247,6 +2403,25 @@ export type Trade$signalArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
    */
   include?: Prisma.SignalInclude<ExtArgs> | null
   where?: Prisma.SignalWhereInput
+}
+
+/**
+ * Trade.webullShadowOrder
+ */
+export type Trade$webullShadowOrderArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WebullShadowOrder
+   */
+  select?: Prisma.WebullShadowOrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WebullShadowOrder
+   */
+  omit?: Prisma.WebullShadowOrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WebullShadowOrderInclude<ExtArgs> | null
+  where?: Prisma.WebullShadowOrderWhereInput
 }
 
 /**

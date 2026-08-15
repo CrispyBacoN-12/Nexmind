@@ -400,7 +400,9 @@ export const ModelName = {
   ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
   Setting: 'Setting',
-  ScanLog: 'ScanLog'
+  ScanLog: 'ScanLog',
+  WebullShadowOrder: 'WebullShadowOrder',
+  WebullTickerCache: 'WebullTickerCache'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -416,7 +418,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "holding" | "optionHolding" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "holding" | "optionHolding" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "webullShadowOrder" | "webullTickerCache"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1678,6 +1680,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    WebullShadowOrder: {
+      payload: Prisma.$WebullShadowOrderPayload<ExtArgs>
+      fields: Prisma.WebullShadowOrderFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WebullShadowOrderFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WebullShadowOrderFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
+        }
+        findFirst: {
+          args: Prisma.WebullShadowOrderFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WebullShadowOrderFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
+        }
+        findMany: {
+          args: Prisma.WebullShadowOrderFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>[]
+        }
+        create: {
+          args: Prisma.WebullShadowOrderCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
+        }
+        createMany: {
+          args: Prisma.WebullShadowOrderCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WebullShadowOrderCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>[]
+        }
+        delete: {
+          args: Prisma.WebullShadowOrderDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
+        }
+        update: {
+          args: Prisma.WebullShadowOrderUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
+        }
+        deleteMany: {
+          args: Prisma.WebullShadowOrderDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WebullShadowOrderUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WebullShadowOrderUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>[]
+        }
+        upsert: {
+          args: Prisma.WebullShadowOrderUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
+        }
+        aggregate: {
+          args: Prisma.WebullShadowOrderAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWebullShadowOrder>
+        }
+        groupBy: {
+          args: Prisma.WebullShadowOrderGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WebullShadowOrderGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WebullShadowOrderCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WebullShadowOrderCountAggregateOutputType> | number
+        }
+      }
+    }
+    WebullTickerCache: {
+      payload: Prisma.$WebullTickerCachePayload<ExtArgs>
+      fields: Prisma.WebullTickerCacheFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WebullTickerCacheFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WebullTickerCacheFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
+        }
+        findFirst: {
+          args: Prisma.WebullTickerCacheFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WebullTickerCacheFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
+        }
+        findMany: {
+          args: Prisma.WebullTickerCacheFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>[]
+        }
+        create: {
+          args: Prisma.WebullTickerCacheCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
+        }
+        createMany: {
+          args: Prisma.WebullTickerCacheCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WebullTickerCacheCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>[]
+        }
+        delete: {
+          args: Prisma.WebullTickerCacheDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
+        }
+        update: {
+          args: Prisma.WebullTickerCacheUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
+        }
+        deleteMany: {
+          args: Prisma.WebullTickerCacheDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WebullTickerCacheUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WebullTickerCacheUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>[]
+        }
+        upsert: {
+          args: Prisma.WebullTickerCacheUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
+        }
+        aggregate: {
+          args: Prisma.WebullTickerCacheAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWebullTickerCache>
+        }
+        groupBy: {
+          args: Prisma.WebullTickerCacheGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WebullTickerCacheGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WebullTickerCacheCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WebullTickerCacheCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1804,6 +1954,7 @@ export const PortfolioScalarFieldEnum = {
   universe: 'universe',
   killSwitch: 'killSwitch',
   killSwitchReason: 'killSwitchReason',
+  webullShadowEnabled: 'webullShadowEnabled',
   sort: 'sort',
   createdAt: 'createdAt'
 } as const
@@ -1993,6 +2144,36 @@ export const ScanLogScalarFieldEnum = {
 } as const
 
 export type ScanLogScalarFieldEnum = (typeof ScanLogScalarFieldEnum)[keyof typeof ScanLogScalarFieldEnum]
+
+
+export const WebullShadowOrderScalarFieldEnum = {
+  id: 'id',
+  tradeId: 'tradeId',
+  parentOrderId: 'parentOrderId',
+  slOrderId: 'slOrderId',
+  tpOrderId: 'tpOrderId',
+  status: 'status',
+  entryFillPrice: 'entryFillPrice',
+  entryFilledQty: 'entryFilledQty',
+  entryFilledAt: 'entryFilledAt',
+  exitPrice: 'exitPrice',
+  exitReason: 'exitReason',
+  exitFilledQty: 'exitFilledQty',
+  closedAt: 'closedAt',
+  lastError: 'lastError',
+  createdAt: 'createdAt'
+} as const
+
+export type WebullShadowOrderScalarFieldEnum = (typeof WebullShadowOrderScalarFieldEnum)[keyof typeof WebullShadowOrderScalarFieldEnum]
+
+
+export const WebullTickerCacheScalarFieldEnum = {
+  symbol: 'symbol',
+  tickerId: 'tickerId',
+  updatedAt: 'updatedAt'
+} as const
+
+export type WebullTickerCacheScalarFieldEnum = (typeof WebullTickerCacheScalarFieldEnum)[keyof typeof WebullTickerCacheScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2214,6 +2395,8 @@ export type GlobalOmitConfig = {
   report?: Prisma.ReportOmit
   setting?: Prisma.SettingOmit
   scanLog?: Prisma.ScanLogOmit
+  webullShadowOrder?: Prisma.WebullShadowOrderOmit
+  webullTickerCache?: Prisma.WebullTickerCacheOmit
 }
 
 /* Types for Logging */

@@ -105,3 +105,17 @@ export type Setting = Prisma.SettingModel
  * or with the deployed web app that renders the Activity page.
  */
 export type ScanLog = Prisma.ScanLogModel
+/**
+ * Model WebullShadowOrder
+ * A risk-free "shadow" bracket order mirrored into Webull's PaperTrade
+ * account for a NEXMIND Trade — purely observational, never fed back into
+ * grading. Parent (entry) + up to two OCO children (stop-loss/take-profit).
+ */
+export type WebullShadowOrder = Prisma.WebullShadowOrderModel
+/**
+ * Model WebullTickerCache
+ * Cache of symbol -> Webull's internal numeric tickerId (static per symbol).
+ * Persistent (not in-memory) because the exec-stage hook and the polling
+ * cron are fresh, short-lived processes that share no memory.
+ */
+export type WebullTickerCache = Prisma.WebullTickerCacheModel
