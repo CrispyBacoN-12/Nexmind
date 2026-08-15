@@ -90,6 +90,7 @@ model Portfolio {
   universe         String      @default("")  // swing: "" = use watchlist, else a universe key (dow30…) to auto-trade
   killSwitch       Boolean     @default(false)
   killSwitchReason String      @default("")
+  webullShadowEnabled Boolean  @default(false)
   sort             Int         @default(0)
   createdAt        DateTime    @default(now())
   trades           Trade[]
@@ -159,6 +160,7 @@ model Trade {
   stagedTp        String   @default("{}") // JSON ladder state
   openedAt        DateTime  @default(now())
   closedAt        DateTime?
+  webullShadowOrder WebullShadowOrder?
 }
 
 /// Research gathered by SCOUT and fed back to the analysts as context.
@@ -271,4 +273,35 @@ model ScanLog {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+/// A risk-free "shadow" bracket order mirrored into Webull's PaperTrade
+/// account for a NEXMIND Trade — purely observational, never fed back into
+/// grading. Parent (entry) + up to two OCO children (stop-loss/take-profit).
+model WebullShadowOrder {
+  id             Int       @id @default(autoincrement())
+  trade          Trade     @relation(fields: [tradeId], references: [id])
+  tradeId        Int       @unique
+  parentOrderId  String
+  slOrderId      String?
+  tpOrderId      String?
+  status         String // pending | open | filled | closed | cancelled | rejected
+  entryFillPrice Float?
+  entryFilledQty Float?
+  entryFilledAt  DateTime?
+  exitPrice      Float? // VWAP of the triggered child order's executions
+  exitReason     String? // TAKE_PROFIT | STOP_LOSS | MANUAL_CANCEL
+  exitFilledQty  Float?
+  closedAt       DateTime?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+}
+
+/// Cache of symbol -> Webull's internal numeric tickerId (static per symbol).
+/// Persistent (not in-memory) because the exec-stage hook and the polling
+/// cron are fresh, short-lived processes that share no memory.
+model WebullTickerCache {
+  symbol    String   @id
+  tickerId  Int
+  updatedAt DateTime @updatedAt
 }

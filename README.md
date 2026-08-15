@@ -48,9 +48,23 @@ Add the key to switch on real Claude analysis (model tiers: Haiku/Sonnet/Opus pe
 
 NEXMIND reads candles and prices through a provider router
 (`src/lib/marketData.ts`). By default it uses Yahoo Finance (no key needed).
-If you set `ALPACA_KEY` and `ALPACA_SECRET` in `.env.local`, it uses Alpaca's
-free IEX feed instead and falls back to Yahoo automatically on any error.
-This is data-only; NEXMIND does not place orders through Alpaca.
+If you set `WEBULL_APP_KEY`/`WEBULL_APP_SECRET`, Webull is tried first; if you
+set `ALPACA_KEY`/`ALPACA_SECRET`, Alpaca is tried next; Yahoo is always the
+final fallback. Any provider failure (missing key, bad response, empty bars)
+falls through to the next one automatically.
+
+### Webull shadow execution (optional)
+
+When a portfolio has `webullShadowEnabled` set (per-portfolio, opt-in), every
+executed paper trade also places a real, risk-free bracket order into your
+Webull PaperTrade account (`WEBULL_PAPER_ACCOUNT_ID`), purely to observe
+realistic fills/slippage alongside NEXMIND's own simulation — it never feeds
+back into grading, sizing, or `manage.ts`. Requires `WEBULL_APP_KEY`/
+`WEBULL_APP_SECRET`/`WEBULL_PAPER_ACCOUNT_ID`. Shadow orders are polled by
+`.github/workflows/poll-webull-shadow-orders.yml` (every ~20 min during
+market hours) and, as a backstop, by every swing-scan cron run. See
+`docs/superpowers/specs/2026-08-14-webull-data-provider-and-papertrade-shadow-design.md`
+for the full design.
 
 ## Pages
 

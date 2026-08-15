@@ -68,3 +68,5 @@ obsidian-vault/.obsidian/
 # graphify local build cache (regenerated; graph.json itself is tracked)
 graphify-out/cache/
 graphify-out/.graphify_root
+
+.cache/

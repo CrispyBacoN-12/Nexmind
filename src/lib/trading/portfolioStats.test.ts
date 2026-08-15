@@ -1,3 +1,4 @@
+import "dotenv/config"; // portfolioStats.ts -> circuitBreaker.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { computePortfolioStats, type PortfolioTrade } from "./portfolioStats";
