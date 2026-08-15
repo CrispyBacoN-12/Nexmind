@@ -1,7 +1,7 @@
 ---
 type: strategy
 key: research-62
-status: approved
+status: rejected
 symbol: "GC=F"
 timeframe: "1h"
 tags: [strategy, research, sma, liquidity-sweep, gold]
@@ -42,4 +42,4 @@ return null;
 
 ## Live status
 
-Approved - available as `research-62` if assigned to a portfolio's strategy key. From research run #35.
+Rejected after review - not live. From research run #35.

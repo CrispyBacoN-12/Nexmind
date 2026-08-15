@@ -14,6 +14,7 @@ Open this folder (`obsidian-vault/`) directly as an Obsidian vault: **Open folde
 - `Backtests/` — dated blind-test / sweep results, so past runs don't need to be re-derived from scripts.
 - `Desks/` — portfolio-level decisions (merges, archives, why a desk exists).
 - `Journal/` — freeform dated notes; anything that doesn't fit the above yet.
+- `Claude Skills/` — reference snapshot of the Claude Code skills available across projects (not NEXMIND-specific, kept here since this is the only vault on the machine).
 
 ## Suggested plugins
 
