@@ -70,18 +70,17 @@ obsidian-vault/.obsidian/
 # churned ~76 files per session while contributing nothing reviewable.
 obsidian-vault/.smart-env/
 
-# graphify local build cache (regenerated; graph.json itself is tracked)
-graphify-out/cache/
-
-# graphify rendered output — dated run snapshots, the HTML viewer, and the
-# report are all regenerated from graph.json, which stays tracked.
-graphify-out/[0-9]*/
-graphify-out/graph.html
-graphify-out/GRAPH_REPORT.md
-graphify-out/.graphify_labels.json
+# graphify output is entirely generated from the vault. graph.json rewrote
+# ~115k lines on its second run and manifest.json is a table of per-machine
+# mtimes, so neither produces a reviewable diff. Ignore the directory whole.
+graphify-out/
 
 # python bytecode (mt5-bridge)
 __pycache__/
-graphify-out/.graphify_root
 
 .cache/
+
+# Personal vault notes that have nothing to do with this repo and should not
+# be published with it: medical-school coursework and a Claude skills index.
+obsidian-vault/SIID*.md
+obsidian-vault/Claude Skills/
