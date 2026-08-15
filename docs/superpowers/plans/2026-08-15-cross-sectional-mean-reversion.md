@@ -408,6 +408,18 @@ function flatSeries(n: number, price: number, volume = 1_000_000): Candle[] {
   }));
 }
 
+/**
+ * A gently rising series. Wilder's RSI needs at least some up-moves to produce
+ * distinguishable values — on a series with none, avgGain stays exactly 0 and
+ * every RSI reading pins to 0 (or to 100 while avgLoss is also 0).
+ */
+function risingSeries(n: number, start: number, step = 0.1, volume = 1_000_000): Candle[] {
+  return Array.from({ length: n }, (_, i) => {
+    const p = start + i * step;
+    return { t: (i + 1) * DAY, o: p, h: p * 1.01, l: p * 0.99, c: p, v: volume };
+  });
+}
+
 // Optional filters start OFF here so each test can switch on exactly the one it
 // is exercising. A fixture built to trip the SMA200 filter also trips the
 // news filter, and vice versa — turning both on by default would make every
@@ -486,16 +498,22 @@ test("rankScore: atrReturn is negative for a faller and positive for a riser", (
 
 test("rankScore: the rsi2 measure ranks the more oversold symbol lower", () => {
   const cfg: CsConfig = { ...baseCfg, measure: "rsi2" };
-  const mild = flatSeries(250, 100);
-  mild[249] = { ...mild[249], o: 99, h: 100, l: 98, c: 99 };
-  const severe = flatSeries(250, 100);
-  severe[248] = { ...severe[248], o: 95, h: 96, l: 94, c: 95 };
-  severe[249] = { ...severe[249], o: 90, h: 91, l: 89, c: 90 };
+  // Rising baseline, not flat — see risingSeries. Each fixture's drop is written
+  // relative to the previous close so the numbers do not depend on `step`.
+  const mild = risingSeries(250, 100);
+  const mPrev = mild[248].c;
+  mild[249] = { ...mild[249], o: mPrev, h: mPrev, l: mPrev - 0.9, c: mPrev - 0.9 };
+
+  const severe = risingSeries(250, 100);
+  const sPrev = severe[247].c;
+  severe[248] = { ...severe[248], o: sPrev, h: sPrev, l: sPrev - 5, c: sPrev - 5 };
+  const sPrev2 = severe[248].c;
+  severe[249] = { ...severe[249], o: sPrev2, h: sPrev2, l: sPrev2 - 5, c: sPrev2 - 5 };
 
   const mildScore = rankScore(buildSeries(mild), 249, cfg);
   const severeScore = rankScore(buildSeries(severe), 249, cfg);
   assert.ok(mildScore !== null && severeScore !== null);
-  assert.ok(severeScore < mildScore);
+  assert.ok(severeScore < mildScore, `expected ${severeScore} < ${mildScore}`);
 });
 
 test("rankScore returns null before the lookback window is available", () => {
@@ -937,14 +955,24 @@ test("a stop closes the position and reports a loss", () => {
   closes[257] = 60;
   closes[258] = 55;
   closes[259] = 50;
+  const bars = new Map<string, Candle[]>([["AAA", series(closes)]]);
 
-  const res = crossSectionalBacktest(new Map([["AAA", series(closes)]]), { ...cfg, stopAtrMult: 2 });
-  assert.equal(res.trades.length, 1);
-  assert.equal(res.trades[0].reason, "stop");
-  assert.ok(res.trades[0].pnl < 0);
-  assert.ok(res.trades[0].rMultiple !== null);
+  const res = crossSectionalBacktest(bars, { ...cfg, stopAtrMult: 2 });
+  // Do not assert a trade *count*: the bar that trips the stop is itself a large
+  // decline, so the engine correctly re-enters afterwards. What this test pins is
+  // the stopped trade, and that the stop is what produced it.
+  const stopped = res.trades.find((t) => t.reason === "stop");
+  assert.ok(stopped, `expected a stop exit, reasons were: ${res.trades.map((t) => t.reason).join(", ")}`);
+  assert.equal(res.trades[0], stopped); // the stop is the first exit taken
+  assert.ok(stopped.pnl < 0);
+  assert.ok(stopped.rMultiple !== null);
   // holdDays is 3, so a hold-expiry exit would not have fired by bar 256.
-  assert.ok(res.trades[0].daysHeld < cfg.holdDays);
+  assert.ok(stopped.daysHeld < cfg.holdDays);
+
+  // Control: the collapse alone does not produce a stop. Without stopAtrMult the
+  // same bars exit on the hold clock, which is what makes the case above causal.
+  const noStop = crossSectionalBacktest(bars, cfg);
+  assert.ok(!noStop.trades.some((t) => t.reason === "stop"));
 });
 
 test("rMultiple is null when the config has no stop", () => {
@@ -1270,7 +1298,8 @@ Create `scripts/sweep-cross-sectional.mts`:
 // Usage: node --env-file=.env --import tsx scripts/sweep-cross-sectional.mts [universe]
 import { readFile } from "node:fs/promises";
 import { crossSectionalBacktest } from "@/lib/backtest/crossSectional/engine";
-import type { CsConfig, FallMeasure, RegimeMode } from "@/lib/backtest/crossSectional/types";
+import { summarizeCrossSectional } from "@/lib/backtest/crossSectional/summary";
+import type { CsConfig, CsSummary, FallMeasure, RegimeMode } from "@/lib/backtest/crossSectional/types";
 import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 import type { Candle } from "@/lib/indicators";
 
@@ -1285,20 +1314,62 @@ console.log(`loaded ${Object.keys(raw.bars).length} symbols from cache (fetched 
 
 // Split on a shared date, not per-symbol bar counts, so every symbol's train and
 // test windows cover the same calendar period.
-const allTimes = Object.values(raw.bars).flatMap((b) => b.map((c) => c.t)).sort((a, b) => a - b);
-const cutoff = allTimes[Math.floor(allTimes.length * TRAIN_FRACTION)];
+const uniqueTimes = [...new Set(Object.values(raw.bars).flatMap((b) => b.map((c) => c.t)))].sort((a, b) => a - b);
+const cutoff = uniqueTimes[Math.floor(uniqueTimes.length * TRAIN_FRACTION)];
 console.log(`split at ${new Date(cutoff * 1000).toISOString().slice(0, 10)}`);
 
-function slice(before: boolean): Map<string, Candle[]> {
+// `isEligible` refuses every index below 200 (the SMA200 warm-up), so handing the
+// engine a bare slice would kill the first 200 trading days of EVERY window — the
+// test half would lose ~200 of its ~530 days, and gate 1 would fail for reasons
+// that have nothing to do with the edge. Each window therefore carries a warm-up
+// prefix taken from before its start. Exactly 200 bars, not more: at that length
+// the prefix is entirely ineligible, so it warms the indicators without
+// generating a single trade of its own.
+const WARMUP_BARS = 200;
+
+/** Bars from `fromT` (inclusive) to `toT` (exclusive), preceded by the warm-up prefix. */
+function window(fromT: number | null, toT: number | null): Map<string, Candle[]> {
   const out = new Map<string, Candle[]>();
   for (const [sym, candles] of Object.entries(raw.bars)) {
-    const part = candles.filter((c) => (before ? c.t < cutoff : c.t >= cutoff));
+    let start = 0;
+    if (fromT != null) {
+      const at = candles.findIndex((c) => c.t >= fromT);
+      if (at === -1) continue; // symbol stopped trading before this window opens
+      start = Math.max(0, at - WARMUP_BARS);
+    }
+    const endAt = toT == null ? -1 : candles.findIndex((c) => c.t >= toT);
+    const part = candles.slice(start, endAt === -1 ? candles.length : endAt);
     if (part.length) out.set(sym, part);
   }
   return out;
 }
-const trainBars = slice(true);
-const testBars = slice(false);
+
+/**
+ * Run one window and summarise only the part inside it: trades entered during the
+ * warm-up prefix and equity points before `windowStart` are dropped, so drawdown,
+ * CAGR and time-in-market describe the window itself rather than the prefix.
+ */
+function runWindow(bars: Map<string, Candle[]>, cfg: CsConfig, windowStart: number): CsSummary {
+  const res = crossSectionalBacktest(bars, cfg);
+  const trades = res.trades.filter((t) => t.entryT >= windowStart);
+  const curve = res.equityCurve.filter((p) => p.t >= windowStart);
+  if (!curve.length) return summarizeCrossSectional(trades, [], cfg.capital);
+  // Rebase to the window's own opening equity so a drawdown is measured against
+  // the capital the window actually started with.
+  const base = curve[0].equity;
+  const scale = base > 0 ? cfg.capital / base : 1;
+  return summarizeCrossSectional(trades, curve.map((p) => ({ ...p, equity: p.equity * scale })), cfg.capital);
+}
+
+// The train window has no pre-history to borrow, so its own first WARMUP_BARS days
+// are genuinely untradable — nobody can trade before their indicators exist.
+const trainBars = window(null, cutoff);
+const trainStart = uniqueTimes[WARMUP_BARS];
+const testBars = window(cutoff, null);
+console.log(
+  `train from ${new Date(trainStart * 1000).toISOString().slice(0, 10)}, test from cutoff` +
+  ` (each window warmed by ${WARMUP_BARS} prior bars)`,
+);
 
 const BASE: CsConfig = {
   lookback: 3, measure: "atrReturn", maxRankScore: 0,
@@ -1341,13 +1412,13 @@ console.log(`sweeping ${combos.length} combos ...\n`);
 const label = (c: CsConfig) =>
   `${c.measure}${c.measure === "atrReturn" ? `/k=${c.lookback}` : ""} sma200=${c.requireAboveSma200 ? "y" : "n"} regime=${c.regime} slots=${c.slots} hold=${c.holdDays} stop=${c.stopAtrMult ?? "off"}`;
 
-const rows: { label: string; train: ReturnType<typeof crossSectionalBacktest>["summary"]; test: ReturnType<typeof crossSectionalBacktest>["summary"] }[] = [];
+const rows: { label: string; train: CsSummary; test: CsSummary }[] = [];
 for (const combo of combos) {
-  const train = crossSectionalBacktest(trainBars, combo).summary;
+  const train = runWindow(trainBars, combo, trainStart);
   // Train bar: a real edge must be clearly profitable in-sample AND have enough
   // trades to mean anything. 500 is gate 1 from the spec.
   if (train.trades < 500 || (train.profitFactor ?? 0) < 1.1) continue;
-  const test = crossSectionalBacktest(testBars, combo).summary;
+  const test = runWindow(testBars, combo, cutoff);
   rows.push({ label: label(combo), train, test });
 }
 
@@ -1370,8 +1441,8 @@ for (const r of rows) {
 // Failure-mode diagnostic, same as the gold sweeps: distinguish "no combo made
 // enough trades" from "plenty of trades, no edge".
 if (!rows.length) {
-  const sample = crossSectionalBacktest(trainBars, BASE).summary;
-  console.log(`\nno combo passed. baseline train: ${sample.trades} trades, PF ${(sample.profitFactor ?? 0).toFixed(2)}`);
+  const sample = runWindow(trainBars, BASE, trainStart);
+  console.log(`\nno combo passed. baseline train: ${sample.trades} trades over ${sample.tradingDays} days, PF ${(sample.profitFactor ?? 0).toFixed(2)}`);
   console.log(sample.trades < 500 ? "→ TRADE STARVATION: loosen filters or shorten holdDays" : "→ NO EDGE: the mechanism does not work here");
 }
 ```
@@ -1420,7 +1491,8 @@ Create `scripts/walkforward-cross-sectional.mts`:
 //          [universe] [measure] [lookback] [regime] [slots] [holdDays] [stop|off] [sma200:y|n]
 import { readFile } from "node:fs/promises";
 import { crossSectionalBacktest } from "@/lib/backtest/crossSectional/engine";
-import type { CsConfig, FallMeasure, RegimeMode } from "@/lib/backtest/crossSectional/types";
+import { summarizeCrossSectional } from "@/lib/backtest/crossSectional/summary";
+import type { CsConfig, CsSummary, FallMeasure, RegimeMode } from "@/lib/backtest/crossSectional/types";
 import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 import type { Candle } from "@/lib/indicators";
 
@@ -1454,17 +1526,44 @@ const cfg: CsConfig = {
 const bars = await loadBars(universeKey);
 console.log(`config: ${JSON.stringify({ ...cfg, costs: undefined })}\n`);
 
+// `isEligible` refuses every index below 200 (the SMA200 warm-up), so a bare window
+// slice would kill its own first 200 trading days. The blocks below are only ~220
+// days long, so bare slicing would leave ~20 usable days each and gates 2-3 would
+// fail for reasons that have nothing to do with the edge. Every window therefore
+// carries a warm-up prefix of exactly 200 bars: long enough to warm each indicator,
+// short enough that the prefix is wholly ineligible and adds no trades of its own.
+const WARMUP_BARS = 200;
+
 function windowBars(all: Map<string, Candle[]>, from: number, to: number): Map<string, Candle[]> {
   const out = new Map<string, Candle[]>();
   for (const [sym, candles] of all) {
-    const part = candles.filter((c) => c.t >= from && c.t < to);
+    const at = candles.findIndex((c) => c.t >= from);
+    if (at === -1) continue; // symbol stopped trading before this window opens
+    const endAt = candles.findIndex((c) => c.t >= to);
+    const part = candles.slice(Math.max(0, at - WARMUP_BARS), endAt === -1 ? candles.length : endAt);
     if (part.length) out.set(sym, part);
   }
   return out;
 }
 
-const times = [...bars.values()].flatMap((b) => b.map((c) => c.t)).sort((a, b) => a - b);
-const start = times[0];
+/** Run one window and summarise only the part that falls inside the window itself. */
+function runWindow(all: Map<string, Candle[]>, from: number, to: number): CsSummary {
+  const res = crossSectionalBacktest(windowBars(all, from, to), cfg);
+  const trades = res.trades.filter((t) => t.entryT >= from);
+  const curve = res.equityCurve.filter((p) => p.t >= from);
+  if (!curve.length) return summarizeCrossSectional(trades, [], cfg.capital);
+  // Rebase to the window's own opening equity so a drawdown is measured against the
+  // capital this window actually started with.
+  const base = curve[0].equity;
+  const scale = base > 0 ? cfg.capital / base : 1;
+  return summarizeCrossSectional(trades, curve.map((p) => ({ ...p, equity: p.equity * scale })), cfg.capital);
+}
+
+const times = [...new Set([...bars.values()].flatMap((b) => b.map((c) => c.t)))].sort((a, b) => a - b);
+// Walk forward over the TRADABLE span only. The dataset's first WARMUP_BARS days can
+// never produce a trade, and including them would hand block 1 a couple hundred dead
+// days that blocks 2-6 do not have, making the blocks incomparable.
+const start = times[WARMUP_BARS];
 const end = times[times.length - 1];
 const span = (end - start) / BLOCKS;
 const iso = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -1475,7 +1574,7 @@ let positiveBlocks = 0;
 for (let b = 0; b < BLOCKS; b++) {
   const from = start + b * span;
   const to = b === BLOCKS - 1 ? end + 1 : start + (b + 1) * span;
-  const s = crossSectionalBacktest(windowBars(bars, from, to), cfg).summary;
+  const s = runWindow(bars, from, to);
   const positive = s.totalPnl > 0;
   if (positive) positiveBlocks++;
   console.log(
@@ -1489,8 +1588,8 @@ for (let b = 0; b < BLOCKS; b++) {
 }
 
 const mid = start + (end - start) * 0.65;
-const trainS = crossSectionalBacktest(windowBars(bars, start, mid), cfg).summary;
-const testS = crossSectionalBacktest(windowBars(bars, mid, end + 1), cfg).summary;
+const trainS = runWindow(bars, start, mid);
+const testS = runWindow(bars, mid, end + 1);
 
 // --- Gate 5: 3x cost stress ---
 const stressed = crossSectionalBacktest(bars, {
