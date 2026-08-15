@@ -65,8 +65,23 @@ scripts/sqlite-export.json
 # Obsidian workspace state (machine-local, not content)
 obsidian-vault/.obsidian/
 
+# Smart Connections plugin store — per-machine embeddings and event logs,
+# rebuilt from the notes themselves. Same category as .obsidian/ above: it
+# churned ~76 files per session while contributing nothing reviewable.
+obsidian-vault/.smart-env/
+
 # graphify local build cache (regenerated; graph.json itself is tracked)
 graphify-out/cache/
+
+# graphify rendered output — dated run snapshots, the HTML viewer, and the
+# report are all regenerated from graph.json, which stays tracked.
+graphify-out/[0-9]*/
+graphify-out/graph.html
+graphify-out/GRAPH_REPORT.md
+graphify-out/.graphify_labels.json
+
+# python bytecode (mt5-bridge)
+__pycache__/
 graphify-out/.graphify_root
 
 .cache/
