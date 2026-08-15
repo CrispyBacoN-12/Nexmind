@@ -126,8 +126,15 @@ for (const key of ["dow30", "nasdaq100", "sp500"]) {
 }
 
 // --- Gate 7: SPY benchmark, return per unit of max drawdown ---
+// The benchmark is measured over the TRADABLE span, not the whole file. The
+// strategy cannot open a position until its SMA200 exists, so crediting SPY with
+// the months it gained while the strategy was structurally flat compares a
+// buy-and-hold that started early against a strategy that could not. That is a
+// limitation of this dataset's depth, not of the strategy: live, the 200 bars of
+// history would already exist. On the sp500 cache it is worth ~37 points of SPY
+// return, i.e. the difference between the gate looking 3x lost and 1.7x lost.
 const full = crossSectionalBacktest(bars, cfg).summary;
-const spy = bars.get("SPY") ?? [];
+const spy = (bars.get("SPY") ?? []).filter((c) => c.t >= start);
 let spyReturnPct = 0;
 let spyMaxDdPct = 0;
 if (spy.length) {
@@ -150,7 +157,9 @@ const gates: [string, boolean, string][] = [
   ["4. parameter plateau", false, "MANUAL — read the Task 6 sweep table"],
   ["5. survives 3x costs", stressed.totalPnl > 0, `pnl=${stressed.totalPnl.toFixed(0)}`],
   ["6. no improvement as universe narrows", (haircut.dow30 ?? 0) <= (haircut.sp500 ?? 0), `dow30=${(haircut.dow30 ?? 0).toFixed(2)} sp500=${(haircut.sp500 ?? 0).toFixed(2)}`],
-  ["7. beats SPY return/maxDD", stratRatio != null && spyRatio != null && stratRatio > spyRatio, `strat=${stratRatio?.toFixed(2)} spy=${spyRatio?.toFixed(2)}`],
+  ["7. beats SPY return/maxDD", stratRatio != null && spyRatio != null && stratRatio > spyRatio,
+    `strat=${stratRatio?.toFixed(2)} (${stratReturnPct.toFixed(1)}%/${(full.maxDrawdownPct ?? 0).toFixed(1)}%)` +
+    ` spy=${spyRatio?.toFixed(2)} (${spyReturnPct.toFixed(1)}%/${spyMaxDdPct.toFixed(1)}%) over ${iso(start)}..${iso(end)}`],
 ];
 
 console.log("\n--- gate scorecard ---");

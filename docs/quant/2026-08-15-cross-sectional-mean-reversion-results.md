@@ -8,11 +8,12 @@
 ## TL;DR
 
 **REJECTED.** The mechanism produces a small, genuine-looking edge — 2,131 trades, 54.5% win rate,
-PF 1.15, +61.7% over 7.8 years — and it fails anyway, for two independent reasons:
+PF 1.15, +61.7% over 5.7 tradable years — and it fails anyway, for two independent reasons:
 
-1. **It loses to buying SPY, badly, at the same risk.** +61.7% against SPY's +185.8%, on a 24.0%
-   max drawdown against SPY's 25.4%. Three times less return for the same pain, and that is
-   before adjusting for the survivorship bias that inflates the strategy but not the benchmark.
+1. **It loses to buying SPY at the same risk.** +61.7% against SPY's +109.0% over the same span,
+   on a 24.0% max drawdown against SPY's 25.4%. Roughly 40% less return for the same pain — and
+   that is before adjusting for the survivorship bias that inflates the strategy but not the
+   benchmark.
 2. **Parameter choice is indistinguishable from noise.** Across the 150 configs that cleared the
    in-sample bar, the rank correlation between train profit factor and test profit factor is
    **−0.016**. In-sample ranking carries no information about out-of-sample ranking. Picking the
@@ -26,7 +27,14 @@ The gates exist to stop exactly the loop that a 1.15 profit factor invites.
 - **Data:** Alpaca daily bars, 491 S&P 500 symbols + 31 Dow 30, cached at `.cache/bars/`.
   Median depth **1,518 bars ≈ 6.0 years**; SPY spans 2018-11-01 … 2026-08-14 (1,522 bars).
   This sits in the spec's "4–8y: proceed but flag" band — flagged here.
-- **Costs:** `DEFAULT_COST_MODEL` = 0.5 bps slippage + 1 bps commission, i.e. ~3 bps round trip.
+- **Costs:** `DEFAULT_COST_MODEL` = 0.5 bps slippage charged on each side + a 1 bps round-turn
+  commission charged once against entry notional, i.e. **~2 bps round trip**.
+- **Benchmark span:** the strategy cannot open a position until its SMA200 exists, so it is
+  structurally flat for the first 200 bars of the file. SPY is therefore measured over the
+  **tradable** span (2021-01-05 …) and not from 2018-11-01. Crediting the benchmark with the
+  36.7% it gained while the strategy was forced flat would compare a buy-and-hold that started
+  early against a strategy that could not — a limitation of this cache's depth, not of the
+  strategy, since live those 200 bars of history would already exist.
 - **Point-in-time discipline:** every filter and score reads bars at index ≤ t; the signal comes
   from bar t and the fill happens at the **open of t+1**. The engine has a direct regression test
   that future bars cannot change a past result.
@@ -99,7 +107,7 @@ Run over the tradable span 2021-01-05 … 2026-08-14, six walk-forward blocks of
 | 4. parameter plateau | **FAIL** (see above) | **FAIL** | **FAIL** |
 | 5. survives 3× costs | **PASS** +4856 | **PASS** +7853 | **PASS** +4366 |
 | 6. no gain as universe narrows | **PASS** dow30 1.07 ≤ sp500 1.15 | **PASS** 1.20 ≤ 1.35 | **PASS** 1.13 ≤ 1.14 |
-| 7. beats SPY return/maxDD | **FAIL** 2.58 vs 7.32 | **FAIL** 3.71 vs 7.32 | **FAIL** 2.74 vs 7.32 |
+| 7. beats SPY return/maxDD | **FAIL** 2.58 vs 4.30 | **FAIL** 3.71 vs 4.30 | **FAIL** 2.74 vs 4.30 |
 
 **No config passes.** Gates 4 and 7 fail on every config tested; gates 1 and 3 fail on two of three.
 
@@ -122,13 +130,13 @@ regime in this sample where dips kept going down, it did what you would expect.
 
 Not trade starvation — 2,131 trades on the full universe. Not "no edge" either: 54.5% win rate and
 +0.258% average net return per trade are real, and the 3× cost stress passes comfortably (costs are
-~3 bps round trip against a ~26 bps average edge, so costs are not the binding constraint).
+~2 bps round trip against a ~26 bps average edge, so costs are not the binding constraint).
 
 The failure is **a small edge that is not worth harvesting**:
 
-- **It does not beat the alternative.** +61.7% / 24.0% DD versus SPY's +185.8% / 25.4% DD. An
-  investor who did nothing but hold the index earned three times as much for the same drawdown,
-  with no turnover, no PDT exposure, and no execution risk.
+- **It does not beat the alternative.** +61.7% / 24.0% DD versus SPY's +109.0% / 25.4% DD over the
+  same tradable span. An investor who did nothing but hold the index earned nearly twice as much
+  for the same drawdown, with no turnover, no PDT exposure, and no execution risk.
 - **It cannot be tuned reliably.** Train→test rank correlation of −0.016 means the sweep cannot
   tell you which parameters to run. Whatever config you pick, you are picking blind.
 - **It concentrates in one window.** For the top-by-testPF config, block 4 alone (2023-10 … 2024-10)
@@ -148,7 +156,8 @@ The engine handles a symbol that stops producing bars by marking it at its last 
 closing the position there, so a delisting inside the sample is not silently erased. But that only
 covers survivors of the *list*; it cannot recover names the list never contained.
 
-So the honest reading is: **a strategy that already loses to SPY by 3× is losing by more than 3×.**
+So the honest reading is: **a strategy that already loses to SPY on a like-for-like span is losing
+by more than the measured margin.**
 The gate-6 haircut is consistent with this — the narrower, more survivorship-biased Dow 30 does not
 score better than the S&P 500, which is the check passing, but it is a weak check against a bias
 this structural.
