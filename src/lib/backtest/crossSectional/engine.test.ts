@@ -179,7 +179,13 @@ test("an empty universe returns an empty result rather than throwing", () => {
 // --- Fix round 1 regression tests (C1, C2, and the rest of the review) ---
 
 test("point-in-time sizing: a still-open position's TODAY close cannot influence a new entry's size on the same day (C1 regression)", () => {
-  const holdCfg: CsConfig = { ...cfg, slots: 2, holdDays: 200 };
+  // slots must be high enough that equity/slots stays BELOW available cash. With
+  // slots: 2 the cash cap pins the allocation at `cash` in both runs, so the buggy
+  // and correct sizings agree and the test passes for the wrong reason (verified by
+  // mutation: reverting the fix left this test green at slots: 2). At slots: 5 with
+  // one position held, cash is ~8000 while equity/5 is ~2000, so the equity term is
+  // what actually decides the size — and a lookahead in it changes the share count.
+  const holdCfg: CsConfig = { ...cfg, slots: 5, holdDays: 200 };
 
   const aClosesBase = risingBase(260);
   aClosesBase[220] -= 8; // AAA dips and enters; holdDays is huge so it stays open throughout
@@ -322,6 +328,19 @@ test("commission is charged once per trade, not on both legs", () => {
   const notional = free.trades[0].shares * free.trades[0].entry;
   const expectedCommission = notional * (commissionBps / 10_000);
   assert.ok(Math.abs(free.trades[0].pnl - costed.trades[0].pnl - expectedCommission) < 1e-6);
+});
+
+test("a tie in rank score is broken by symbol name, not by insertion order", () => {
+  const closes = risingBase(260);
+  closes[254] -= 8;
+  const identical = series(closes);
+  // Identical price paths score identically. Inserted reverse-alphabetically, so
+  // an insertion-ordered or reversed tiebreak would pick ZZZ.
+  const bars = new Map<string, Candle[]>([["ZZZ", identical], ["AAA", identical]]);
+
+  const res = crossSectionalBacktest(bars, cfg);
+  assert.ok(res.trades.length > 0);
+  assert.equal(res.trades[0].symbol, "AAA");
 });
 
 test("running the same input twice produces byte-identical trades (determinism)", () => {
