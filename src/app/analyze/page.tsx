@@ -57,7 +57,7 @@ export default function AnalyzePage() {
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && run()}
-            placeholder="symbol — NVDA, PTT.BK, GC=F, BTC-USD"
+            placeholder="symbol — NVDA, PTT.BK, XAUUSD, BTC-USD"
             className="flex-1 h-10 rounded-md border border-(--color-border) bg-(--color-background) px-3 text-sm font-mono focus:outline-none focus:border-(--color-accent)/50"
           />
           <Button onClick={run} disabled={busy}>{busy ? "Analyzing…" : "Analyze"}</Button>

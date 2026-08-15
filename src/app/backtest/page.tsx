@@ -25,7 +25,7 @@ interface Row {
   error?: string;
 }
 
-const SYMBOLS = ["GC=F", "BTC-USD"];
+const SYMBOLS = ["XAUUSD", "BTC-USD"];
 
 // The two comparison matrices the lab can run.
 const TIMEFRAME_CONFIGS = [
@@ -95,7 +95,7 @@ export default function BacktestLab() {
         : mode === "chart" ? CHART_GOLD_CONFIGS
         : mode === "candlestick" ? CANDLESTICK_CONFIGS
         : COMBO_CONFIGS;
-      const symbols = mode === "chart" ? ["GC=F"] : SYMBOLS;
+      const symbols = mode === "chart" ? ["XAUUSD"] : SYMBOLS;
       const res = await fetch("/api/backtest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,7 +128,7 @@ export default function BacktestLab() {
 
       <Card className="mb-5">
         <CardTitle>Run a comparison</CardTitle>
-        <p className="text-xs text-(--color-muted) mb-3">Gold (GC=F) + Bitcoin (BTC-USD). Pick what to vary.</p>
+        <p className="text-xs text-(--color-muted) mb-3">Gold (XAUUSD) + Bitcoin (BTC-USD). Pick what to vary.</p>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => run("timeframe")} disabled={!!busy}>
             {busy === "timeframe" ? "Running…" : "Compare timeframes (15m / 1h / 1d)"}

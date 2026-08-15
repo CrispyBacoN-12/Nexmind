@@ -38,9 +38,12 @@ const PATTERN_TAGS: Record<string, string> = {
 };
 
 // Readable asset name for the tags list, matching the vault's existing style
-// (e.g. DI-Dominance Widening.md tags gold rather than the raw "GC=F" ticker).
+// (e.g. DI-Dominance Widening.md tags gold rather than the raw ticker).
 // Unrecognized symbols are simply omitted from tags rather than guessed at.
+// "GC=F" is kept for research runs recorded before the watchlist switched to
+// the bare MT5 ticker.
 const SYMBOL_TAGS: Record<string, string> = {
+  "XAUUSD": "gold",
   "GC=F": "gold",
 };
 

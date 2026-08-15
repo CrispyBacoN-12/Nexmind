@@ -36,7 +36,7 @@ export default function CommandBridge() {
     router.push("/build");
   }
 
-  const [symbol, setSymbol] = useState("GC=F");
+  const [symbol, setSymbol] = useState("XAUUSD");
   const [tick, setTick] = useState<TickResult | null>(null);
   const [ticking, setTicking] = useState(false);
 
@@ -216,7 +216,7 @@ export default function CommandBridge() {
 
           <Card>
             <CardTitle>📡 Trade Tick (paper)</CardTitle>
-            <p className="text-xs text-(--color-muted) mb-3">Run the desk once on a Yahoo symbol — GC=F (gold), BTC-USD, EURUSD=X.</p>
+            <p className="text-xs text-(--color-muted) mb-3">Run the desk once on any symbol — XAUUSD (gold), BTC-USD, EURUSD, AAPL.</p>
             <div className="flex gap-2">
               <input
                 value={symbol}

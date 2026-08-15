@@ -4,9 +4,9 @@
 import { prisma } from "@/lib/db";
 
 export const DEFAULT_WATCHLIST: { symbol: string; label: string }[] = [
-  { symbol: "GC=F", label: "Gold" },
+  { symbol: "XAUUSD", label: "Gold" },
   { symbol: "BTC-USD", label: "Bitcoin" },
-  { symbol: "EURUSD=X", label: "EUR/USD" },
+  { symbol: "EURUSD", label: "EUR/USD" },
   { symbol: "^GSPC", label: "S&P 500" },
   { symbol: "AAPL", label: "Apple" },
   { symbol: "NVDA", label: "NVIDIA" },
@@ -15,7 +15,7 @@ export const DEFAULT_WATCHLIST: { symbol: string; label: string }[] = [
 ];
 
 // Options portfolios can only trade names with a Yahoo option chain — that rules
-// out futures (GC=F), crypto (BTC-USD), forex (EURUSD=X), indices (^GSPC), and
+// out spot gold (XAUUSD), crypto (BTC-USD), forex (EURUSD), indices (^GSPC), and
 // SET stocks. Seed liquid US single-name options instead.
 export const OPTIONS_WATCHLIST: { symbol: string; label: string }[] = [
   { symbol: "AAPL", label: "Apple" },

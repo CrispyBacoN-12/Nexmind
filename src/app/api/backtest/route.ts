@@ -11,7 +11,7 @@ export const maxDuration = 300;
 
 interface ConfigIn { interval?: string; range?: string; adxFloor?: number; rsiLow?: number; rsiHigh?: number; strategy?: string }
 
-const DEFAULT_SYMBOLS = ["GC=F", "BTC-USD"];
+const DEFAULT_SYMBOLS = ["XAUUSD", "BTC-USD"];
 const DEFAULT_CONFIGS: ConfigIn[] = [
   { interval: "15m", range: "5d" },
   { interval: "1h", range: "3mo" },

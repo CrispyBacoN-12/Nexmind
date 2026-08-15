@@ -16,7 +16,7 @@ export interface Fundamentals {
   note?: string; // why fundamentals are missing, when they are
 }
 
-export const NON_EQUITY = /=[FX]$|-USD$|^\^/; // futures (GC=F), forex (EURUSD=X), crypto (BTC-USD), indices (^GSPC)
+export const NON_EQUITY = /=[FX]$|-USD$|^\^|^(XAUUSD|XAGUSD)$|^[A-Z]{6}$/; // futures (GC=F), forex (EURUSD=X or bare EURUSD), crypto (BTC-USD), indices (^GSPC), spot gold/silver (XAUUSD)
 
 const fmt = (n: number | null, d = 1) => (n == null ? "n/a" : n.toFixed(d));
 

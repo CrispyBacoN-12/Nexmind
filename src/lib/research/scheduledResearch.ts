@@ -32,17 +32,17 @@ const MOMENTUM_LADDER =
 export const RESEARCH_ROTATION: RotationEntry[] = [
   {
     label: "gold-momentum",
-    symbol: "GC=F",
+    symbol: "XAUUSD",
     interval: "1h",
     range: "3mo",
-    brief: `Momentum/breakout entry signal for gold (GC=F) swing trading, ${MOMENTUM_LADDER}.`,
+    brief: `Momentum/breakout entry signal for gold (XAUUSD) swing trading, ${MOMENTUM_LADDER}.`,
   },
   {
     label: "gold-meanrev",
-    symbol: "GC=F",
+    symbol: "XAUUSD",
     interval: "1h",
     range: "3mo",
-    brief: `Mean-reversion entry signal for gold (GC=F) swing trading, ${MOMENTUM_LADDER}.`,
+    brief: `Mean-reversion entry signal for gold (XAUUSD) swing trading, ${MOMENTUM_LADDER}.`,
   },
   {
     label: "btc-momentum",
