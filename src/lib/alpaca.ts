@@ -73,6 +73,36 @@ const ALPACA_DATA_BASE = "https://data.alpaca.markets/v2/stocks";
  */
 const ADJUSTMENT = "all";
 
+/**
+ * `iex` returns only trades that crossed the IEX exchange — a few percent of
+ * volume — so its history is full of holes: AAPL's IEX daily bars start
+ * 2020-07-27, and MPWR has a single 100-share print in Jan 2019 and then nothing
+ * until that same date. Any return measured across a hole spans months, not a
+ * day, which is how a 127% "one-day move" appears in a clean-looking cache.
+ * `sip` is the consolidated tape: every symbol probed returns an identical
+ * 1,914-bar history from 2019-01-02 with no gaps.
+ *
+ * Set ALPACA_FEED to override (e.g. back to `iex` on a key without SIP
+ * entitlement). There is deliberately no silent per-request downgrade: a
+ * fallback to `iex` would quietly restore the gapped data that this default
+ * exists to avoid. A key lacking SIP gets a hard upstream error, and
+ * marketData's router backfills from Yahoo with a warning.
+ */
+const feed = () => process.env.ALPACA_FEED ?? "sip";
+
+/**
+ * On the free plan Alpaca refuses SIP data newer than ~15 minutes, and it
+ * refuses the WHOLE request when `end` reaches into that window —
+ * `403 subscription does not permit querying recent SIP data` — so asking for
+ * `end = now` returns nothing at all rather than a truncated series. Hold `end`
+ * back past the boundary. The cost is that the newest bar can be up to 16
+ * minutes stale; a caller that needs real-time prices should set
+ * ALPACA_FEED=iex and accept the gappy history that comes with it.
+ */
+const SIP_DELAY_MS = 16 * 60_000;
+const endTime = () =>
+  new Date(Date.now() - (feed() === "sip" ? SIP_DELAY_MS : 0)).toISOString();
+
 const toCandle = (b: AlpacaBar): Candle => ({
   t: Math.floor(Date.parse(b.t) / 1000), o: b.o, h: b.h, l: b.l, c: b.c, v: b.v ?? 0,
 });
@@ -95,8 +125,9 @@ export function parseAlpacaBatch(
 }
 
 /**
- * Fetch candles from Alpaca's IEX (free) feed. Throws when no key is set, on a
- * non-OK response, or when the body has no bars — callers fall back to Yahoo.
+ * Fetch candles from Alpaca (see `feed` above for which tape). Throws when no
+ * key is set, on a non-OK response, or when the body has no bars — callers fall
+ * back to Yahoo.
  */
 export async function fetchAlpacaCandles(
   symbol: string,
@@ -110,7 +141,7 @@ export async function fetchAlpacaCandles(
   }
 
   const start = new Date(Date.now() - rangeToLookbackMs(range)).toISOString();
-  const end = new Date().toISOString();
+  const end = endTime();
   const headers = {
     "APCA-API-KEY-ID": key,
     "APCA-API-SECRET-KEY": secret,
@@ -127,7 +158,7 @@ export async function fetchAlpacaCandles(
       timeframe: intervalToTimeframe(interval),
       start,
       end,
-      feed: "iex",
+      feed: feed(),
       limit: "10000",
       sort: "asc",
       adjustment: ADJUSTMENT,
@@ -167,7 +198,7 @@ export async function fetchAlpacaCandlesBatch(
   if (symbols.length === 0) return new Map();
 
   const start = new Date(Date.now() - rangeToLookbackMs(range)).toISOString();
-  const end = new Date().toISOString();
+  const end = endTime();
   const headers = { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret, Accept: "application/json" };
   const CHUNK = 100; // Alpaca rejects very long symbol lists — chunk the request.
 
@@ -184,7 +215,7 @@ export async function fetchAlpacaCandlesBatch(
           const params = new URLSearchParams({
             symbols: chunk.join(","),
             timeframe: intervalToTimeframe(interval),
-            start, end, feed: "iex", limit: "10000", sort: "asc",
+            start, end, feed: feed(), limit: "10000", sort: "asc",
             adjustment: ADJUSTMENT,
           });
           if (pageToken) params.set("page_token", pageToken);

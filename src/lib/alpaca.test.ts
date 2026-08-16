@@ -81,13 +81,16 @@ test("fetchAlpacaCandles throws when no API key is configured", async () => {
  * dropped, Alpaca silently returns raw prices and every long-horizon return is
  * wrong -- so the request itself is the only place it can be asserted.
  */
-async function captureUrls(run: () => Promise<unknown>): Promise<string[]> {
+async function captureUrls(run: () => Promise<unknown>, feed?: string): Promise<string[]> {
   const urls: string[] = [];
   const realFetch = globalThis.fetch;
   const prevKey = process.env.ALPACA_KEY;
   const prevSecret = process.env.ALPACA_SECRET;
+  const prevFeed = process.env.ALPACA_FEED;
   process.env.ALPACA_KEY = "k";
   process.env.ALPACA_SECRET = "s";
+  if (feed === undefined) delete process.env.ALPACA_FEED;
+  else process.env.ALPACA_FEED = feed;
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     urls.push(String(input));
     return {
@@ -106,6 +109,8 @@ async function captureUrls(run: () => Promise<unknown>): Promise<string[]> {
     else process.env.ALPACA_KEY = prevKey;
     if (prevSecret === undefined) delete process.env.ALPACA_SECRET;
     else process.env.ALPACA_SECRET = prevSecret;
+    if (prevFeed === undefined) delete process.env.ALPACA_FEED;
+    else process.env.ALPACA_FEED = prevFeed;
   }
   return urls;
 }
@@ -124,4 +129,40 @@ test("fetchAlpacaCandles requests split- and dividend-adjusted bars", async () =
   );
   assert.ok(urls.length >= 1, "expected at least one request");
   assert.equal(new URL(urls[0]).searchParams.get("adjustment"), "all");
+});
+
+test("both fetchers default to the SIP consolidated tape, not IEX", async () => {
+  // IEX carries only IEX-exchange trades, so its daily history has multi-month
+  // holes (AAPL's IEX bars begin 2020-07-27). A gap-spanning return looks like a
+  // one-day move and silently corrupts any lookback that crosses it.
+  const batch = await captureUrls(() => fetchAlpacaCandlesBatch(["AAPL"], "max", "1d"));
+  assert.equal(new URL(batch[0]).searchParams.get("feed"), "sip");
+
+  const single = await captureUrls(() =>
+    fetchAlpacaCandles("AAPL", "max", "1d").catch(() => undefined),
+  );
+  assert.equal(new URL(single[0]).searchParams.get("feed"), "sip");
+});
+
+test("ALPACA_FEED overrides the feed for keys without SIP entitlement", async () => {
+  const urls = await captureUrls(() => fetchAlpacaCandlesBatch(["AAPL"], "max", "1d"), "iex");
+  assert.equal(new URL(urls[0]).searchParams.get("feed"), "iex");
+});
+
+test("SIP requests hold `end` back past the delayed-data boundary", async () => {
+  // Alpaca 403s the ENTIRE request when `end` reaches into the last ~15 minutes
+  // of SIP data ("subscription does not permit querying recent SIP data"), so an
+  // end of `now` returns no bars at all rather than a shorter series.
+  const before = Date.now();
+  const urls = await captureUrls(() => fetchAlpacaCandlesBatch(["AAPL"], "max", "1d"));
+  const end = Date.parse(new URL(urls[0]).searchParams.get("end")!);
+  assert.ok(end <= before - 15 * 60_000, `end must be at least 15 min old, was ${before - end}ms`);
+  assert.ok(end > before - 60 * 60_000, "end must not be held back further than necessary");
+});
+
+test("IEX requests are not held back, since the delay is a SIP restriction", async () => {
+  const before = Date.now();
+  const urls = await captureUrls(() => fetchAlpacaCandlesBatch(["AAPL"], "max", "1d"), "iex");
+  const end = Date.parse(new URL(urls[0]).searchParams.get("end")!);
+  assert.ok(end >= before - 5_000, `IEX end should be ~now, was ${before - end}ms old`);
 });
