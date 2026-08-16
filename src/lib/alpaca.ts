@@ -64,6 +64,15 @@ export function parseAlpacaBars(
 
 const ALPACA_DATA_BASE = "https://data.alpaca.markets/v2/stocks";
 
+/**
+ * Alpaca defaults to `adjustment=raw`, which reports prices exactly as they
+ * traded — so a 20:1 split shows up as a -95% overnight return and any lookback
+ * spanning it is nonsense. `all` applies both split and dividend adjustment,
+ * giving the same total-return series as Yahoo's adjclose. Backtests need this;
+ * so does anything measuring a return over more than a few weeks.
+ */
+const ADJUSTMENT = "all";
+
 const toCandle = (b: AlpacaBar): Candle => ({
   t: Math.floor(Date.parse(b.t) / 1000), o: b.o, h: b.h, l: b.l, c: b.c, v: b.v ?? 0,
 });
@@ -121,6 +130,7 @@ export async function fetchAlpacaCandles(
       feed: "iex",
       limit: "10000",
       sort: "asc",
+      adjustment: ADJUSTMENT,
     });
     if (pageToken) params.set("page_token", pageToken);
     const url = `${ALPACA_DATA_BASE}/${encodeURIComponent(symbol)}/bars?${params}`;
@@ -175,6 +185,7 @@ export async function fetchAlpacaCandlesBatch(
             symbols: chunk.join(","),
             timeframe: intervalToTimeframe(interval),
             start, end, feed: "iex", limit: "10000", sort: "asc",
+            adjustment: ADJUSTMENT,
           });
           if (pageToken) params.set("page_token", pageToken);
           const res = await fetch(`${ALPACA_DATA_BASE}/bars?${params}`, { headers, next: { revalidate: 30 } });

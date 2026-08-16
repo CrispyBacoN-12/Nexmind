@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { intervalToTimeframe, rangeToLookbackMs, parseAlpacaBars, parseAlpacaBatch, fetchAlpacaCandles } from "./alpaca";
+import { intervalToTimeframe, rangeToLookbackMs, parseAlpacaBars, parseAlpacaBatch, fetchAlpacaCandles, fetchAlpacaCandlesBatch } from "./alpaca";
 
 test("intervalToTimeframe maps every supported interval", () => {
   assert.equal(intervalToTimeframe("5m"), "5Min");
@@ -73,4 +73,55 @@ test("fetchAlpacaCandles throws when no API key is configured", async () => {
     if (prevKey !== undefined) process.env.ALPACA_KEY = prevKey;
     if (prevSecret !== undefined) process.env.ALPACA_SECRET = prevSecret;
   }
+});
+
+/**
+ * Capture the URLs a fetcher requests without touching the network. The
+ * adjustment parameter is not visible in the parsed output at all -- if it is
+ * dropped, Alpaca silently returns raw prices and every long-horizon return is
+ * wrong -- so the request itself is the only place it can be asserted.
+ */
+async function captureUrls(run: () => Promise<unknown>): Promise<string[]> {
+  const urls: string[] = [];
+  const realFetch = globalThis.fetch;
+  const prevKey = process.env.ALPACA_KEY;
+  const prevSecret = process.env.ALPACA_SECRET;
+  process.env.ALPACA_KEY = "k";
+  process.env.ALPACA_SECRET = "s";
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    urls.push(String(input));
+    return {
+      ok: true,
+      json: async () => ({
+        bars: { AAPL: [{ t: "2026-06-15T13:30:00Z", o: 1, h: 3, l: 0.5, c: 2, v: 100 }] },
+        next_page_token: null,
+      }),
+    } as Response;
+  }) as typeof fetch;
+  try {
+    await run();
+  } finally {
+    globalThis.fetch = realFetch;
+    if (prevKey === undefined) delete process.env.ALPACA_KEY;
+    else process.env.ALPACA_KEY = prevKey;
+    if (prevSecret === undefined) delete process.env.ALPACA_SECRET;
+    else process.env.ALPACA_SECRET = prevSecret;
+  }
+  return urls;
+}
+
+test("fetchAlpacaCandlesBatch requests split- and dividend-adjusted bars", async () => {
+  const urls = await captureUrls(() => fetchAlpacaCandlesBatch(["AAPL"], "max", "1d"));
+  assert.equal(urls.length, 1);
+  const p = new URL(urls[0]).searchParams;
+  // Alpaca's default is adjustment=raw, which puts unadjusted splits in the bars.
+  assert.equal(p.get("adjustment"), "all");
+});
+
+test("fetchAlpacaCandles requests split- and dividend-adjusted bars", async () => {
+  const urls = await captureUrls(() =>
+    fetchAlpacaCandles("AAPL", "max", "1d").catch(() => undefined),
+  );
+  assert.ok(urls.length >= 1, "expected at least one request");
+  assert.equal(new URL(urls[0]).searchParams.get("adjustment"), "all");
 });
