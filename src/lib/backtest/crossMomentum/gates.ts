@@ -5,7 +5,7 @@ import { permutationPValue, spreadSeries } from "./permutation";
 import { mean, spearman, splitBlocks, tStat, turnover } from "./stats";
 import type { GateReport, MomentumConfig, ScoreLeg, Snapshot } from "./types";
 
-/** Spearman rho across the buckets. One-sided p at 0.60 with n = 10 is ~0.07. */
+/** Spearman rho across the buckets. One-sided (one-tailed) p at 0.60 with n = 10 is ~0.033. */
 export const RHO_MIN = 0.6;
 export const P_MAX = 0.05;
 export const BLOCKS_POSITIVE_MIN = 4;
