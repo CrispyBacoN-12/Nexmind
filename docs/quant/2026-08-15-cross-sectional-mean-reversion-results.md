@@ -5,6 +5,41 @@
 **Plan:** `docs/superpowers/plans/2026-08-15-cross-sectional-mean-reversion.md`
 **Code:** `src/lib/backtest/crossSectional/`, `scripts/sweep-cross-sectional.mts`, `scripts/walkforward-cross-sectional.mts`
 
+> ## ⚠️ Note added 2026-08-17: the input data was defective
+>
+> This study ran on a cache built before three provider defects were found and fixed. **The
+> rejection stands; the numbers in it do not.** Deliberately not re-run — see "Why this is not
+> re-run" below.
+>
+> The defects, all fixed in `e5e2730`, `3e6377a` and `7290b8d`:
+>
+> 1. **Prices were not split-adjusted.** Alpaca's bars endpoint defaults to `adjustment=raw` and the
+>    fetcher never sent the parameter, so a 20:1 split appears as a −95% overnight return. The Yahoo
+>    fallback had the same defect independently: it read the `quote` block and ignored `adjclose`.
+> 2. **The feed was `iex`, not `sip`.** IEX carries only trades that crossed the IEX exchange — a few
+>    percent of volume — so its daily history has multi-month holes. The "median depth 1,518 bars ≈
+>    6.0 years, running 2020-07-27 … 2026-08-14" recorded below is that artifact: **2020-07-27 is
+>    where IEX's daily history begins**, not a property of the market or of the symbols. On the SIP
+>    consolidated tape the same universe returns 2,669 gap-free bars per symbol from 2016-01-04, so
+>    this study saw roughly half the history it could have.
+> 3. A return measured across one of those holes spans months but is treated as a single day.
+>
+> **Direction of the bias.** Unadjusted splits bias *toward* apparent mean reversion: a split prints
+> a large fake decline, and the price "recovers" it the next day by construction. So the mechanism
+> was measured with a thumb on its side of the scale and was rejected anyway — the rejection is the
+> conservative direction, and finding these defects does not reopen it. Treat every specific figure
+> below (the 1.15 profit factor, the +61.7%, the 24.0% drawdown, the −0.016 rank correlation) as
+> unreliable rather than as a measurement.
+>
+> **Why this is not re-run.** Reason 2 in the TL;DR is not a data question. The rank correlation
+> between in-sample and out-of-sample profit factor being indistinguishable from zero means parameter
+> selection carries no information — a longer, cleaner sample changes that number but not the
+> conclusion it supports, and re-running invites exactly the re-tuning loop the closing paragraph
+> forbids. The successor study (`2026-08-16-cross-sectional-momentum-results.md`) runs on the
+> corrected cache and adds a data screen at the study's edge, because the corrected feed is still not
+> clean: Alpaca's `adjustment=all` misses recent splits (KLAC, 2026-06-12) and returned one symbol
+> (DOW) as weekly bars.
+
 ## TL;DR
 
 **REJECTED.** The mechanism produces a small, genuine-looking edge — 2,131 trades, 54.5% win rate,
