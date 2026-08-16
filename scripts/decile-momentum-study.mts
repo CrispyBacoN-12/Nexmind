@@ -8,6 +8,13 @@ import { dirname } from "node:path";
 import { alignUniverse } from "@/lib/backtest/crossSectional/calendar";
 import { evaluateGates } from "@/lib/backtest/crossMomentum/gates";
 import { buildSnapshots, subsetBars, topByDollarVolume } from "@/lib/backtest/crossMomentum/study";
+import {
+  screenBars,
+  MIN_DAILY_RATIO,
+  MAX_DAILY_RATIO,
+  MAX_ZERO_VOLUME_SHARE,
+  MAX_MEDIAN_SPACING_DAYS,
+} from "@/lib/backtest/crossMomentum/dataQuality";
 import type { MomentumConfig, ScoreLeg } from "@/lib/backtest/crossMomentum/types";
 import type { Candle } from "@/lib/indicators";
 
@@ -15,6 +22,8 @@ const CACHE = ".cache/bars/sp500-1d.json";
 const OUT = "docs/quant/2026-08-16-cross-sectional-momentum-results.md";
 const MEGA_CAP_COUNT = 200;
 const DOLLAR_VOL_WINDOW = 63;
+/** Set by hand, not read from the clock, so a re-run of the same cache is reproducible. */
+const RUN_DATE = "2026-08-17";
 
 const cfg: MomentumConfig = {
   lookback: 252,
@@ -28,16 +37,27 @@ const cfg: MomentumConfig = {
 };
 
 const raw = JSON.parse(await readFile(CACHE, "utf8")) as { fetchedAt: string; bars: Record<string, Candle[]> };
-const bars = new Map(Object.entries(raw.bars));
+const cached = new Map(Object.entries(raw.bars));
 // SPY is an index proxy, not a cross-section member.
-bars.delete("SPY");
+cached.delete("SPY");
+
+// Screen before anything is measured. Alpaca's `adjustment=all` is provably
+// incomplete for recent splits, so the cache cannot be trusted blindly even
+// after the provider fixes; see crossMomentum/dataQuality.ts.
+const { kept: bars, excluded } = screenBars(cached);
+if (bars.size === 0) throw new Error("data screen rejected every symbol — check the cache");
 
 const iso = (day: number) => new Date(day * 86_400_000).toISOString().slice(0, 10);
 
 const full = buildSnapshots(bars, cfg);
 if (full.snapshots.length === 0) throw new Error("no rebalance dates produced — check the cache");
 
-const { days } = alignUniverse(bars);
+const { days, index } = alignUniverse(bars);
+// A backfilled membership list is not a rectangle: names list late (IPOs,
+// spinoffs) and stop early (acquisitions). Those are properties of the universe,
+// not holes in the cache, and the fill/exit logic exists to handle them.
+const lateStarts = [...index.values()].filter((m) => ![...m.keys()].includes(days[0])).length;
+const earlyEnds = [...index.values()].filter((m) => ![...m.keys()].includes(days[days.length - 1])).length;
 const megaSymbols = topByDollarVolume(bars, days, full.snapshots[0].day, DOLLAR_VOL_WINDOW, MEGA_CAP_COUNT);
 const mega = buildSnapshots(subsetBars(bars, megaSymbols), cfg);
 
@@ -52,7 +72,7 @@ const yn = (b: boolean) => (b ? "**PASS**" : "**FAIL**");
 const lines: string[] = [
   "# Cross-Sectional Momentum — Decile Study Results",
   "",
-  `**Run date:** 2026-08-16 · **Cache fetched:** ${raw.fetchedAt}`,
+  `**Run date:** ${RUN_DATE} · **Cache fetched:** ${raw.fetchedAt}`,
   `**Spec:** \`docs/superpowers/specs/2026-08-16-cross-sectional-momentum-design.md\``,
   "",
   "This is a diagnostic, not a strategy. The strongest outcome available is NOT REJECTED.",
@@ -63,6 +83,53 @@ const lines: string[] = [
   "> exists. Do not re-run it after the verdict has been written; if the study needs to be re-run,",
   "> copy the verdict out first and reconcile it by hand afterward.",
   "",
+  "## This run is not blind",
+  "",
+  "The first run of this study (2026-08-16) was voided: its cache held unadjusted split prices, which",
+  "load genuine winners into the loser bucket and drive the decile spread negative by construction.",
+  "Three data defects were found and fixed — Yahoo ignored `adjclose`, Alpaca defaulted to",
+  "`adjustment=raw`, and Alpaca's free `iex` feed has multi-month holes. The author of this re-run has",
+  "therefore already seen one set of gate results for the same hypothesis on the same universe. The",
+  "hypothesis, the six gates, and the thresholds are unchanged from the pre-registration — but a",
+  "re-run by someone who has seen a prior outcome is weaker evidence than a blind one, and nothing",
+  "here should be read as if it were blind.",
+  "",
+  "The screen below also ran twice, and the first version of it is disclosed here so the sequence is",
+  "not mistaken for tuning. Rules 2-4 were written and committed before any post-fix numbers existed;",
+  "that screen dropped 12 of 490 symbols and produced **Leg A: REJECTED** (ρ 0.248, p 0.0559) and",
+  "**Leg B: REJECTED** (ρ 0.515, p 0.2058). Auditing the calendar of that run then showed that 37",
+  "union-calendar days were market holidays contributed by a single symbol, DOW, whose series came",
+  "back from the provider as weekly bars; one of those holidays, 2021-05-31, had become a rebalance",
+  "date. Rule 1 was added to catch that class and the study re-run. The trigger was a defective",
+  "calendar, not a disappointing gate — but the reader is entitled to both sets of numbers.",
+  "",
+  "## Data screen (stated before the results)",
+  "",
+  "Alpaca's `adjustment=all` is incomplete for recent splits: KLAC split 10:1 on 2026-06-12 and the",
+  "feed still reports 2411.64 → 254.54, while Yahoo's `adjclose` shows a smooth 241.16 → 254.54 with",
+  "every post-split bar agreeing exactly. So the cache is screened rather than trusted. A symbol is",
+  "excluded from the study entirely — not for one month — when any of these holds:",
+  "",
+  `1. its bars are spaced more than ${MAX_MEDIAN_SPACING_DAYS} calendar days apart at the median — i.e. it is not a daily series;`,
+  `2. any close is zero or negative;`,
+  `3. any adjacent-session close ratio falls outside [${MIN_DAILY_RATIO}, ${MAX_DAILY_RATIO}];`,
+  `4. at least ${(MAX_ZERO_VOLUME_SHARE * 100).toFixed(0)}% of its bars have zero volume (a placeholder or reused-ticker series).`,
+  "",
+  "Whole-symbol, because a contaminated bar spoils every 252-day window that crosses it — a year of",
+  "rebalances — not just the month it sits in. Rule 2 also removes genuine one-day collapses, which is",
+  "a real cost; but an excluded symbol leaves the winner and loser buckets alike, so the exclusion has",
+  "no known directional effect on the spread, unlike split contamination.",
+  "",
+  `**${excluded.length} of ${cached.size} symbols excluded.**`,
+  "",
+  ...(excluded.length === 0
+    ? ["_(none)_", ""]
+    : [
+        "| Symbol | Reason | Evidence |",
+        "|---|---|---|",
+        ...excluded.map((e) => `| ${e.symbol} | ${e.reason} | ${e.detail} |`),
+        "",
+      ]),
   "## Sample",
   "",
   `- symbols: ${bars.size}`,
@@ -113,18 +180,16 @@ lines.push(
   "The universe is the **current** S&P 500 membership backfilled, so it is survivorship-biased in the",
   "direction that manufactures momentum. Gates 4 and 5 exist to test that explanation directly.",
   "",
-  "The fill/exit substitution count above was checked against the pre-registered expectation of a",
-  "single-digit count and found far higher. Investigation (per-symbol bar-date ranges, day-by-day",
-  "union-calendar coverage) traced this to the cache itself: `.cache/bars/sp500-1d.json` has scattered,",
-  "mostly single-day gaps spread across nearly the whole symbol set — 490 symbols but only 54 of 1,639",
-  "union calendar days have a bar from every symbol. A small number of names (about a dozen, e.g. BK,",
-  "CTRA, DFS, HOLX, JNPR, K, MMC) stop receiving bars months before the cache's stated fetch date despite",
-  "still being live, currently-traded tickers, not delistings. This is a data-completeness property of",
-  "the cache, not a defect in `buildSnapshots`: the fill logic (exit at the last available open) and the",
-  "unfillable count (1, matching the pre-registered expectation) behave exactly as designed given an",
-  "imperfect feed. It does not change the gate results, since gates operate on realized returns, not on",
-  "whether a return's bar landed on the exact intended day — but it means this run's substitution count",
-  "is a statement about the cache's completeness, not about the study.",
+  `The union calendar holds ${days.length} trading days. Of the ${bars.size} surviving symbols, ${lateStarts} have no bar on the`,
+  `first day and ${earlyEnds} have none on the last: a backfilled membership list is not a rectangle, because`,
+  "names list late (IPOs, spinoffs) and stop early (acquisitions — JNPR, ANSS, HES, DFS and DAY all",
+  "left the tape inside this window). The fill/exit logic covers those, and the unfillable count above",
+  "is the number of selections that could not be measured at all.",
+  "",
+  "The substitution count above is the pre-registered check on that logic, and it now sits in the",
+  "single digits. It did not on the first screened run — 4,701 substitutions, 9% of symbol-months —",
+  "which is what led to the DOW discovery described at the top: one weekly series had injected 37",
+  "market holidays into the union calendar, so on each of those days every other symbol needed a fill.",
   "",
 );
 

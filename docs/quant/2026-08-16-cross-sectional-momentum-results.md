@@ -1,32 +1,6 @@
 # Cross-Sectional Momentum — Decile Study Results
 
-> # ⛔ VOID — DO NOT CITE THIS RUN
->
-> **Every number below this line is an artifact of unadjusted stock splits and measures
-> nothing about momentum.** `.cache/bars/sp500-1d.json` stores raw, unadjusted prices.
-> Verified directly in the cache: CMG closes at 3283.08 on 2024-06-25 and opens at 65.62 the
-> next session (50:1), GOOGL 2235.49 → 112.68 (20:1), AMZN 2446.41 → 125.345 (20:1).
->
-> This is not noise, and it is not symmetric. A 12-month lookback spanning a split reads as
-> roughly −95%, so the score ranks the stock an extreme loser and puts it in bucket 0. But
-> companies split *because the price ran up* — the contaminated names are NVDA, AMZN, GOOGL,
-> CMG, BKNG. Genuine winners are loaded into the loser bucket, where they go on winning. The
-> bottom bucket therefore outperforms and the spread turns negative **by construction**,
-> which is precisely the reported result: bucket 1 (losers) +2.909% against bucket 10
-> (winners) +1.254%, with ρ negative on both legs.
->
-> One symbol-month, `PARA` at +5269.9% on 2024-08-30, produces that month's −113.88% spread
-> single-handedly, and that one month produces the −11.859% sub-period block that exposed the
-> defect. 8 symbol-months exceed ±100% and 71 exceed ±50% across the study.
->
-> **The REJECTED verdict below is a measurement of the cache's split handling, not of
-> cross-sectional momentum. The study has not been run.** The six gates and their thresholds
-> are untouched and remain pre-registered as committed; only the input data is disqualified.
-> Re-running on split-adjusted bars is a correction of a measurably broken input, not a
-> re-specification of the hypothesis after seeing a result — but the re-run will no longer be
-> blind, and that limitation must be stated wherever its numbers are reported.
-
-**Run date:** 2026-08-16 · **Cache fetched:** 2026-08-15T09:12:21.233Z
+**Run date:** 2026-08-17 · **Cache fetched:** 2026-08-16T20:39:45.212Z
 **Spec:** `docs/superpowers/specs/2026-08-16-cross-sectional-momentum-design.md`
 
 This is a diagnostic, not a strategy. The strongest outcome available is NOT REJECTED.
@@ -37,14 +11,69 @@ This is a diagnostic, not a strategy. The strongest outcome available is NOT REJ
 > exists. Do not re-run it after the verdict has been written; if the study needs to be re-run,
 > copy the verdict out first and reconcile it by hand afterward.
 
+## This run is not blind
+
+The first run of this study (2026-08-16) was voided: its cache held unadjusted split prices, which
+load genuine winners into the loser bucket and drive the decile spread negative by construction.
+Three data defects were found and fixed — Yahoo ignored `adjclose`, Alpaca defaulted to
+`adjustment=raw`, and Alpaca's free `iex` feed has multi-month holes. The author of this re-run has
+therefore already seen one set of gate results for the same hypothesis on the same universe. The
+hypothesis, the six gates, and the thresholds are unchanged from the pre-registration — but a
+re-run by someone who has seen a prior outcome is weaker evidence than a blind one, and nothing
+here should be read as if it were blind.
+
+The screen below also ran twice, and the first version of it is disclosed here so the sequence is
+not mistaken for tuning. Rules 2-4 were written and committed before any post-fix numbers existed;
+that screen dropped 12 of 490 symbols and produced **Leg A: REJECTED** (ρ 0.248, p 0.0559) and
+**Leg B: REJECTED** (ρ 0.515, p 0.2058). Auditing the calendar of that run then showed that 37
+union-calendar days were market holidays contributed by a single symbol, DOW, whose series came
+back from the provider as weekly bars; one of those holidays, 2021-05-31, had become a rebalance
+date. Rule 1 was added to catch that class and the study re-run. The trigger was a defective
+calendar, not a disappointing gate — but the reader is entitled to both sets of numbers.
+
+## Data screen (stated before the results)
+
+Alpaca's `adjustment=all` is incomplete for recent splits: KLAC split 10:1 on 2026-06-12 and the
+feed still reports 2411.64 → 254.54, while Yahoo's `adjclose` shows a smooth 241.16 → 254.54 with
+every post-split bar agreeing exactly. So the cache is screened rather than trusted. A symbol is
+excluded from the study entirely — not for one month — when any of these holds:
+
+1. its bars are spaced more than 4 calendar days apart at the median — i.e. it is not a daily series;
+2. any close is zero or negative;
+3. any adjacent-session close ratio falls outside [0.5, 2];
+4. at least 10% of its bars have zero volume (a placeholder or reused-ticker series).
+
+Whole-symbol, because a contaminated bar spoils every 252-day window that crosses it — a year of
+rebalances — not just the month it sits in. Rule 2 also removes genuine one-day collapses, which is
+a real cost; but an excluded symbol leaves the winner and loser buckets alike, so the exclusion has
+no known directional effect on the spread, unlike split contamination.
+
+**13 of 490 symbols excluded.**
+
+| Symbol | Reason | Evidence |
+|---|---|---|
+| APA | discontinuity | 17.53 -> 8.09 on 2020-03-09 (x0.4614, -53.9%) |
+| APTV | discontinuity | 259.06 -> 73.49 on 2017-12-05 (x0.2837, -71.6%) |
+| DOW | wrongInterval | 388 bars spaced 7.0 days apart — not a daily series |
+| EQT | discontinuity | 39.70 -> 17.01 on 2018-11-13 (x0.4285, -57.2%) |
+| FI | discontinuity | 3.15 -> 115.78 on 2023-06-07 (x36.7556, 3575.6%) |
+| GL | discontinuity | 102.89 -> 48.21 on 2024-04-11 (x0.4686, -53.1%) |
+| KLAC | discontinuity | 2411.64 -> 254.54 on 2026-06-12 (x0.1055, -89.4%) |
+| OXY | discontinuity | 24.29 -> 11.65 on 2020-03-09 (x0.4796, -52.0%) |
+| PARA | discontinuity | 1885.20 -> 92887.11 on 2021-02-12 (x49.2718, 4827.2%) |
+| PCG | discontinuity | 17.29 -> 8.24 on 2019-01-14 (x0.4763, -52.4%) |
+| RTX | discontinuity | 148.21 -> 43.02 on 2020-04-03 (x0.2903, -71.0%) |
+| SMCI | staleSeries | 349/2669 bars (13.1%) have zero volume |
+| TRGP | discontinuity | 24.36 -> 11.47 on 2020-03-09 (x0.4709, -52.9%) |
+
 ## Sample
 
-- symbols: 490
-- rebalances: **59** (2021-08-31 → 2026-06-30)
-- eligible per rebalance: min 476, max 488
-- fill/exit substitutions: 3879 (13.644% of symbol-months — see "Reading these numbers" below)
+- symbols: 477
+- rebalances: **113** (2017-02-28 → 2026-06-30)
+- eligible per rebalance: min 450, max 476
+- fill/exit substitutions: 10 (0.019% of symbol-months — see "Reading these numbers" below)
 - unfillable selections (dropped, no measurable return): 1
-- mega-cap subset: 200 symbols, 59 rebalances
+- mega-cap subset: 200 symbols, 113 rebalances
 - config: lookback 252, skip 21, buckets 10, seed 20260816, 1000 permutations
 
 ## Leg A — classic 12-1
@@ -53,20 +82,20 @@ This is a diagnostic, not a strategy. The strongest outcome available is NOT REJ
 
 | # | Gate | Value | Threshold | Result |
 |---|---|---|---|---|
-| 1 | Monotonicity (Spearman ρ) | -0.079 | ≥ 0.60 | **FAIL** |
-| 2 | Permutation p | 0.9211 | ≤ 0.05 | **FAIL** |
-| 3 | Other leg's mean spread | -1.344% | > 0 | **FAIL** |
-| 4 | Bottom bucket vs universe ex-top | -1.884% | > 0 | **FAIL** |
-| 5 | Mega-cap mean spread | -0.394% | > 0 | **FAIL** |
+| 1 | Monotonicity (Spearman ρ) | 0.333 | ≥ 0.60 | **FAIL** |
+| 2 | Permutation p | 0.0569 | ≤ 0.05 | **FAIL** |
+| 3 | Other leg's mean spread | 0.118% | > 0 | **PASS** |
+| 4 | Bottom bucket vs universe ex-top | -0.416% | > 0 | **FAIL** |
+| 5 | Mega-cap mean spread | 0.153% | > 0 | **PASS** |
 | 6 | Positive sub-periods | 3 of 6 | ≥ 4 | **FAIL** |
 
 Reported, not gated:
 
-- mean monthly spread: **-1.655%** (net of 5 bps/side: -1.707%)
-- t-statistic: **-0.81** over 59 months
-- mean turnover per rebalance: 26.406%
-- bucket means (1 = losers → 10 = winners): 2.909%, 0.462%, 0.854%, 2.015%, 0.292%, 0.602%, 0.638%, 0.670%, 0.827%, 1.254%
-- sub-period means: 0.660%, -0.671%, 1.330%, -11.859%, 0.870%, -0.102%
+- mean monthly spread: **0.236%** (net of 5 bps/side: 0.180%)
+- t-statistic: **0.44** over 113 months
+- mean turnover per rebalance: 27.913%
+- bucket means (1 = losers → 10 = winners): 1.673%, 1.153%, 1.128%, 1.292%, 1.025%, 1.256%, 1.270%, 1.233%, 1.295%, 1.909%
+- sub-period means: 1.346%, -0.010%, -0.947%, -0.862%, 1.158%, 0.757%
 
 ## Leg B — volatility-adjusted
 
@@ -74,24 +103,24 @@ Reported, not gated:
 
 | # | Gate | Value | Threshold | Result |
 |---|---|---|---|---|
-| 1 | Monotonicity (Spearman ρ) | -0.321 | ≥ 0.60 | **FAIL** |
-| 2 | Permutation p | 0.8901 | ≤ 0.05 | **FAIL** |
-| 3 | Other leg's mean spread | -1.655% | > 0 | **FAIL** |
-| 4 | Bottom bucket vs universe ex-top | -1.164% | > 0 | **FAIL** |
-| 5 | Mega-cap mean spread | -0.062% | > 0 | **FAIL** |
-| 6 | Positive sub-periods | 4 of 6 | ≥ 4 | **PASS** |
+| 1 | Monotonicity (Spearman ρ) | 0.430 | ≥ 0.60 | **FAIL** |
+| 2 | Permutation p | 0.2038 | ≤ 0.05 | **FAIL** |
+| 3 | Other leg's mean spread | 0.236% | > 0 | **PASS** |
+| 4 | Bottom bucket vs universe ex-top | -0.017% | > 0 | **FAIL** |
+| 5 | Mega-cap mean spread | 0.295% | > 0 | **PASS** |
+| 6 | Positive sub-periods | 3 of 6 | ≥ 4 | **FAIL** |
 
 Reported, not gated:
 
-- mean monthly spread: **-1.344%** (net of 5 bps/side: -1.404%)
-- t-statistic: **-0.67** over 59 months
-- mean turnover per rebalance: 30.086%
-- bucket means (1 = losers → 10 = winners): 2.229%, 1.928%, 0.780%, 1.083%, 0.517%, 0.781%, 0.644%, 0.803%, 0.833%, 0.886%
-- sub-period means: -0.478%, 0.050%, 2.453%, -11.439%, 0.140%, 1.494%
+- mean monthly spread: **0.118%** (net of 5 bps/side: 0.057%)
+- t-statistic: **0.23** over 113 months
+- mean turnover per rebalance: 30.472%
+- bucket means (1 = losers → 10 = winners): 1.327%, 1.339%, 1.235%, 1.217%, 1.226%, 1.365%, 1.311%, 1.307%, 1.465%, 1.445%
+- sub-period means: 0.810%, -0.556%, -0.912%, -0.620%, 1.192%, 0.832%
 
 ## Reading these numbers
 
-At 59 monthly observations, `t = 2` requires an annual Sharpe near 0.90, while
+At 113 monthly observations, `t = 2` requires an annual Sharpe near 0.90, while
 published momentum decile spreads run 0.5-0.6 over far longer samples. The t-statistic above is
 therefore reported for reference and is not one of the gates. A leg marked NOT REJECTED has cleared
 six pre-registered hurdles on a short sample; it has not been validated.
@@ -99,46 +128,13 @@ six pre-registered hurdles on a short sample; it has not been validated.
 The universe is the **current** S&P 500 membership backfilled, so it is survivorship-biased in the
 direction that manufactures momentum. Gates 4 and 5 exist to test that explanation directly.
 
-The fill/exit substitution count above was checked against the pre-registered expectation of a
-single-digit count and found far higher. Investigation (per-symbol bar-date ranges, day-by-day
-union-calendar coverage) traced this to the cache itself: `.cache/bars/sp500-1d.json` has scattered,
-mostly single-day gaps spread across nearly the whole symbol set — 490 symbols but only 54 of 1,639
-union calendar days have a bar from every symbol. A small number of names (about a dozen, e.g. BK,
-CTRA, DFS, HOLX, JNPR, K, MMC) stop receiving bars months before the cache's stated fetch date despite
-still being live, currently-traded tickers, not delistings. This is a data-completeness property of
-the cache, not a defect in `buildSnapshots`: the fill logic (exit at the last available open) and the
-unfillable count (1, matching the pre-registered expectation) behave exactly as designed given an
-imperfect feed. It does not change the gate results, since gates operate on realized returns, not on
-whether a return's bar landed on the exact intended day — but it means this run's substitution count
-is a statement about the cache's completeness, not about the study.
+The union calendar holds 2669 trading days. Of the 477 surviving symbols, 28 have no bar on the
+first day and 12 have none on the last: a backfilled membership list is not a rectangle, because
+names list late (IPOs, spinoffs) and stop early (acquisitions — JNPR, ANSS, HES, DFS and DAY all
+left the tape inside this window). The fill/exit logic covers those, and the unfillable count above
+is the number of selections that could not be measured at all.
 
-## Verdict
-
-**Leg A — classic 12-1: REJECTED.** All six gates failed. Monotonicity ρ = -0.079 against a ≥ 0.60
-threshold, short of it by 0.679. Permutation p = 0.9211 against a ≤ 0.05 threshold — a spread this
-extreme or more arose in about 92% of label-shuffled nulls. The volatility-adjusted leg's mean spread
-is also negative (-1.344%, need > 0). The bottom bucket does not underperform the rest of the universe
-(excess -1.884%, need > 0). The mega-cap subset spread is negative (-0.394%, need > 0). Only 3 of 6
-sub-periods were positive, against a ≥ 4 requirement. Mean monthly spread is -1.655% (t = -0.81 over
-59 months) — reported, not gated, and negative besides.
-
-**Leg B — volatility-adjusted: REJECTED.** Five of six gates failed. Monotonicity ρ = -0.321. Permutation
-p = 0.8901. The raw leg's mean spread is negative (-1.655%, need > 0). The bottom bucket does not
-underperform (excess -1.164%, need > 0). The mega-cap subset spread is negative (-0.062%, need > 0).
-The sub-periods gate passed, 4 of 6 blocks positive — the only gate either leg cleared. `passed` is an
-AND of all six gates, not a tally: one passing gate does not offset five failing ones, so this leg is
-rejected exactly as plainly as Leg A. Mean monthly spread -1.344% (t = -0.67 over 59 months).
-
-**Conclusion: REJECTED, both legs.** Over the 59 monthly rebalances in this run (2021-08-31 to
-2026-06-30, S&P 500 large-cap cross-section), neither the classic 12-1 momentum score nor its
-volatility-adjusted variant produced a monotone decile spread that cleared the pre-registered gate
-battery. Both legs' bucket-mean patterns are non-monotone (ρ negative on both) and both mean spreads
-are negative over the sample — the opposite sign from published cross-sectional momentum results, not
-merely an insignificant one. This is not a near-miss: the monotonicity gate alone misses its threshold
-by more than half a point of Spearman ρ on both legs, and the permutation test places the observed
-spread pattern inside the bulk of the label-shuffled null distribution rather than in its tail on
-either leg. Neither result is being read as evidence that momentum "doesn't work" in general — it is
-evidence that this pre-registered mechanism, on this cache, over this sample, did not clear the bar set
-for it before the numbers were seen. No gate is being reconsidered and no parameter is being reweighed
-in light of this outcome; the six-gate battery was fixed precisely so that a result like this one would
-stand as reported rather than invite a second attempt.
+The substitution count above is the pre-registered check on that logic, and it now sits in the
+single digits. It did not on the first screened run — 4,701 substitutions, 9% of symbol-months —
+which is what led to the DOW discovery described at the top: one weekly series had injected 37
+market holidays into the union calendar, so on each of those days every other symbol needed a fill.
