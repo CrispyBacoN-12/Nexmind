@@ -138,3 +138,68 @@ The substitution count above is the pre-registered check on that logic, and it n
 single digits. It did not on the first screened run — 4,701 substitutions, 9% of symbol-months —
 which is what led to the DOW discovery described at the top: one weekly series had injected 37
 market holidays into the union calendar, so on each of those days every other symbol needed a fill.
+
+---
+
+## Verdict
+
+**Both legs REJECTED. Cross-sectional momentum, as pre-registered, is not tradeable on this
+universe.** Hand-written after the run above; `scripts/decile-momentum-study.mts` will destroy this
+section if re-run.
+
+This rejection is worth more than the voided one of 2026-08-16. That run failed with ρ = −0.079 and
+p = 0.9211 — the reverse of the hypothesis — because unadjusted splits had loaded genuine winners
+into the loser bucket. This run fails in the *right direction*: the spread is positive (0.236%/month
+raw, 0.118% vol-adjusted), ρ is positive, and the top decile is the strongest bucket. The effect is
+real and simply far too weak to clear the bar that was set before it was measured.
+
+**The decisive finding is gate 4, not gate 1 or 2.** Leg A's bucket means are U-shaped —
+1.673% at the bottom, ~1.0–1.3% across the middle, 1.909% at the top. The bottom decile does not
+lose; it *beats the middle of the universe* by roughly 0.4%/month. So the entire 12-1 spread comes
+from the long side, and a long-short implementation would have paid to hold a short leg that
+outperformed. That is a volatility smile, not momentum, and gate 4 exists precisely to refuse it.
+Vol-adjusting (Leg B) flattens the smile — bucket means run 1.327% to 1.445%, gate 4 lands at
+−0.017%, essentially zero — but flattening it also shrinks the spread to 0.118%/month gross, 0.057%
+net of 5 bps/side. Half the gross edge is transaction cost at 30% monthly turnover.
+
+**Leg A's p = 0.0569 is not a near miss to be argued around.** The threshold was pre-registered at
+0.05 and the seed at 20260816. Re-running with another seed to walk p under the line is the exact
+failure this design was built to prevent. It fails.
+
+Three of six gates fail on each leg, including two that no amount of sample would fix (gate 4's sign,
+gate 6's 3-of-6 sub-periods). Both legs are negative through sub-periods 2–4 — roughly 2019 through
+2022 — which covers the COVID crash and the 2022 drawdown, the two regimes where a momentum book
+most needs to survive.
+
+**What this does not say.** It does not say momentum is absent from equities; the published
+literature rests on samples decades longer and on universes that include the small and illiquid names
+this S&P 500 cross-section excludes by construction. It says that on 113 monthly rebalances of the
+current S&P 500 membership, at 5 bps/side, the effect does not clear six hurdles set in advance —
+and that the part of it that survives is a long-only top-decile tilt, which is a different
+hypothesis from the one registered.
+
+### Consequences
+
+- **Do not proceed to Stage 2** (can this be traded on $2–3k at Webull, whole shares). Stage 2 was
+  conditional on Stage 1 returning NOT REJECTED for at least one leg. Neither did.
+- **Do not re-cut this hypothesis** on the same data by changing lookback, skip, bucket count, or
+  universe until a NOT REJECTED appears. Two mechanisms have now been rejected on this cross-section
+  (mean reversion 2026-08-15, momentum here); a third pass over the same 490 names with a tuned
+  parameter set would be fitting the sample, not testing anything.
+- **The long-only top-decile tilt is a legitimate separate hypothesis** and the U-shape is the reason
+  to consider it. It must be pre-registered and tested on its own terms — with its own gates, its own
+  seed, and against a buy-and-hold SPY benchmark, since a 1.9%/month bucket in a period when the
+  index compounded strongly may be nothing but beta. It is not a rescue of this result.
+- **The data-quality work is the durable asset here.** Four provider-level defects were found and
+  fixed (Yahoo ignoring `adjclose`, Alpaca defaulting to `adjustment=raw`, the gapped `iex` feed, and
+  the SIP recency 403), and a fifth class — series the provider returns at the wrong interval, and
+  splits its own adjustment misses — is now screened at the study's edge. Any future study on this
+  cache inherits that.
+
+### What would change this verdict
+
+A longer sample is the only honest lever, and it is not available from this provider on this plan.
+At 113 months a t-statistic of 2 requires an annual Sharpe near 0.90, which no published equity
+momentum decile spread achieves. Extending to a 25–30 year sample with a survivorship-free
+membership list (point-in-time index constituents, not today's members backfilled) would test the
+hypothesis properly. That is a data-acquisition project, not a code change.
