@@ -222,10 +222,23 @@ is forbidden, as is any other non-determinism, so a run is exactly reproducible.
 point the same way, not that it also pass. Requiring both legs to pass would collapse the
 pre-registration into a single test and forfeit the reason for declaring two legs.
 
-**Gate 4 — not top-decile-only.** `universeMean_t` is the equal-weight mean return of all eligible
-symbols at `t`. The gate asks whether the bottom decile **underperforms the universe**. Per Section
-2, an edge living entirely in the top decile is indistinguishable from the survivorship artifact,
-and is rejected regardless of headline numbers.
+**Gate 4 — not top-decile-only.** `universeExTopMean_t` is the equal-weight mean return of all
+eligible symbols at `t` **except those in the top decile**. The gate asks whether the bottom decile
+**underperforms that mean**. Per Section 2, an edge living entirely in the top decile is
+indistinguishable from the survivorship artifact, and is rejected regardless of headline numbers.
+
+> **Amendment, 2026-08-16 — before the study was run on any real data.** As first written, this gate
+> compared the bottom decile against the mean of the *whole* universe, top decile included. That
+> statistic cannot fail for the shape it exists to reject. A top-only edge lifts the universe mean
+> above the flat bottom decile, so `universeMean − bottomMean` is positive **by construction**, and
+> the stronger the artifact the more comfortably the gate passes. Verified numerically on the
+> study's own top-only fixture: universe mean `+0.004992`, bottom decile `−0.000016`, difference
+> `+0.005009` → **pass**, where the gate exists to fail. Excluding the top decile from the
+> comparison mean removes the contamination and leaves the gate's stated intent untouched — the
+> sign of the excess is now governed entirely by whether the bottom decile underperforms the
+> non-top universe. This is recorded here, rather than changed silently, because it alters a
+> pre-registered statistic. It was decided before any real-data result existed, and no result
+> informed it.
 
 **Gate 5 — mega-cap subset.** Dollar volume is proxied by `close × volume`. For each symbol take the
 **median** over the 63 union days immediately **preceding** the first rebalance date — a window that

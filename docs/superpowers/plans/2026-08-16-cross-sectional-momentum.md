@@ -1623,18 +1623,30 @@ test("passed is an AND — one failing gate sinks the report", () => {
 
 test("an edge living only in the top bucket fails the survivorship gate", () => {
   // Every bucket flat except the top one: the shape survivorship fabricates.
-  const rand = mulberry32(24);
+  // Buckets 0-8 are EXACTLY flat, with no noise at all. That is deliberate. Once
+  // the top decile is excluded from the comparison mean the true excess here is
+  // exactly zero, so any residual noise decides the sign of a `> 0` test by coin
+  // flip: an earlier draft of this fixture carried +-0.001 of noise, and the
+  // corrected gate returned +1.13e-5 and PASSED on it. Exactly flat makes the
+  // excess exactly 0, and `0 > 0` is false deterministically, for every seed.
   const snaps: Snapshot[] = Array.from({ length: 59 }, (_, m) => {
     const scores = Array.from({ length: 100 }, (_, i) => i);
     return {
       day: 1_000 + m,
       symbols: scores.map((_, i) => `S${i}`),
       scores: { raw: scores, volAdj: scores },
-      returns: scores.map((s) => (s >= 90 ? 0.05 : 0) + (rand() - 0.5) * 0.002),
+      returns: scores.map((s) => (s >= 90 ? 0.05 : 0)),
     };
   });
   const r = evaluateGates({ leg: "raw", snapshots: snaps, megaCapSnapshots: snaps, cfg });
-  assert.equal(r.notTopOnly.pass, false, "the bottom bucket does not underperform the universe");
+  assert.equal(r.notTopOnly.pass, false, "the bottom bucket does not underperform the non-top universe");
+  // The equality is the load-bearing assertion, not the boolean above it. The
+  // original full-universe statistic returns 0.005000000000000003 on this exact
+  // fixture, so only an exact-zero check distinguishes the two.
+  assert.equal(r.notTopOnly.meanShortLegExcess, 0);
+  // NB: `passed` is also false here because monotonicity fails (rho = 0.522 with
+  // nine tied buckets, under RHO_MIN). It is corroboration, not evidence — the
+  // two assertions above are what pin gate 4.
   assert.equal(r.passed, false);
 });
 
@@ -1726,10 +1738,34 @@ export function evaluateGates(args: {
   // collapse the two pre-registered legs into a single test.
   const otherMeanSpread = mean(spreadSeries(snapshots, OTHER[leg], cfg.buckets));
 
-  // Gate 4 — survivorship inflates the top bucket and deflates the bottom, so
-  // an edge that exists only at the top is the artifact, not the signal. The
-  // bottom bucket has to actually underperform the universe.
-  const shortLegExcess = mean(months.map((m) => m.universeReturn - m.bucketReturns[0]));
+  // Gate 4 — survivorship inflates the top bucket and deflates the bottom, so an
+  // edge that exists only at the top is the artifact, not the signal. The bottom
+  // bucket has to underperform the universe EXCLUDING the top bucket.
+  //
+  // Excluding the top is not a refinement, it is the whole gate. Measured against
+  // the full universe (`m.universeReturn`, which contains the top bucket), a
+  // top-only edge lifts the benchmark above the flat bottom bucket, so the excess
+  // is positive BY CONSTRUCTION and the gate passes precisely the shape it exists
+  // to reject — the stronger the artifact, the more comfortably it passes. It
+  // measured +0.005009 on the top-only fixture before this was corrected. See the
+  // Gate 4 amendment note in the design spec.
+  //
+  // Buckets are weighted by their size because they are not equal: when the
+  // eligible count is not divisible by `buckets` the low buckets hold one symbol
+  // fewer, and this must remain an equal-weight mean over SYMBOLS, not over
+  // buckets.
+  const shortLegExcess = mean(
+    months.map((m) => {
+      let sum = 0;
+      let count = 0;
+      for (let k = 0; k < m.bucketReturns.length - 1; k++) {
+        const size = m.bucketSymbols[k].length;
+        sum += m.bucketReturns[k] * size;
+        count += size;
+      }
+      return sum / count - m.bucketReturns[0];
+    }),
+  );
 
   // Gate 5 — the same question on names that were index members throughout.
   const megaMonths = megaCapSnapshots.map((s) => bucketMonth(s, leg, cfg.buckets));
@@ -1788,10 +1824,20 @@ Temporarily change `passed` to `Object.values(gates).some((g) => g.pass)`.
 Run: `npx tsx --test src/lib/backtest/crossMomentum/gates.test.ts`
 Expected: FAIL, with `passed is an AND — one failing gate sinks the report` among the failures.
 
-Then temporarily change gate 4 to `pass: true`.
+Then restore that, and temporarily change gate 4's `pass` to the constant `true`.
 Expected: FAIL, with `an edge living only in the top bucket fails the survivorship gate` among the failures.
 
-**Restore both.** Run again and confirm PASS.
+Then restore that, and instead revert gate 4's statistic to the full-universe form —
+replace the whole weighted loop with `mean(months.map((m) => m.universeReturn - m.bucketReturns[0]))`.
+Expected: FAIL, the same test, on the `meanShortLegExcess` equality: expected `0`, got
+`0.005000000000000003`.
+
+**This third mutation is the one that matters.** It reproduces the exact defect the design
+spec's Gate 4 amendment records — a gate that passes the shape it exists to reject. If it
+comes back green, the fixture has stopped constraining the statistic and that is a finding,
+not a convenience: report it rather than proceeding.
+
+**Restore all three.** Run again and confirm PASS.
 
 - [ ] **Step 6: Typecheck and full suite**
 
@@ -1904,7 +1950,7 @@ for (const r of reports) {
     `| 1 | Monotonicity (Spearman ρ) | ${r.monotonicity.rho.toFixed(3)} | ≥ 0.60 | ${yn(r.monotonicity.pass)} |`,
     `| 2 | Permutation p | ${r.permutation.p.toFixed(4)} | ≤ 0.05 | ${yn(r.permutation.pass)} |`,
     `| 3 | Other leg's mean spread | ${pct(r.crossDefinition.otherMeanSpread)} | > 0 | ${yn(r.crossDefinition.pass)} |`,
-    `| 4 | Bottom bucket vs universe | ${pct(r.notTopOnly.meanShortLegExcess)} | > 0 | ${yn(r.notTopOnly.pass)} |`,
+    `| 4 | Bottom bucket vs universe ex-top | ${pct(r.notTopOnly.meanShortLegExcess)} | > 0 | ${yn(r.notTopOnly.pass)} |`,
     `| 5 | Mega-cap mean spread | ${pct(r.megaCap.meanSpread)} | > 0 | ${yn(r.megaCap.pass)} |`,
     `| 6 | Positive sub-periods | ${r.subPeriods.positive} of ${r.subPeriods.of} | ≥ 4 | ${yn(r.subPeriods.pass)} |`,
     "",
