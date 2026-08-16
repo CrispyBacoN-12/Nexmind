@@ -1851,6 +1851,20 @@ git add src/lib/backtest/crossMomentum/gates.ts src/lib/backtest/crossMomentum/g
 git commit -m "feat(crossMomentum): six-gate battery"
 ```
 
+> **Post-implementation note, 2026-08-16.** Review of the shipped task found the
+> test list above sufficient to prove the gates *work* but not sufficient to prove
+> they are *wired in*: the monotonicity, permutation and sub-period gates could
+> each be replaced with a hardcoded `pass: true` and every test here would stay
+> green, and gate 4's size-weighting was unconstrained because every fixture above
+> uses 100 symbols in 10 buckets, where all weights are equal. The cost arithmetic
+> had no numeric assertion. Five tests were added in `8465a4c` to close those gaps
+> — one failing-gate fixture each for gates 1, 2 and 6, a 103-symbol fixture that
+> makes bucket sizes unequal, and an exact assertion on the cost drag. `gates.ts`
+> logic is unchanged; the only edit there corrects the `RHO_MIN` doc comment,
+> which cited the two-sided p (~0.07) while calling it one-sided (~0.033). The
+> shipped test file is the authority; this task's text is left as written so the
+> gap and its closure both stay on the record.
+
 ---
 
 ### Task 9: Runner script and results document
