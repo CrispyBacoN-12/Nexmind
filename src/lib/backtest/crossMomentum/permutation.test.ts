@@ -49,16 +49,19 @@ test("p is never zero", () => {
   // is safe here, not a tolerance gamble: both sides are the same
   // correctly-rounded IEEE division of the same two integers (1 and 101).
   const snaps = build(30, 80, 14, (s) => s);
-  const { p, observed, nullMean } = permutationPValue(snaps, "raw", 10, 100, 5);
+  const { p, nullMean } = permutationPValue(snaps, "raw", 10, 100, 5);
   assert.equal(p, 1 / 101, `p must be exactly 1/(B+1), got ${p}`);
   // nullMean is the null distribution's own soundness check: shuffling
   // destroys the score-return link entirely, so the null's mean spread should
-  // sit near zero no matter how large the observed (unshuffled) spread is. On
-  // this fixture nullMean ~= 0.0018 while observed ~= 0.889 (`observed` above)
-  // - an ~89x margin below the value a mis-centered null (one that only
-  // partially breaks the link, or carries a sign error) would produce, so 0.01
-  // is a safe bound without being a coin-flip tolerance.
-  assert.ok(Math.abs(nullMean) < 0.01, `expected nullMean near zero, got ${nullMean} (observed ${observed})`);
+  // sit near zero no matter how large the observed (unshuffled, ~0.889) spread
+  // is. 0.0017609177655540404 is a golden value: observed by running this
+  // exact fixture and pinned exactly, not a tolerance band, because a loose
+  // bound (e.g. "< 0.01") cannot tell mean(nullMeans) apart from a single
+  // draw nullMeans[0] (~0.0034 here) or a constant 0 — both also clear a loose
+  // bound. If a future refactor changes this value, that is a signal to
+  // investigate the RNG stream order (did the shuffle draws get reordered
+  // relative to this seed?), not a cue to update the constant reflexively.
+  assert.equal(nullMean, 0.0017609177655540404);
 });
 
 test("an empty snapshot list throws instead of returning a degenerate p", () => {
