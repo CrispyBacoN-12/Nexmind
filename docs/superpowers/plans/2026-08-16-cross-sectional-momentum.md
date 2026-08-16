@@ -851,7 +851,7 @@ test("a symbol whose bars stop mid-period exits at its last open and is not drop
   const out = buildSnapshots(truncated, cfg);
   const finalSnap = out.snapshots[out.snapshots.length - 1];
   assert.ok(finalSnap.symbols.includes("DOWN"), "DOWN must not be silently dropped");
-  assert.equal(out.substitutions >= 1, true, "the substituted exit must be counted");
+  assert.ok(out.substitutions >= 1, "the substituted exit must be counted");
 
   const i = finalSnap.symbols.indexOf("DOWN");
   const fillDay = finalSnap.day + 1;
@@ -1615,7 +1615,7 @@ export function evaluateGates(args: {
   // Gate 4 — survivorship inflates the top bucket and deflates the bottom, so
   // an edge that exists only at the top is the artifact, not the signal. The
   // bottom bucket has to actually underperform the universe.
-  const shortLegExcess = months.map((m) => m.universeReturn - m.bucketReturns[0]);
+  const shortLegExcess = mean(months.map((m) => m.universeReturn - m.bucketReturns[0]));
 
   // Gate 5 — the same question on names that were index members throughout.
   const megaMonths = megaCapSnapshots.map((s) => bucketMonth(s, leg, cfg.buckets));
@@ -1641,7 +1641,7 @@ export function evaluateGates(args: {
     monotonicity: { rho, pass: rho >= RHO_MIN },
     permutation: { p: perm.p, pass: perm.p <= P_MAX },
     crossDefinition: { otherMeanSpread, pass: otherMeanSpread > 0 },
-    notTopOnly: { meanShortLegExcess: mean(shortLegExcess), pass: mean(shortLegExcess) > 0 },
+    notTopOnly: { meanShortLegExcess: shortLegExcess, pass: shortLegExcess > 0 },
     megaCap: { meanSpread: megaSpread, months: megaMonths.length, pass: megaSpread > 0 },
     subPeriods: { positive, of: cfg.blocks, blockMeans, pass: positive >= BLOCKS_POSITIVE_MIN },
   };
