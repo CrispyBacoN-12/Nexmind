@@ -748,7 +748,7 @@ git commit -m "feat(crossMomentum): decile bucketing"
 **Interfaces:**
 - Consumes: `alignUniverse`, `dayKey` from `@/lib/backtest/crossSectional/calendar`; `monthEndIndices` from `./monthEnds`; `momentumScores` from `./scores`; `MomentumConfig`, `Snapshot` from `./types`; `Candle` from `@/lib/indicators`.
 - Produces:
-  - `buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig): { snapshots: Snapshot[]; substitutions: number }`
+  - `buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig): { snapshots: Snapshot[]; substitutions: number; unfillable: number }`
   - `topByDollarVolume(bars: Map<string, Candle[]>, days: number[], beforeDay: number, window: number, count: number): Set<string>`
   - `subsetBars(bars: Map<string, Candle[]>, keep: Set<string>): Map<string, Candle[]>`
 
@@ -773,12 +773,21 @@ const cfg: MomentumConfig = {
 };
 
 /**
- * Bars on consecutive UTC days. `o` is deliberately 1% below `c`, so a fill
- * that reads the close instead of the open produces a different return.
+ * Bars on consecutive UTC days. `o/c` deliberately varies by bar (0.975 at
+ * bar 0 rising to 1.005 by bar 600), so a fill that reads the close instead
+ * of the open produces a different return. A *constant* offset would cancel
+ * out of any open-to-open vs. close-to-close ratio comparison; varying it
+ * per bar means no two bars share a factor, so the ratios can never coincide.
+ *
+ * NB the factor MUST vary per bar. An earlier draft of this plan used a flat
+ * `o = c * 0.99` and claimed it made a fill-at-close visible. It does not:
+ * (c2 * 0.99) / (c1 * 0.99) === c2 / c1 exactly, so the mutation `.o` -> `.c`
+ * left every test green, differing only by ~2e-16 of floating-point noise.
+ * The stated range stays inside the fixture's own l = c * 0.97 / h = c * 1.02.
  */
 function series(closes: number[], startDay = START): Candle[] {
   return closes.map((c, i) => ({
-    t: (startDay + i) * DAY, o: c * 0.99, h: c * 1.02, l: c * 0.97, c, v: 1_000,
+    t: (startDay + i) * DAY, o: c * (0.975 + i * 0.00005), h: c * 1.02, l: c * 0.97, c, v: 1_000,
   }));
 }
 
@@ -798,8 +807,11 @@ test("snapshots start only once the warm-up is behind them", () => {
   const { snapshots } = buildSnapshots(twoSymbols(), cfg);
   assert.ok(snapshots.length > 0, "expected at least one rebalance");
   const firstDay = snapshots[0].day;
-  // Bar 273 is the earliest eligible bar; its day key is START + 273.
-  assert.ok(firstDay >= START + 273, `first rebalance ${firstDay} precedes the warm-up`);
+  // Bar 273 is the earliest eligible bar and is itself a month end (2020-09-30),
+  // so the first rebalance lands on it exactly. A `>=` here would leave 30 bars
+  // of slack: the previous month end is bar 243, so a warm-up short by up to
+  // thirty bars would still produce START + 273 and pass.
+  assert.equal(firstDay, START + 273, `first rebalance ${firstDay} is not the warm-up bar`);
 });
 
 test("returns are measured open-to-open, not close-to-close", () => {
@@ -817,10 +829,12 @@ test("returns are measured open-to-open, not close-to-close", () => {
 
   assert.ok(Math.abs(s.returns[i] - expected) < 1e-12, `open-to-open expected ${expected}, got ${s.returns[i]}`);
 
-  // Vacuity guard: the close-to-close number must differ, or this test would
-  // pass against a fill-at-close bug.
+  // Vacuity guard: the close-to-close number must differ meaningfully, or
+  // this test would pass against a fill-at-close bug on floating-point noise
+  // alone. A bare assert.notEqual is NOT enough — it is satisfied by a 2e-16
+  // difference, which is exactly how the flat-0.99 fixture passed.
   const closeToClose = candles[at(nextDay)].c / candles[at(fillDay)].c - 1;
-  assert.notEqual(expected, closeToClose);
+  assert.ok(Math.abs(expected - closeToClose) > 1e-6, `open- and close-based returns must differ meaningfully, got ${expected} vs ${closeToClose}`);
 });
 
 test("consecutive snapshots are one month apart and strictly increasing", () => {
@@ -893,6 +907,58 @@ test("topByDollarVolume ignores bars at or after the cutoff day", () => {
   ]);
   const { days } = alignUniverse(bars);
   assert.deepEqual([...topByDollarVolume(bars, days, days[80], 63, 1)], ["STEADY"]);
+
+  // The 63-day assertion above cannot actually detect the off-by-one it exists
+  // to prevent: a median is robust to one added day, so admitting the cutoff
+  // itself moves LATE's median from 100 to 100 and STEADY still wins. Narrowing
+  // the window to a single day removes that robustness — the correct window is
+  // index 79 alone (LATE 100, STEADY 50,000), while an inclusive bug windows
+  // 79-80 and hands LATE a median of ~5e7.
+  assert.deepEqual([...topByDollarVolume(bars, days, days[80], 1, 1)], ["STEADY"]);
+});
+
+test("topByDollarVolume averages the two middle values on an even-length window", () => {
+  // Sorted dollar volumes [1, 10, 20, 100]: the median is 15, not the
+  // lower-middle 20 — and not the lower-middle 10 that `dv[mid - 1]` gives.
+  const flat = (v: number) => series([v, v, v, v, v]).map((c) => ({ ...c, v: 1 }));
+  const bars = new Map<string, Candle[]>([
+    ["EVEN", series([1, 10, 20, 100, 999]).map((c) => ({ ...c, v: 1 }))],
+    ["RIVAL", flat(12)],
+  ]);
+  const { days } = alignUniverse(bars);
+  // EVEN's median is 15 and beats RIVAL's 12. Taking the lower middle instead
+  // gives EVEN 10, and RIVAL wins — which is how this test detects the bug.
+  assert.deepEqual([...topByDollarVolume(bars, days, days[4], 4, 1)], ["EVEN"]);
+});
+
+test("topByDollarVolume rejects a cutoff that is not a union calendar day", () => {
+  // Failing open is a lookahead: indexOf returns -1, and slice(0, -1) is the
+  // whole history minus one day, silently ranking on data past the cutoff.
+  const bars = twoSymbols();
+  const { days } = alignUniverse(bars);
+  assert.throws(() => topByDollarVolume(bars, days, 999_999, 63, 1), /not a union calendar day/);
+  // Vacuity guard: a real union day on the same fixture does not throw.
+  assert.ok(topByDollarVolume(bars, days, days[80], 63, 1).size > 0);
+});
+
+test("a selected symbol with no bar on or after the fill day is counted, not hidden", () => {
+  // Delisting at the ranking bar itself leaves nothing measurable, so the
+  // symbol cannot enter the snapshot. It must still be counted: a universe
+  // full of month-end delistings would otherwise report substitutions = 0 and
+  // look clean.
+  const loose = { ...cfg, minEligible: 1 };
+  const bars = twoSymbols();
+  const full = bars.get("DOWN")!;
+  // DOWN's last bar IS the first rebalance's ranking bar, so it scores and is
+  // then unfillable.
+  bars.set("DOWN", full.slice(0, 274));
+
+  const out = buildSnapshots(bars, loose);
+  assert.equal(out.unfillable, 1, "the unfillable selection must be counted exactly once");
+  const first = out.snapshots[0];
+  assert.equal(first.day, START + 273, "the rebalance that dropped DOWN must still exist");
+  assert.ok(first.symbols.includes("UP"), "UP must still be selected");
+  assert.ok(!first.symbols.includes("DOWN"), "DOWN has no measurable return to report");
 });
 
 test("subsetBars keeps only the named symbols", () => {
@@ -935,6 +1001,16 @@ export interface StudyOutput {
   snapshots: Snapshot[];
   /** Selections whose fill or exit bar was not the intended union day. */
   substitutions: number;
+  /**
+   * Selected symbols with no return to report: either no bar ever arrived on
+   * or after the fill day (delisted at the ranking bar itself), or the
+   * fallback exit collapsed onto the fill bar (the symbol's last bar was
+   * already its fill). Both leave nothing measurable, so the symbol is left
+   * out of every snapshot rather than assigned a fabricated return — this
+   * counts how often that happened so a run with many of them is visible
+   * instead of silently reporting `substitutions = 0` and looking clean.
+   */
+  unfillable: number;
 }
 
 export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig): StudyOutput {
@@ -942,6 +1018,7 @@ export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig)
   const ends = monthEndIndices(days);
   const snapshots: Snapshot[] = [];
   let substitutions = 0;
+  let unfillable = 0;
 
   // Each rebalance needs the NEXT month end to exit into, so the last flagged
   // month end never opens a position.
@@ -966,15 +1043,25 @@ export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig)
       if (score === null) continue;
 
       // Fill and exit are resolved only after selection, because neither is
-      // knowable at the ranking date. A selected symbol is never dropped for
-      // what happens after — dropping it retroactively is the survivorship
-      // mechanism this study exists to avoid.
+      // knowable at the ranking date. A selected symbol whose bars merely stop
+      // early is not dropped — it exits at its last open, because dropping it
+      // retroactively is the survivorship mechanism this study exists to avoid.
+      //
+      // Two cases leave nothing to measure at all, and both are counted rather
+      // than assigned a fabricated return: no bar ever arrives on or after the
+      // fill day, and a fallback exit that lands on the fill bar itself.
       const fill = barAtOrAfter(perDay, days, fillIdx);
-      if (fill === null) continue; // no fill ever happened; there is no trade
+      if (fill === null) {
+        unfillable++;
+        continue; // no fill ever happened; there is no trade
+      }
       const exact = barAtOrAfter(perDay, days, exitFillIdx);
       // Bars stopped before the exit day: exit at the last available open.
       const exit = exact ?? candles.length - 1;
-      if (exit <= fill) continue;
+      if (exit <= fill) {
+        unfillable++;
+        continue;
+      }
 
       if (dayKey(candles[fill].t) !== days[fillIdx] || dayKey(candles[exit].t) !== days[exitFillIdx]) {
         substitutions++;
@@ -990,7 +1077,7 @@ export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig)
     snapshots.push({ day: days[rankIdx], symbols, scores: { raw, volAdj }, returns });
   }
 
-  return { snapshots, substitutions };
+  return { snapshots, substitutions, unfillable };
 }
 
 /**
@@ -1007,6 +1094,9 @@ export function topByDollarVolume(
   count: number,
 ): Set<string> {
   const end = days.indexOf(beforeDay);
+  // Failing open here would be a lookahead, not an inconvenience: a missing
+  // cutoff gives end = -1, and slice(0, -1) is the whole history bar one day.
+  if (end < 0) throw new Error(`beforeDay ${beforeDay} is not a union calendar day`);
   const lo = Math.max(0, end - window);
   const wanted = new Set(days.slice(lo, end));
 
@@ -1034,19 +1124,33 @@ export function subsetBars(bars: Map<string, Candle[]>, keep: Set<string>): Map<
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx tsx --test src/lib/backtest/crossMomentum/study.test.ts`
-Expected: PASS, 9 tests
+Expected: PASS, 12 tests
 
-- [ ] **Step 5: Verify the fill test is load-bearing (mutation check)**
+- [ ] **Step 5: Verify the tests are load-bearing (mutation checks)**
 
-Temporarily change `returns.push(candles[exit].o / candles[fill].o - 1)` to use `.c` on both sides.
+Six mutations. Apply one at a time, run the test file, confirm the NAMED test
+fails, restore before the next. A mutation that leaves every test green is a
+finding about the tests, not a pass — report it rather than moving on.
 
-Run: `npx tsx --test src/lib/backtest/crossMomentum/study.test.ts`
-Expected: FAIL, with `returns are measured open-to-open, not close-to-close` among the failures.
+1. `returns.push(candles[exit].o / candles[fill].o - 1)` → `.c` on both sides.
+   Expected: FAIL — `returns are measured open-to-open, not close-to-close`.
+   (Test 6, `a symbol whose bars stop mid-period…`, also fails: it shares the
+   same return line. That is expected, not a second finding.)
+2. `const exit = exact ?? candles.length - 1;` → `const exit = exact; if (exit === null) continue;` (typed `number | null`).
+   Expected: FAIL — `a symbol whose bars stop mid-period exits at its last open and is not dropped`.
+3. `days.slice(lo, end)` → `days.slice(lo, end + 1)`.
+   Expected: FAIL — `topByDollarVolume ignores bars at or after the cutoff day`,
+   on its `window = 1` assertion. The `63` assertion above it will still pass:
+   a median absorbs one added day. That is the whole reason the `window = 1`
+   probe exists.
+4. `(dv[mid - 1] + dv[mid]) / 2` → `dv[mid - 1]`.
+   Expected: FAIL — `topByDollarVolume averages the two middle values on an even-length window`.
+5. Delete the `if (end < 0) throw` line.
+   Expected: FAIL — `topByDollarVolume rejects a cutoff that is not a union calendar day`.
+6. Delete `unfillable++` from the `fill === null` branch.
+   Expected: FAIL — `a selected symbol with no bar on or after the fill day is counted, not hidden`.
 
-Then temporarily replace `const exit = exact ?? candles.length - 1;` with `const exit = exact; if (exit === null) continue;` (typed as `number | null`).
-Expected: FAIL, with `a symbol whose bars stop mid-period exits at its last open and is not dropped` among the failures.
-
-**Restore both.** Run again and confirm PASS.
+**Restore all six.** Run again and confirm PASS.
 
 - [ ] **Step 6: Typecheck and full suite**
 
@@ -1783,6 +1887,7 @@ const lines: string[] = [
   `- rebalances: **${full.snapshots.length}** (${iso(full.snapshots[0].day)} → ${iso(full.snapshots[full.snapshots.length - 1].day)})`,
   `- eligible per rebalance: min ${Math.min(...full.snapshots.map((s) => s.symbols.length))}, max ${Math.max(...full.snapshots.map((s) => s.symbols.length))}`,
   `- fill/exit substitutions: ${full.substitutions}`,
+  `- unfillable selections (dropped, no measurable return): ${full.unfillable}`,
   `- mega-cap subset: ${megaSymbols.size} symbols, ${mega.snapshots.length} rebalances`,
   `- config: lookback ${cfg.lookback}, skip ${cfg.skip}, buckets ${cfg.buckets}, seed ${cfg.seed}, ${cfg.iterations} permutations`,
   "",
@@ -1846,6 +1951,9 @@ Read the generated document and confirm each of these. Any mismatch is a defect 
 - eligible-per-rebalance minimum is comfortably above `minEligible` (expect 400+)
 - the mega-cap subset holds exactly 200 symbols
 - substitutions is small (single digits); a large count means the bar cache has gaps worth investigating
+- unfillable is small (single digits). A large count means many selected names had no measurable
+  next-month return at all — that is the delisting bias this study cannot correct, and it must be
+  stated in the results doc rather than left in the console output
 - `bucketMeans` has 10 entries and none is `NaN`
 - the two legs' mean spreads are not bit-identical (that would mean one leg is reading the other's scores)
 
