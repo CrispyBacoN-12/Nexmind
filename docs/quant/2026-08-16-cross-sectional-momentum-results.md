@@ -1,5 +1,31 @@
 # Cross-Sectional Momentum — Decile Study Results
 
+> # ⛔ VOID — DO NOT CITE THIS RUN
+>
+> **Every number below this line is an artifact of unadjusted stock splits and measures
+> nothing about momentum.** `.cache/bars/sp500-1d.json` stores raw, unadjusted prices.
+> Verified directly in the cache: CMG closes at 3283.08 on 2024-06-25 and opens at 65.62 the
+> next session (50:1), GOOGL 2235.49 → 112.68 (20:1), AMZN 2446.41 → 125.345 (20:1).
+>
+> This is not noise, and it is not symmetric. A 12-month lookback spanning a split reads as
+> roughly −95%, so the score ranks the stock an extreme loser and puts it in bucket 0. But
+> companies split *because the price ran up* — the contaminated names are NVDA, AMZN, GOOGL,
+> CMG, BKNG. Genuine winners are loaded into the loser bucket, where they go on winning. The
+> bottom bucket therefore outperforms and the spread turns negative **by construction**,
+> which is precisely the reported result: bucket 1 (losers) +2.909% against bucket 10
+> (winners) +1.254%, with ρ negative on both legs.
+>
+> One symbol-month, `PARA` at +5269.9% on 2024-08-30, produces that month's −113.88% spread
+> single-handedly, and that one month produces the −11.859% sub-period block that exposed the
+> defect. 8 symbol-months exceed ±100% and 71 exceed ±50% across the study.
+>
+> **The REJECTED verdict below is a measurement of the cache's split handling, not of
+> cross-sectional momentum. The study has not been run.** The six gates and their thresholds
+> are untouched and remain pre-registered as committed; only the input data is disqualified.
+> Re-running on split-adjusted bars is a correction of a measurably broken input, not a
+> re-specification of the hypothesis after seeing a result — but the re-run will no longer be
+> blind, and that limitation must be stated wherever its numbers are reported.
+
 **Run date:** 2026-08-16 · **Cache fetched:** 2026-08-15T09:12:21.233Z
 **Spec:** `docs/superpowers/specs/2026-08-16-cross-sectional-momentum-design.md`
 
