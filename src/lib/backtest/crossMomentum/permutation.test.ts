@@ -45,10 +45,28 @@ test("the p-value is reproducible from its seed", () => {
 
 test("p is never zero", () => {
   // The +1 on both sides of the ratio: a null that never beat the observed
-  // value gives 1/(B+1), not a claim of impossibility.
+  // value gives exactly 1/(B+1), not a claim of impossibility. Exact equality
+  // is safe here, not a tolerance gamble: both sides are the same
+  // correctly-rounded IEEE division of the same two integers (1 and 101).
   const snaps = build(30, 80, 14, (s) => s);
-  const { p } = permutationPValue(snaps, "raw", 10, 100, 5);
-  assert.ok(p >= 1 / 101, `p must be at least 1/(B+1), got ${p}`);
+  const { p, observed, nullMean } = permutationPValue(snaps, "raw", 10, 100, 5);
+  assert.equal(p, 1 / 101, `p must be exactly 1/(B+1), got ${p}`);
+  // nullMean is the null distribution's own soundness check: shuffling
+  // destroys the score-return link entirely, so the null's mean spread should
+  // sit near zero no matter how large the observed (unshuffled) spread is. On
+  // this fixture nullMean ~= 0.0018 while observed ~= 0.889 (`observed` above)
+  // - an ~89x margin below the value a mis-centered null (one that only
+  // partially breaks the link, or carries a sign error) would produce, so 0.01
+  // is a safe bound without being a coin-flip tolerance.
+  assert.ok(Math.abs(nullMean) < 0.01, `expected nullMean near zero, got ${nullMean} (observed ${observed})`);
+});
+
+test("an empty snapshot list throws instead of returning a degenerate p", () => {
+  // observed = mean([]) = 0; each null iteration divides 0/0 -> NaN; NaN >=
+  // observed is always false, so atLeast stays 0 and p bottoms out at
+  // 1/(B+1) - the most significant value the instrument can express, computed
+  // from zero data. That must not happen silently.
+  assert.throws(() => permutationPValue([], "raw", 10, 1000, 1));
 });
 
 test("permuting does not mutate the snapshots", () => {
@@ -64,7 +82,11 @@ test("spreadSeries returns one observation per snapshot", () => {
 });
 
 test("spreadSeries reads the leg it is asked for", () => {
-  // volAdj is the reversed score array, so its spread must be the negation.
+  // volAdj is the reversed score array, not the negated one: symbol i keeps
+  // return link(scores[i]) but ranks under scores[n-1-i], so its top bucket
+  // holds symbols whose true rank (and return) is arbitrary and mid-distribution,
+  // not the raw loser bucket. The two spread series must simply differ, not
+  // be mirror images of each other.
   const snaps = build(12, 40, 17, (s) => s);
   const raw = spreadSeries(snaps, "raw", 10);
   const vol = spreadSeries(snaps, "volAdj", 10);

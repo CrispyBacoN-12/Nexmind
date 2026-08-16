@@ -33,6 +33,12 @@ export function permutationPValue(
   iterations: number,
   seed: number,
 ): PermutationResult {
+  // A p-value from zero data is not a small p-value, it is an undefined one:
+  // 0/0 -> NaN per iteration, NaN >= observed is always false, and the ratio
+  // silently bottoms out at the most significant value the instrument can
+  // express. Fail loudly instead, the same way study.ts's topByDollarVolume
+  // refuses a lookahead rather than returning a number that looks plausible.
+  if (snapshots.length === 0) throw new Error("permutationPValue: snapshots is empty");
   const observed = mean(spreadSeries(snapshots, leg, buckets));
   const rand = mulberry32(seed);
   const nullMeans: number[] = [];
