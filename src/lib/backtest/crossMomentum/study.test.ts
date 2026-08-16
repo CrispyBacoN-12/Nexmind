@@ -14,12 +14,15 @@ const cfg: MomentumConfig = {
 };
 
 /**
- * Bars on consecutive UTC days. `o` is deliberately 1% below `c`, so a fill
- * that reads the close instead of the open produces a different return.
+ * Bars on consecutive UTC days. `o/c` deliberately varies by bar (0.975 at
+ * bar 0 rising to 1.005 by bar 600), so a fill that reads the close instead
+ * of the open produces a different return. A *constant* offset would cancel
+ * out of any open-to-open vs. close-to-close ratio comparison; varying it
+ * per bar means no two bars share a factor, so the ratios can never coincide.
  */
 function series(closes: number[], startDay = START): Candle[] {
   return closes.map((c, i) => ({
-    t: (startDay + i) * DAY, o: c * 0.99, h: c * 1.02, l: c * 0.97, c, v: 1_000,
+    t: (startDay + i) * DAY, o: c * (0.975 + i * 0.00005), h: c * 1.02, l: c * 0.97, c, v: 1_000,
   }));
 }
 
@@ -58,10 +61,11 @@ test("returns are measured open-to-open, not close-to-close", () => {
 
   assert.ok(Math.abs(s.returns[i] - expected) < 1e-12, `open-to-open expected ${expected}, got ${s.returns[i]}`);
 
-  // Vacuity guard: the close-to-close number must differ, or this test would
-  // pass against a fill-at-close bug.
+  // Vacuity guard: the close-to-close number must differ meaningfully, or
+  // this test would pass against a fill-at-close bug on floating-point noise
+  // alone.
   const closeToClose = candles[at(nextDay)].c / candles[at(fillDay)].c - 1;
-  assert.notEqual(expected, closeToClose);
+  assert.ok(Math.abs(expected - closeToClose) > 1e-6, `open- and close-based returns must differ meaningfully, got ${expected} vs ${closeToClose}`);
 });
 
 test("consecutive snapshots are one month apart and strictly increasing", () => {
