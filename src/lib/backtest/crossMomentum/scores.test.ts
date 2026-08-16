@@ -54,15 +54,13 @@ test("the score at bar i cannot see bar i + 1", () => {
   assert.equal(after.raw, base.raw);
   assert.equal(after.volAdj, base.volAdj);
 
-  // Vacuity guard: bar 301 lies inside the window for i = 330 (which spans bars
-  // 57..309), so the perturbation MUST move that score. Without this the
-  // assertions above would also pass against a function that returns a constant.
-  // Note: `raw` is close[end] / close[start] - 1, a ratio of the two window
-  // endpoints only (57 and 309), so an interior perturbation at 301 cannot move
-  // it by construction — only `volAdj` (which depends on every return in the
-  // window, via sigma) is affected, and that's what this guard checks.
-  const movedBefore = momentumScores(c, 330, LOOKBACK, SKIP)!;
-  const movedAfter = momentumScores(perturbed, 330, LOOKBACK, SKIP)!;
+  // Vacuity guard: bar 301 is the window's own `end` for i = 322 (window
+  // 49..301, since end = 322 - 21 = 301 and start = 301 - 252 = 49), so the
+  // perturbation MUST move both scores. Without this the assertions above
+  // would also pass against a function that returns a constant.
+  const movedBefore = momentumScores(c, 322, LOOKBACK, SKIP)!;
+  const movedAfter = momentumScores(perturbed, 322, LOOKBACK, SKIP)!;
+  assert.notEqual(movedAfter.raw, movedBefore.raw);
   assert.notEqual(movedAfter.volAdj, movedBefore.volAdj);
 });
 
