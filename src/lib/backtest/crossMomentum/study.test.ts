@@ -42,8 +42,11 @@ test("snapshots start only once the warm-up is behind them", () => {
   const { snapshots } = buildSnapshots(twoSymbols(), cfg);
   assert.ok(snapshots.length > 0, "expected at least one rebalance");
   const firstDay = snapshots[0].day;
-  // Bar 273 is the earliest eligible bar; its day key is START + 273.
-  assert.ok(firstDay >= START + 273, `first rebalance ${firstDay} precedes the warm-up`);
+  // Bar 273 is the earliest eligible bar and is itself a month end (2020-09-30),
+  // so the first rebalance lands on it exactly. A `>=` here would leave 30 bars
+  // of slack: the previous month end is bar 243, so a warm-up short by up to
+  // thirty bars would still produce START + 273 and pass.
+  assert.equal(firstDay, START + 273, `first rebalance ${firstDay} is not the warm-up bar`);
 });
 
 test("returns are measured open-to-open, not close-to-close", () => {
@@ -138,6 +141,58 @@ test("topByDollarVolume ignores bars at or after the cutoff day", () => {
   ]);
   const { days } = alignUniverse(bars);
   assert.deepEqual([...topByDollarVolume(bars, days, days[80], 63, 1)], ["STEADY"]);
+
+  // The 63-day assertion above cannot actually detect the off-by-one it exists
+  // to prevent: a median is robust to one added day, so admitting the cutoff
+  // itself moves LATE's median from 100 to 100 and STEADY still wins. Narrowing
+  // the window to a single day removes that robustness — the correct window is
+  // index 79 alone (LATE 100, STEADY 50,000), while an inclusive bug windows
+  // 79-80 and hands LATE a median of ~5e7.
+  assert.deepEqual([...topByDollarVolume(bars, days, days[80], 1, 1)], ["STEADY"]);
+});
+
+test("topByDollarVolume averages the two middle values on an even-length window", () => {
+  // Sorted dollar volumes [1, 10, 20, 100]: the median is 15, not the
+  // lower-middle 20 — and not the lower-middle 10 that `dv[mid - 1]` gives.
+  const flat = (v: number) => series([v, v, v, v, v]).map((c) => ({ ...c, v: 1 }));
+  const bars = new Map<string, Candle[]>([
+    ["EVEN", series([1, 10, 20, 100, 999]).map((c) => ({ ...c, v: 1 }))],
+    ["RIVAL", flat(12)],
+  ]);
+  const { days } = alignUniverse(bars);
+  // EVEN's median is 15 and beats RIVAL's 12. Taking the lower middle instead
+  // gives EVEN 10, and RIVAL wins — which is how this test detects the bug.
+  assert.deepEqual([...topByDollarVolume(bars, days, days[4], 4, 1)], ["EVEN"]);
+});
+
+test("topByDollarVolume rejects a cutoff that is not a union calendar day", () => {
+  // Failing open is a lookahead: indexOf returns -1, and slice(0, -1) is the
+  // whole history minus one day, silently ranking on data past the cutoff.
+  const bars = twoSymbols();
+  const { days } = alignUniverse(bars);
+  assert.throws(() => topByDollarVolume(bars, days, 999_999, 63, 1), /not a union calendar day/);
+  // Vacuity guard: a real union day on the same fixture does not throw.
+  assert.ok(topByDollarVolume(bars, days, days[80], 63, 1).size > 0);
+});
+
+test("a selected symbol with no bar on or after the fill day is counted, not hidden", () => {
+  // Delisting at the ranking bar itself leaves nothing measurable, so the
+  // symbol cannot enter the snapshot. It must still be counted: a universe
+  // full of month-end delistings would otherwise report substitutions = 0 and
+  // look clean.
+  const loose = { ...cfg, minEligible: 1 };
+  const bars = twoSymbols();
+  const full = bars.get("DOWN")!;
+  // DOWN's last bar IS the first rebalance's ranking bar, so it scores and is
+  // then unfillable.
+  bars.set("DOWN", full.slice(0, 274));
+
+  const out = buildSnapshots(bars, loose);
+  assert.equal(out.unfillable, 1, "the unfillable selection must be counted exactly once");
+  const first = out.snapshots[0];
+  assert.equal(first.day, START + 273, "the rebalance that dropped DOWN must still exist");
+  assert.ok(first.symbols.includes("UP"), "UP must still be selected");
+  assert.ok(!first.symbols.includes("DOWN"), "DOWN has no measurable return to report");
 });
 
 test("subsetBars keeps only the named symbols", () => {

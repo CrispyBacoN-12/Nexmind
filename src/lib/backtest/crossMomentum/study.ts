@@ -20,6 +20,16 @@ export interface StudyOutput {
   snapshots: Snapshot[];
   /** Selections whose fill or exit bar was not the intended union day. */
   substitutions: number;
+  /**
+   * Selected symbols with no return to report: either no bar ever arrived on
+   * or after the fill day (delisted at the ranking bar itself), or the
+   * fallback exit collapsed onto the fill bar (the symbol's last bar was
+   * already its fill). Both leave nothing measurable, so the symbol is left
+   * out of every snapshot rather than assigned a fabricated return — this
+   * counts how often that happened so a run with many of them is visible
+   * instead of silently reporting `substitutions = 0` and looking clean.
+   */
+  unfillable: number;
 }
 
 export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig): StudyOutput {
@@ -27,6 +37,7 @@ export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig)
   const ends = monthEndIndices(days);
   const snapshots: Snapshot[] = [];
   let substitutions = 0;
+  let unfillable = 0;
 
   // Each rebalance needs the NEXT month end to exit into, so the last flagged
   // month end never opens a position.
@@ -51,15 +62,25 @@ export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig)
       if (score === null) continue;
 
       // Fill and exit are resolved only after selection, because neither is
-      // knowable at the ranking date. A selected symbol is never dropped for
-      // what happens after — dropping it retroactively is the survivorship
-      // mechanism this study exists to avoid.
+      // knowable at the ranking date. A selected symbol whose bars merely stop
+      // early is not dropped — it exits at its last open, because dropping it
+      // retroactively is the survivorship mechanism this study exists to avoid.
+      //
+      // Two cases leave nothing to measure at all, and both are counted rather
+      // than assigned a fabricated return: no bar ever arrives on or after the
+      // fill day, and a fallback exit that lands on the fill bar itself.
       const fill = barAtOrAfter(perDay, days, fillIdx);
-      if (fill === null) continue; // no fill ever happened; there is no trade
+      if (fill === null) {
+        unfillable++;
+        continue; // no fill ever happened; there is no trade
+      }
       const exact = barAtOrAfter(perDay, days, exitFillIdx);
       // Bars stopped before the exit day: exit at the last available open.
       const exit = exact ?? candles.length - 1;
-      if (exit <= fill) continue;
+      if (exit <= fill) {
+        unfillable++;
+        continue;
+      }
 
       if (dayKey(candles[fill].t) !== days[fillIdx] || dayKey(candles[exit].t) !== days[exitFillIdx]) {
         substitutions++;
@@ -75,7 +96,7 @@ export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig)
     snapshots.push({ day: days[rankIdx], symbols, scores: { raw, volAdj }, returns });
   }
 
-  return { snapshots, substitutions };
+  return { snapshots, substitutions, unfillable };
 }
 
 /**
@@ -92,6 +113,9 @@ export function topByDollarVolume(
   count: number,
 ): Set<string> {
   const end = days.indexOf(beforeDay);
+  // Failing open here would be a lookahead, not an inconvenience: a missing
+  // cutoff gives end = -1, and slice(0, -1) is the whole history bar one day.
+  if (end < 0) throw new Error(`beforeDay ${beforeDay} is not a union calendar day`);
   const lo = Math.max(0, end - window);
   const wanted = new Set(days.slice(lo, end));
 
