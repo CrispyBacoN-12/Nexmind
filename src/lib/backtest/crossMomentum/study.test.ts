@@ -226,12 +226,17 @@ test("isMember excludes a non-member symbol from a rebalance", () => {
 });
 
 test("isMember includes a symbol once it becomes a member", () => {
-  const bars = twoSymbols();
+  const bars = threeSymbols();
   const { snapshots: baseline } = buildSnapshots(bars, cfg);
   const firstDay = baseline[0].day;
 
-  const isMember = (symbol: string, d: number) => symbol === "UP" || d > firstDay;
+  // DOWN is excluded only on the first rebalance's ranking day; UP and FLAT
+  // are always members, so DOWN's exclusion still leaves 2 eligible
+  // (>= minEligible) and the rebalance still happens on firstDay, with DOWN
+  // rejoining as a candidate on the next rebalance.
+  const isMember = (symbol: string, d: number) => symbol !== "DOWN" || d > firstDay;
   const { snapshots } = buildSnapshots(bars, cfg, isMember);
+  assert.ok(!snapshots[0].symbols.includes("DOWN"), "DOWN should be excluded from the first rebalance");
   const second = snapshots[1];
   assert.ok(second.symbols.includes("DOWN"), "DOWN should be a candidate again once it becomes a member");
 });

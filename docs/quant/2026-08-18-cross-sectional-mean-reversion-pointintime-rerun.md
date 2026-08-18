@@ -2,17 +2,32 @@
 
 **Date:** 2026-08-18
 **Spec:** `docs/superpowers/specs/2026-08-15-cross-sectional-mean-reversion-design.md`
-**Plan:** `docs/superpowers/sdd/2026-08-18-point-in-time-membership/`
+**Plan:** `docs/superpowers/plans/2026-08-18-point-in-time-membership.md`
 **Code:** `src/lib/backtest/crossSectional/`, `src/lib/backtest/crossSectional/membership.ts`,
 `scripts/sweep-cross-sectional.mts`, `scripts/walkforward-cross-sectional.mts`
 
 ## What changed from the 2026-08-15 run
 
-Nothing except the universe. Every gate, threshold, config value, train/test split
-fraction, and cost model is identical to the original run — this is a data-correctness
-re-run, not a re-cut of the hypothesis. The only difference: candidate selection is now
-gated on real point-in-time S&P 500 membership (`src/lib/backtest/crossSectional/membership.ts`),
-instead of applying today's S&P 500 list uniformly across the entire backtest history.
+The membership gate — plus one thing this task's plan text didn't anticipate: this run's bar
+cache (`.cache/bars/sp500-1d.json`, fetched 2026-08-16) is also different from the one behind
+the 2026-08-15 doc, and covers a longer, more recent span (~10 years vs ~5.3 years; see "How
+this was measured" below). That cache difference wasn't part of this task's design — it was
+already sitting in this worktree when this task started.
+
+Because of that, this doc's numbers are not a clean A/B against the 2026-08-15 figures. The
+actual controlled comparison lives entirely inside this document: the same "best" config run
+twice on the *same* cache, once with the point-in-time membership gate on (`pit=y`, the main
+scorecard below) and once with it off (`pit=n`, the "For comparison" block below). That pair is
+what isolates the gate's effect. The 2026-08-15 numbers should be read only for shape (REJECTED
+then, REJECTED now) rather than compared value-for-value — and that doc's own 2026-08-17
+addendum already flags its specific figures (profit factor, return, drawdown, rank correlation)
+as unreliable measurements in the first place, for reasons unrelated to this task.
+
+Every gate, threshold, config value, train/test split fraction, and cost model is otherwise
+identical to the original run — this is a data-correctness re-run, not a re-cut of the
+hypothesis. Candidate selection is now gated on real point-in-time S&P 500 membership
+(`src/lib/backtest/crossSectional/membership.ts`), instead of applying today's S&P 500 list
+uniformly across the entire backtest history.
 
 This fixes look-ahead inclusion (a symbol traded as a candidate before it actually joined
 the index) and stale inclusion (a symbol kept trading as a candidate after it actually left).
@@ -37,8 +52,11 @@ gate scorecard now fails **three** gates instead of two:
   Spearman(trainPF, testPF) across 419 surviving combos is **0.0244** — indistinguishable from
   zero, same finding as the original **−0.016**. In-sample ranking still carries no information
   about out-of-sample ranking.
-- **Gate 7 (beats SPY return/maxDD) still fails**, now by a wider margin: 3.58 vs. SPY's 9.54
-  over the (much longer, 2016-10-18…2026-08-14) span this cache now covers.
+- **Gate 7 (beats SPY return/maxDD) still fails**, essentially unchanged from the pit=n control
+  run on this same cache (strat 3.51 → 3.58, still far short of SPY's 9.54, over the
+  2016-10-18…2026-08-14 span). The ratio moved marginally in the strategy's favor — return fell
+  (139.9% → 126.9%) but drawdown fell more (39.9% → 35.4%) — see the pit=n comparison later in
+  this doc.
 
 The mechanism was already rejected on 2026-08-15. Point-in-time membership does not rescue it —
 if anything, it tightens the rejection by turning a previously-passing gate (positive in both
@@ -192,10 +210,11 @@ Not trade starvation — 4,082 trades on the full sp500 universe over this cache
 The failure is the same two-part failure as 2026-08-15, now joined by a third:
 
 - **It does not beat the alternative.** strat return/maxDD ratio 3.58 vs. SPY's 9.54 over the
-  same tradable span (126.9% / 35.4% DD vs. 322.5% / 33.8% DD). This gap is wider than the
-  ungated run's (3.51 vs. 9.54), because this longer cache captures a stronger SPY bull run that
-  the strategy — structurally flat until its own SMA200 warms up, and long-only mean-reversion
-  in a trending market — could not keep pace with.
+  same tradable span (126.9% / 35.4% DD vs. 322.5% / 33.8% DD). This is essentially the same
+  shortfall as the pit=n control run on the identical cache (ratio 3.51 vs. SPY's 9.54) — the
+  membership gate moved the ratio only slightly, and in the strategy's favor, not against it.
+  Either way the strategy — structurally flat until its own SMA200 warms up, and long-only
+  mean-reversion in a trending market — could not keep pace with SPY's run over this span.
 - **It cannot be tuned reliably.** Spearman(trainPF, testPF) = 0.0244 across 419 survivors.
   Whatever config the sweep hands you, you are picking blind.
 - **New in this run: it loses money out-of-sample.** Under point-in-time membership, the
