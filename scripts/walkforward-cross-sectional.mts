@@ -3,18 +3,20 @@
 // mechanical here; gate 4 (parameter plateau) is read off the Task 6 sweep table.
 //
 // Usage: node --env-file=.env --import tsx scripts/walkforward-cross-sectional.mts \
-//          [universe] [measure] [lookback] [regime] [slots] [holdDays] [stop|off] [sma200:y|n]
+//          [universe] [measure] [lookback] [regime] [slots] [holdDays] [stop|off] [sma200:y|n] [pit:y|n]
 import { readFile } from "node:fs/promises";
 import { crossSectionalBacktest } from "@/lib/backtest/crossSectional/engine";
 import { summarizeCrossSectional } from "@/lib/backtest/crossSectional/summary";
 import type { CsConfig, CsSummary, FallMeasure, RegimeMode } from "@/lib/backtest/crossSectional/types";
 import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 import type { Candle } from "@/lib/indicators";
+import { parseMembershipCsv, buildMembershipIndex } from "@/lib/backtest/crossSectional/membership";
 
 const BLOCKS = 6;
 
 const [, , universeKey = "sp500", measure = "atrReturn", lookback = "3", regime = "spySma200",
-  slots = "5", holdDays = "5", stop = "off", sma200 = "y"] = process.argv;
+  slots = "5", holdDays = "5", stop = "off", sma200 = "y", pitArg = "n"] = process.argv;
+const pit = pitArg === "y";
 
 async function loadBars(key: string): Promise<Map<string, Candle[]>> {
   const raw = JSON.parse(await readFile(`.cache/bars/${key}-1d.json`, "utf8")) as { bars: Record<string, Candle[]> };
@@ -41,6 +43,11 @@ const cfg: CsConfig = {
 const bars = await loadBars(universeKey);
 console.log(`config: ${JSON.stringify({ ...cfg, costs: undefined })}\n`);
 
+const isMember = pit
+  ? buildMembershipIndex(parseMembershipCsv(await readFile(".cache/sp500-membership.csv", "utf8")))
+  : undefined;
+if (pit) console.log("point-in-time membership gate: ON (.cache/sp500-membership.csv)\n");
+
 // `isEligible` refuses every index below 200 (the SMA200 warm-up), so a bare window
 // slice would kill its own first 200 trading days. The blocks below are only ~220
 // days long, so bare slicing would leave ~20 usable days each and gates 2-3 would
@@ -63,7 +70,7 @@ function windowBars(all: Map<string, Candle[]>, from: number, to: number): Map<s
 
 /** Run one window and summarise only the part that falls inside the window itself. */
 function runWindow(all: Map<string, Candle[]>, from: number, to: number): CsSummary {
-  const res = crossSectionalBacktest(windowBars(all, from, to), cfg);
+  const res = crossSectionalBacktest(windowBars(all, from, to), cfg, isMember);
   const trades = res.trades.filter((t) => t.entryT >= from);
   const curve = res.equityCurve.filter((p) => p.t >= from);
   if (!curve.length) return summarizeCrossSectional(trades, [], cfg.capital);
@@ -110,14 +117,14 @@ const testS = runWindow(bars, mid, end + 1);
 const stressed = crossSectionalBacktest(bars, {
   ...cfg,
   costs: { slippageBps: (DEFAULT_COST_MODEL.slippageBps ?? 0) * 3, commissionBps: (DEFAULT_COST_MODEL.commissionBps ?? 0) * 3 },
-}).summary;
+}, isMember).summary;
 
 // --- Gate 6: universe haircut ---
 console.log("\n--- universe haircut (narrower list = more survivorship bias) ---");
 const haircut: Record<string, number> = {};
 for (const key of ["dow30", "nasdaq100", "sp500"]) {
   try {
-    const s = crossSectionalBacktest(await loadBars(key), cfg).summary;
+    const s = crossSectionalBacktest(await loadBars(key), cfg, pit && key === "sp500" ? isMember : undefined).summary;
     haircut[key] = s.profitFactor ?? 0;
     console.log(`${key.padEnd(12)} PF=${(s.profitFactor ?? 0).toFixed(2)} trades=${s.trades}`);
   } catch {
@@ -133,7 +140,7 @@ for (const key of ["dow30", "nasdaq100", "sp500"]) {
 // limitation of this dataset's depth, not of the strategy: live, the 200 bars of
 // history would already exist. On the sp500 cache it is worth ~37 points of SPY
 // return, i.e. the difference between the gate looking 3x lost and 1.7x lost.
-const full = crossSectionalBacktest(bars, cfg).summary;
+const full = crossSectionalBacktest(bars, cfg, isMember).summary;
 const spy = (bars.get("SPY") ?? []).filter((c) => c.t >= start);
 let spyReturnPct = 0;
 let spyMaxDdPct = 0;

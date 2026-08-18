@@ -2,15 +2,17 @@
 // prints, for every combo that clears the train bar, its untouched TEST metrics
 // beside its train ones. Same protocol as scripts/sweep-*.mts on gold.
 //
-// Usage: node --env-file=.env --import tsx scripts/sweep-cross-sectional.mts [universe]
+// Usage: node --env-file=.env --import tsx scripts/sweep-cross-sectional.mts [universe] [pit:y|n]
 import { readFile } from "node:fs/promises";
 import { crossSectionalBacktest } from "@/lib/backtest/crossSectional/engine";
 import { summarizeCrossSectional } from "@/lib/backtest/crossSectional/summary";
 import type { CsConfig, CsSummary, FallMeasure, RegimeMode } from "@/lib/backtest/crossSectional/types";
 import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 import type { Candle } from "@/lib/indicators";
+import { parseMembershipCsv, buildMembershipIndex } from "@/lib/backtest/crossSectional/membership";
 
 const universeKey = process.argv[2] ?? "sp500";
+const pit = process.argv[3] === "y";
 const TRAIN_FRACTION = 0.65;
 
 const raw = JSON.parse(await readFile(`.cache/bars/${universeKey}-1d.json`, "utf8")) as {
@@ -18,6 +20,11 @@ const raw = JSON.parse(await readFile(`.cache/bars/${universeKey}-1d.json`, "utf
   bars: Record<string, Candle[]>;
 };
 console.log(`loaded ${Object.keys(raw.bars).length} symbols from cache (fetched ${raw.fetchedAt})`);
+
+const isMember = pit
+  ? buildMembershipIndex(parseMembershipCsv(await readFile(".cache/sp500-membership.csv", "utf8")))
+  : undefined;
+if (pit) console.log("point-in-time membership gate: ON (.cache/sp500-membership.csv)");
 
 // Split on a shared date, not per-symbol bar counts, so every symbol's train and
 // test windows cover the same calendar period.
@@ -57,7 +64,7 @@ function window(fromT: number | null, toT: number | null): Map<string, Candle[]>
  * CAGR and time-in-market describe the window itself rather than the prefix.
  */
 function runWindow(bars: Map<string, Candle[]>, cfg: CsConfig, windowStart: number): CsSummary {
-  const res = crossSectionalBacktest(bars, cfg);
+  const res = crossSectionalBacktest(bars, cfg, isMember);
   const trades = res.trades.filter((t) => t.entryT >= windowStart);
   const curve = res.equityCurve.filter((p) => p.t >= windowStart);
   if (!curve.length) return summarizeCrossSectional(trades, [], cfg.capital);
