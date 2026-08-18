@@ -32,7 +32,11 @@ export interface StudyOutput {
   unfillable: number;
 }
 
-export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig): StudyOutput {
+export function buildSnapshots(
+  bars: Map<string, Candle[]>,
+  cfg: MomentumConfig,
+  isMember?: (symbol: string, day: number) => boolean,
+): StudyOutput {
   const { days, index } = alignUniverse(bars);
   const ends = monthEndIndices(days);
   const snapshots: Snapshot[] = [];
@@ -56,6 +60,7 @@ export function buildSnapshots(bars: Map<string, Candle[]>, cfg: MomentumConfig)
       const perDay = index.get(symbol)!;
       const i = perDay.get(days[rankIdx]);
       if (i === undefined) continue;
+      if (isMember && !isMember(symbol, days[rankIdx])) continue;
 
       // Selection happens here, on data no later than the ranking day.
       const score = momentumScores(candles, i, cfg.lookback, cfg.skip);

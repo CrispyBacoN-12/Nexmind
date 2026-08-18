@@ -38,6 +38,15 @@ function twoSymbols(): Map<string, Candle[]> {
   ]);
 }
 
+/** Three symbols: used for membership gating tests where excluding one symbol should still leave enough to meet minEligible. */
+function threeSymbols(): Map<string, Candle[]> {
+  return new Map([
+    ["UP", series(trend(600, 0.002))],
+    ["DOWN", series(trend(600, 0.0002))],
+    ["FLAT", series(trend(600, 0.001))],
+  ]);
+}
+
 test("snapshots start only once the warm-up is behind them", () => {
   const { snapshots } = buildSnapshots(twoSymbols(), cfg);
   assert.ok(snapshots.length > 0, "expected at least one rebalance");
@@ -200,4 +209,36 @@ test("subsetBars keeps only the named symbols", () => {
   const out = subsetBars(bars, new Set(["UP"]));
   assert.deepEqual([...out.keys()], ["UP"]);
   assert.equal(out.get("UP"), bars.get("UP"));
+});
+
+test("isMember excludes a non-member symbol from a rebalance", () => {
+  const bars = threeSymbols();
+  const { snapshots: baseline } = buildSnapshots(bars, cfg);
+  const firstDay = baseline[0].day;
+
+  // DOWN is a member only from the day AFTER the first rebalance's ranking
+  // day; UP and FLAT are always members, so excluding DOWN still leaves 2
+  // eligible (>= minEligible), and the rebalance still happens on firstDay.
+  const isMember = (symbol: string, d: number) => symbol !== "DOWN" || d > firstDay;
+  const { snapshots } = buildSnapshots(bars, cfg, isMember);
+  assert.equal(snapshots[0].day, firstDay, "rebalance should still occur on the original day");
+  assert.ok(!snapshots[0].symbols.includes("DOWN"), "DOWN should be excluded from the first rebalance");
+});
+
+test("isMember includes a symbol once it becomes a member", () => {
+  const bars = twoSymbols();
+  const { snapshots: baseline } = buildSnapshots(bars, cfg);
+  const firstDay = baseline[0].day;
+
+  const isMember = (symbol: string, d: number) => symbol === "UP" || d > firstDay;
+  const { snapshots } = buildSnapshots(bars, cfg, isMember);
+  const second = snapshots[1];
+  assert.ok(second.symbols.includes("DOWN"), "DOWN should be a candidate again once it becomes a member");
+});
+
+test("omitting isMember reproduces today's behaviour bit-for-bit", () => {
+  const bars = twoSymbols();
+  const withUndefined = buildSnapshots(bars, cfg, undefined);
+  const withoutParam = buildSnapshots(bars, cfg);
+  assert.deepEqual(withUndefined, withoutParam);
 });
