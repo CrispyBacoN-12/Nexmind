@@ -556,3 +556,36 @@ test("a symbol that stops trading mid-hold is force-closed at its last known pri
   assert.equal(aaaTrade!.reason, "end-of-data");
   assert.ok(aaaTrade!.pnl < 0, "the crash before delisting must show up as a loss, not be erased");
 });
+
+test("isMember excludes a non-member symbol from candidate selection", () => {
+  const closes = risingBase(260);
+  closes[254] = closes[254] - 8; // same dip as the causality test above; signal fires on day 255
+  const bars = new Map<string, Candle[]>([["AAA", series(closes)]]);
+
+  // AAA is not a member on the signal day (255) — only from day 256 on, one
+  // day too late to ever be seen as a candidate for this particular dip.
+  const isMember = (symbol: string, d: number) => symbol === "AAA" && d >= 256;
+  const res = crossSectionalBacktest(bars, cfg, isMember);
+  assert.equal(res.trades.length, 0);
+});
+
+test("isMember admits a member symbol exactly as the unguarded engine would", () => {
+  const closes = risingBase(260);
+  closes[254] = closes[254] - 8;
+  const bars = new Map<string, Candle[]>([["AAA", series(closes)]]);
+
+  const isMember = () => true;
+  const res = crossSectionalBacktest(bars, cfg, isMember);
+  assert.equal(res.trades.length, 1);
+  assert.equal(res.trades[0].entryT, 256 * DAY);
+});
+
+test("omitting isMember reproduces today's behaviour bit-for-bit", () => {
+  const closes = risingBase(260);
+  closes[254] = closes[254] - 8;
+  const bars = new Map<string, Candle[]>([["AAA", series(closes)]]);
+
+  const withUndefined = crossSectionalBacktest(bars, cfg, undefined);
+  const withoutParam = crossSectionalBacktest(bars, cfg);
+  assert.deepEqual(withUndefined, withoutParam);
+});

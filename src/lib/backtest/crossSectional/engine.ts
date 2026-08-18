@@ -54,7 +54,11 @@ function regimeOpen(cfg: CsConfig, spy: SymbolSeries | undefined, spyIdx: number
   return now != null && then != null && now > then;
 }
 
-export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfig): CsResult {
+export function crossSectionalBacktest(
+  bars: Map<string, Candle[]>,
+  cfg: CsConfig,
+  isMember?: (symbol: string, day: number) => boolean,
+): CsResult {
   const aligned = alignUniverse(bars);
   const seriesBySymbol = new Map<string, SymbolSeries>();
   for (const [symbol, candles] of bars) seriesBySymbol.set(symbol, buildSeries(candles));
@@ -211,6 +215,7 @@ export function crossSectionalBacktest(bars: Map<string, Candle[]>, cfg: CsConfi
       const candidates: { symbol: string; score: number }[] = [];
       for (const symbol of tradable) {
         if (open.has(symbol)) continue;
+        if (isMember && !isMember(symbol, day)) continue;
         const s = seriesBySymbol.get(symbol)!;
         const i = idxOf(symbol, day);
         if (i == null || !isEligible(s, i, cfg)) continue;
