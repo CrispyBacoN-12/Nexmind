@@ -1,39 +1,43 @@
 // Shared HMAC-SHA256 request signing for Webull's OpenAPI (data + PaperTrade).
 // One module so webull.ts and webull/paperTrade.ts never build two
 // independently-maintained signature implementations that could drift apart.
+// Algorithm verified against webull-inc/webull-openapi-python-sdk's
+// default_signature_composer + token_manager (see scripts/webull-account-list.mts
+// for the original reference implementation this was ported from, including
+// the x-access-token exchange that some endpoints/environments require).
 import { createHmac, createHash, randomUUID } from "node:crypto";
 
-export interface SignableRequest {
-  host: string;
-  params: Record<string, string>;
-  body?: string;
-  nonce: string;
+/** Pure: `YYYY-MM-DDTHH:MM:SSZ` — seconds precision, no milliseconds. This is
+ *  the ISO-8601 format Webull's signing spec requires for `x-timestamp`. */
+export function isoTimestamp(now: Date): string {
+  return now.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-/** Pure: builds the exact string Webull hashes — every query param plus
- *  `host` and `x-signature-nonce`, sorted alphabetically, from one shared
- *  source list (never two independently-maintained lists that could drift
- *  apart). A POST body is appended as `toUpper(SHA256(body))`; a bodyless GET
- *  omits that segment entirely rather than hashing an empty string. */
-export function buildSignatureString(req: SignableRequest): string {
-  const entries: [string, string][] = [
-    ...Object.entries(req.params),
-    ["host", req.host],
-    ["x-signature-nonce", req.nonce],
-  ];
-  entries.sort(([a], [b]) => a.localeCompare(b));
-  const sorted = entries.map(([k, v]) => `${k}=${v}`).join("&");
-  if (req.body) {
-    const bodyHash = createHash("sha256").update(req.body).digest("hex").toUpperCase();
-    return `${sorted}&${bodyHash}`;
-  }
-  return sorted;
+/** Pure: Python's `urllib.parse.quote(s, safe='')`. `encodeURIComponent`
+ *  leaves `!'()*` unescaped, so those are percent-encoded by hand to match. */
+export function quoteAll(s: string): string {
+  return encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
-/** Pure: HMAC-SHA256 hex signature. The key is `app_secret + "&"` (a literal
- *  trailing ampersand), not the raw secret — Webull's OpenAPI signing spec. */
-export function signString(signatureString: string, appSecret: string): string {
-  return createHmac("sha256", `${appSecret}&`).update(signatureString).digest("hex");
+/** Pure: the exact string Webull signs — the request path, then every
+ *  signing param (headers lower-cased, plus `host`, plus any query params)
+ *  sorted by codepoint, then (when a body is present) a trailing
+ *  uppercase-hex SHA-256 of the compact-JSON body — all percent-encoded as
+ *  one blob. */
+export function buildStringToSign(path: string, signParams: Record<string, string>, bodyHash?: string): string {
+  const sorted = Object.entries(signParams)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
+  const withBody = bodyHash ? `${path}&${sorted}&${bodyHash}` : `${path}&${sorted}`;
+  return quoteAll(withBody);
+}
+
+/** Pure: base64 HMAC-SHA256 keyed by `app_secret + "&"` (a literal trailing
+ *  ampersand), not the raw secret — Webull's OpenAPI signing spec. Base64,
+ *  not hex. */
+export function signString(stringToSign: string, appSecret: string): string {
+  return createHmac("sha256", `${appSecret}&`).update(stringToSign).digest("base64");
 }
 
 export type WebullAuthErrorReason = "clock-skew" | "bad-key";
@@ -59,37 +63,50 @@ export interface SignedFetchOptions {
   method?: "GET" | "POST";
   params?: Record<string, string>;
   body?: unknown;
+  /** Overrides the app key/secret pair (defaults to WEBULL_APP_KEY/SECRET —
+   *  the production pair — so existing callers keep working unchanged). Pass
+   *  these explicitly to sign against a different environment, e.g. sandbox's
+   *  WEBULL_PAPER_APP_KEY/SECRET. */
+  appKey?: string;
+  appSecret?: string;
+  /** Session token from POST /openapi/auth/token/create (+ /check), required
+   *  by environments/apps with token_check_enabled — see
+   *  scripts/webull-account-list.mts. Omit where it isn't required (verified
+   *  true for the shared sandbox test credentials). */
+  accessToken?: string;
 }
 
 async function doSignedFetch(path: string, opts: SignedFetchOptions, retried: boolean): Promise<Response> {
-  const appKey = process.env.WEBULL_APP_KEY;
-  const appSecret = process.env.WEBULL_APP_SECRET;
+  const appKey = opts.appKey ?? process.env.WEBULL_APP_KEY;
+  const appSecret = opts.appSecret ?? process.env.WEBULL_APP_SECRET;
   if (!appKey || !appSecret) throw new Error("webull: missing WEBULL_APP_KEY / WEBULL_APP_SECRET");
 
   const method = opts.method ?? "GET";
   const url = new URL(path, opts.baseUrl);
-  const host = url.host;
-  const bodyStr = opts.body != null ? JSON.stringify(opts.body) : undefined;
-  const nonce = randomUUID();
-  // Every call sets its timestamp from call time (never cached) — Webull's
-  // signing is timestamp-based and rejects requests outside its clock-skew
-  // window, so a stale cached timestamp would fail every subsequent call.
-  const params: Record<string, string> = { ...(opts.params ?? {}), appKey, timestamp: String(Date.now()) };
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries(opts.params ?? {})) url.searchParams.set(k, v);
 
-  const signatureString = buildSignatureString({ host, params, body: bodyStr, nonce });
-  const signature = signString(signatureString, appSecret);
+  const bodyStr = opts.body !== undefined ? JSON.stringify(opts.body) : undefined;
+  const bodyHash = bodyStr !== undefined ? createHash("sha256").update(bodyStr).digest("hex").toUpperCase() : undefined;
 
-  const res = await fetch(url.toString(), {
-    method,
-    headers: {
-      "x-signature-nonce": nonce,
-      "x-app-key": appKey,
-      "x-signature": signature,
-      ...(bodyStr ? { "content-type": "application/json" } : {}),
-    },
-    ...(bodyStr ? { body: bodyStr } : {}),
-  });
+  // Every call sets its timestamp/nonce from call time (never cached) —
+  // Webull's signing rejects requests outside its clock-skew window, so a
+  // stale cached timestamp would fail every subsequent call.
+  const headers: Record<string, string> = {
+    "x-app-key": appKey,
+    "x-timestamp": isoTimestamp(new Date()),
+    "x-signature-version": "1.0",
+    "x-signature-algorithm": "HMAC-SHA256",
+    "x-signature-nonce": randomUUID(),
+  };
+  // `host` plus every signing header plus any query params form the signed
+  // set — never a second, independently-maintained list. Do NOT put a `host`
+  // header on the actual outgoing request; it's signed but not sent as one.
+  const signParams: Record<string, string> = { ...headers, host: url.host, ...(opts.params ?? {}) };
+  headers["x-signature"] = signString(buildStringToSign(path, signParams, bodyHash), appSecret);
+  if (opts.accessToken) headers["x-access-token"] = opts.accessToken;
+  if (bodyStr !== undefined) headers["content-type"] = "application/json";
+
+  const res = await fetch(url.toString(), { method, headers, ...(bodyStr !== undefined ? { body: bodyStr } : {}) });
 
   if (res.status === 401) {
     const errBody = await res.json().catch(() => ({}));

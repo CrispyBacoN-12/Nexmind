@@ -11,9 +11,11 @@ export function shouldTryAlpaca(env: { ALPACA_KEY?: string; ALPACA_SECRET?: stri
   return Boolean(env.ALPACA_KEY && env.ALPACA_SECRET);
 }
 
-/** Pure decision: try Webull only when both credentials are present. */
-export function shouldTryWebull(env: { WEBULL_APP_KEY?: string; WEBULL_APP_SECRET?: string }): boolean {
-  return Boolean(env.WEBULL_APP_KEY && env.WEBULL_APP_SECRET);
+/** Pure decision: try Webull only when both credentials are present. Checks
+ *  the sandbox (WEBULL_PAPER_*) pair, since that's what fetchWebullCandles
+ *  actually signs with — see webull.ts for why. */
+export function shouldTryWebull(env: { WEBULL_PAPER_APP_KEY?: string; WEBULL_PAPER_APP_SECRET?: string }): boolean {
+  return Boolean(env.WEBULL_PAPER_APP_KEY && env.WEBULL_PAPER_APP_SECRET);
 }
 
 /** Retry an async fetch once on a transient failure (network blip / 5xx). */
@@ -41,7 +43,7 @@ export async function fetchCandles(
   range: Range = "1mo",
   interval: Interval = "1h",
 ): Promise<CandleResponse> {
-  const webullEnv = { WEBULL_APP_KEY: process.env.WEBULL_APP_KEY, WEBULL_APP_SECRET: process.env.WEBULL_APP_SECRET };
+  const webullEnv = { WEBULL_PAPER_APP_KEY: process.env.WEBULL_PAPER_APP_KEY, WEBULL_PAPER_APP_SECRET: process.env.WEBULL_PAPER_APP_SECRET };
   if (shouldTryWebull(webullEnv)) {
     try {
       return await fetchWebullCandles(symbol, range, interval);
@@ -98,7 +100,7 @@ export async function fetchCandlesBatch(
 ): Promise<Map<string, CandleResponse>> {
   const out = new Map<string, CandleResponse>();
 
-  const webullEnv = { WEBULL_APP_KEY: process.env.WEBULL_APP_KEY, WEBULL_APP_SECRET: process.env.WEBULL_APP_SECRET };
+  const webullEnv = { WEBULL_PAPER_APP_KEY: process.env.WEBULL_PAPER_APP_KEY, WEBULL_PAPER_APP_SECRET: process.env.WEBULL_PAPER_APP_SECRET };
   if (shouldTryWebull(webullEnv)) {
     const fetched = await mapWithConcurrency(symbols, WEBULL_BATCH_CONCURRENCY, (sym) => fetchWebullCandles(sym, range, interval));
     fetched.forEach((resp, i) => { if (resp) out.set(symbols[i], resp); });

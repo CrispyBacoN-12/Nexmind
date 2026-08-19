@@ -7,7 +7,7 @@ export const ALLOWED_RANGES = [
   "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max",
 ] as const;
 export const ALLOWED_INTERVALS = [
-  "5m", "15m", "30m", "60m", "1h", "1d", "1wk",
+  "1m", "5m", "15m", "30m", "60m", "1h", "1d", "1wk",
 ] as const;
 export type Range = (typeof ALLOWED_RANGES)[number];
 export type Interval = (typeof ALLOWED_INTERVALS)[number];

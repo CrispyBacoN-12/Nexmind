@@ -16,6 +16,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     killSwitch?: boolean; riskPctPerTrade?: number; maxOpenPositions?: number;
     startingBalance?: number; drawdownHaltPct?: number; status?: string; name?: string;
     scanInterval?: string; scanRange?: string; strategy?: string; universe?: string;
+    sort?: number; webullShadowEnabled?: boolean;
   };
   const data: Record<string, unknown> = {};
   if (typeof b.killSwitch === "boolean") {
@@ -32,6 +33,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (typeof b.scanRange === "string" && (ALLOWED_RANGES as readonly string[]).includes(b.scanRange)) data.scanRange = b.scanRange;
   if (typeof b.strategy === "string" && (getStrategy(b.strategy) || (await getResearchStrategy(b.strategy)))) data.strategy = b.strategy;
   if (typeof b.universe === "string" && (b.universe === "" || b.universe in UNIVERSES)) data.universe = b.universe;
+  if (typeof b.sort === "number" && Number.isFinite(b.sort)) data.sort = Math.floor(b.sort);
+  if (typeof b.webullShadowEnabled === "boolean") data.webullShadowEnabled = b.webullShadowEnabled;
 
   const updated = await prisma.portfolio.update({ where: { id: portfolioId }, data });
   return NextResponse.json(updated);

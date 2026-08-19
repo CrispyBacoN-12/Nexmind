@@ -11,8 +11,8 @@ test("shouldTryAlpaca is true only when both key and secret are present", () => 
 });
 
 test("shouldTryWebull is true only when both key and secret are present", () => {
-  assert.equal(shouldTryWebull({ WEBULL_APP_KEY: "k", WEBULL_APP_SECRET: "s" }), true);
-  assert.equal(shouldTryWebull({ WEBULL_APP_KEY: "k" }), false);
-  assert.equal(shouldTryWebull({ WEBULL_APP_SECRET: "s" }), false);
+  assert.equal(shouldTryWebull({ WEBULL_PAPER_APP_KEY: "k", WEBULL_PAPER_APP_SECRET: "s" }), true);
+  assert.equal(shouldTryWebull({ WEBULL_PAPER_APP_KEY: "k" }), false);
+  assert.equal(shouldTryWebull({ WEBULL_PAPER_APP_SECRET: "s" }), false);
   assert.equal(shouldTryWebull({}), false);
 });

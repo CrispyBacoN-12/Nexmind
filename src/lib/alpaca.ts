@@ -10,6 +10,7 @@ const DAY_MS = 86_400_000;
 /** Map our Interval to an Alpaca v2 timeframe string. */
 export function intervalToTimeframe(interval: Interval): string {
   switch (interval) {
+    case "1m": return "1Min";
     case "5m": return "5Min";
     case "15m": return "15Min";
     case "30m": return "30Min";

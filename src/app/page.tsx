@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/db";
 import { Card, CardTitle, Stat, Badge, PageHeader, Empty } from "@/components/ui";
 import { fmtMoney, fmtNumber, fmtAgo, colorForChange } from "@/lib/utils";
+import { TradeDeskPanel } from "./trade-desk-panel";
+import { EquityCurveChart } from "./equity-curve-chart";
+import { AllocationChart } from "./allocation-chart";
+import { WebullPanel } from "./webull-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -98,10 +102,14 @@ export default async function WarRoom({ searchParams }: { searchParams: Promise<
         })}
       </div>
 
+      <div className="mb-6">
+        <WebullPanel />
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-8">
           {blocks.length === 0 ? (
-            <Empty title="No portfolios in this group" hint="Create one from the Command Bridge and pick this kind." />
+            <Empty title="No portfolios in this group" hint="Create one in the Trade Desk panel and pick this kind." />
           ) : (
             blocks.map((b) => (
               <section key={b.p.id} className="space-y-3">
@@ -118,7 +126,9 @@ export default async function WarRoom({ searchParams }: { searchParams: Promise<
           )}
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <TradeDeskPanel />
+
           <CardTitle>🛰️ SCOUT Intel</CardTitle>
           {news.length === 0 ? (
             <Empty title="No intel yet" hint="SCOUT pulls free news, funding, and sentiment daily." />
@@ -168,9 +178,15 @@ function SwingBlock({ b }: { b: SwingData }) {
       </div>
 
       {trades.length === 0 && vetoed.length === 0 ? (
-        <Empty title="No activity yet" hint="Run a trade tick from the Command Bridge or seed demo data." />
+        <Empty title="No activity yet" hint="Run a trade tick from the Trade Desk panel or seed demo data." />
       ) : (
         <div className="space-y-3">
+          {closed.length >= 2 && (
+            <Card className="p-4">
+              <div className="text-[11px] uppercase tracking-wide text-(--color-muted) mb-1">Cumulative P/L</div>
+              <EquityCurveChart trades={closed} />
+            </Card>
+          )}
           {trades.map((t) => {
             const votes = safeParse<HawkVote[]>(t.hawkVotes, []);
             const log = safeParse<DecisionStep[]>(t.decisionLog, []);
@@ -256,28 +272,34 @@ function InvestBlock({ b }: { b: InvestData }) {
       {holdings.length === 0 ? (
         <Empty title="No holdings yet" hint="Generate a rebalance plan on the Long-term Invest page and approve it." />
       ) : (
-        <Card className="p-4 overflow-x-auto">
-          <table className="w-full text-xs font-mono">
-            <thead>
-              <tr className="text-(--color-muted) border-b border-(--color-border)">
-                <th className="text-left py-1 pr-3">Symbol</th>
-                <th className="text-right py-1 pr-3">Shares</th>
-                <th className="text-right py-1 pr-3">Avg Cost</th>
-                <th className="text-right py-1">Cost Basis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {holdings.map((h) => (
-                <tr key={h.id} className="border-b border-(--color-border)/50">
-                  <td className="py-1 pr-3 font-semibold">{h.symbol}</td>
-                  <td className="py-1 pr-3 text-right">{fmtNumber(h.shares, 2)}</td>
-                  <td className="py-1 pr-3 text-right text-(--color-muted)">{fmtNumber(h.avgCost, 2)}</td>
-                  <td className="py-1 text-right">{fmtMoney(h.shares * h.avgCost)}</td>
+        <>
+          <Card className="p-4">
+            <div className="text-[11px] uppercase tracking-wide text-(--color-muted) mb-1">Allocation by cost basis</div>
+            <AllocationChart items={holdings.map((h) => ({ label: h.symbol, value: h.shares * h.avgCost }))} />
+          </Card>
+          <Card className="p-4 overflow-x-auto">
+            <table className="w-full text-xs font-mono">
+              <thead>
+                <tr className="text-(--color-muted) border-b border-(--color-border)">
+                  <th className="text-left py-1 pr-3">Symbol</th>
+                  <th className="text-right py-1 pr-3">Shares</th>
+                  <th className="text-right py-1 pr-3">Avg Cost</th>
+                  <th className="text-right py-1">Cost Basis</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+              </thead>
+              <tbody>
+                {holdings.map((h) => (
+                  <tr key={h.id} className="border-b border-(--color-border)/50">
+                    <td className="py-1 pr-3 font-semibold">{h.symbol}</td>
+                    <td className="py-1 pr-3 text-right">{fmtNumber(h.shares, 2)}</td>
+                    <td className="py-1 pr-3 text-right text-(--color-muted)">{fmtNumber(h.avgCost, 2)}</td>
+                    <td className="py-1 text-right">{fmtMoney(h.shares * h.avgCost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </>
       )}
     </>
   );
@@ -296,37 +318,43 @@ function OptionsBlock({ b }: { b: OptionsData }) {
       {positions.length === 0 ? (
         <Empty title="No open positions" hint="Run the Options Desk to open delta-targeted calls/puts." />
       ) : (
-        <Card className="p-4 overflow-x-auto">
-          <table className="w-full text-xs font-mono">
-            <thead>
-              <tr className="text-(--color-muted) border-b border-(--color-border)">
-                <th className="text-left py-1 pr-3">Underlying</th>
-                <th className="text-left py-1 pr-3">Type</th>
-                <th className="text-right py-1 pr-3">Strike</th>
-                <th className="text-right py-1 pr-3">Days</th>
-                <th className="text-right py-1 pr-3">Contracts</th>
-                <th className="text-right py-1">Paid</th>
-              </tr>
-            </thead>
-            <tbody>
-              {positions.map((o) => {
-                const days = daysLeft(o.expiry);
-                return (
-                  <tr key={o.id} className="border-b border-(--color-border)/50">
-                    <td className="py-1 pr-3 font-semibold">{o.underlying}</td>
-                    <td className="py-1 pr-3">
-                      <Badge tone={o.type === "call" ? "positive" : "negative"}>{o.type.toUpperCase()}</Badge>
-                    </td>
-                    <td className="py-1 pr-3 text-right">{fmtNumber(o.strike, 2)}</td>
-                    <td className={`py-1 pr-3 text-right ${days <= 7 ? "text-amber-400" : ""}`}>{days}d</td>
-                    <td className="py-1 pr-3 text-right">{o.contracts}</td>
-                    <td className="py-1 text-right text-(--color-muted)">{fmtNumber(o.premiumPaid, 2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+        <>
+          <Card className="p-4">
+            <div className="text-[11px] uppercase tracking-wide text-(--color-muted) mb-1">Premium at risk by underlying</div>
+            <AllocationChart items={positions.map((o) => ({ label: o.underlying, value: o.premiumPaid * o.contracts * 100 }))} />
+          </Card>
+          <Card className="p-4 overflow-x-auto">
+            <table className="w-full text-xs font-mono">
+              <thead>
+                <tr className="text-(--color-muted) border-b border-(--color-border)">
+                  <th className="text-left py-1 pr-3">Underlying</th>
+                  <th className="text-left py-1 pr-3">Type</th>
+                  <th className="text-right py-1 pr-3">Strike</th>
+                  <th className="text-right py-1 pr-3">Days</th>
+                  <th className="text-right py-1 pr-3">Contracts</th>
+                  <th className="text-right py-1">Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions.map((o) => {
+                  const days = daysLeft(o.expiry);
+                  return (
+                    <tr key={o.id} className="border-b border-(--color-border)/50">
+                      <td className="py-1 pr-3 font-semibold">{o.underlying}</td>
+                      <td className="py-1 pr-3">
+                        <Badge tone={o.type === "call" ? "positive" : "negative"}>{o.type.toUpperCase()}</Badge>
+                      </td>
+                      <td className="py-1 pr-3 text-right">{fmtNumber(o.strike, 2)}</td>
+                      <td className={`py-1 pr-3 text-right ${days <= 7 ? "text-amber-400" : ""}`}>{days}d</td>
+                      <td className="py-1 pr-3 text-right">{o.contracts}</td>
+                      <td className="py-1 text-right text-(--color-muted)">{fmtNumber(o.premiumPaid, 2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        </>
       )}
     </>
   );
