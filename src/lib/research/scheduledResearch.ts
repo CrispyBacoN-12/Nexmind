@@ -22,42 +22,14 @@ interface RotationEntry {
   brief: string;
 }
 
-// One entry per (asset, mechanism angle) so repeated rounds don't just ask
-// the AI to re-propose the same idea. Symbols/cadence mirror the live desks'
-// own scan interval/range (Gold Desk: 1h/3mo; Bitcoin: 1h/3mo; Stocks desk
-// convention from past manual dispatches: 1d/2y, sp500-style single name).
+// One entry per (name, mechanism angle) so repeated rounds don't just ask the AI
+// to re-propose the same idea. All entries are US equities on 1d/2y, matching
+// the US Stocks Desk's own cadence — the gold and BTC rotations were dropped
+// when the app narrowed to stocks-only.
 const MOMENTUM_LADDER =
   "tight single-target ladder (SL=1.5xATR, TP=1.2xATR), risk 1% per trade, win rate >50% with profit stable across both halves of the sample (not just a good average)";
 
 export const RESEARCH_ROTATION: RotationEntry[] = [
-  {
-    label: "gold-momentum",
-    symbol: "GC=F",
-    interval: "1h",
-    range: "3mo",
-    brief: `Momentum/breakout entry signal for gold (GC=F) swing trading, ${MOMENTUM_LADDER}.`,
-  },
-  {
-    label: "gold-meanrev",
-    symbol: "GC=F",
-    interval: "1h",
-    range: "3mo",
-    brief: `Mean-reversion entry signal for gold (GC=F) swing trading, ${MOMENTUM_LADDER}.`,
-  },
-  {
-    label: "btc-momentum",
-    symbol: "BTC-USD",
-    interval: "1h",
-    range: "3mo",
-    brief: `Momentum/breakout entry signal for BTC-USD swing trading, ${MOMENTUM_LADDER}.`,
-  },
-  {
-    label: "btc-meanrev",
-    symbol: "BTC-USD",
-    interval: "1h",
-    range: "3mo",
-    brief: `Mean-reversion entry signal for BTC-USD swing trading, ${MOMENTUM_LADDER}.`,
-  },
   {
     label: "stocks-momentum",
     symbol: "AAPL",
@@ -71,6 +43,20 @@ export const RESEARCH_ROTATION: RotationEntry[] = [
     interval: "1d",
     range: "2y",
     brief: `Mean-reversion entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
+  },
+  {
+    label: "stocks-trend-pullback",
+    symbol: "MSFT",
+    interval: "1d",
+    range: "2y",
+    brief: `Pullback-within-uptrend entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
+  },
+  {
+    label: "stocks-volatility",
+    symbol: "NVDA",
+    interval: "1d",
+    range: "2y",
+    brief: `Volatility-contraction / range-expansion entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
   },
 ];
 

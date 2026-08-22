@@ -16,7 +16,6 @@ import { isSwingKind, canPortfolioTrade } from "@/lib/portfolioGuards";
 import { SECONDARY_PASSES } from "@/lib/trading/secondaryPasses";
 import { getCurrentDrawdownPct } from "@/lib/trading/circuitBreaker";
 import { sendDiscordNotification } from "@/lib/notify/discord";
-import { pollOpenShadowOrders } from "@/lib/webull/pollShadowOrders";
 import type { Interval, Range } from "@/lib/yahoo";
 
 type Portfolio = Awaited<ReturnType<typeof prisma.portfolio.findMany>>[number];
@@ -111,22 +110,7 @@ export async function runScheduledScan(ids?: number[]): Promise<string[]> {
     }
   }
 
-  await pollWebullShadowBackstop(log);
   return persistAndReturn(lines);
-}
-
-/** Backstop pass over WebullShadowOrder rows, in case the dedicated
- *  poll-webull-shadow-orders.mts cron is missed or delayed — same sweep,
- *  safe under overlap (see pollShadowOrders.ts). No-ops when Webull isn't
- *  configured. */
-async function pollWebullShadowBackstop(log: (m: string) => void): Promise<void> {
-  if (!process.env.WEBULL_APP_KEY) return;
-  try {
-    const summary = await pollOpenShadowOrders();
-    if (summary.checked > 0) log(`webull shadow backstop: ${summary.checked} checked, ${summary.updated} updated, ${summary.errors} errors`);
-  } catch (e) {
-    log(`webull shadow backstop ERROR ${String(e)}`);
-  }
 }
 
 async function persistAndReturn(lines: string[]): Promise<string[]> {

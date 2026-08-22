@@ -389,8 +389,6 @@ export const ModelName = {
   PipelineStep: 'PipelineStep',
   Signal: 'Signal',
   Portfolio: 'Portfolio',
-  Holding: 'Holding',
-  OptionHolding: 'OptionHolding',
   Trade: 'Trade',
   NewsItem: 'NewsItem',
   Lesson: 'Lesson',
@@ -400,9 +398,7 @@ export const ModelName = {
   ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
   Setting: 'Setting',
-  ScanLog: 'ScanLog',
-  WebullShadowOrder: 'WebullShadowOrder',
-  WebullTickerCache: 'WebullTickerCache'
+  ScanLog: 'ScanLog'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -418,7 +414,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "holding" | "optionHolding" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "webullShadowOrder" | "webullTickerCache"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -789,154 +785,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.PortfolioCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.PortfolioCountAggregateOutputType> | number
-        }
-      }
-    }
-    Holding: {
-      payload: Prisma.$HoldingPayload<ExtArgs>
-      fields: Prisma.HoldingFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.HoldingFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.HoldingFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>
-        }
-        findFirst: {
-          args: Prisma.HoldingFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.HoldingFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>
-        }
-        findMany: {
-          args: Prisma.HoldingFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>[]
-        }
-        create: {
-          args: Prisma.HoldingCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>
-        }
-        createMany: {
-          args: Prisma.HoldingCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.HoldingCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>[]
-        }
-        delete: {
-          args: Prisma.HoldingDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>
-        }
-        update: {
-          args: Prisma.HoldingUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>
-        }
-        deleteMany: {
-          args: Prisma.HoldingDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.HoldingUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.HoldingUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>[]
-        }
-        upsert: {
-          args: Prisma.HoldingUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingPayload>
-        }
-        aggregate: {
-          args: Prisma.HoldingAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateHolding>
-        }
-        groupBy: {
-          args: Prisma.HoldingGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.HoldingGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.HoldingCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.HoldingCountAggregateOutputType> | number
-        }
-      }
-    }
-    OptionHolding: {
-      payload: Prisma.$OptionHoldingPayload<ExtArgs>
-      fields: Prisma.OptionHoldingFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.OptionHoldingFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.OptionHoldingFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>
-        }
-        findFirst: {
-          args: Prisma.OptionHoldingFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.OptionHoldingFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>
-        }
-        findMany: {
-          args: Prisma.OptionHoldingFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>[]
-        }
-        create: {
-          args: Prisma.OptionHoldingCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>
-        }
-        createMany: {
-          args: Prisma.OptionHoldingCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.OptionHoldingCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>[]
-        }
-        delete: {
-          args: Prisma.OptionHoldingDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>
-        }
-        update: {
-          args: Prisma.OptionHoldingUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>
-        }
-        deleteMany: {
-          args: Prisma.OptionHoldingDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.OptionHoldingUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.OptionHoldingUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>[]
-        }
-        upsert: {
-          args: Prisma.OptionHoldingUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$OptionHoldingPayload>
-        }
-        aggregate: {
-          args: Prisma.OptionHoldingAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateOptionHolding>
-        }
-        groupBy: {
-          args: Prisma.OptionHoldingGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.OptionHoldingGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.OptionHoldingCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.OptionHoldingCountAggregateOutputType> | number
         }
       }
     }
@@ -1680,154 +1528,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    WebullShadowOrder: {
-      payload: Prisma.$WebullShadowOrderPayload<ExtArgs>
-      fields: Prisma.WebullShadowOrderFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.WebullShadowOrderFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.WebullShadowOrderFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
-        }
-        findFirst: {
-          args: Prisma.WebullShadowOrderFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.WebullShadowOrderFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
-        }
-        findMany: {
-          args: Prisma.WebullShadowOrderFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>[]
-        }
-        create: {
-          args: Prisma.WebullShadowOrderCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
-        }
-        createMany: {
-          args: Prisma.WebullShadowOrderCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.WebullShadowOrderCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>[]
-        }
-        delete: {
-          args: Prisma.WebullShadowOrderDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
-        }
-        update: {
-          args: Prisma.WebullShadowOrderUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
-        }
-        deleteMany: {
-          args: Prisma.WebullShadowOrderDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.WebullShadowOrderUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.WebullShadowOrderUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>[]
-        }
-        upsert: {
-          args: Prisma.WebullShadowOrderUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullShadowOrderPayload>
-        }
-        aggregate: {
-          args: Prisma.WebullShadowOrderAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateWebullShadowOrder>
-        }
-        groupBy: {
-          args: Prisma.WebullShadowOrderGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.WebullShadowOrderGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.WebullShadowOrderCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.WebullShadowOrderCountAggregateOutputType> | number
-        }
-      }
-    }
-    WebullTickerCache: {
-      payload: Prisma.$WebullTickerCachePayload<ExtArgs>
-      fields: Prisma.WebullTickerCacheFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.WebullTickerCacheFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.WebullTickerCacheFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
-        }
-        findFirst: {
-          args: Prisma.WebullTickerCacheFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.WebullTickerCacheFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
-        }
-        findMany: {
-          args: Prisma.WebullTickerCacheFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>[]
-        }
-        create: {
-          args: Prisma.WebullTickerCacheCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
-        }
-        createMany: {
-          args: Prisma.WebullTickerCacheCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.WebullTickerCacheCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>[]
-        }
-        delete: {
-          args: Prisma.WebullTickerCacheDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
-        }
-        update: {
-          args: Prisma.WebullTickerCacheUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
-        }
-        deleteMany: {
-          args: Prisma.WebullTickerCacheDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.WebullTickerCacheUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.WebullTickerCacheUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>[]
-        }
-        upsert: {
-          args: Prisma.WebullTickerCacheUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebullTickerCachePayload>
-        }
-        aggregate: {
-          args: Prisma.WebullTickerCacheAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateWebullTickerCache>
-        }
-        groupBy: {
-          args: Prisma.WebullTickerCacheGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.WebullTickerCacheGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.WebullTickerCacheCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.WebullTickerCacheCountAggregateOutputType> | number
-        }
-      }
-    }
   }
 } & {
   other: {
@@ -1946,55 +1646,17 @@ export const PortfolioScalarFieldEnum = {
   riskPctPerTrade: 'riskPctPerTrade',
   maxOpenPositions: 'maxOpenPositions',
   drawdownHaltPct: 'drawdownHaltPct',
-  cash: 'cash',
-  rebalanceBandPct: 'rebalanceBandPct',
   scanInterval: 'scanInterval',
   scanRange: 'scanRange',
   strategy: 'strategy',
   universe: 'universe',
   killSwitch: 'killSwitch',
   killSwitchReason: 'killSwitchReason',
-  webullShadowEnabled: 'webullShadowEnabled',
   sort: 'sort',
   createdAt: 'createdAt'
 } as const
 
 export type PortfolioScalarFieldEnum = (typeof PortfolioScalarFieldEnum)[keyof typeof PortfolioScalarFieldEnum]
-
-
-export const HoldingScalarFieldEnum = {
-  id: 'id',
-  portfolioId: 'portfolioId',
-  symbol: 'symbol',
-  shares: 'shares',
-  avgCost: 'avgCost',
-  status: 'status',
-  realizedPnl: 'realizedPnl',
-  openedAt: 'openedAt',
-  closedAt: 'closedAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type HoldingScalarFieldEnum = (typeof HoldingScalarFieldEnum)[keyof typeof HoldingScalarFieldEnum]
-
-
-export const OptionHoldingScalarFieldEnum = {
-  id: 'id',
-  portfolioId: 'portfolioId',
-  underlying: 'underlying',
-  type: 'type',
-  strike: 'strike',
-  expiry: 'expiry',
-  contracts: 'contracts',
-  premiumPaid: 'premiumPaid',
-  status: 'status',
-  realizedPnl: 'realizedPnl',
-  openedAt: 'openedAt',
-  closedAt: 'closedAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type OptionHoldingScalarFieldEnum = (typeof OptionHoldingScalarFieldEnum)[keyof typeof OptionHoldingScalarFieldEnum]
 
 
 export const TradeScalarFieldEnum = {
@@ -2144,36 +1806,6 @@ export const ScanLogScalarFieldEnum = {
 } as const
 
 export type ScanLogScalarFieldEnum = (typeof ScanLogScalarFieldEnum)[keyof typeof ScanLogScalarFieldEnum]
-
-
-export const WebullShadowOrderScalarFieldEnum = {
-  id: 'id',
-  tradeId: 'tradeId',
-  parentOrderId: 'parentOrderId',
-  slOrderId: 'slOrderId',
-  tpOrderId: 'tpOrderId',
-  status: 'status',
-  entryFillPrice: 'entryFillPrice',
-  entryFilledQty: 'entryFilledQty',
-  entryFilledAt: 'entryFilledAt',
-  exitPrice: 'exitPrice',
-  exitReason: 'exitReason',
-  exitFilledQty: 'exitFilledQty',
-  closedAt: 'closedAt',
-  lastError: 'lastError',
-  createdAt: 'createdAt'
-} as const
-
-export type WebullShadowOrderScalarFieldEnum = (typeof WebullShadowOrderScalarFieldEnum)[keyof typeof WebullShadowOrderScalarFieldEnum]
-
-
-export const WebullTickerCacheScalarFieldEnum = {
-  symbol: 'symbol',
-  tickerId: 'tickerId',
-  updatedAt: 'updatedAt'
-} as const
-
-export type WebullTickerCacheScalarFieldEnum = (typeof WebullTickerCacheScalarFieldEnum)[keyof typeof WebullTickerCacheScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2383,8 +2015,6 @@ export type GlobalOmitConfig = {
   pipelineStep?: Prisma.PipelineStepOmit
   signal?: Prisma.SignalOmit
   portfolio?: Prisma.PortfolioOmit
-  holding?: Prisma.HoldingOmit
-  optionHolding?: Prisma.OptionHoldingOmit
   trade?: Prisma.TradeOmit
   newsItem?: Prisma.NewsItemOmit
   lesson?: Prisma.LessonOmit
@@ -2395,8 +2025,6 @@ export type GlobalOmitConfig = {
   report?: Prisma.ReportOmit
   setting?: Prisma.SettingOmit
   scanLog?: Prisma.ScanLogOmit
-  webullShadowOrder?: Prisma.WebullShadowOrderOmit
-  webullTickerCache?: Prisma.WebullTickerCacheOmit
 }
 
 /* Types for Logging */

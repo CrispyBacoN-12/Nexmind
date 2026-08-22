@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const symbol = typeof body.symbol === "string" ? body.symbol.trim() : "";
   const portfolioId = Number(body.portfolioId);
-  if (!symbol) return Response.json({ error: "symbol is required (e.g. GC=F, BTC-USD, EURUSD=X)" }, { status: 400 });
+  if (!symbol) return Response.json({ error: "symbol is required (e.g. AAPL, MSFT, NVDA)" }, { status: 400 });
   if (!Number.isInteger(portfolioId)) return Response.json({ error: "portfolioId is required" }, { status: 400 });
 
   const portfolio = await prisma.portfolio.findUnique({ where: { id: portfolioId } });

@@ -157,7 +157,7 @@ function AnalyzeInner() {
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && run()}
-            placeholder="symbol — NVDA, AAPL, PTT.BK, GC=F, BTC-USD"
+            placeholder="symbol — NVDA, AAPL, MSFT, GOOGL"
             className="flex-1 h-10 rounded-md border border-(--color-border) bg-(--color-background) px-3 text-sm font-mono focus:outline-none focus:border-(--color-accent)/50"
           />
           <Button onClick={run} disabled={busy}>{busy ? "กำลังวิเคราะห์…" : "วิเคราะห์"}</Button>

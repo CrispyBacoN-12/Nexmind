@@ -82,55 +82,17 @@ model Portfolio {
   riskPctPerTrade  Float       @default(1)
   maxOpenPositions Int         @default(5)
   drawdownHaltPct  Float       @default(10)
-  cash             Float       @default(0)   // invest portfolio: uninvested cash (0 for swing)
-  rebalanceBandPct Float       @default(5)   // invest portfolio: drift % before TRIM/ADD
   scanInterval     String      @default("1h")  // swing scanner candle interval (5m..1d)
   scanRange        String      @default("3mo") // swing scanner lookback range (1d..1y)
   strategy         String      @default("trend-pullback") // swing entry strategy key
   universe         String      @default("")  // swing: "" = use watchlist, else a universe key (dow30…) to auto-trade
   killSwitch       Boolean     @default(false)
   killSwitchReason String      @default("")
-  webullShadowEnabled Boolean  @default(false)
   sort             Int         @default(0)
   createdAt        DateTime    @default(now())
   trades           Trade[]
   signals          Signal[]
   watchlist        Watchlist[]
-  holdings         Holding[]
-  optionHoldings   OptionHolding[]
-}
-
-/// A buy-and-hold position in an invest portfolio (avg-cost accounting).
-model Holding {
-  id          Int       @id @default(autoincrement())
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
-  portfolioId Int
-  symbol      String
-  shares      Float
-  avgCost     Float
-  status      String    @default("held") // held | sold
-  realizedPnl Float     @default(0)
-  openedAt    DateTime  @default(now())
-  closedAt    DateTime?
-  updatedAt   DateTime  @updatedAt
-}
-
-/// A long single-leg option position (avg-cost not needed — one buy per lot).
-model OptionHolding {
-  id          Int       @id @default(autoincrement())
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
-  portfolioId Int
-  underlying  String
-  type        String                     // call | put
-  strike      Float
-  expiry      DateTime
-  contracts   Int                        // 1 contract = 100 shares
-  premiumPaid Float                      // entry premium per share
-  status      String    @default("open") // open | closed | expired
-  realizedPnl Float     @default(0)
-  openedAt    DateTime  @default(now())
-  closedAt    DateTime?
-  updatedAt   DateTime  @updatedAt
 }
 
 /// A paper trade and the full team decision trail behind it.
@@ -160,7 +122,6 @@ model Trade {
   stagedTp        String   @default("{}") // JSON ladder state
   openedAt        DateTime  @default(now())
   closedAt        DateTime?
-  webullShadowOrder WebullShadowOrder?
 }
 
 /// Research gathered by SCOUT and fed back to the analysts as context.
@@ -273,35 +234,4 @@ model ScanLog {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
-}
-
-/// A risk-free "shadow" bracket order mirrored into Webull's PaperTrade
-/// account for a NEXMIND Trade — purely observational, never fed back into
-/// grading. Parent (entry) + up to two OCO children (stop-loss/take-profit).
-model WebullShadowOrder {
-  id             Int       @id @default(autoincrement())
-  trade          Trade     @relation(fields: [tradeId], references: [id])
-  tradeId        Int       @unique
-  parentOrderId  String
-  slOrderId      String?
-  tpOrderId      String?
-  status         String // pending | open | filled | closed | cancelled | rejected
-  entryFillPrice Float?
-  entryFilledQty Float?
-  entryFilledAt  DateTime?
-  exitPrice      Float? // VWAP of the triggered child order's executions
-  exitReason     String? // TAKE_PROFIT | STOP_LOSS | MANUAL_CANCEL
-  exitFilledQty  Float?
-  closedAt       DateTime?
-  lastError      String?
-  createdAt      DateTime  @default(now())
-}
-
-/// Cache of symbol -> Webull's internal numeric tickerId (static per symbol).
-/// Persistent (not in-memory) because the exec-stage hook and the polling
-/// cron are fresh, short-lived processes that share no memory.
-model WebullTickerCache {
-  symbol    String   @id
-  tickerId  Int
-  updatedAt DateTime @updatedAt
 }

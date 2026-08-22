@@ -7,7 +7,7 @@ export const maxDuration = 120;
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const symbol = typeof body.symbol === "string" ? body.symbol.trim().toUpperCase() : "";
-  if (!symbol) return Response.json({ error: "symbol is required (e.g. NVDA, PTT.BK, GC=F)" }, { status: 400 });
+  if (!symbol) return Response.json({ error: "symbol is required (e.g. NVDA, AAPL, MSFT)" }, { status: 400 });
 
   try {
     return Response.json(await analyzeSymbol(symbol));

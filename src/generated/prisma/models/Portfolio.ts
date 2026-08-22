@@ -32,8 +32,6 @@ export type PortfolioAvgAggregateOutputType = {
   riskPctPerTrade: number | null
   maxOpenPositions: number | null
   drawdownHaltPct: number | null
-  cash: number | null
-  rebalanceBandPct: number | null
   sort: number | null
 }
 
@@ -43,8 +41,6 @@ export type PortfolioSumAggregateOutputType = {
   riskPctPerTrade: number | null
   maxOpenPositions: number | null
   drawdownHaltPct: number | null
-  cash: number | null
-  rebalanceBandPct: number | null
   sort: number | null
 }
 
@@ -57,15 +53,12 @@ export type PortfolioMinAggregateOutputType = {
   riskPctPerTrade: number | null
   maxOpenPositions: number | null
   drawdownHaltPct: number | null
-  cash: number | null
-  rebalanceBandPct: number | null
   scanInterval: string | null
   scanRange: string | null
   strategy: string | null
   universe: string | null
   killSwitch: boolean | null
   killSwitchReason: string | null
-  webullShadowEnabled: boolean | null
   sort: number | null
   createdAt: Date | null
 }
@@ -79,15 +72,12 @@ export type PortfolioMaxAggregateOutputType = {
   riskPctPerTrade: number | null
   maxOpenPositions: number | null
   drawdownHaltPct: number | null
-  cash: number | null
-  rebalanceBandPct: number | null
   scanInterval: string | null
   scanRange: string | null
   strategy: string | null
   universe: string | null
   killSwitch: boolean | null
   killSwitchReason: string | null
-  webullShadowEnabled: boolean | null
   sort: number | null
   createdAt: Date | null
 }
@@ -101,15 +91,12 @@ export type PortfolioCountAggregateOutputType = {
   riskPctPerTrade: number
   maxOpenPositions: number
   drawdownHaltPct: number
-  cash: number
-  rebalanceBandPct: number
   scanInterval: number
   scanRange: number
   strategy: number
   universe: number
   killSwitch: number
   killSwitchReason: number
-  webullShadowEnabled: number
   sort: number
   createdAt: number
   _all: number
@@ -122,8 +109,6 @@ export type PortfolioAvgAggregateInputType = {
   riskPctPerTrade?: true
   maxOpenPositions?: true
   drawdownHaltPct?: true
-  cash?: true
-  rebalanceBandPct?: true
   sort?: true
 }
 
@@ -133,8 +118,6 @@ export type PortfolioSumAggregateInputType = {
   riskPctPerTrade?: true
   maxOpenPositions?: true
   drawdownHaltPct?: true
-  cash?: true
-  rebalanceBandPct?: true
   sort?: true
 }
 
@@ -147,15 +130,12 @@ export type PortfolioMinAggregateInputType = {
   riskPctPerTrade?: true
   maxOpenPositions?: true
   drawdownHaltPct?: true
-  cash?: true
-  rebalanceBandPct?: true
   scanInterval?: true
   scanRange?: true
   strategy?: true
   universe?: true
   killSwitch?: true
   killSwitchReason?: true
-  webullShadowEnabled?: true
   sort?: true
   createdAt?: true
 }
@@ -169,15 +149,12 @@ export type PortfolioMaxAggregateInputType = {
   riskPctPerTrade?: true
   maxOpenPositions?: true
   drawdownHaltPct?: true
-  cash?: true
-  rebalanceBandPct?: true
   scanInterval?: true
   scanRange?: true
   strategy?: true
   universe?: true
   killSwitch?: true
   killSwitchReason?: true
-  webullShadowEnabled?: true
   sort?: true
   createdAt?: true
 }
@@ -191,15 +168,12 @@ export type PortfolioCountAggregateInputType = {
   riskPctPerTrade?: true
   maxOpenPositions?: true
   drawdownHaltPct?: true
-  cash?: true
-  rebalanceBandPct?: true
   scanInterval?: true
   scanRange?: true
   strategy?: true
   universe?: true
   killSwitch?: true
   killSwitchReason?: true
-  webullShadowEnabled?: true
   sort?: true
   createdAt?: true
   _all?: true
@@ -300,15 +274,12 @@ export type PortfolioGroupByOutputType = {
   riskPctPerTrade: number
   maxOpenPositions: number
   drawdownHaltPct: number
-  cash: number
-  rebalanceBandPct: number
   scanInterval: string
   scanRange: string
   strategy: string
   universe: string
   killSwitch: boolean
   killSwitchReason: string
-  webullShadowEnabled: boolean
   sort: number
   createdAt: Date
   _count: PortfolioCountAggregateOutputType | null
@@ -345,22 +316,17 @@ export type PortfolioWhereInput = {
   riskPctPerTrade?: Prisma.FloatFilter<"Portfolio"> | number
   maxOpenPositions?: Prisma.IntFilter<"Portfolio"> | number
   drawdownHaltPct?: Prisma.FloatFilter<"Portfolio"> | number
-  cash?: Prisma.FloatFilter<"Portfolio"> | number
-  rebalanceBandPct?: Prisma.FloatFilter<"Portfolio"> | number
   scanInterval?: Prisma.StringFilter<"Portfolio"> | string
   scanRange?: Prisma.StringFilter<"Portfolio"> | string
   strategy?: Prisma.StringFilter<"Portfolio"> | string
   universe?: Prisma.StringFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringFilter<"Portfolio"> | string
-  webullShadowEnabled?: Prisma.BoolFilter<"Portfolio"> | boolean
   sort?: Prisma.IntFilter<"Portfolio"> | number
   createdAt?: Prisma.DateTimeFilter<"Portfolio"> | Date | string
   trades?: Prisma.TradeListRelationFilter
   signals?: Prisma.SignalListRelationFilter
   watchlist?: Prisma.WatchlistListRelationFilter
-  holdings?: Prisma.HoldingListRelationFilter
-  optionHoldings?: Prisma.OptionHoldingListRelationFilter
 }
 
 export type PortfolioOrderByWithRelationInput = {
@@ -372,22 +338,17 @@ export type PortfolioOrderByWithRelationInput = {
   riskPctPerTrade?: Prisma.SortOrder
   maxOpenPositions?: Prisma.SortOrder
   drawdownHaltPct?: Prisma.SortOrder
-  cash?: Prisma.SortOrder
-  rebalanceBandPct?: Prisma.SortOrder
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
-  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   trades?: Prisma.TradeOrderByRelationAggregateInput
   signals?: Prisma.SignalOrderByRelationAggregateInput
   watchlist?: Prisma.WatchlistOrderByRelationAggregateInput
-  holdings?: Prisma.HoldingOrderByRelationAggregateInput
-  optionHoldings?: Prisma.OptionHoldingOrderByRelationAggregateInput
 }
 
 export type PortfolioWhereUniqueInput = Prisma.AtLeast<{
@@ -402,22 +363,17 @@ export type PortfolioWhereUniqueInput = Prisma.AtLeast<{
   riskPctPerTrade?: Prisma.FloatFilter<"Portfolio"> | number
   maxOpenPositions?: Prisma.IntFilter<"Portfolio"> | number
   drawdownHaltPct?: Prisma.FloatFilter<"Portfolio"> | number
-  cash?: Prisma.FloatFilter<"Portfolio"> | number
-  rebalanceBandPct?: Prisma.FloatFilter<"Portfolio"> | number
   scanInterval?: Prisma.StringFilter<"Portfolio"> | string
   scanRange?: Prisma.StringFilter<"Portfolio"> | string
   strategy?: Prisma.StringFilter<"Portfolio"> | string
   universe?: Prisma.StringFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringFilter<"Portfolio"> | string
-  webullShadowEnabled?: Prisma.BoolFilter<"Portfolio"> | boolean
   sort?: Prisma.IntFilter<"Portfolio"> | number
   createdAt?: Prisma.DateTimeFilter<"Portfolio"> | Date | string
   trades?: Prisma.TradeListRelationFilter
   signals?: Prisma.SignalListRelationFilter
   watchlist?: Prisma.WatchlistListRelationFilter
-  holdings?: Prisma.HoldingListRelationFilter
-  optionHoldings?: Prisma.OptionHoldingListRelationFilter
 }, "id">
 
 export type PortfolioOrderByWithAggregationInput = {
@@ -429,15 +385,12 @@ export type PortfolioOrderByWithAggregationInput = {
   riskPctPerTrade?: Prisma.SortOrder
   maxOpenPositions?: Prisma.SortOrder
   drawdownHaltPct?: Prisma.SortOrder
-  cash?: Prisma.SortOrder
-  rebalanceBandPct?: Prisma.SortOrder
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
-  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.PortfolioCountOrderByAggregateInput
@@ -459,15 +412,12 @@ export type PortfolioScalarWhereWithAggregatesInput = {
   riskPctPerTrade?: Prisma.FloatWithAggregatesFilter<"Portfolio"> | number
   maxOpenPositions?: Prisma.IntWithAggregatesFilter<"Portfolio"> | number
   drawdownHaltPct?: Prisma.FloatWithAggregatesFilter<"Portfolio"> | number
-  cash?: Prisma.FloatWithAggregatesFilter<"Portfolio"> | number
-  rebalanceBandPct?: Prisma.FloatWithAggregatesFilter<"Portfolio"> | number
   scanInterval?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   scanRange?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   strategy?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   universe?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
   killSwitch?: Prisma.BoolWithAggregatesFilter<"Portfolio"> | boolean
   killSwitchReason?: Prisma.StringWithAggregatesFilter<"Portfolio"> | string
-  webullShadowEnabled?: Prisma.BoolWithAggregatesFilter<"Portfolio"> | boolean
   sort?: Prisma.IntWithAggregatesFilter<"Portfolio"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Portfolio"> | Date | string
 }
@@ -480,22 +430,17 @@ export type PortfolioCreateInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
   signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUncheckedCreateInput = {
@@ -507,22 +452,17 @@ export type PortfolioUncheckedCreateInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
   signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUpdateInput = {
@@ -533,22 +473,17 @@ export type PortfolioUpdateInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
   signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioUncheckedUpdateInput = {
@@ -560,22 +495,17 @@ export type PortfolioUncheckedUpdateInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
   signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUncheckedUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioCreateManyInput = {
@@ -587,15 +517,12 @@ export type PortfolioCreateManyInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
 }
@@ -608,15 +535,12 @@ export type PortfolioUpdateManyMutationInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -630,15 +554,12 @@ export type PortfolioUncheckedUpdateManyInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -657,15 +578,12 @@ export type PortfolioCountOrderByAggregateInput = {
   riskPctPerTrade?: Prisma.SortOrder
   maxOpenPositions?: Prisma.SortOrder
   drawdownHaltPct?: Prisma.SortOrder
-  cash?: Prisma.SortOrder
-  rebalanceBandPct?: Prisma.SortOrder
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
-  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -676,8 +594,6 @@ export type PortfolioAvgOrderByAggregateInput = {
   riskPctPerTrade?: Prisma.SortOrder
   maxOpenPositions?: Prisma.SortOrder
   drawdownHaltPct?: Prisma.SortOrder
-  cash?: Prisma.SortOrder
-  rebalanceBandPct?: Prisma.SortOrder
   sort?: Prisma.SortOrder
 }
 
@@ -690,15 +606,12 @@ export type PortfolioMaxOrderByAggregateInput = {
   riskPctPerTrade?: Prisma.SortOrder
   maxOpenPositions?: Prisma.SortOrder
   drawdownHaltPct?: Prisma.SortOrder
-  cash?: Prisma.SortOrder
-  rebalanceBandPct?: Prisma.SortOrder
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
-  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -712,15 +625,12 @@ export type PortfolioMinOrderByAggregateInput = {
   riskPctPerTrade?: Prisma.SortOrder
   maxOpenPositions?: Prisma.SortOrder
   drawdownHaltPct?: Prisma.SortOrder
-  cash?: Prisma.SortOrder
-  rebalanceBandPct?: Prisma.SortOrder
   scanInterval?: Prisma.SortOrder
   scanRange?: Prisma.SortOrder
   strategy?: Prisma.SortOrder
   universe?: Prisma.SortOrder
   killSwitch?: Prisma.SortOrder
   killSwitchReason?: Prisma.SortOrder
-  webullShadowEnabled?: Prisma.SortOrder
   sort?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -731,8 +641,6 @@ export type PortfolioSumOrderByAggregateInput = {
   riskPctPerTrade?: Prisma.SortOrder
   maxOpenPositions?: Prisma.SortOrder
   drawdownHaltPct?: Prisma.SortOrder
-  cash?: Prisma.SortOrder
-  rebalanceBandPct?: Prisma.SortOrder
   sort?: Prisma.SortOrder
 }
 
@@ -752,34 +660,6 @@ export type PortfolioUpdateOneRequiredWithoutSignalsNestedInput = {
 
 export type BoolFieldUpdateOperationsInput = {
   set?: boolean
-}
-
-export type PortfolioCreateNestedOneWithoutHoldingsInput = {
-  create?: Prisma.XOR<Prisma.PortfolioCreateWithoutHoldingsInput, Prisma.PortfolioUncheckedCreateWithoutHoldingsInput>
-  connectOrCreate?: Prisma.PortfolioCreateOrConnectWithoutHoldingsInput
-  connect?: Prisma.PortfolioWhereUniqueInput
-}
-
-export type PortfolioUpdateOneRequiredWithoutHoldingsNestedInput = {
-  create?: Prisma.XOR<Prisma.PortfolioCreateWithoutHoldingsInput, Prisma.PortfolioUncheckedCreateWithoutHoldingsInput>
-  connectOrCreate?: Prisma.PortfolioCreateOrConnectWithoutHoldingsInput
-  upsert?: Prisma.PortfolioUpsertWithoutHoldingsInput
-  connect?: Prisma.PortfolioWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.PortfolioUpdateToOneWithWhereWithoutHoldingsInput, Prisma.PortfolioUpdateWithoutHoldingsInput>, Prisma.PortfolioUncheckedUpdateWithoutHoldingsInput>
-}
-
-export type PortfolioCreateNestedOneWithoutOptionHoldingsInput = {
-  create?: Prisma.XOR<Prisma.PortfolioCreateWithoutOptionHoldingsInput, Prisma.PortfolioUncheckedCreateWithoutOptionHoldingsInput>
-  connectOrCreate?: Prisma.PortfolioCreateOrConnectWithoutOptionHoldingsInput
-  connect?: Prisma.PortfolioWhereUniqueInput
-}
-
-export type PortfolioUpdateOneRequiredWithoutOptionHoldingsNestedInput = {
-  create?: Prisma.XOR<Prisma.PortfolioCreateWithoutOptionHoldingsInput, Prisma.PortfolioUncheckedCreateWithoutOptionHoldingsInput>
-  connectOrCreate?: Prisma.PortfolioCreateOrConnectWithoutOptionHoldingsInput
-  upsert?: Prisma.PortfolioUpsertWithoutOptionHoldingsInput
-  connect?: Prisma.PortfolioWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.PortfolioUpdateToOneWithWhereWithoutOptionHoldingsInput, Prisma.PortfolioUpdateWithoutOptionHoldingsInput>, Prisma.PortfolioUncheckedUpdateWithoutOptionHoldingsInput>
 }
 
 export type PortfolioCreateNestedOneWithoutTradesInput = {
@@ -818,21 +698,16 @@ export type PortfolioCreateWithoutSignalsInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUncheckedCreateWithoutSignalsInput = {
@@ -844,21 +719,16 @@ export type PortfolioUncheckedCreateWithoutSignalsInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioCreateOrConnectWithoutSignalsInput = {
@@ -885,21 +755,16 @@ export type PortfolioUpdateWithoutSignalsInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioUncheckedUpdateWithoutSignalsInput = {
@@ -911,257 +776,16 @@ export type PortfolioUncheckedUpdateWithoutSignalsInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUncheckedUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedUpdateManyWithoutPortfolioNestedInput
-}
-
-export type PortfolioCreateWithoutHoldingsInput = {
-  name: string
-  kind?: string
-  status?: string
-  startingBalance?: number
-  riskPctPerTrade?: number
-  maxOpenPositions?: number
-  drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
-  scanInterval?: string
-  scanRange?: string
-  strategy?: string
-  universe?: string
-  killSwitch?: boolean
-  killSwitchReason?: string
-  webullShadowEnabled?: boolean
-  sort?: number
-  createdAt?: Date | string
-  trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
-  signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
-  watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingCreateNestedManyWithoutPortfolioInput
-}
-
-export type PortfolioUncheckedCreateWithoutHoldingsInput = {
-  id?: number
-  name: string
-  kind?: string
-  status?: string
-  startingBalance?: number
-  riskPctPerTrade?: number
-  maxOpenPositions?: number
-  drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
-  scanInterval?: string
-  scanRange?: string
-  strategy?: string
-  universe?: string
-  killSwitch?: boolean
-  killSwitchReason?: string
-  webullShadowEnabled?: boolean
-  sort?: number
-  createdAt?: Date | string
-  trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
-  signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
-  watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedCreateNestedManyWithoutPortfolioInput
-}
-
-export type PortfolioCreateOrConnectWithoutHoldingsInput = {
-  where: Prisma.PortfolioWhereUniqueInput
-  create: Prisma.XOR<Prisma.PortfolioCreateWithoutHoldingsInput, Prisma.PortfolioUncheckedCreateWithoutHoldingsInput>
-}
-
-export type PortfolioUpsertWithoutHoldingsInput = {
-  update: Prisma.XOR<Prisma.PortfolioUpdateWithoutHoldingsInput, Prisma.PortfolioUncheckedUpdateWithoutHoldingsInput>
-  create: Prisma.XOR<Prisma.PortfolioCreateWithoutHoldingsInput, Prisma.PortfolioUncheckedCreateWithoutHoldingsInput>
-  where?: Prisma.PortfolioWhereInput
-}
-
-export type PortfolioUpdateToOneWithWhereWithoutHoldingsInput = {
-  where?: Prisma.PortfolioWhereInput
-  data: Prisma.XOR<Prisma.PortfolioUpdateWithoutHoldingsInput, Prisma.PortfolioUncheckedUpdateWithoutHoldingsInput>
-}
-
-export type PortfolioUpdateWithoutHoldingsInput = {
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  kind?: Prisma.StringFieldUpdateOperationsInput | string
-  status?: Prisma.StringFieldUpdateOperationsInput | string
-  startingBalance?: Prisma.FloatFieldUpdateOperationsInput | number
-  riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
-  maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
-  drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
-  scanRange?: Prisma.StringFieldUpdateOperationsInput | string
-  strategy?: Prisma.StringFieldUpdateOperationsInput | string
-  universe?: Prisma.StringFieldUpdateOperationsInput | string
-  killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  sort?: Prisma.IntFieldUpdateOperationsInput | number
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
-  signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
-  watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUpdateManyWithoutPortfolioNestedInput
-}
-
-export type PortfolioUncheckedUpdateWithoutHoldingsInput = {
-  id?: Prisma.IntFieldUpdateOperationsInput | number
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  kind?: Prisma.StringFieldUpdateOperationsInput | string
-  status?: Prisma.StringFieldUpdateOperationsInput | string
-  startingBalance?: Prisma.FloatFieldUpdateOperationsInput | number
-  riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
-  maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
-  drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
-  scanRange?: Prisma.StringFieldUpdateOperationsInput | string
-  strategy?: Prisma.StringFieldUpdateOperationsInput | string
-  universe?: Prisma.StringFieldUpdateOperationsInput | string
-  killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  sort?: Prisma.IntFieldUpdateOperationsInput | number
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
-  signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
-  watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedUpdateManyWithoutPortfolioNestedInput
-}
-
-export type PortfolioCreateWithoutOptionHoldingsInput = {
-  name: string
-  kind?: string
-  status?: string
-  startingBalance?: number
-  riskPctPerTrade?: number
-  maxOpenPositions?: number
-  drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
-  scanInterval?: string
-  scanRange?: string
-  strategy?: string
-  universe?: string
-  killSwitch?: boolean
-  killSwitchReason?: string
-  webullShadowEnabled?: boolean
-  sort?: number
-  createdAt?: Date | string
-  trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
-  signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
-  watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingCreateNestedManyWithoutPortfolioInput
-}
-
-export type PortfolioUncheckedCreateWithoutOptionHoldingsInput = {
-  id?: number
-  name: string
-  kind?: string
-  status?: string
-  startingBalance?: number
-  riskPctPerTrade?: number
-  maxOpenPositions?: number
-  drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
-  scanInterval?: string
-  scanRange?: string
-  strategy?: string
-  universe?: string
-  killSwitch?: boolean
-  killSwitchReason?: string
-  webullShadowEnabled?: boolean
-  sort?: number
-  createdAt?: Date | string
-  trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
-  signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
-  watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutPortfolioInput
-}
-
-export type PortfolioCreateOrConnectWithoutOptionHoldingsInput = {
-  where: Prisma.PortfolioWhereUniqueInput
-  create: Prisma.XOR<Prisma.PortfolioCreateWithoutOptionHoldingsInput, Prisma.PortfolioUncheckedCreateWithoutOptionHoldingsInput>
-}
-
-export type PortfolioUpsertWithoutOptionHoldingsInput = {
-  update: Prisma.XOR<Prisma.PortfolioUpdateWithoutOptionHoldingsInput, Prisma.PortfolioUncheckedUpdateWithoutOptionHoldingsInput>
-  create: Prisma.XOR<Prisma.PortfolioCreateWithoutOptionHoldingsInput, Prisma.PortfolioUncheckedCreateWithoutOptionHoldingsInput>
-  where?: Prisma.PortfolioWhereInput
-}
-
-export type PortfolioUpdateToOneWithWhereWithoutOptionHoldingsInput = {
-  where?: Prisma.PortfolioWhereInput
-  data: Prisma.XOR<Prisma.PortfolioUpdateWithoutOptionHoldingsInput, Prisma.PortfolioUncheckedUpdateWithoutOptionHoldingsInput>
-}
-
-export type PortfolioUpdateWithoutOptionHoldingsInput = {
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  kind?: Prisma.StringFieldUpdateOperationsInput | string
-  status?: Prisma.StringFieldUpdateOperationsInput | string
-  startingBalance?: Prisma.FloatFieldUpdateOperationsInput | number
-  riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
-  maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
-  drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
-  scanRange?: Prisma.StringFieldUpdateOperationsInput | string
-  strategy?: Prisma.StringFieldUpdateOperationsInput | string
-  universe?: Prisma.StringFieldUpdateOperationsInput | string
-  killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  sort?: Prisma.IntFieldUpdateOperationsInput | number
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
-  signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
-  watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUpdateManyWithoutPortfolioNestedInput
-}
-
-export type PortfolioUncheckedUpdateWithoutOptionHoldingsInput = {
-  id?: Prisma.IntFieldUpdateOperationsInput | number
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  kind?: Prisma.StringFieldUpdateOperationsInput | string
-  status?: Prisma.StringFieldUpdateOperationsInput | string
-  startingBalance?: Prisma.FloatFieldUpdateOperationsInput | number
-  riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
-  maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
-  drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
-  scanRange?: Prisma.StringFieldUpdateOperationsInput | string
-  strategy?: Prisma.StringFieldUpdateOperationsInput | string
-  universe?: Prisma.StringFieldUpdateOperationsInput | string
-  killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  sort?: Prisma.IntFieldUpdateOperationsInput | number
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
-  signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
-  watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUncheckedUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioCreateWithoutTradesInput = {
@@ -1172,21 +796,16 @@ export type PortfolioCreateWithoutTradesInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUncheckedCreateWithoutTradesInput = {
@@ -1198,21 +817,16 @@ export type PortfolioUncheckedCreateWithoutTradesInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioCreateOrConnectWithoutTradesInput = {
@@ -1239,21 +853,16 @@ export type PortfolioUpdateWithoutTradesInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioUncheckedUpdateWithoutTradesInput = {
@@ -1265,21 +874,16 @@ export type PortfolioUncheckedUpdateWithoutTradesInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUncheckedUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioCreateWithoutWatchlistInput = {
@@ -1290,21 +894,16 @@ export type PortfolioCreateWithoutWatchlistInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
   signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUncheckedCreateWithoutWatchlistInput = {
@@ -1316,21 +915,16 @@ export type PortfolioUncheckedCreateWithoutWatchlistInput = {
   riskPctPerTrade?: number
   maxOpenPositions?: number
   drawdownHaltPct?: number
-  cash?: number
-  rebalanceBandPct?: number
   scanInterval?: string
   scanRange?: string
   strategy?: string
   universe?: string
   killSwitch?: boolean
   killSwitchReason?: string
-  webullShadowEnabled?: boolean
   sort?: number
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
   signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
-  holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutPortfolioInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioCreateOrConnectWithoutWatchlistInput = {
@@ -1357,21 +951,16 @@ export type PortfolioUpdateWithoutWatchlistInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
   signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioUncheckedUpdateWithoutWatchlistInput = {
@@ -1383,21 +972,16 @@ export type PortfolioUncheckedUpdateWithoutWatchlistInput = {
   riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
   maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
   drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
-  cash?: Prisma.FloatFieldUpdateOperationsInput | number
-  rebalanceBandPct?: Prisma.FloatFieldUpdateOperationsInput | number
   scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
   scanRange?: Prisma.StringFieldUpdateOperationsInput | string
   strategy?: Prisma.StringFieldUpdateOperationsInput | string
   universe?: Prisma.StringFieldUpdateOperationsInput | string
   killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
   killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
-  webullShadowEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sort?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
   signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
-  holdings?: Prisma.HoldingUncheckedUpdateManyWithoutPortfolioNestedInput
-  optionHoldings?: Prisma.OptionHoldingUncheckedUpdateManyWithoutPortfolioNestedInput
 }
 
 
@@ -1409,16 +993,12 @@ export type PortfolioCountOutputType = {
   trades: number
   signals: number
   watchlist: number
-  holdings: number
-  optionHoldings: number
 }
 
 export type PortfolioCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   trades?: boolean | PortfolioCountOutputTypeCountTradesArgs
   signals?: boolean | PortfolioCountOutputTypeCountSignalsArgs
   watchlist?: boolean | PortfolioCountOutputTypeCountWatchlistArgs
-  holdings?: boolean | PortfolioCountOutputTypeCountHoldingsArgs
-  optionHoldings?: boolean | PortfolioCountOutputTypeCountOptionHoldingsArgs
 }
 
 /**
@@ -1452,20 +1032,6 @@ export type PortfolioCountOutputTypeCountWatchlistArgs<ExtArgs extends runtime.T
   where?: Prisma.WatchlistWhereInput
 }
 
-/**
- * PortfolioCountOutputType without action
- */
-export type PortfolioCountOutputTypeCountHoldingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.HoldingWhereInput
-}
-
-/**
- * PortfolioCountOutputType without action
- */
-export type PortfolioCountOutputTypeCountOptionHoldingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.OptionHoldingWhereInput
-}
-
 
 export type PortfolioSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1476,22 +1042,17 @@ export type PortfolioSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   riskPctPerTrade?: boolean
   maxOpenPositions?: boolean
   drawdownHaltPct?: boolean
-  cash?: boolean
-  rebalanceBandPct?: boolean
   scanInterval?: boolean
   scanRange?: boolean
   strategy?: boolean
   universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
-  webullShadowEnabled?: boolean
   sort?: boolean
   createdAt?: boolean
   trades?: boolean | Prisma.Portfolio$tradesArgs<ExtArgs>
   signals?: boolean | Prisma.Portfolio$signalsArgs<ExtArgs>
   watchlist?: boolean | Prisma.Portfolio$watchlistArgs<ExtArgs>
-  holdings?: boolean | Prisma.Portfolio$holdingsArgs<ExtArgs>
-  optionHoldings?: boolean | Prisma.Portfolio$optionHoldingsArgs<ExtArgs>
   _count?: boolean | Prisma.PortfolioCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["portfolio"]>
 
@@ -1504,15 +1065,12 @@ export type PortfolioSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   riskPctPerTrade?: boolean
   maxOpenPositions?: boolean
   drawdownHaltPct?: boolean
-  cash?: boolean
-  rebalanceBandPct?: boolean
   scanInterval?: boolean
   scanRange?: boolean
   strategy?: boolean
   universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
-  webullShadowEnabled?: boolean
   sort?: boolean
   createdAt?: boolean
 }, ExtArgs["result"]["portfolio"]>
@@ -1526,15 +1084,12 @@ export type PortfolioSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   riskPctPerTrade?: boolean
   maxOpenPositions?: boolean
   drawdownHaltPct?: boolean
-  cash?: boolean
-  rebalanceBandPct?: boolean
   scanInterval?: boolean
   scanRange?: boolean
   strategy?: boolean
   universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
-  webullShadowEnabled?: boolean
   sort?: boolean
   createdAt?: boolean
 }, ExtArgs["result"]["portfolio"]>
@@ -1548,26 +1103,21 @@ export type PortfolioSelectScalar = {
   riskPctPerTrade?: boolean
   maxOpenPositions?: boolean
   drawdownHaltPct?: boolean
-  cash?: boolean
-  rebalanceBandPct?: boolean
   scanInterval?: boolean
   scanRange?: boolean
   strategy?: boolean
   universe?: boolean
   killSwitch?: boolean
   killSwitchReason?: boolean
-  webullShadowEnabled?: boolean
   sort?: boolean
   createdAt?: boolean
 }
 
-export type PortfolioOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "kind" | "status" | "startingBalance" | "riskPctPerTrade" | "maxOpenPositions" | "drawdownHaltPct" | "cash" | "rebalanceBandPct" | "scanInterval" | "scanRange" | "strategy" | "universe" | "killSwitch" | "killSwitchReason" | "webullShadowEnabled" | "sort" | "createdAt", ExtArgs["result"]["portfolio"]>
+export type PortfolioOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "kind" | "status" | "startingBalance" | "riskPctPerTrade" | "maxOpenPositions" | "drawdownHaltPct" | "scanInterval" | "scanRange" | "strategy" | "universe" | "killSwitch" | "killSwitchReason" | "sort" | "createdAt", ExtArgs["result"]["portfolio"]>
 export type PortfolioInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   trades?: boolean | Prisma.Portfolio$tradesArgs<ExtArgs>
   signals?: boolean | Prisma.Portfolio$signalsArgs<ExtArgs>
   watchlist?: boolean | Prisma.Portfolio$watchlistArgs<ExtArgs>
-  holdings?: boolean | Prisma.Portfolio$holdingsArgs<ExtArgs>
-  optionHoldings?: boolean | Prisma.Portfolio$optionHoldingsArgs<ExtArgs>
   _count?: boolean | Prisma.PortfolioCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PortfolioIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1579,8 +1129,6 @@ export type $PortfolioPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     trades: Prisma.$TradePayload<ExtArgs>[]
     signals: Prisma.$SignalPayload<ExtArgs>[]
     watchlist: Prisma.$WatchlistPayload<ExtArgs>[]
-    holdings: Prisma.$HoldingPayload<ExtArgs>[]
-    optionHoldings: Prisma.$OptionHoldingPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
@@ -1591,15 +1139,12 @@ export type $PortfolioPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     riskPctPerTrade: number
     maxOpenPositions: number
     drawdownHaltPct: number
-    cash: number
-    rebalanceBandPct: number
     scanInterval: string
     scanRange: string
     strategy: string
     universe: string
     killSwitch: boolean
     killSwitchReason: string
-    webullShadowEnabled: boolean
     sort: number
     createdAt: Date
   }, ExtArgs["result"]["portfolio"]>
@@ -1999,8 +1544,6 @@ export interface Prisma__PortfolioClient<T, Null = never, ExtArgs extends runtim
   trades<T extends Prisma.Portfolio$tradesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$tradesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TradePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   signals<T extends Prisma.Portfolio$signalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$signalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SignalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   watchlist<T extends Prisma.Portfolio$watchlistArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$watchlistArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WatchlistPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  holdings<T extends Prisma.Portfolio$holdingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$holdingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HoldingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  optionHoldings<T extends Prisma.Portfolio$optionHoldingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$optionHoldingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OptionHoldingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2038,15 +1581,12 @@ export interface PortfolioFieldRefs {
   readonly riskPctPerTrade: Prisma.FieldRef<"Portfolio", 'Float'>
   readonly maxOpenPositions: Prisma.FieldRef<"Portfolio", 'Int'>
   readonly drawdownHaltPct: Prisma.FieldRef<"Portfolio", 'Float'>
-  readonly cash: Prisma.FieldRef<"Portfolio", 'Float'>
-  readonly rebalanceBandPct: Prisma.FieldRef<"Portfolio", 'Float'>
   readonly scanInterval: Prisma.FieldRef<"Portfolio", 'String'>
   readonly scanRange: Prisma.FieldRef<"Portfolio", 'String'>
   readonly strategy: Prisma.FieldRef<"Portfolio", 'String'>
   readonly universe: Prisma.FieldRef<"Portfolio", 'String'>
   readonly killSwitch: Prisma.FieldRef<"Portfolio", 'Boolean'>
   readonly killSwitchReason: Prisma.FieldRef<"Portfolio", 'String'>
-  readonly webullShadowEnabled: Prisma.FieldRef<"Portfolio", 'Boolean'>
   readonly sort: Prisma.FieldRef<"Portfolio", 'Int'>
   readonly createdAt: Prisma.FieldRef<"Portfolio", 'DateTime'>
 }
@@ -2511,54 +2051,6 @@ export type Portfolio$watchlistArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.WatchlistScalarFieldEnum | Prisma.WatchlistScalarFieldEnum[]
-}
-
-/**
- * Portfolio.holdings
- */
-export type Portfolio$holdingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Holding
-   */
-  select?: Prisma.HoldingSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the Holding
-   */
-  omit?: Prisma.HoldingOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.HoldingInclude<ExtArgs> | null
-  where?: Prisma.HoldingWhereInput
-  orderBy?: Prisma.HoldingOrderByWithRelationInput | Prisma.HoldingOrderByWithRelationInput[]
-  cursor?: Prisma.HoldingWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.HoldingScalarFieldEnum | Prisma.HoldingScalarFieldEnum[]
-}
-
-/**
- * Portfolio.optionHoldings
- */
-export type Portfolio$optionHoldingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the OptionHolding
-   */
-  select?: Prisma.OptionHoldingSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the OptionHolding
-   */
-  omit?: Prisma.OptionHoldingOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.OptionHoldingInclude<ExtArgs> | null
-  where?: Prisma.OptionHoldingWhereInput
-  orderBy?: Prisma.OptionHoldingOrderByWithRelationInput | Prisma.OptionHoldingOrderByWithRelationInput[]
-  cursor?: Prisma.OptionHoldingWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.OptionHoldingScalarFieldEnum | Prisma.OptionHoldingScalarFieldEnum[]
 }
 
 /**

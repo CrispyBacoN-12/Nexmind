@@ -76,7 +76,7 @@ export function WatchlistPanel({ portfolioId }: { portfolioId: number }) {
           value={sym}
           onChange={(e) => setSym(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="add symbol e.g. TSLA, GC=F"
+          placeholder="add symbol e.g. TSLA, NVDA"
           className="flex-1 h-9 rounded-md border border-(--color-border) bg-(--color-background) px-3 text-sm font-mono focus:outline-none focus:border-(--color-accent)/50"
         />
         <Button onClick={add} variant="outline" size="sm">Add</Button>

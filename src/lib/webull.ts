@@ -1,14 +1,27 @@
 // Webull market-data provider — same CandleResponse shape as alpaca.ts/
-// yahoo.ts so the router is provider-agnostic. Data-only: never touches
-// Webull's PaperTrade order APIs (see webull/paperTrade.ts for that).
+// yahoo.ts so the router is provider-agnostic. Data-only, and necessarily so:
+// Webull is not usable as an execution venue from here (see below).
 //
 // Signs against the sandbox/UAT host with the shared WEBULL_PAPER_APP_KEY/
 // SECRET pair, not the production WEBULL_APP_KEY/SECRET pair — verified
-// (scripts/webull-account-list.mts) that GET /openapi/market-data/stock/bars
+// (scripts/webull-sandbox-smoke-test.mts) that GET /openapi/market-data/stock/bars
 // returns real market data on sandbox with plain AK/SK signing, no
 // x-access-token exchange required. Production requires that exchange to be
 // approved in the Webull mobile app per session, which doesn't suit an
 // unattended fetch path; sandbox needs no such approval.
+//
+// Why there is no order path here: the sandbox host serves only market-data
+// plus /openapi/account/list — every /openapi/trade/* route 404s at its
+// gateway. Those routes do exist on production (api.webull.co.th), but there
+// they answer INVALID_TOKEN without an x-access-token, i.e. they need the
+// same per-session mobile approval. A shadow paper-trade path used to live
+// in webull/paperTrade.ts + webull/symbols.ts; it never placed a single
+// order because it targeted Webull's legacy app API (/api/paper/order/*,
+// /api/openapi/quote/symbol-search), which does not exist on the OpenAPI
+// gateway at all. It was removed rather than ported, for the reason above.
+//
+// Note for any future port: a symbol-search call is not needed — the bars
+// response already carries tickerId/instrument_id on every row.
 import type { Candle } from "./indicators";
 import type { CandleResponse, Range, Interval } from "./yahoo";
 import { signedFetch } from "./webull/auth";

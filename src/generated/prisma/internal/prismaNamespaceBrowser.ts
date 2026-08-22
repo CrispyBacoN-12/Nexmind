@@ -56,8 +56,6 @@ export const ModelName = {
   PipelineStep: 'PipelineStep',
   Signal: 'Signal',
   Portfolio: 'Portfolio',
-  Holding: 'Holding',
-  OptionHolding: 'OptionHolding',
   Trade: 'Trade',
   NewsItem: 'NewsItem',
   Lesson: 'Lesson',
@@ -67,9 +65,7 @@ export const ModelName = {
   ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
   Setting: 'Setting',
-  ScanLog: 'ScanLog',
-  WebullShadowOrder: 'WebullShadowOrder',
-  WebullTickerCache: 'WebullTickerCache'
+  ScanLog: 'ScanLog'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -167,55 +163,17 @@ export const PortfolioScalarFieldEnum = {
   riskPctPerTrade: 'riskPctPerTrade',
   maxOpenPositions: 'maxOpenPositions',
   drawdownHaltPct: 'drawdownHaltPct',
-  cash: 'cash',
-  rebalanceBandPct: 'rebalanceBandPct',
   scanInterval: 'scanInterval',
   scanRange: 'scanRange',
   strategy: 'strategy',
   universe: 'universe',
   killSwitch: 'killSwitch',
   killSwitchReason: 'killSwitchReason',
-  webullShadowEnabled: 'webullShadowEnabled',
   sort: 'sort',
   createdAt: 'createdAt'
 } as const
 
 export type PortfolioScalarFieldEnum = (typeof PortfolioScalarFieldEnum)[keyof typeof PortfolioScalarFieldEnum]
-
-
-export const HoldingScalarFieldEnum = {
-  id: 'id',
-  portfolioId: 'portfolioId',
-  symbol: 'symbol',
-  shares: 'shares',
-  avgCost: 'avgCost',
-  status: 'status',
-  realizedPnl: 'realizedPnl',
-  openedAt: 'openedAt',
-  closedAt: 'closedAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type HoldingScalarFieldEnum = (typeof HoldingScalarFieldEnum)[keyof typeof HoldingScalarFieldEnum]
-
-
-export const OptionHoldingScalarFieldEnum = {
-  id: 'id',
-  portfolioId: 'portfolioId',
-  underlying: 'underlying',
-  type: 'type',
-  strike: 'strike',
-  expiry: 'expiry',
-  contracts: 'contracts',
-  premiumPaid: 'premiumPaid',
-  status: 'status',
-  realizedPnl: 'realizedPnl',
-  openedAt: 'openedAt',
-  closedAt: 'closedAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type OptionHoldingScalarFieldEnum = (typeof OptionHoldingScalarFieldEnum)[keyof typeof OptionHoldingScalarFieldEnum]
 
 
 export const TradeScalarFieldEnum = {
@@ -365,36 +323,6 @@ export const ScanLogScalarFieldEnum = {
 } as const
 
 export type ScanLogScalarFieldEnum = (typeof ScanLogScalarFieldEnum)[keyof typeof ScanLogScalarFieldEnum]
-
-
-export const WebullShadowOrderScalarFieldEnum = {
-  id: 'id',
-  tradeId: 'tradeId',
-  parentOrderId: 'parentOrderId',
-  slOrderId: 'slOrderId',
-  tpOrderId: 'tpOrderId',
-  status: 'status',
-  entryFillPrice: 'entryFillPrice',
-  entryFilledQty: 'entryFilledQty',
-  entryFilledAt: 'entryFilledAt',
-  exitPrice: 'exitPrice',
-  exitReason: 'exitReason',
-  exitFilledQty: 'exitFilledQty',
-  closedAt: 'closedAt',
-  lastError: 'lastError',
-  createdAt: 'createdAt'
-} as const
-
-export type WebullShadowOrderScalarFieldEnum = (typeof WebullShadowOrderScalarFieldEnum)[keyof typeof WebullShadowOrderScalarFieldEnum]
-
-
-export const WebullTickerCacheScalarFieldEnum = {
-  symbol: 'symbol',
-  tickerId: 'tickerId',
-  updatedAt: 'updatedAt'
-} as const
-
-export type WebullTickerCacheScalarFieldEnum = (typeof WebullTickerCacheScalarFieldEnum)[keyof typeof WebullTickerCacheScalarFieldEnum]
 
 
 export const SortOrder = {

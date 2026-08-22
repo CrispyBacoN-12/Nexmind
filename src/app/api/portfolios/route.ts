@@ -43,7 +43,6 @@ export async function POST(req: Request) {
       name,
       kind,
       startingBalance,
-      cash: kind === "invest" || kind === "options" ? startingBalance : 0,
       riskPctPerTrade: b.riskPctPerTrade ?? 1,
       maxOpenPositions: b.maxOpenPositions ? Math.floor(b.maxOpenPositions) : 5,
       drawdownHaltPct: b.drawdownHaltPct ?? 10,

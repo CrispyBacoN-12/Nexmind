@@ -6,22 +6,20 @@ import { Card, CardTitle, Button, Badge } from "@/components/ui";
 
 interface TickStep { stage: string; note: string }
 interface TickResult { symbol: string; outcome: string; steps: TickStep[]; tradeId?: number; costUsd: number }
-interface PortfolioOption { id: number; name: string; kind: string; status: string; equity: number; realizedPnl: number; openCount: number; currentDrawdownPct: number; killSwitch: boolean; webullShadowEnabled: boolean }
+interface PortfolioOption { id: number; name: string; kind: string; status: string; equity: number; realizedPnl: number; openCount: number; currentDrawdownPct: number; killSwitch: boolean }
 
 /** Trade-tick execution + portfolio create/select — relocated from the former
  *  Command Bridge page so War Room is the one place to actually trade. */
 export function TradeDeskPanel() {
   const router = useRouter();
-  const [symbol, setSymbol] = useState("GC=F");
+  const [symbol, setSymbol] = useState("AAPL");
   const [tick, setTick] = useState<TickResult | null>(null);
   const [ticking, setTicking] = useState(false);
 
   const [portfolios, setPortfolios] = useState<PortfolioOption[]>([]);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
   const [newName, setNewName] = useState("");
-  const [newKind, setNewKind] = useState("swing");
   const [creating, setCreating] = useState(false);
-  const [togglingWebull, setTogglingWebull] = useState(false);
 
   const loadPortfolios = useCallback(async (selectId?: number) => {
     const list = (await fetch("/api/portfolios").then((r) => r.json())) as PortfolioOption[];
@@ -41,7 +39,7 @@ export function TradeDeskPanel() {
     setCreating(true);
     try {
       const res = await fetch("/api/portfolios", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, kind: newKind }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, kind: "swing" }),
       });
       const created = await res.json();
       setNewName("");
@@ -51,22 +49,6 @@ export function TradeDeskPanel() {
   }
 
   const selected = portfolios.find((p) => p.id === selectedPortfolioId) ?? null;
-
-  async function toggleWebullShadow() {
-    if (!selected || togglingWebull) return;
-    setTogglingWebull(true);
-    try {
-      await fetch(`/api/portfolios/${selected.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ webullShadowEnabled: !selected.webullShadowEnabled }),
-      });
-      await loadPortfolios(selected.id);
-      router.refresh();
-    } finally {
-      setTogglingWebull(false);
-    }
-  }
 
   async function runTick() {
     if (!symbol.trim() || ticking || selectedPortfolioId == null) return;
@@ -113,17 +95,6 @@ export function TradeDeskPanel() {
                   <span>open {selected.openCount}</span>
                   <span>dd {selected.currentDrawdownPct.toFixed(1)}%</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between rounded-md border border-(--color-border) px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <Badge tone={selected.webullShadowEnabled ? "positive" : "neutral"}>
-                      {selected.webullShadowEnabled ? "WEBULL SHADOW · ON" : "WEBULL SHADOW · OFF"}
-                    </Badge>
-                    <span className="text-[11px] text-(--color-muted)">mirrors fills into Webull PaperTrade</span>
-                  </div>
-                  <Button onClick={toggleWebullShadow} disabled={togglingWebull} variant="outline" size="sm">
-                    {togglingWebull ? "…" : selected.webullShadowEnabled ? "Turn off" : "Turn on"}
-                  </Button>
-                </div>
               </>
             )}
           </>
@@ -143,21 +114,12 @@ export function TradeDeskPanel() {
               {creating ? "…" : "Create"}
             </Button>
           </div>
-          <select
-            value={newKind}
-            onChange={(e) => setNewKind(e.target.value)}
-            className="w-full h-9 rounded-md border border-(--color-border) bg-(--color-background) px-3 text-sm focus:outline-none focus:border-(--color-accent)/50"
-          >
-            <option value="swing">Swing — autonomous trade desk</option>
-            <option value="invest">Invest — long-term, you approve</option>
-            <option value="options">Options — autonomous options desk</option>
-          </select>
         </div>
       </Card>
 
       <Card>
         <CardTitle>📡 Trade Tick (paper)</CardTitle>
-        <p className="text-xs text-(--color-muted) mb-3">Run the desk once on a Yahoo symbol — GC=F (gold), BTC-USD, EURUSD=X.</p>
+        <p className="text-xs text-(--color-muted) mb-3">Run the desk once on a US stock symbol — AAPL, MSFT, NVDA.</p>
         <div className="flex gap-2">
           <input
             value={symbol}

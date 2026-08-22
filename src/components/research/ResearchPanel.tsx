@@ -35,7 +35,7 @@ function parseSummary(json: string): Summary | null {
 
 export default function ResearchPanel() {
   const [brief, setBrief] = useState("");
-  const [symbol, setSymbol] = useState("BTC-USD");
+  const [symbol, setSymbol] = useState("AAPL");
   const [interval, setInterval_] = useState("1h");
   const [range, setRange] = useState("3mo");
   const [running, setRunning] = useState(false);

@@ -36,14 +36,13 @@ export default function CommandBridge() {
     router.push("/build");
   }
 
-  const [symbol, setSymbol] = useState("GC=F");
+  const [symbol, setSymbol] = useState("AAPL");
   const [tick, setTick] = useState<TickResult | null>(null);
   const [ticking, setTicking] = useState(false);
 
   const [portfolios, setPortfolios] = useState<PortfolioOption[]>([]);
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
   const [newName, setNewName] = useState("");
-  const [newKind, setNewKind] = useState("swing");
   const [creating, setCreating] = useState(false);
 
   const loadPortfolios = useCallback(async (selectId?: number) => {
@@ -64,7 +63,7 @@ export default function CommandBridge() {
     setCreating(true);
     try {
       const res = await fetch("/api/portfolios", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, kind: newKind }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, kind: "swing" }),
       });
       const created = await res.json();
       setNewName("");
@@ -202,21 +201,12 @@ export default function CommandBridge() {
                   {creating ? "…" : "Create"}
                 </Button>
               </div>
-              <select
-                value={newKind}
-                onChange={(e) => setNewKind(e.target.value)}
-                className="w-full h-9 rounded-md border border-(--color-border) bg-(--color-background) px-3 text-sm focus:outline-none focus:border-(--color-accent)/50"
-              >
-                <option value="swing">Swing — autonomous trade desk</option>
-                <option value="invest">Invest — long-term, you approve</option>
-                <option value="options">Options — autonomous options desk</option>
-              </select>
             </div>
           </Card>
 
           <Card>
             <CardTitle>📡 Trade Tick (paper)</CardTitle>
-            <p className="text-xs text-(--color-muted) mb-3">Run the desk once on a Yahoo symbol — GC=F (gold), BTC-USD, EURUSD=X.</p>
+            <p className="text-xs text-(--color-muted) mb-3">Run the desk once on a US stock symbol — AAPL, MSFT, NVDA.</p>
             <div className="flex gap-2">
               <input
                 value={symbol}

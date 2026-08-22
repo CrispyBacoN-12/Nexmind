@@ -48,10 +48,6 @@ export async function getKillSwitchReason(portfolioId: number): Promise<string> 
   return (await getPortfolio(portfolioId)).killSwitchReason;
 }
 
-export async function isWebullShadowEnabled(portfolioId: number): Promise<boolean> {
-  return (await getPortfolio(portfolioId)).webullShadowEnabled;
-}
-
 export async function getMaxOpenPositions(portfolioId: number): Promise<number> {
   const n = (await getPortfolio(portfolioId)).maxOpenPositions;
   return Number.isFinite(n) && n > 0 ? n : 5;

@@ -1,6 +1,5 @@
-// Shared HMAC-SHA256 request signing for Webull's OpenAPI (data + PaperTrade).
-// One module so webull.ts and webull/paperTrade.ts never build two
-// independently-maintained signature implementations that could drift apart.
+// Shared HMAC-SHA256 request signing for Webull's OpenAPI.
+// Kept as its own module so the signing algorithm has one home.
 // Algorithm verified against webull-inc/webull-openapi-python-sdk's
 // default_signature_composer + token_manager (see scripts/webull-account-list.mts
 // for the original reference implementation this was ported from, including
