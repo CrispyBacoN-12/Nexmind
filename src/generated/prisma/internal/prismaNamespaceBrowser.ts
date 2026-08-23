@@ -56,6 +56,7 @@ export const ModelName = {
   PipelineStep: 'PipelineStep',
   Signal: 'Signal',
   Portfolio: 'Portfolio',
+  Counterfactual: 'Counterfactual',
   Trade: 'Trade',
   NewsItem: 'NewsItem',
   Lesson: 'Lesson',
@@ -174,6 +175,39 @@ export const PortfolioScalarFieldEnum = {
 } as const
 
 export type PortfolioScalarFieldEnum = (typeof PortfolioScalarFieldEnum)[keyof typeof PortfolioScalarFieldEnum]
+
+
+export const CounterfactualScalarFieldEnum = {
+  id: 'id',
+  portfolioId: 'portfolioId',
+  symbol: 'symbol',
+  timeframe: 'timeframe',
+  aiBackend: 'aiBackend',
+  scanSide: 'scanSide',
+  scanNote: 'scanNote',
+  aiOutcome: 'aiOutcome',
+  aiReason: 'aiReason',
+  tradeId: 'tradeId',
+  aiEntry: 'aiEntry',
+  aiSl: 'aiSl',
+  aiTp1: 'aiTp1',
+  aiTp2: 'aiTp2',
+  mockEntry: 'mockEntry',
+  mockSl: 'mockSl',
+  mockTp1: 'mockTp1',
+  mockTp2: 'mockTp2',
+  lot: 'lot',
+  resolvedAt: 'resolvedAt',
+  aiR: 'aiR',
+  mockR: 'mockR',
+  aiPnl: 'aiPnl',
+  mockPnl: 'mockPnl',
+  aiExitNote: 'aiExitNote',
+  mockExitNote: 'mockExitNote',
+  openedAt: 'openedAt'
+} as const
+
+export type CounterfactualScalarFieldEnum = (typeof CounterfactualScalarFieldEnum)[keyof typeof CounterfactualScalarFieldEnum]
 
 
 export const TradeScalarFieldEnum = {

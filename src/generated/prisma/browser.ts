@@ -43,6 +43,20 @@ export type Signal = Prisma.SignalModel
  */
 export type Portfolio = Prisma.PortfolioModel
 /**
+ * Model Counterfactual
+ * One tick where the scanner fired AND a real AI backend was live: what the
+ * analysts decided, and what the deterministic mock would have decided on the
+ * very same bar.
+ * 
+ * The desk has never been able to answer "do HAWK and SAGE add money?" — a
+ * trade the analysts refused simply doesn't exist in the Trade table, so the
+ * only evidence on file is the trades they approved. This row keeps the
+ * refusals too. Both arms are replayed forward against the same candles by the
+ * same exit rules, so the comparison measures the decision and nothing else;
+ * the Trade table stays the real paper record.
+ */
+export type Counterfactual = Prisma.CounterfactualModel
+/**
  * Model Trade
  * A paper trade and the full team decision trail behind it.
  */

@@ -327,6 +327,7 @@ export type PortfolioWhereInput = {
   trades?: Prisma.TradeListRelationFilter
   signals?: Prisma.SignalListRelationFilter
   watchlist?: Prisma.WatchlistListRelationFilter
+  counterfactuals?: Prisma.CounterfactualListRelationFilter
 }
 
 export type PortfolioOrderByWithRelationInput = {
@@ -349,6 +350,7 @@ export type PortfolioOrderByWithRelationInput = {
   trades?: Prisma.TradeOrderByRelationAggregateInput
   signals?: Prisma.SignalOrderByRelationAggregateInput
   watchlist?: Prisma.WatchlistOrderByRelationAggregateInput
+  counterfactuals?: Prisma.CounterfactualOrderByRelationAggregateInput
 }
 
 export type PortfolioWhereUniqueInput = Prisma.AtLeast<{
@@ -374,6 +376,7 @@ export type PortfolioWhereUniqueInput = Prisma.AtLeast<{
   trades?: Prisma.TradeListRelationFilter
   signals?: Prisma.SignalListRelationFilter
   watchlist?: Prisma.WatchlistListRelationFilter
+  counterfactuals?: Prisma.CounterfactualListRelationFilter
 }, "id">
 
 export type PortfolioOrderByWithAggregationInput = {
@@ -441,6 +444,7 @@ export type PortfolioCreateInput = {
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
   signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
+  counterfactuals?: Prisma.CounterfactualCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUncheckedCreateInput = {
@@ -463,6 +467,7 @@ export type PortfolioUncheckedCreateInput = {
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
   signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
+  counterfactuals?: Prisma.CounterfactualUncheckedCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUpdateInput = {
@@ -484,6 +489,7 @@ export type PortfolioUpdateInput = {
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
   signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
+  counterfactuals?: Prisma.CounterfactualUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioUncheckedUpdateInput = {
@@ -506,6 +512,7 @@ export type PortfolioUncheckedUpdateInput = {
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
   signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
+  counterfactuals?: Prisma.CounterfactualUncheckedUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioCreateManyInput = {
@@ -662,6 +669,20 @@ export type BoolFieldUpdateOperationsInput = {
   set?: boolean
 }
 
+export type PortfolioCreateNestedOneWithoutCounterfactualsInput = {
+  create?: Prisma.XOR<Prisma.PortfolioCreateWithoutCounterfactualsInput, Prisma.PortfolioUncheckedCreateWithoutCounterfactualsInput>
+  connectOrCreate?: Prisma.PortfolioCreateOrConnectWithoutCounterfactualsInput
+  connect?: Prisma.PortfolioWhereUniqueInput
+}
+
+export type PortfolioUpdateOneRequiredWithoutCounterfactualsNestedInput = {
+  create?: Prisma.XOR<Prisma.PortfolioCreateWithoutCounterfactualsInput, Prisma.PortfolioUncheckedCreateWithoutCounterfactualsInput>
+  connectOrCreate?: Prisma.PortfolioCreateOrConnectWithoutCounterfactualsInput
+  upsert?: Prisma.PortfolioUpsertWithoutCounterfactualsInput
+  connect?: Prisma.PortfolioWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PortfolioUpdateToOneWithWhereWithoutCounterfactualsInput, Prisma.PortfolioUpdateWithoutCounterfactualsInput>, Prisma.PortfolioUncheckedUpdateWithoutCounterfactualsInput>
+}
+
 export type PortfolioCreateNestedOneWithoutTradesInput = {
   create?: Prisma.XOR<Prisma.PortfolioCreateWithoutTradesInput, Prisma.PortfolioUncheckedCreateWithoutTradesInput>
   connectOrCreate?: Prisma.PortfolioCreateOrConnectWithoutTradesInput
@@ -708,6 +729,7 @@ export type PortfolioCreateWithoutSignalsInput = {
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
+  counterfactuals?: Prisma.CounterfactualCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUncheckedCreateWithoutSignalsInput = {
@@ -729,6 +751,7 @@ export type PortfolioUncheckedCreateWithoutSignalsInput = {
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
+  counterfactuals?: Prisma.CounterfactualUncheckedCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioCreateOrConnectWithoutSignalsInput = {
@@ -765,6 +788,7 @@ export type PortfolioUpdateWithoutSignalsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
+  counterfactuals?: Prisma.CounterfactualUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioUncheckedUpdateWithoutSignalsInput = {
@@ -786,6 +810,109 @@ export type PortfolioUncheckedUpdateWithoutSignalsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
+  counterfactuals?: Prisma.CounterfactualUncheckedUpdateManyWithoutPortfolioNestedInput
+}
+
+export type PortfolioCreateWithoutCounterfactualsInput = {
+  name: string
+  kind?: string
+  status?: string
+  startingBalance?: number
+  riskPctPerTrade?: number
+  maxOpenPositions?: number
+  drawdownHaltPct?: number
+  scanInterval?: string
+  scanRange?: string
+  strategy?: string
+  universe?: string
+  killSwitch?: boolean
+  killSwitchReason?: string
+  sort?: number
+  createdAt?: Date | string
+  trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
+  signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
+  watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
+}
+
+export type PortfolioUncheckedCreateWithoutCounterfactualsInput = {
+  id?: number
+  name: string
+  kind?: string
+  status?: string
+  startingBalance?: number
+  riskPctPerTrade?: number
+  maxOpenPositions?: number
+  drawdownHaltPct?: number
+  scanInterval?: string
+  scanRange?: string
+  strategy?: string
+  universe?: string
+  killSwitch?: boolean
+  killSwitchReason?: string
+  sort?: number
+  createdAt?: Date | string
+  trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
+  signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
+  watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
+}
+
+export type PortfolioCreateOrConnectWithoutCounterfactualsInput = {
+  where: Prisma.PortfolioWhereUniqueInput
+  create: Prisma.XOR<Prisma.PortfolioCreateWithoutCounterfactualsInput, Prisma.PortfolioUncheckedCreateWithoutCounterfactualsInput>
+}
+
+export type PortfolioUpsertWithoutCounterfactualsInput = {
+  update: Prisma.XOR<Prisma.PortfolioUpdateWithoutCounterfactualsInput, Prisma.PortfolioUncheckedUpdateWithoutCounterfactualsInput>
+  create: Prisma.XOR<Prisma.PortfolioCreateWithoutCounterfactualsInput, Prisma.PortfolioUncheckedCreateWithoutCounterfactualsInput>
+  where?: Prisma.PortfolioWhereInput
+}
+
+export type PortfolioUpdateToOneWithWhereWithoutCounterfactualsInput = {
+  where?: Prisma.PortfolioWhereInput
+  data: Prisma.XOR<Prisma.PortfolioUpdateWithoutCounterfactualsInput, Prisma.PortfolioUncheckedUpdateWithoutCounterfactualsInput>
+}
+
+export type PortfolioUpdateWithoutCounterfactualsInput = {
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  startingBalance?: Prisma.FloatFieldUpdateOperationsInput | number
+  riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
+  maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
+  drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
+  scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
+  scanRange?: Prisma.StringFieldUpdateOperationsInput | string
+  strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
+  killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  sort?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
+  signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
+  watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
+}
+
+export type PortfolioUncheckedUpdateWithoutCounterfactualsInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  startingBalance?: Prisma.FloatFieldUpdateOperationsInput | number
+  riskPctPerTrade?: Prisma.FloatFieldUpdateOperationsInput | number
+  maxOpenPositions?: Prisma.IntFieldUpdateOperationsInput | number
+  drawdownHaltPct?: Prisma.FloatFieldUpdateOperationsInput | number
+  scanInterval?: Prisma.StringFieldUpdateOperationsInput | string
+  scanRange?: Prisma.StringFieldUpdateOperationsInput | string
+  strategy?: Prisma.StringFieldUpdateOperationsInput | string
+  universe?: Prisma.StringFieldUpdateOperationsInput | string
+  killSwitch?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  killSwitchReason?: Prisma.StringFieldUpdateOperationsInput | string
+  sort?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
+  signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
+  watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioCreateWithoutTradesInput = {
@@ -806,6 +933,7 @@ export type PortfolioCreateWithoutTradesInput = {
   createdAt?: Date | string
   signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistCreateNestedManyWithoutPortfolioInput
+  counterfactuals?: Prisma.CounterfactualCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUncheckedCreateWithoutTradesInput = {
@@ -827,6 +955,7 @@ export type PortfolioUncheckedCreateWithoutTradesInput = {
   createdAt?: Date | string
   signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
   watchlist?: Prisma.WatchlistUncheckedCreateNestedManyWithoutPortfolioInput
+  counterfactuals?: Prisma.CounterfactualUncheckedCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioCreateOrConnectWithoutTradesInput = {
@@ -863,6 +992,7 @@ export type PortfolioUpdateWithoutTradesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUpdateManyWithoutPortfolioNestedInput
+  counterfactuals?: Prisma.CounterfactualUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioUncheckedUpdateWithoutTradesInput = {
@@ -884,6 +1014,7 @@ export type PortfolioUncheckedUpdateWithoutTradesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
   watchlist?: Prisma.WatchlistUncheckedUpdateManyWithoutPortfolioNestedInput
+  counterfactuals?: Prisma.CounterfactualUncheckedUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioCreateWithoutWatchlistInput = {
@@ -904,6 +1035,7 @@ export type PortfolioCreateWithoutWatchlistInput = {
   createdAt?: Date | string
   trades?: Prisma.TradeCreateNestedManyWithoutPortfolioInput
   signals?: Prisma.SignalCreateNestedManyWithoutPortfolioInput
+  counterfactuals?: Prisma.CounterfactualCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioUncheckedCreateWithoutWatchlistInput = {
@@ -925,6 +1057,7 @@ export type PortfolioUncheckedCreateWithoutWatchlistInput = {
   createdAt?: Date | string
   trades?: Prisma.TradeUncheckedCreateNestedManyWithoutPortfolioInput
   signals?: Prisma.SignalUncheckedCreateNestedManyWithoutPortfolioInput
+  counterfactuals?: Prisma.CounterfactualUncheckedCreateNestedManyWithoutPortfolioInput
 }
 
 export type PortfolioCreateOrConnectWithoutWatchlistInput = {
@@ -961,6 +1094,7 @@ export type PortfolioUpdateWithoutWatchlistInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUpdateManyWithoutPortfolioNestedInput
   signals?: Prisma.SignalUpdateManyWithoutPortfolioNestedInput
+  counterfactuals?: Prisma.CounterfactualUpdateManyWithoutPortfolioNestedInput
 }
 
 export type PortfolioUncheckedUpdateWithoutWatchlistInput = {
@@ -982,6 +1116,7 @@ export type PortfolioUncheckedUpdateWithoutWatchlistInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   trades?: Prisma.TradeUncheckedUpdateManyWithoutPortfolioNestedInput
   signals?: Prisma.SignalUncheckedUpdateManyWithoutPortfolioNestedInput
+  counterfactuals?: Prisma.CounterfactualUncheckedUpdateManyWithoutPortfolioNestedInput
 }
 
 
@@ -993,12 +1128,14 @@ export type PortfolioCountOutputType = {
   trades: number
   signals: number
   watchlist: number
+  counterfactuals: number
 }
 
 export type PortfolioCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   trades?: boolean | PortfolioCountOutputTypeCountTradesArgs
   signals?: boolean | PortfolioCountOutputTypeCountSignalsArgs
   watchlist?: boolean | PortfolioCountOutputTypeCountWatchlistArgs
+  counterfactuals?: boolean | PortfolioCountOutputTypeCountCounterfactualsArgs
 }
 
 /**
@@ -1032,6 +1169,13 @@ export type PortfolioCountOutputTypeCountWatchlistArgs<ExtArgs extends runtime.T
   where?: Prisma.WatchlistWhereInput
 }
 
+/**
+ * PortfolioCountOutputType without action
+ */
+export type PortfolioCountOutputTypeCountCounterfactualsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CounterfactualWhereInput
+}
+
 
 export type PortfolioSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1053,6 +1197,7 @@ export type PortfolioSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   trades?: boolean | Prisma.Portfolio$tradesArgs<ExtArgs>
   signals?: boolean | Prisma.Portfolio$signalsArgs<ExtArgs>
   watchlist?: boolean | Prisma.Portfolio$watchlistArgs<ExtArgs>
+  counterfactuals?: boolean | Prisma.Portfolio$counterfactualsArgs<ExtArgs>
   _count?: boolean | Prisma.PortfolioCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["portfolio"]>
 
@@ -1118,6 +1263,7 @@ export type PortfolioInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   trades?: boolean | Prisma.Portfolio$tradesArgs<ExtArgs>
   signals?: boolean | Prisma.Portfolio$signalsArgs<ExtArgs>
   watchlist?: boolean | Prisma.Portfolio$watchlistArgs<ExtArgs>
+  counterfactuals?: boolean | Prisma.Portfolio$counterfactualsArgs<ExtArgs>
   _count?: boolean | Prisma.PortfolioCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PortfolioIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1129,6 +1275,7 @@ export type $PortfolioPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     trades: Prisma.$TradePayload<ExtArgs>[]
     signals: Prisma.$SignalPayload<ExtArgs>[]
     watchlist: Prisma.$WatchlistPayload<ExtArgs>[]
+    counterfactuals: Prisma.$CounterfactualPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
@@ -1544,6 +1691,7 @@ export interface Prisma__PortfolioClient<T, Null = never, ExtArgs extends runtim
   trades<T extends Prisma.Portfolio$tradesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$tradesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TradePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   signals<T extends Prisma.Portfolio$signalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$signalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SignalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   watchlist<T extends Prisma.Portfolio$watchlistArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$watchlistArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WatchlistPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  counterfactuals<T extends Prisma.Portfolio$counterfactualsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Portfolio$counterfactualsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CounterfactualPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2051,6 +2199,30 @@ export type Portfolio$watchlistArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.WatchlistScalarFieldEnum | Prisma.WatchlistScalarFieldEnum[]
+}
+
+/**
+ * Portfolio.counterfactuals
+ */
+export type Portfolio$counterfactualsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Counterfactual
+   */
+  select?: Prisma.CounterfactualSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Counterfactual
+   */
+  omit?: Prisma.CounterfactualOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CounterfactualInclude<ExtArgs> | null
+  where?: Prisma.CounterfactualWhereInput
+  orderBy?: Prisma.CounterfactualOrderByWithRelationInput | Prisma.CounterfactualOrderByWithRelationInput[]
+  cursor?: Prisma.CounterfactualWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CounterfactualScalarFieldEnum | Prisma.CounterfactualScalarFieldEnum[]
 }
 
 /**

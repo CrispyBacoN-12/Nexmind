@@ -389,6 +389,7 @@ export const ModelName = {
   PipelineStep: 'PipelineStep',
   Signal: 'Signal',
   Portfolio: 'Portfolio',
+  Counterfactual: 'Counterfactual',
   Trade: 'Trade',
   NewsItem: 'NewsItem',
   Lesson: 'Lesson',
@@ -414,7 +415,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -785,6 +786,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.PortfolioCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.PortfolioCountAggregateOutputType> | number
+        }
+      }
+    }
+    Counterfactual: {
+      payload: Prisma.$CounterfactualPayload<ExtArgs>
+      fields: Prisma.CounterfactualFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CounterfactualFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CounterfactualFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>
+        }
+        findFirst: {
+          args: Prisma.CounterfactualFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CounterfactualFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>
+        }
+        findMany: {
+          args: Prisma.CounterfactualFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>[]
+        }
+        create: {
+          args: Prisma.CounterfactualCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>
+        }
+        createMany: {
+          args: Prisma.CounterfactualCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CounterfactualCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>[]
+        }
+        delete: {
+          args: Prisma.CounterfactualDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>
+        }
+        update: {
+          args: Prisma.CounterfactualUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>
+        }
+        deleteMany: {
+          args: Prisma.CounterfactualDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CounterfactualUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CounterfactualUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>[]
+        }
+        upsert: {
+          args: Prisma.CounterfactualUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CounterfactualPayload>
+        }
+        aggregate: {
+          args: Prisma.CounterfactualAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCounterfactual>
+        }
+        groupBy: {
+          args: Prisma.CounterfactualGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CounterfactualGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CounterfactualCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CounterfactualCountAggregateOutputType> | number
         }
       }
     }
@@ -1659,6 +1734,39 @@ export const PortfolioScalarFieldEnum = {
 export type PortfolioScalarFieldEnum = (typeof PortfolioScalarFieldEnum)[keyof typeof PortfolioScalarFieldEnum]
 
 
+export const CounterfactualScalarFieldEnum = {
+  id: 'id',
+  portfolioId: 'portfolioId',
+  symbol: 'symbol',
+  timeframe: 'timeframe',
+  aiBackend: 'aiBackend',
+  scanSide: 'scanSide',
+  scanNote: 'scanNote',
+  aiOutcome: 'aiOutcome',
+  aiReason: 'aiReason',
+  tradeId: 'tradeId',
+  aiEntry: 'aiEntry',
+  aiSl: 'aiSl',
+  aiTp1: 'aiTp1',
+  aiTp2: 'aiTp2',
+  mockEntry: 'mockEntry',
+  mockSl: 'mockSl',
+  mockTp1: 'mockTp1',
+  mockTp2: 'mockTp2',
+  lot: 'lot',
+  resolvedAt: 'resolvedAt',
+  aiR: 'aiR',
+  mockR: 'mockR',
+  aiPnl: 'aiPnl',
+  mockPnl: 'mockPnl',
+  aiExitNote: 'aiExitNote',
+  mockExitNote: 'mockExitNote',
+  openedAt: 'openedAt'
+} as const
+
+export type CounterfactualScalarFieldEnum = (typeof CounterfactualScalarFieldEnum)[keyof typeof CounterfactualScalarFieldEnum]
+
+
 export const TradeScalarFieldEnum = {
   id: 'id',
   portfolioId: 'portfolioId',
@@ -2016,6 +2124,7 @@ export type GlobalOmitConfig = {
   pipelineStep?: Prisma.PipelineStepOmit
   signal?: Prisma.SignalOmit
   portfolio?: Prisma.PortfolioOmit
+  counterfactual?: Prisma.CounterfactualOmit
   trade?: Prisma.TradeOmit
   newsItem?: Prisma.NewsItemOmit
   lesson?: Prisma.LessonOmit

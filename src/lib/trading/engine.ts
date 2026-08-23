@@ -3,12 +3,15 @@
 // Every stage is appended to a decision log so the War Room can show the trail.
 
 import { prisma } from "@/lib/db";
-import { aiEnabled } from "@/lib/anthropic";
+import { aiBackend, aiOutageReason, type AiBackend } from "@/lib/anthropic";
 import { scanSymbol, type ScanResult } from "./scanner";
 import { runHawk, type HawkVerdict, type HawkVote, type ProposedLevels } from "./hawk";
 import { runSage, type SageVerdict } from "./sage";
+import { buildAnalystContext, type AnalystExtras } from "./context";
+import { fetchFundamentals, fundamentalsLine } from "@/lib/market/fundamentals";
 import { applyIronRules, riskReward, type AccountState } from "./ironRules";
 import { applySlippage } from "./positionRules";
+import { recordCounterfactual } from "./counterfactual";
 import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 import { isKillSwitchOn, getFearGreed, getStartingBalance, getRiskPctPerTrade, isGlobalTradingHalt, getPortfolioStrategy } from "@/lib/settings";
 import { type Interval, type Range } from "@/lib/yahoo";
@@ -159,11 +162,66 @@ export async function runTradeTick(
   }
 
   // 2) HAWK ×3
+  //
+  // The AI stages degrade rather than fail: a desk with an expired login still
+  // scans and still respects the Iron Rules, it just decides on rules alone.
+  // What it must never do is pass a mock verdict off as an analyst verdict, so
+  // the backend that actually decided is logged on the step and stored on the
+  // trade — see the aiBackend column.
   const newsDigest = await latestNewsDigest();
   const exitOverride = resolveExitOverride(scan, isResearch);
-  const hawk: HawkVerdict = aiEnabled()
-    ? await runHawk(scan, { newsDigest, ...exitOverride })
-    : mockHawk(scan, exitOverride);
+  let backend: AiBackend = aiBackend();
+  if (backend === "mock") {
+    steps.push({ stage: "ai", note: `no AI — rule-only decision (${aiOutageReason() ?? "no backend configured"})` });
+  }
+
+  // The counterfactual arm. What the deterministic mock would have done with
+  // this exact scan, written down next to whatever the analysts decide below.
+  // Without it the Trade table only ever holds the trades HAWK and SAGE agreed
+  // to take, so "are the analysts any good?" can only be answered from their own
+  // survivors. Built before HAWK runs, because the interesting rows are the ones
+  // where the analysts refuse and no Trade row is ever created.
+  const mockRaw = mockSage(mockHawk(scan, exitOverride).levels!).adjusted;
+  const mockLevels: ProposedLevels = {
+    ...mockRaw,
+    entry: applySlippage(scan.side === "long" ? "buy" : "sell", mockRaw.entry, DEFAULT_COST_MODEL.slippageBps ?? 0),
+  };
+  const cfLot = backend === "mock" ? 0 : await counterfactualLot(portfolioId, mockLevels);
+  const logCf = async (
+    aiOutcome: "executed" | "no-consensus" | "vetoed" | "rules-blocked",
+    aiReason: string,
+    aiLevels: ProposedLevels | null,
+    tradeId?: number,
+  ) => {
+    // On a mock tick both arms are literally the same decision — nothing to compare.
+    // Read at call time, so a mid-flight fallback to mock suppresses the row too.
+    if (backend === "mock") return;
+    await recordCounterfactual({
+      portfolioId, symbol, timeframe: scan.timeframe, aiBackend: backend,
+      scanSide: scan.side!, scanNote: scan.note,
+      aiOutcome, aiReason, tradeId, aiLevels, mockLevels, lot: cfLot,
+    });
+  };
+
+  // Built once and shared: HAWK's three personas and SAGE all judge the same
+  // facts, so a disagreement means they read the market differently rather than
+  // that one of them was handed a different market. Skipped entirely on the mock
+  // path — nothing there reads it, and the extras cost two network round-trips.
+  const context =
+    backend === "mock" ? undefined : buildAnalystContext(scan, { ...(await fetchAnalystExtras(symbol)), newsDigest });
+
+  let hawk: HawkVerdict;
+  if (backend === "mock") {
+    hawk = mockHawk(scan, exitOverride);
+  } else {
+    try {
+      hawk = await runHawk(scan, { context, ...exitOverride });
+    } catch (e) {
+      backend = "mock";
+      hawk = mockHawk(scan, exitOverride);
+      steps.push({ stage: "ai", note: `HAWK unavailable — rule-only decision (${errText(e)})` });
+    }
+  }
   costUsd += hawk.totalCostUsd;
   steps.push({
     stage: "hawk",
@@ -171,14 +229,25 @@ export async function runTradeTick(
   });
 
   if (!hawk.agreed || !hawk.side || !hawk.levels) {
+    await logCf("no-consensus", `votes ${hawk.votes.map((v) => `${v.persona}:${v.vote}`).join(", ")}`, null);
     await prisma.signal.update({ where: { id: signal.id }, data: { status: "discarded" } });
     return { symbol, outcome: "no-consensus", steps, costUsd };
   }
 
-  // 3) SAGE
-  const sage: SageVerdict = aiEnabled()
-    ? await runSage(scan, hawk.side, hawk.levels, { newsDigest, lessons: await latestLessons() })
-    : mockSage(hawk.levels);
+  // 3) SAGE — mock approves everything, so a silent fall-through here would turn
+  // the risk veto into a rubber stamp without anyone noticing. Hence the log line.
+  let sage: SageVerdict;
+  if (backend === "mock") {
+    sage = mockSage(hawk.levels);
+  } else {
+    try {
+      sage = await runSage(scan, hawk.side, hawk.levels, { context, lessons: await latestLessons() });
+    } catch (e) {
+      backend = "mock";
+      sage = mockSage(hawk.levels);
+      steps.push({ stage: "ai", note: `SAGE unavailable — risk veto not applied (${errText(e)})` });
+    }
+  }
   costUsd += sage.costUsd;
   steps.push({ stage: "sage", note: `${sage.approved ? "approve" : "VETO"} — ${sage.reason}` });
 
@@ -187,6 +256,7 @@ export async function runTradeTick(
       where: { id: signal.id },
       data: { status: "vetoed", note: `SAGE veto: ${sage.reason}` },
     });
+    await logCf("vetoed", sage.reason, null);
     return { symbol, outcome: "vetoed", steps, costUsd };
   }
 
@@ -274,6 +344,7 @@ export async function runTradeTick(
       where: { id: signal.id },
       data: { status: "discarded", note: `Iron Rules: ${verdict.failures.join("; ")}` },
     });
+    await logCf("rules-blocked", verdict.failures.join("; "), levels);
     return { symbol, outcome: "rules-blocked", steps, costUsd };
   }
 
@@ -289,6 +360,11 @@ export async function runTradeTick(
       lot, riskReward: riskReward({ symbol, side: hawk.side, entry: fillEntry, sl: levels.sl, tp1: levels.tp1, lot }),
       status: "open", ironRulesPassed: true,
       sageVerdict: `approve — ${sage.reason}`,
+      // Stamped so performance analysis can separate trades the analysts really
+      // decided from trades the deterministic stand-in decided. Without it the
+      // two are indistinguishable in the DB and every review of "how is the AI
+      // doing" silently measures the mock instead.
+      aiBackend: backend,
       hawkVotes: JSON.stringify(hawk.votes),
       decisionLog: JSON.stringify(steps),
       stagedTp: JSON.stringify({
@@ -303,6 +379,7 @@ export async function runTradeTick(
     },
   });
   await prisma.signal.update({ where: { id: signal.id }, data: { status: "executed" } });
+  await logCf("executed", `approve — ${sage.reason}`, { ...levels, entry: fillEntry }, trade.id);
 
   return { symbol, outcome: "executed", steps, tradeId: trade.id, costUsd };
 }
@@ -321,6 +398,17 @@ async function latestLessons(): Promise<string> {
   return lessons.map((l) => l.text).join("; ");
 }
 
+/** The two facts the scan can't produce: the daily chart and the company behind
+ *  the ticker. Both fail soft — a missing block costs the analysts a paragraph,
+ *  not the trade. */
+async function fetchAnalystExtras(symbol: string): Promise<AnalystExtras> {
+  const [higherTf, fundamentals] = await Promise.all([
+    fetchCandles(symbol, "1y", "1d").then((r) => r.candles).catch(() => null),
+    fetchFundamentals(symbol).then((f) => fundamentalsLine(f, symbol)).catch(() => null),
+  ]);
+  return { higherTf, fundamentals };
+}
+
 /** Daily returns for correlation, or null if the candle fetch fails. */
 async function fetchDailyReturns(symbol: string): Promise<number[] | null> {
   try {
@@ -331,7 +419,26 @@ async function fetchDailyReturns(symbol: string): Promise<number[] | null> {
   }
 }
 
-// ---- mock path (no API key): deterministic so the pipeline is demoable ----
+/** Position size for both counterfactual arms, always taken off the mock
+ *  ladder. Holding size constant is what makes the difference between the arms
+ *  a measure of the DECISION rather than of the sizing — and the correlation
+ *  haircut is left out on purpose, since which positions are open is itself
+ *  downstream of past AI decisions and would leak one arm into the other. */
+async function counterfactualLot(portfolioId: number, levels: ProposedLevels): Promise<number> {
+  const riskUsd = ((await getStartingBalance(portfolioId)) * (await getRiskPctPerTrade(portfolioId))) / 100;
+  return computeLot({
+    entry: levels.entry, sl: levels.sl, riskUsd,
+    maxLotPerTrade: DEFAULT_ACCOUNT.maxLotPerTrade, avgCorrelation: null,
+  }).lot;
+}
+
+function errText(e: unknown): string {
+  return (e instanceof Error ? e.message : String(e)).slice(0, 160);
+}
+
+// ---- mock path (no AI backend): deterministic so the pipeline stays demoable.
+// Everything below is a stand-in, not an opinion. Trades decided here are
+// stamped aiBackend="mock" so they are never mistaken for analyst calls. ----
 
 function mockHawk(scan: ScanResult, exit: ExitOverride): HawkVerdict {
   const side = scan.side!;

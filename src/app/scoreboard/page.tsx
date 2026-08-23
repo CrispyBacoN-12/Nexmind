@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { Card, CardTitle, Badge, PageHeader, Empty, Stat } from "@/components/ui";
 import { fmtNumber, fmtMoney, colorForChange } from "@/lib/utils";
 import { isSwingKind } from "@/lib/portfolioGuards";
+import { compareArms } from "@/lib/trading/counterfactual";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,15 @@ export default async function Scoreboard() {
   const withTrades = ranked.filter((r) => r.closed > 0);
   const totalClosed = rows.reduce((s, r) => s + r.closed, 0);
   const totalOpen = rows.reduce((s, r) => s + r.open, 0);
+
+  // The AI-vs-mock arms. Only ticks where a real backend decided are recorded,
+  // and only rows whose BOTH arms have terminated are scored — see counterfactual.ts.
+  const arms = compareArms(
+    await prisma.counterfactual.findMany({
+      where: { portfolioId: { in: swing.map((p) => p.id) }, resolvedAt: { not: null } },
+      select: { aiOutcome: true, aiR: true, mockR: true },
+    }),
+  );
 
   return (
     <div>
@@ -94,6 +104,36 @@ export default async function Scoreboard() {
           </table>
         </Card>
       )}
+
+      {arms.ai.opportunities > 0 ? (
+        <Card className="mt-5">
+          <CardTitle>Do the analysts add money?</CardTitle>
+          <p className="text-xs text-(--color-muted) mt-1 mb-3">
+            Every tick a real backend decided, replayed twice on the same candles: once with HAWK/SAGE&apos;s call, once
+            with the deterministic stand-in that always takes the scanner&apos;s side. {arms.ai.opportunities} scored
+            opportunities.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="AI" value={fmtNumber(arms.ai.avgR, 3)} sub={`R/opportunity · ${arms.ai.traded} traded`} />
+            <Stat label="Mock" value={fmtNumber(arms.mock.avgR, 3)} sub={`R/opportunity · ${arms.mock.traded} traded`} />
+            <Stat label="AI edge" value={fmtNumber(arms.edgePerOpportunity, 3)} sub="AI minus mock" />
+            <Stat
+              label="Refused"
+              value={arms.refused}
+              sub={`would have made ${fmtNumber(arms.refusedAvgR, 2)}R`}
+            />
+          </div>
+          <p className={`mt-3 text-xs ${rColor(arms.edgePerOpportunity)}`}>
+            {arms.edgePerOpportunity > 0
+              ? "The analysts beat the stand-in on this sample."
+              : "The analysts did not beat the stand-in on this sample."}
+          </p>
+          <p className="mt-2 text-[11px] text-(--color-muted)">
+            Scored per opportunity, not per trade: a veto earns exactly 0R rather than being dropped. Excluding refusals
+            is what lets a veto-happy desk report a great win rate on three lucky survivors.
+          </p>
+        </Card>
+      ) : null}
 
       <p className="mt-3 text-[11px] text-(--color-muted)">
         Avg R = mean R-multiple of closed trades (reward ÷ initial risk) — comparable across assets. P/L is paper USD and

@@ -93,6 +93,61 @@ model Portfolio {
   trades           Trade[]
   signals          Signal[]
   watchlist        Watchlist[]
+  counterfactuals  Counterfactual[]
+}
+
+/// One tick where the scanner fired AND a real AI backend was live: what the
+/// analysts decided, and what the deterministic mock would have decided on the
+/// very same bar.
+///
+/// The desk has never been able to answer "do HAWK and SAGE add money?" — a
+/// trade the analysts refused simply doesn't exist in the Trade table, so the
+/// only evidence on file is the trades they approved. This row keeps the
+/// refusals too. Both arms are replayed forward against the same candles by the
+/// same exit rules, so the comparison measures the decision and nothing else;
+/// the Trade table stays the real paper record.
+model Counterfactual {
+  id          Int       @id @default(autoincrement())
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
+  portfolioId Int
+  symbol      String
+  timeframe   String
+  /// api | cli — never "mock": on a mock tick the two arms are the same decision.
+  aiBackend   String
+  scanSide    String
+  scanNote    String
+
+  /// executed | no-consensus | vetoed | rules-blocked
+  aiOutcome String
+  aiReason  String?
+  tradeId   Int? // the real paper trade, when the analysts took it
+  aiEntry   Float?
+  aiSl      Float?
+  aiTp1     Float?
+  aiTp2     Float?
+
+  /// The mock always trades the scanner's side, so these are never null.
+  mockEntry Float
+  mockSl    Float
+  mockTp1   Float
+  mockTp2   Float?
+  lot       Float
+
+  /// Replay results — null until both arms have terminated. aiR is 0, not null,
+  /// when the analysts stood aside: standing aside is a decision that earns
+  /// exactly nothing, and scoring it as "no data" is how a veto-happy desk
+  /// flatters itself.
+  resolvedAt   DateTime?
+  aiR          Float?
+  mockR        Float?
+  aiPnl        Float?
+  mockPnl      Float?
+  aiExitNote   String?
+  mockExitNote String?
+
+  openedAt DateTime @default(now())
+
+  @@index([portfolioId, resolvedAt])
 }
 
 /// A paper trade and the full team decision trail behind it.
