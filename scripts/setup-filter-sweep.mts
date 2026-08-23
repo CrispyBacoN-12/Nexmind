@@ -15,8 +15,15 @@
 // Usage:
 //   node --env-file=.env --import tsx scripts/setup-filter-sweep.mts --split=is
 //   node --env-file=.env --import tsx scripts/setup-filter-sweep.mts --split=oos --only="LC agrees,VWAP side"
+//   node --env-file=.env --import tsx scripts/setup-filter-sweep.mts --split=is --interval=1wk
 //
-// Flags: --split=is|oos  --universe=sp500|dow30  --every=N (symbol stride)  --only=label,label
+// Flags: --split=is|oos  --interval=1d|1wk  --universe=sp500|dow30
+//        --every=N (symbol stride)  --only=label,label
+//
+// --interval exists because the cache only holds daily bars while the live desk
+// may be configured on another timeframe (portfolio #11 scans 1wk/5y). A sweep
+// run at the wrong interval measures a strategy the desk does not trade, so the
+// interval is printed in the header of every run and belongs in any quoted result.
 
 import { readFile } from "node:fs/promises";
 import { backtestCandles, barSnapshots, DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
@@ -27,14 +34,44 @@ import type { SimTrade } from "@/lib/backtest/engine";
 const arg = (k: string, d?: string) => process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=").slice(1).join("=") ?? d;
 
 const SPLIT = (arg("split", "is") as "is" | "oos");
+const INTERVAL = (arg("interval", "1d") as "1d" | "1wk");
 const UNIVERSE = arg("universe", "sp500")!;
 const STRIDE = Number(arg("every", "3"));
 const ONLY = arg("only")?.split(",").map((s) => s.trim()).filter(Boolean);
+if (INTERVAL !== "1d" && INTERVAL !== "1wk") { console.error("--interval must be 1d or 1wk"); process.exit(1); }
+
+// Monday-anchored UTC weeks, matching how Yahoo stamps its own 1wk bars. Epoch 0
+// is a Thursday, hence the 4-day shift.
+const WEEK = 604_800;
+const MONDAY_EPOCH = 345_600;
+function toWeekly(daily: Candle[]): Candle[] {
+  const out: Candle[] = [];
+  let bucket = NaN;
+  for (const d of daily) {
+    const wk = Math.floor((d.t - MONDAY_EPOCH) / WEEK);
+    if (wk !== bucket) {
+      out.push({ ...d });
+      bucket = wk;
+      continue;
+    }
+    const w = out[out.length - 1];
+    w.h = Math.max(w.h, d.h);
+    w.l = Math.min(w.l, d.l);
+    w.c = d.c;
+    w.v += d.v;
+  }
+  return out;
+}
 
 // The held-out period. Chosen once, by calendar, before any result was seen —
 // not tuned to make a number look good.
 const CUT = Date.UTC(2023, 0, 1) / 1000;
-const LEAD_IN = 300; // bars of history the OOS slice needs before its first tradable bar
+// Both counts are in BARS, so they scale with the interval: the backtest engine
+// needs WARMUP=60 bars before sma50/ADX mean anything, and a slice too short to
+// produce a usable sample is skipped rather than reported thin. 300 bars of
+// lead-in and 400-bar slices do not exist on a weekly series of ~550 bars total.
+const LEAD_IN = INTERVAL === "1wk" ? 120 : 300;
+const MIN_BARS = INTERVAL === "1wk" ? 160 : 400;
 
 const VARIANTS: Array<{ label: string; t: SetupThresholds }> = [
   { label: "baseline", t: DEFAULT_THRESHOLDS },
@@ -63,16 +100,20 @@ const cache = JSON.parse(await readFile(`.cache/bars/${UNIVERSE}-1d.json`, "utf8
   bars: Record<string, Candle[]>;
 };
 const symbols = Object.keys(cache.bars).filter((_, i) => i % STRIDE === 0);
+const barsFor = (symbol: string): Candle[] => {
+  const daily = cache.bars[symbol] ?? [];
+  return INTERVAL === "1wk" ? toWeekly(daily) : daily;
+};
 
 console.log(`${UNIVERSE} · ${symbols.length} symbols (every ${STRIDE}) · cached ${cache.fetchedAt.slice(0, 10)}`);
-console.log(`split=${SPLIT}  cut=${new Date(CUT * 1000).toISOString().slice(0, 10)}  costs=${JSON.stringify(DEFAULT_COST_MODEL)}\n`);
+console.log(`split=${SPLIT}  interval=${INTERVAL}${INTERVAL === "1wk" ? " (resampled from daily)" : ""}  cut=${new Date(CUT * 1000).toISOString().slice(0, 10)}  costs=${JSON.stringify(DEFAULT_COST_MODEL)}\n`);
 
 /** Bars to feed the engine, plus the timestamp before which trades don't count. */
 function slice(bars: Candle[]): { bars: Candle[]; countFrom: number } | null {
   const cutIdx = bars.findIndex((b) => b.t >= CUT);
   if (SPLIT === "is") {
     const isBars = cutIdx < 0 ? bars : bars.slice(0, cutIdx);
-    return isBars.length > 400 ? { bars: isBars, countFrom: 0 } : null;
+    return isBars.length > MIN_BARS ? { bars: isBars, countFrom: 0 } : null;
   }
   if (cutIdx < 0) return null;
   // Give the OOS slice real history to warm up on, then discard any trade that
@@ -80,7 +121,7 @@ function slice(bars: Candle[]): { bars: Candle[]; countFrom: number } | null {
   // includes trades from the training period.
   const from = Math.max(0, cutIdx - LEAD_IN);
   const oos = bars.slice(from);
-  return oos.length > 400 ? { bars: oos, countFrom: CUT } : null;
+  return oos.length > MIN_BARS ? { bars: oos, countFrom: CUT } : null;
 }
 
 const collected = new Map<string, SimTrade[]>(variants.map((v) => [v.label, []]));
@@ -88,7 +129,7 @@ let used = 0;
 const started = Date.now();
 
 for (const [n, symbol] of symbols.entries()) {
-  const s = slice(cache.bars[symbol] ?? []);
+  const s = slice(barsFor(symbol));
   if (!s) continue;
   used++;
   // Built once per symbol and shared by every variant: the Lorentzian series
@@ -102,18 +143,28 @@ for (const [n, symbol] of symbols.entries()) {
   if ((n + 1) % 25 === 0) console.log(`  ...${n + 1}/${symbols.length} (${((Date.now() - started) / 1000).toFixed(0)}s)`);
 }
 
-interface Row { label: string; trades: number; winRate: number; avgR: number; totalR: number; pf: number }
+interface Row { label: string; trades: number; winRate: number; avgR: number; sdR: number; tStat: number; totalR: number; pf: number }
 
 function score(label: string, trades: SimTrade[]): Row {
   const rs = trades.map((t) => t.rMultiple).filter((r): r is number => r != null);
   const wins = trades.filter((t) => t.outcome === "win").length;
   const gross = trades.reduce((a, t) => a + Math.max(0, t.pnl), 0);
   const loss = trades.reduce((a, t) => a + Math.max(0, -t.pnl), 0);
+  const avgR = rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0;
+  // Dispersion, and avgR's t-statistic against zero. An avgR quoted without
+  // these is unreadable: R-multiples scatter with sd near 1, so on a thousand
+  // trades the standard error alone is ~0.03 — the same size as most of the
+  // deltas this sweep produces. |t| < 2 means "indistinguishable from no edge",
+  // however good the number looks.
+  const varR = rs.length > 1 ? rs.reduce((a, b) => a + (b - avgR) ** 2, 0) / (rs.length - 1) : 0;
+  const sdR = Math.sqrt(varR);
   return {
     label,
     trades: trades.length,
     winRate: trades.length ? (wins / trades.length) * 100 : 0,
-    avgR: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0,
+    avgR,
+    sdR,
+    tStat: sdR > 0 && rs.length ? avgR / (sdR / Math.sqrt(rs.length)) : 0,
     totalR: rs.reduce((a, b) => a + b, 0),
     pf: loss > 0 ? gross / loss : Infinity,
   };
@@ -122,15 +173,15 @@ function score(label: string, trades: SimTrade[]): Row {
 const rows = variants.map((v) => score(v.label, collected.get(v.label)!));
 const base = rows[0];
 
-console.log(`\n${used} symbols with enough ${SPLIT.toUpperCase()} history\n`);
+console.log(`\n${used} symbols with enough ${SPLIT.toUpperCase()} history at ${INTERVAL}\n`);
 const pad = (s: string, n: number) => s.padEnd(n);
 const num = (n: number, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "inf").padStart(7);
-console.log(`${pad("filter", 16)} ${pad("trades", 8)} ${pad("kept", 7)} ${pad("win%", 7)} ${pad("avgR", 7)} ${pad("ΔavgR", 8)} ${pad("totalR", 9)} ${pad("PF", 7)}`);
+console.log(`${pad("filter", 16)} ${pad("trades", 8)} ${pad("kept", 7)} ${pad("win%", 7)} ${pad("avgR", 7)} ${pad("ΔavgR", 8)} ${pad("sdR", 7)} ${pad("t", 7)} ${pad("totalR", 9)} ${pad("PF", 7)}`);
 for (const r of rows) {
   const kept = base.trades ? ((r.trades / base.trades) * 100).toFixed(0) + "%" : "-";
   const dR = r.label === "baseline" ? "" : `${r.avgR - base.avgR >= 0 ? "+" : ""}${(r.avgR - base.avgR).toFixed(3)}`;
   console.log(
-    `${pad(r.label, 16)} ${pad(String(r.trades), 8)} ${pad(kept, 7)} ${num(r.winRate, 1)} ${num(r.avgR, 3)} ${pad(dR, 8)} ${num(r.totalR, 1)} ${num(r.pf)}`,
+    `${pad(r.label, 16)} ${pad(String(r.trades), 8)} ${pad(kept, 7)} ${num(r.winRate, 1)} ${num(r.avgR, 3)} ${pad(dR, 8)} ${num(r.sdR, 2)} ${num(r.tStat, 2)} ${num(r.totalR, 1)} ${num(r.pf)}`,
   );
 }
 console.log(`\ndone in ${((Date.now() - started) / 1000).toFixed(0)}s`);
