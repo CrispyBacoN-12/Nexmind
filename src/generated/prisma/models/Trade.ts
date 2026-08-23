@@ -75,6 +75,7 @@ export type TradeMinAggregateOutputType = {
   rMultiple: number | null
   hawkVotes: string | null
   sageVerdict: string | null
+  aiBackend: string | null
   ironRulesPassed: boolean | null
   decisionLog: string | null
   stagedTp: string | null
@@ -101,6 +102,7 @@ export type TradeMaxAggregateOutputType = {
   rMultiple: number | null
   hawkVotes: string | null
   sageVerdict: string | null
+  aiBackend: string | null
   ironRulesPassed: boolean | null
   decisionLog: string | null
   stagedTp: string | null
@@ -127,6 +129,7 @@ export type TradeCountAggregateOutputType = {
   rMultiple: number
   hawkVotes: number
   sageVerdict: number
+  aiBackend: number
   ironRulesPassed: number
   decisionLog: number
   stagedTp: number
@@ -185,6 +188,7 @@ export type TradeMinAggregateInputType = {
   rMultiple?: true
   hawkVotes?: true
   sageVerdict?: true
+  aiBackend?: true
   ironRulesPassed?: true
   decisionLog?: true
   stagedTp?: true
@@ -211,6 +215,7 @@ export type TradeMaxAggregateInputType = {
   rMultiple?: true
   hawkVotes?: true
   sageVerdict?: true
+  aiBackend?: true
   ironRulesPassed?: true
   decisionLog?: true
   stagedTp?: true
@@ -237,6 +242,7 @@ export type TradeCountAggregateInputType = {
   rMultiple?: true
   hawkVotes?: true
   sageVerdict?: true
+  aiBackend?: true
   ironRulesPassed?: true
   decisionLog?: true
   stagedTp?: true
@@ -350,6 +356,7 @@ export type TradeGroupByOutputType = {
   rMultiple: number | null
   hawkVotes: string
   sageVerdict: string | null
+  aiBackend: string | null
   ironRulesPassed: boolean
   decisionLog: string
   stagedTp: string
@@ -399,6 +406,7 @@ export type TradeWhereInput = {
   rMultiple?: Prisma.FloatNullableFilter<"Trade"> | number | null
   hawkVotes?: Prisma.StringFilter<"Trade"> | string
   sageVerdict?: Prisma.StringNullableFilter<"Trade"> | string | null
+  aiBackend?: Prisma.StringNullableFilter<"Trade"> | string | null
   ironRulesPassed?: Prisma.BoolFilter<"Trade"> | boolean
   decisionLog?: Prisma.StringFilter<"Trade"> | string
   stagedTp?: Prisma.StringFilter<"Trade"> | string
@@ -427,6 +435,7 @@ export type TradeOrderByWithRelationInput = {
   rMultiple?: Prisma.SortOrderInput | Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrderInput | Prisma.SortOrder
+  aiBackend?: Prisma.SortOrderInput | Prisma.SortOrder
   ironRulesPassed?: Prisma.SortOrder
   decisionLog?: Prisma.SortOrder
   stagedTp?: Prisma.SortOrder
@@ -458,6 +467,7 @@ export type TradeWhereUniqueInput = Prisma.AtLeast<{
   rMultiple?: Prisma.FloatNullableFilter<"Trade"> | number | null
   hawkVotes?: Prisma.StringFilter<"Trade"> | string
   sageVerdict?: Prisma.StringNullableFilter<"Trade"> | string | null
+  aiBackend?: Prisma.StringNullableFilter<"Trade"> | string | null
   ironRulesPassed?: Prisma.BoolFilter<"Trade"> | boolean
   decisionLog?: Prisma.StringFilter<"Trade"> | string
   stagedTp?: Prisma.StringFilter<"Trade"> | string
@@ -486,6 +496,7 @@ export type TradeOrderByWithAggregationInput = {
   rMultiple?: Prisma.SortOrderInput | Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrderInput | Prisma.SortOrder
+  aiBackend?: Prisma.SortOrderInput | Prisma.SortOrder
   ironRulesPassed?: Prisma.SortOrder
   decisionLog?: Prisma.SortOrder
   stagedTp?: Prisma.SortOrder
@@ -520,6 +531,7 @@ export type TradeScalarWhereWithAggregatesInput = {
   rMultiple?: Prisma.FloatNullableWithAggregatesFilter<"Trade"> | number | null
   hawkVotes?: Prisma.StringWithAggregatesFilter<"Trade"> | string
   sageVerdict?: Prisma.StringNullableWithAggregatesFilter<"Trade"> | string | null
+  aiBackend?: Prisma.StringNullableWithAggregatesFilter<"Trade"> | string | null
   ironRulesPassed?: Prisma.BoolWithAggregatesFilter<"Trade"> | boolean
   decisionLog?: Prisma.StringWithAggregatesFilter<"Trade"> | string
   stagedTp?: Prisma.StringWithAggregatesFilter<"Trade"> | string
@@ -543,6 +555,7 @@ export type TradeCreateInput = {
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
+  aiBackend?: string | null
   ironRulesPassed?: boolean
   decisionLog?: string
   stagedTp?: string
@@ -571,6 +584,7 @@ export type TradeUncheckedCreateInput = {
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
+  aiBackend?: string | null
   ironRulesPassed?: boolean
   decisionLog?: string
   stagedTp?: string
@@ -594,6 +608,7 @@ export type TradeUpdateInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -622,6 +637,7 @@ export type TradeUncheckedUpdateInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -648,6 +664,7 @@ export type TradeCreateManyInput = {
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
+  aiBackend?: string | null
   ironRulesPassed?: boolean
   decisionLog?: string
   stagedTp?: string
@@ -671,6 +688,7 @@ export type TradeUpdateManyMutationInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -697,6 +715,7 @@ export type TradeUncheckedUpdateManyInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -738,6 +757,7 @@ export type TradeCountOrderByAggregateInput = {
   rMultiple?: Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrder
+  aiBackend?: Prisma.SortOrder
   ironRulesPassed?: Prisma.SortOrder
   decisionLog?: Prisma.SortOrder
   stagedTp?: Prisma.SortOrder
@@ -779,6 +799,7 @@ export type TradeMaxOrderByAggregateInput = {
   rMultiple?: Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrder
+  aiBackend?: Prisma.SortOrder
   ironRulesPassed?: Prisma.SortOrder
   decisionLog?: Prisma.SortOrder
   stagedTp?: Prisma.SortOrder
@@ -805,6 +826,7 @@ export type TradeMinOrderByAggregateInput = {
   rMultiple?: Prisma.SortOrder
   hawkVotes?: Prisma.SortOrder
   sageVerdict?: Prisma.SortOrder
+  aiBackend?: Prisma.SortOrder
   ironRulesPassed?: Prisma.SortOrder
   decisionLog?: Prisma.SortOrder
   stagedTp?: Prisma.SortOrder
@@ -925,6 +947,7 @@ export type TradeCreateWithoutSignalInput = {
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
+  aiBackend?: string | null
   ironRulesPassed?: boolean
   decisionLog?: string
   stagedTp?: string
@@ -951,6 +974,7 @@ export type TradeUncheckedCreateWithoutSignalInput = {
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
+  aiBackend?: string | null
   ironRulesPassed?: boolean
   decisionLog?: string
   stagedTp?: string
@@ -990,6 +1014,7 @@ export type TradeUpdateWithoutSignalInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1016,6 +1041,7 @@ export type TradeUncheckedUpdateWithoutSignalInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1039,6 +1065,7 @@ export type TradeCreateWithoutPortfolioInput = {
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
+  aiBackend?: string | null
   ironRulesPassed?: boolean
   decisionLog?: string
   stagedTp?: string
@@ -1065,6 +1092,7 @@ export type TradeUncheckedCreateWithoutPortfolioInput = {
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
+  aiBackend?: string | null
   ironRulesPassed?: boolean
   decisionLog?: string
   stagedTp?: string
@@ -1120,6 +1148,7 @@ export type TradeScalarWhereInput = {
   rMultiple?: Prisma.FloatNullableFilter<"Trade"> | number | null
   hawkVotes?: Prisma.StringFilter<"Trade"> | string
   sageVerdict?: Prisma.StringNullableFilter<"Trade"> | string | null
+  aiBackend?: Prisma.StringNullableFilter<"Trade"> | string | null
   ironRulesPassed?: Prisma.BoolFilter<"Trade"> | boolean
   decisionLog?: Prisma.StringFilter<"Trade"> | string
   stagedTp?: Prisma.StringFilter<"Trade"> | string
@@ -1145,6 +1174,7 @@ export type TradeCreateManyPortfolioInput = {
   rMultiple?: number | null
   hawkVotes?: string
   sageVerdict?: string | null
+  aiBackend?: string | null
   ironRulesPassed?: boolean
   decisionLog?: string
   stagedTp?: string
@@ -1168,6 +1198,7 @@ export type TradeUpdateWithoutPortfolioInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1194,6 +1225,7 @@ export type TradeUncheckedUpdateWithoutPortfolioInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1219,6 +1251,7 @@ export type TradeUncheckedUpdateManyWithoutPortfolioInput = {
   rMultiple?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   hawkVotes?: Prisma.StringFieldUpdateOperationsInput | string
   sageVerdict?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  aiBackend?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ironRulesPassed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   decisionLog?: Prisma.StringFieldUpdateOperationsInput | string
   stagedTp?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1247,6 +1280,7 @@ export type TradeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   rMultiple?: boolean
   hawkVotes?: boolean
   sageVerdict?: boolean
+  aiBackend?: boolean
   ironRulesPassed?: boolean
   decisionLog?: boolean
   stagedTp?: boolean
@@ -1275,6 +1309,7 @@ export type TradeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   rMultiple?: boolean
   hawkVotes?: boolean
   sageVerdict?: boolean
+  aiBackend?: boolean
   ironRulesPassed?: boolean
   decisionLog?: boolean
   stagedTp?: boolean
@@ -1303,6 +1338,7 @@ export type TradeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   rMultiple?: boolean
   hawkVotes?: boolean
   sageVerdict?: boolean
+  aiBackend?: boolean
   ironRulesPassed?: boolean
   decisionLog?: boolean
   stagedTp?: boolean
@@ -1331,6 +1367,7 @@ export type TradeSelectScalar = {
   rMultiple?: boolean
   hawkVotes?: boolean
   sageVerdict?: boolean
+  aiBackend?: boolean
   ironRulesPassed?: boolean
   decisionLog?: boolean
   stagedTp?: boolean
@@ -1338,7 +1375,7 @@ export type TradeSelectScalar = {
   closedAt?: boolean
 }
 
-export type TradeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "portfolioId" | "signalId" | "symbol" | "side" | "entry" | "sl" | "tp1" | "tp2" | "lot" | "riskReward" | "status" | "outcome" | "pnl" | "grossPnl" | "rMultiple" | "hawkVotes" | "sageVerdict" | "ironRulesPassed" | "decisionLog" | "stagedTp" | "openedAt" | "closedAt", ExtArgs["result"]["trade"]>
+export type TradeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "portfolioId" | "signalId" | "symbol" | "side" | "entry" | "sl" | "tp1" | "tp2" | "lot" | "riskReward" | "status" | "outcome" | "pnl" | "grossPnl" | "rMultiple" | "hawkVotes" | "sageVerdict" | "aiBackend" | "ironRulesPassed" | "decisionLog" | "stagedTp" | "openedAt" | "closedAt", ExtArgs["result"]["trade"]>
 export type TradeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   portfolio?: boolean | Prisma.PortfolioDefaultArgs<ExtArgs>
   signal?: boolean | Prisma.Trade$signalArgs<ExtArgs>
@@ -1377,6 +1414,7 @@ export type $TradePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     rMultiple: number | null
     hawkVotes: string
     sageVerdict: string | null
+    aiBackend: string | null
     ironRulesPassed: boolean
     decisionLog: string
     stagedTp: string
@@ -1825,6 +1863,7 @@ export interface TradeFieldRefs {
   readonly rMultiple: Prisma.FieldRef<"Trade", 'Float'>
   readonly hawkVotes: Prisma.FieldRef<"Trade", 'String'>
   readonly sageVerdict: Prisma.FieldRef<"Trade", 'String'>
+  readonly aiBackend: Prisma.FieldRef<"Trade", 'String'>
   readonly ironRulesPassed: Prisma.FieldRef<"Trade", 'Boolean'>
   readonly decisionLog: Prisma.FieldRef<"Trade", 'String'>
   readonly stagedTp: Prisma.FieldRef<"Trade", 'String'>

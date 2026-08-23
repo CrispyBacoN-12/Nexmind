@@ -195,6 +195,7 @@ export const TradeScalarFieldEnum = {
   rMultiple: 'rMultiple',
   hawkVotes: 'hawkVotes',
   sageVerdict: 'sageVerdict',
+  aiBackend: 'aiBackend',
   ironRulesPassed: 'ironRulesPassed',
   decisionLog: 'decisionLog',
   stagedTp: 'stagedTp',

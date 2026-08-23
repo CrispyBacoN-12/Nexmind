@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { aiOutageStatus } from "@/lib/anthropic";
 import { Card, CardTitle, Stat, Badge, PageHeader, Empty } from "@/components/ui";
 import { fmtMoney, fmtNumber, fmtAgo, colorForChange } from "@/lib/utils";
 import { TradeDeskPanel } from "./trade-desk-panel";
@@ -13,6 +14,11 @@ type HawkVote = { persona: string; vote: string; reason: string };
 
 export default async function WarRoom() {
   const portfolios = await prisma.portfolio.findMany({ where: { status: "active" }, orderBy: { sort: "asc" } });
+
+  // The desk keeps trading without AI, on rules alone. That is a legitimate mode
+  // — but silently, it looks exactly like a working analyst team, which is how
+  // 27 rule-only trades ended up on the page labelled as HAWK votes.
+  const outage = await aiOutageStatus();
 
   const news = await prisma.newsItem.findMany({ orderBy: { createdAt: "desc" }, take: 8 });
 
@@ -39,6 +45,17 @@ export default async function WarRoom() {
         description="Live decisions from the trading desk — Scanner → HAWK×3 → SAGE → Iron Rules → execution."
         action={<Badge tone="info">PAPER MODE</Badge>}
       />
+
+      {outage && (
+        <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm font-medium text-amber-300">⚠️ AI offline — decisions are rule-only</p>
+          <p className="mt-1 text-xs text-(--color-muted)">
+            HAWK and SAGE are not running: {outage.reason}{outage.ageMs > 60_000 ? ` (${fmtAgo(new Date(Date.now() - outage.ageMs))})` : ""}.
+            New trades still pass the Scanner and the Iron Rules, but the
+            analyst votes and the risk veto are deterministic stand-ins and are marked <span className="font-mono">MOCK AI</span>.
+          </p>
+        </div>
+      )}
 
       <div className="mb-6">
         <WebullPanel />
@@ -132,6 +149,13 @@ function SwingBlock({ b }: { b: SwingData }) {
                     <Badge tone={t.status === "open" ? "info" : t.outcome === "win" ? "positive" : t.outcome === "loss" ? "negative" : "neutral"}>
                       {t.status === "open" ? "OPEN" : (t.outcome ?? "closed").toUpperCase()}
                     </Badge>
+                    {/* The votes and SAGE line below look identical whether an analyst
+                        wrote them or the deterministic stand-in did. Say which. */}
+                    {t.aiBackend === "mock" && (
+                      <Badge tone="neutral" title="No AI ran — HAWK votes and the SAGE verdict below are the deterministic stand-in, not analyst opinions.">
+                        MOCK AI
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-right">
                     {t.pnl != null && <div className={`font-semibold tabular-nums ${colorForChange(t.pnl)}`}>{fmtMoney(t.pnl)}</div>}

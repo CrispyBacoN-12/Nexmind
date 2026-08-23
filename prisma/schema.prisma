@@ -117,6 +117,11 @@ model Trade {
   rMultiple       Float? // realized R multiple
   hawkVotes       String   @default("[]") // JSON of the 3 analyst opinions
   sageVerdict     String? // approve | veto + reasoning
+  // Which backend actually produced hawkVotes/sageVerdict: "api" | "cli" |
+  // "mock". "mock" means no AI ran and the votes are the deterministic stand-in,
+  // so the trade must not be counted as evidence about the analysts. Null on
+  // rows written before this column existed.
+  aiBackend       String?
   ironRulesPassed Boolean   @default(false)
   decisionLog     String   @default("[]") // JSON timeline of every gate
   stagedTp        String   @default("{}") // JSON ladder state

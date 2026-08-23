@@ -43,7 +43,7 @@ export function Button({
   return <button className={cn(base, sizes[size], variants[variant], className)} {...props} />;
 }
 
-export function Badge({ children, tone = "neutral", className }: { children: ReactNode; tone?: "neutral" | "positive" | "negative" | "warning" | "info"; className?: string }) {
+export function Badge({ children, tone = "neutral", className, title }: { children: ReactNode; tone?: "neutral" | "positive" | "negative" | "warning" | "info"; className?: string; title?: string }) {
   const tones = {
     neutral: "bg-zinc-500/10 text-zinc-400",
     positive: "bg-emerald-500/10 text-emerald-400",
@@ -51,7 +51,7 @@ export function Badge({ children, tone = "neutral", className }: { children: Rea
     warning: "bg-amber-500/10 text-amber-400",
     info: "bg-cyan-500/10 text-cyan-300",
   };
-  return <span className={cn("inline-flex items-center rounded px-2 py-0.5 text-xs font-medium", tones[tone], className)}>{children}</span>;
+  return <span title={title} className={cn("inline-flex items-center rounded px-2 py-0.5 text-xs font-medium", tones[tone], className)}>{children}</span>;
 }
 
 export function Empty({ title, hint }: { title: string; hint?: ReactNode }) {
