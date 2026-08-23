@@ -4,6 +4,7 @@
 import { callAgentJSON } from "@/lib/anthropic";
 import type { ScanResult } from "./scanner";
 import type { ProposedLevels } from "./hawk";
+import { buildAnalystContext, renderContext, type AnalystContext } from "./context";
 
 export interface SageVerdict {
   approved: boolean;
@@ -35,14 +36,18 @@ export async function runSage(
   scan: ScanResult,
   side: "long" | "short",
   levels: ProposedLevels,
-  opts: { newsDigest?: string; lessons?: string } = {},
+  opts: { context?: AnalystContext; newsDigest?: string; lessons?: string } = {},
 ): Promise<SageVerdict> {
-  const s = scan.snapshot;
+  // SAGE's brief names "entering against a higher-timeframe trend" as a veto
+  // reason, but the prompt used to carry five spot indicators and no higher
+  // timeframe at all — it could not have checked. It now reads the same facts
+  // sheet the analysts voted on.
+  const facts = renderContext(opts.context ?? buildAnalystContext(scan, { newsDigest: opts.newsDigest }));
   const prompt = [
-    `Proposed ${side} on ${scan.symbol} (${scan.timeframe}).`,
+    facts,
+    "",
+    `PROPOSAL — ${side} on ${scan.symbol} (${scan.timeframe}).`,
     `Entry ${levels.entry.toFixed(4)}, SL ${levels.sl.toFixed(4)}, TP1 ${levels.tp1.toFixed(4)}, TP2 ${levels.tp2 != null ? levels.tp2.toFixed(4) : "none (single-target — TP1 is the full exit)"}.`,
-    `Context: RSI ${fmt(s.rsi)}, ADX ${fmt(s.adx)}, ATR ${fmt(s.atr)}, SMA20 ${fmt(s.sma20)}, SMA50 ${fmt(s.sma50)}.`,
-    opts.newsDigest ? `Intel: ${opts.newsDigest}` : "",
     opts.lessons ? `Lessons from past losses: ${opts.lessons}` : "",
     `Approve or veto, and optionally tighten SL/TP.`,
   ]
@@ -67,8 +72,6 @@ export async function runSage(
 
   return { approved: r.data.approved, reason: r.data.reason, adjusted, costUsd: r.costUsd };
 }
-
-const fmt = (n: number | null) => (n == null ? "n/a" : n.toFixed(2));
 
 // Accept an adjusted level only if it's sane (correct side of entry); else keep original.
 function validAdjust(v: number | undefined, fallback: number, side: "long" | "short", kind: "sl" | "tp", entry: number): number {

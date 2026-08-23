@@ -1,8 +1,10 @@
 // On-demand AI stock analysis — runs HAWK's 3 perspectives + a SAGE risk read on
 // any symbol, WITHOUT placing a trade. Reuses the Scanner's indicator snapshot.
 
-import { callAgent, callAgentJSON, aiEnabled } from "@/lib/anthropic";
+import { callAgent, callAgentJSON, aiBackend, aiOutageReason, type AiBackend } from "@/lib/anthropic";
 import { scanSymbol, type ScanSnapshot } from "./scanner";
+import { buildAnalystContext, personaLens, renderContext } from "./context";
+import { fetchCandles } from "@/lib/marketData";
 import { prisma } from "@/lib/db";
 import { getFearGreed } from "@/lib/settings";
 import { fetchFundamentals, fundamentalsLine, type Fundamentals } from "@/lib/market/fundamentals";
@@ -27,8 +29,16 @@ export interface AnalysisResult {
   risk: { note: string; suggestedSl: number | null; suggestedTp: number | null };
   newsDigest: string;
   costUsd: number;
+  /** Which backend produced `views`/`summary`/`risk`. "mock" means the numbers
+   *  below are a deterministic stand-in, not an analyst's opinion — the UI must
+   *  say so rather than presenting them as an AI read. */
+  aiBackend: AiBackend;
+  /** Set when aiBackend fell back to "mock": why AI could not answer. */
+  aiNote?: string;
 }
 
+// Same three lenses HAWK votes with (see context.ts) — the Analyze button and
+// the trading desk must not disagree because they were shown different sheets.
 const PERSONAS: { persona: PersonaView["persona"]; system: string }[] = [
   { persona: "trend", system: "You are a trend-following analyst. Judge direction from MA alignment, ADX, +DI/-DI. Be concise." },
   { persona: "structure", system: "You are a market-structure analyst. Judge from swings, support/resistance, and whether price respects key levels. Be concise." },
@@ -67,45 +77,68 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
   const fundLine = fundamentalsLine(fundamentals, scan.symbol);
   const atr = s.atr ?? scan.price * 0.01;
 
-  let views: PersonaView[];
-  let summary: string;
-  let risk: AnalysisResult["risk"];
+  // Seeded with the deterministic read so every exit path has an answer; the AI
+  // branch below overwrites all three when it succeeds.
+  let views: PersonaView[] = mockViews(s);
+  let summary: string = mockSummary(symbol, s, views);
+  let risk: AnalysisResult["risk"] = mockRisk(scan.price, atr, majority(views));
   let cost = 0;
 
-  if (aiEnabled()) {
-    const prompt = `Analyze ${symbol}. ${snapshotLine(s)}.\n${fundLine}\n${newsDigest ? `Intel: ${newsDigest}.\n` : ""}Give your read (bullish / bearish / neutral) with confidence 0-1 and one-sentence reason. Weigh in the fundamentals where relevant. JSON {view, confidence, reason}.`;
-    const results = await Promise.all(
-      PERSONAS.map((p) =>
-        callAgentJSON<{ view: View; confidence: number; reason: string }>({
-          tier: "sonnet", system: p.system, prompt, maxTokens: 250, jsonSchema: VIEW_SCHEMA,
-        }).then((r) => ({ ...r, persona: p.persona })),
-      ),
-    );
-    views = results.map((r) => ({ persona: r.persona, view: r.data.view, confidence: clamp01(r.data.confidence), reason: r.data.reason }));
-    cost += results.reduce((a, r) => a + r.costUsd, 0);
+  // An unreachable or unauthenticated backend used to escape this function and
+  // surface as a 500 from /api/analyze — a blank screen instead of the mock read
+  // the rest of the app already knows how to render. Degrade instead, and report
+  // which path produced the answer so it is never mistaken for an analyst call.
+  let backend: AiBackend = aiBackend();
+  let aiNote = backend === "mock" ? (aiOutageReason() ?? "no AI backend configured") : undefined;
 
-    const summaryRes = await callAgent({
-      tier: "sonnet",
-      system: "You are HAWK, lead market analyst. Synthesize the team's reads into a clear 3-4 sentence verdict for a trader. No fluff.",
-      prompt: `${symbol}. ${snapshotLine(s)}.\n${fundLine}\nAnalyst reads: ${views.map((v) => `${v.persona}=${v.view}(${v.reason})`).join("; ")}.${newsDigest ? ` Intel: ${newsDigest}.` : ""}\nWrite the verdict.`,
-      maxTokens: 350,
-    });
-    summary = summaryRes.text;
-    cost += summaryRes.costUsd;
+  if (backend !== "mock") {
+    try {
+      const facts = renderContext(
+        buildAnalystContext(scan, {
+          newsDigest,
+          fundamentals: fundLine,
+          higherTf: await fetchCandles(scan.symbol, "1y", "1d").then((r) => r.candles).catch(() => null),
+        }),
+      );
+      const task = "Give your read (bullish / bearish / neutral) with confidence 0-1 and a one-sentence reason citing the number that decided it. JSON {view, confidence, reason}.";
+      const results = await Promise.all(
+        PERSONAS.map((p) =>
+          callAgentJSON<{ view: View; confidence: number; reason: string }>({
+            tier: "sonnet", system: p.system, prompt: `${facts}\n\n${personaLens(p.persona)}\n\n${task}`,
+            maxTokens: 250, jsonSchema: VIEW_SCHEMA,
+          }).then((r) => ({ ...r, persona: p.persona })),
+        ),
+      );
+      views = results.map((r) => ({ persona: r.persona, view: r.data.view, confidence: clamp01(r.data.confidence), reason: r.data.reason }));
+      cost += results.reduce((a, r) => a + r.costUsd, 0);
 
-    const riskRes = await callAgentJSON<{ note: string; sl?: number; tp?: number }>({
-      tier: "opus",
-      system: "You are SAGE, head of risk. Give a one-to-two sentence risk read for this symbol and a sensible protective stop and first target if someone took the majority-bias trade. JSON {note, sl, tp}.",
-      prompt: `${symbol}. ${snapshotLine(s)}. Majority bias: ${majority(views)}. ATR ${fmt(atr)}.`,
-      maxTokens: 300, jsonSchema: RISK_SCHEMA,
-    });
-    risk = { note: riskRes.data.note, suggestedSl: num(riskRes.data.sl), suggestedTp: num(riskRes.data.tp) };
-    cost += riskRes.costUsd;
-  } else {
-    views = mockViews(s);
-    summary = mockSummary(symbol, s, views);
-    const bias = majority(views);
-    risk = mockRisk(scan.price, atr, bias);
+      const summaryRes = await callAgent({
+        tier: "sonnet",
+        system: "You are HAWK, lead market analyst. Synthesize the team's reads into a clear 3-4 sentence verdict for a trader. No fluff.",
+        prompt: `${symbol}. ${snapshotLine(s)}.\n${fundLine}\nAnalyst reads: ${views.map((v) => `${v.persona}=${v.view}(${v.reason})`).join("; ")}.${newsDigest ? ` Intel: ${newsDigest}.` : ""}\nWrite the verdict.`,
+        maxTokens: 350,
+      });
+      summary = summaryRes.text;
+      cost += summaryRes.costUsd;
+
+      const riskRes = await callAgentJSON<{ note: string; sl?: number; tp?: number }>({
+        tier: "opus",
+        system: "You are SAGE, head of risk. Give a one-to-two sentence risk read for this symbol and a sensible protective stop and first target if someone took the majority-bias trade. JSON {note, sl, tp}.",
+        prompt: `${symbol}. ${snapshotLine(s)}. Majority bias: ${majority(views)}. ATR ${fmt(atr)}.`,
+        maxTokens: 300, jsonSchema: RISK_SCHEMA,
+      });
+      risk = { note: riskRes.data.note, suggestedSl: num(riskRes.data.sl), suggestedTp: num(riskRes.data.tp) };
+      cost += riskRes.costUsd;
+    } catch (e) {
+      // Partial results are worse than none here: a real persona read paired
+      // with a mock summary would read as one coherent AI opinion. Reset to the
+      // full deterministic read and label it.
+      backend = "mock";
+      aiNote = (e instanceof Error ? e.message : String(e)).slice(0, 200);
+      views = mockViews(s);
+      summary = mockSummary(symbol, s, views);
+      risk = mockRisk(scan.price, atr, majority(views));
+    }
   }
 
   const bias = majority(views);
@@ -114,6 +147,7 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
   return {
     symbol: scan.symbol, price: scan.price, snapshot: s, scannerNote: scan.note, fundamentals,
     views, overall: { bias, confidence, summary }, risk, newsDigest, costUsd: cost,
+    aiBackend: backend, ...(aiNote ? { aiNote } : {}),
   };
 }
 

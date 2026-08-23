@@ -3,6 +3,7 @@
 
 import { callAgentJSON, type ModelTier } from "@/lib/anthropic";
 import type { ScanResult } from "./scanner";
+import { buildAnalystContext, personaLens, renderContext, type AnalystContext, type Persona } from "./context";
 
 export interface HawkVote {
   persona: string;
@@ -29,7 +30,7 @@ export interface HawkVerdict {
   totalCostUsd: number;
 }
 
-const PERSONAS: { persona: string; system: string }[] = [
+const PERSONAS: { persona: Persona; system: string }[] = [
   {
     persona: "trend",
     system:
@@ -58,25 +59,23 @@ const VOTE_SCHEMA = {
   required: ["vote", "confidence", "reason"],
 };
 
-function buildPrompt(scan: ScanResult, newsDigest: string): string {
-  const s = scan.snapshot;
-  return [
-    `Symbol ${scan.symbol} on ${scan.timeframe}. Price ${scan.price}.`,
-    `Scanner setup: ${scan.side ?? "none"} (${scan.note}).`,
-    `Indicators: SMA20 ${fmt(s.sma20)}, SMA50 ${fmt(s.sma50)}, RSI ${fmt(s.rsi)}, ADX ${fmt(s.adx)}, +DI ${fmt(s.plusDI)}, -DI ${fmt(s.minusDI)}, MACD hist ${fmt(s.macdHist)}, ATR ${fmt(s.atr)}.`,
-    newsDigest ? `Recent intel: ${newsDigest}` : "",
-    `Decide: long, short, or skip. Return JSON {vote, confidence (0-1), reason (one sentence)}.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
+const TASK =
+  "Decide: long, short, or skip. The scanner has already fired — your job is to confirm or refuse it, " +
+  "not to invent a different trade. Cite the specific number that decided your vote. " +
+  "Return JSON {vote, confidence (0-1), reason (one sentence)}.";
 
-const fmt = (n: number | null) => (n == null ? "n/a" : n.toFixed(2));
+/** Same facts to all three, different lens each — see context.ts for why. */
+function buildPrompt(facts: string, persona: Persona): string {
+  return `${facts}\n\n${personaLens(persona)}\n\n${TASK}`;
+}
 
 /** Run the three analysts in parallel and tally a 2-of-3 vote. */
 export async function runHawk(
   scan: ScanResult,
   opts: {
+    /** Pre-built facts sheet (the engine builds it once and shares it with SAGE).
+     *  Falls back to a scan-only context so other callers still get the full read. */
+    context?: AnalystContext;
     newsDigest?: string;
     tier?: ModelTier;
     atrSlMult?: number;
@@ -87,13 +86,13 @@ export async function runHawk(
 ): Promise<HawkVerdict> {
   if (!scan.side) return { agreed: false, side: null, votes: [], levels: null, totalCostUsd: 0 };
 
-  const prompt = buildPrompt(scan, opts.newsDigest ?? "");
+  const facts = renderContext(opts.context ?? buildAnalystContext(scan, { newsDigest: opts.newsDigest }));
   const results = await Promise.all(
     PERSONAS.map((p) =>
       callAgentJSON<{ vote: HawkVote["vote"]; confidence: number; reason: string }>({
         tier: opts.tier ?? "sonnet",
         system: p.system,
-        prompt,
+        prompt: buildPrompt(facts, p.persona),
         maxTokens: 300,
         jsonSchema: VOTE_SCHEMA,
       }).then((r) => ({ ...r, persona: p.persona })),

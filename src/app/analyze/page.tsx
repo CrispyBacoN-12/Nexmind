@@ -30,6 +30,8 @@ interface ShortAnalysis {
   views: PersonaView[]; overall: { bias: View; confidence: number; summary: string };
   risk: { note: string; suggestedSl: number | null; suggestedTp: number | null };
   newsDigest: string; costUsd: number;
+  // "mock" = no AI ran; the views below are a deterministic stand-in.
+  aiBackend?: "api" | "cli" | "mock"; aiNote?: string;
 }
 
 const viewTone: Record<View, "positive" | "negative" | "neutral"> = { bullish: "positive", bearish: "negative", neutral: "neutral" };
@@ -181,6 +183,12 @@ function AnalyzeInner() {
                   </div>
                   <span className="text-[11px] font-mono text-(--color-muted)">price {fmtNumber(a.price, 2)} · cost ${a.costUsd.toFixed(4)}</span>
                 </div>
+                {a.aiBackend === "mock" && (
+                  <p className="mt-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                    ⚠️ Rule-only read — HAWK and SAGE did not run{a.aiNote ? `: ${a.aiNote}` : ""}. The verdict below is
+                    computed from the indicators alone, not an analyst opinion.
+                  </p>
+                )}
                 <p className="mt-3 text-sm whitespace-pre-wrap">{a.overall.summary}</p>
               </Card>
 
