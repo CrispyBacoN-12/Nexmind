@@ -4,7 +4,6 @@ import { Card, CardTitle, Stat, Badge, PageHeader, Empty } from "@/components/ui
 import { fmtMoney, fmtNumber, fmtAgo, colorForChange } from "@/lib/utils";
 import { TradeDeskPanel } from "./trade-desk-panel";
 import { EquityCurveChart } from "./equity-curve-chart";
-import { AllocationChart } from "./allocation-chart";
 import { WebullPanel } from "./webull-panel";
 
 export const dynamic = "force-dynamic";

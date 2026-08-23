@@ -1,5 +1,16 @@
 # Webull Data Provider + PaperTrade Shadow Execution — Implementation Plan
 
+> **STATUS: Phase 1 (data) shipped; Phase 2 (shadow execution) REMOVED (2026-08-22).**
+> Webull's trading API cannot be reached unattended: production candle/order calls
+> need a session `x-access-token` minted via `POST /openapi/auth/token/create` and
+> approved by hand in the Webull mobile app before `token/check` reports NORMAL.
+> That is workable for a one-off script and impossible for a cron. The
+> `WebullShadowOrder` table, the `webullShadowEnabled` portfolio flag, the
+> `engine.ts` exec-stage hook, and `poll-webull-shadow-orders.yml` were all
+> removed; orders are placed manually. Webull remains in the provider chain as a
+> **data-only** source, signed against the sandbox (`WEBULL_PAPER_APP_KEY`/`SECRET`),
+> which needs no such approval. Everything below describing Phase 2 is history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add Webull as a market-data provider ahead of Alpaca in NEXMIND's fallback chain, and add an opt-in per-portfolio "shadow" mode that mirrors approved signals into Webull's PaperTrade OpenAPI as real bracket orders, purely to observe realistic fills alongside NEXMIND's own simulation.

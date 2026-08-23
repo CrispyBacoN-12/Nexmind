@@ -1,5 +1,16 @@
 # Webull Data Provider + PaperTrade Shadow Execution — Design
 
+> **STATUS: Phase 1 (data) shipped; Phase 2 (shadow execution) REMOVED (2026-08-22).**
+> Webull's trading API cannot be reached unattended: production candle/order calls
+> need a session `x-access-token` minted via `POST /openapi/auth/token/create` and
+> approved by hand in the Webull mobile app before `token/check` reports NORMAL.
+> That is workable for a one-off script and impossible for a cron. The
+> `WebullShadowOrder` table, the `webullShadowEnabled` portfolio flag, the
+> `engine.ts` exec-stage hook, and `poll-webull-shadow-orders.yml` were all
+> removed; orders are placed manually. Webull remains in the provider chain as a
+> **data-only** source, signed against the sandbox (`WEBULL_PAPER_APP_KEY`/`SECRET`),
+> which needs no such approval. Everything below describing Phase 2 is history.
+
 **Date:** 2026-08-14
 **Status:** Approved (design), pending implementation plan
 **Scope:** Add Webull as a market-data source for NEXMIND equities (ahead of

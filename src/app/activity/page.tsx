@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { Card, CardTitle, Badge, PageHeader, Empty } from "@/components/ui";
+import { Card, Badge, PageHeader, Empty } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 

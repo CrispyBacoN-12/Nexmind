@@ -1,5 +1,15 @@
 # Hybrid RL Allocation (Gold Desk, Shadow Mode) Implementation Plan
 
+> **STATUS: SUPERSEDED (2026-08-23).** This plan's entire asset scope was the gold
+> desk (`GC=F`/`XAUUSD`), and the stocks-only pivot (`68becb9`) deleted that desk.
+> The shadow wiring therefore measured nothing: `rlSizer`, `rlProxyConfidence`,
+> `buildRLState`, and the `if (symbol === "XAUUSD" || symbol === "GC=F")` gate in
+> `engine.ts` were removed. Retargeting the shadow at the stock desk was rejected —
+> `rl/gold-sizer.onnx` was trained on gold, so its output on equities would be noise
+> presented as a second opinion. The offline artifacts (`rl/gold-sizer.onnx`,
+> `rl/train_gold_sizer.py`, `rl/data/`) are kept as the record of the training
+> pipeline; the deleted TypeScript is recoverable from git history.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an offline-trained RL risk-adjusted sizer for the gold desk that runs in shadow mode alongside the real `computeLot()` sizing — logged for review, never controlling real trades in this phase.
