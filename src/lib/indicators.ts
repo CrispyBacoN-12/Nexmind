@@ -342,6 +342,24 @@ export function weeklyAnchor(i: number, candles: Candle[]): boolean {
   return curDay < prevDay || candles[i].t - candles[i - 1].t > 3 * 86_400;
 }
 
+/**
+ * Pick the VWAP anchor that suits the bar spacing. A daily reset is right for
+ * intraday bars, but on daily bars every bar is its own session — VWAP collapses
+ * onto that bar's own typical price and the deviation is always ~0, which reads
+ * as "price is exactly at fair value" on every single bar. Weekly instead.
+ */
+export function anchorFor(candles: Candle[]): (i: number, candles: Candle[]) => boolean {
+  return medianSpacingSec(candles) >= 23 * 3600 ? weeklyAnchor : dailyAnchor;
+}
+
+function medianSpacingSec(candles: Candle[]): number {
+  const gaps: number[] = [];
+  for (let i = 1; i < Math.min(candles.length, 50); i++) gaps.push(candles[i].t - candles[i - 1].t);
+  if (gaps.length === 0) return 0;
+  gaps.sort((a, b) => a - b);
+  return gaps[Math.floor(gaps.length / 2)];
+}
+
 export interface LiquiditySweep { side: "long" | "short"; sweptLevel: number }
 
 /**

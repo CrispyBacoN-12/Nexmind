@@ -3,7 +3,10 @@
 
 import { type Interval, type Range } from "@/lib/yahoo";
 import { fetchCandles } from "@/lib/marketData";
-import { sma, rsi, macd, atr, adx, bollinger, stochastic, anchoredVWAP, dailyAnchor, type Candle } from "@/lib/indicators";
+import {
+  sma, rsi, macd, atr, adx, bollinger, stochastic, anchoredVWAP, anchorFor,
+  volumeProfile, detectLiquiditySweep, type Candle,
+} from "@/lib/indicators";
 import { findRecentUpLeg } from "@/lib/swings";
 import { lorentzianLast, type LCState } from "@/lib/lc/lorentzian";
 import { getStrategy, type Strategy } from "./strategies";
@@ -31,6 +34,37 @@ export interface ScanSnapshot {
   vwapDevPct?: number | null;
   /** Lorentzian Classification state (confluence filter); null when history is too short. */
   lc?: LCState | null;
+  /** Where price sits against the rolling volume profile: -1 below the value
+   *  area, 0 inside it, +1 above. Null when there isn't enough history. */
+  vpPos?: -1 | 0 | 1 | null;
+  /** Direction implied by a liquidity sweep on the last few bars, or null when
+   *  no stop-hunt fired recently. */
+  sweep?: "long" | "short" | null;
+}
+
+/** A sweep older than this many bars is history, not a trade trigger. */
+const SWEEP_BARS = 3;
+
+/**
+ * The two structural reads that need candles rather than a single value —
+ * computed here so the live scanner and the backtester build them the same way.
+ * `i` is the bar being judged; only bars up to and including it are consulted.
+ */
+export function structureFields(
+  candles: Candle[], i: number, price: number,
+): Pick<ScanSnapshot, "vpPos" | "sweep"> {
+  // Under ~20 bars the "value area" is a couple of candles wide and says nothing;
+  // better to abstain than to hand a filter a number it will act on.
+  const vp = i >= 19 ? volumeProfile(candles, i, Math.min(50, i + 1)) : null;
+  const vpPos = vp ? (price > vp.vah ? 1 : price < vp.val ? -1 : 0) : null;
+
+  // Most recent sweep wins; anything older than SWEEP_BARS is not a trigger.
+  let sweep: "long" | "short" | null = null;
+  for (let j = i; j > i - SWEEP_BARS && j >= 0; j--) {
+    const sw = detectLiquiditySweep(candles, j, 20);
+    if (sw) { sweep = sw.side; break; }
+  }
+  return { vpPos, sweep };
 }
 
 export interface ScanResult {
@@ -56,7 +90,37 @@ const last = <T,>(arr: (T | null)[]): T | null => {
 // from a hard gate to a confidence annotation. The setup *structure* (trend
 // alignment + DI + MACD) is unchanged. Exposed as a parameter so the backtester
 // can sweep values to find the best fit per symbol/timeframe.
-export interface SetupThresholds { adxFloor: number; rsiLow: number; rsiHigh: number }
+export interface SetupThresholds {
+  adxFloor: number;
+  rsiLow: number;
+  rsiHigh: number;
+  /**
+   * Confluence filters — the indicators the scanner has always computed and then
+   * thrown away. Every one is inert while undefined, so DEFAULT_THRESHOLDS keeps
+   * the pre-existing behaviour bit-for-bit; they exist to be swept, and only earn
+   * a place in the defaults by surviving an out-of-sample test.
+   *
+   * All of them are vetoes. None can create an entry the trend-pullback rule did
+   * not already find — a filter that can only subtract cannot invent an edge, it
+   * can only reveal whether the trades it removes were the losing ones.
+   */
+  /** Skip longs with Bollinger %B above this (and shorts below 1 - this): price
+   *  already pinned to the band it is supposed to be pulling back from. */
+  bbExtreme?: number;
+  /** Require Bollinger bandwidth >= this fraction of price — no dead squeezes. */
+  bbWidthMin?: number;
+  /** Skip longs with Stochastic %K above this (shorts below 100 - this). */
+  stochExtreme?: number;
+  /** Require price on the trade's side of session VWAP. */
+  requireVwapSide?: boolean;
+  /** Require the Lorentzian classifier to agree with the side (it is currently
+   *  only annotated onto the note). */
+  requireLc?: boolean;
+  /** Require price inside the volume-profile value area — no chasing outside it. */
+  requireValueArea?: boolean;
+  /** Require a recent liquidity sweep pointing the same way as the trade. */
+  requireSweep?: boolean;
+}
 export const DEFAULT_THRESHOLDS: SetupThresholds = { adxFloor: 20, rsiLow: 35, rsiHigh: 70 };
 
 /**
@@ -90,6 +154,9 @@ export function decideSetup(s: ScanSnapshot, t: SetupThresholds = DEFAULT_THRESH
   }
 
   const side: "long" | "short" = up ? "long" : "short";
+  const veto = confluenceVeto(s, side, t);
+  if (veto) return { side: null, note: `no setup · ${veto}` };
+
   const base = `${side === "long" ? "uptrend" : "downtrend"} pullback · ADX ${adxVal.toFixed(0)} · RSI ${r.toFixed(0)}`;
   if (s.lc) {
     const lcAgrees =
@@ -97,6 +164,46 @@ export function decideSetup(s: ScanSnapshot, t: SetupThresholds = DEFAULT_THRESH
     return { side, note: `${base} · LC ${lcAgrees ? "✓" : "—"} (${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction})` };
   }
   return { side, note: base };
+}
+
+/**
+ * The optional confluence gates, applied only after the base setup has fired.
+ * Each returns the reason it blocked the trade, or null to let it through; a
+ * gate whose indicator is missing abstains rather than blocking, so a symbol
+ * with short history is not silently filtered out of every backtest.
+ */
+function confluenceVeto(s: ScanSnapshot, side: "long" | "short", t: SetupThresholds): string | null {
+  const long = side === "long";
+
+  if (t.bbExtreme != null && s.bbPercentB != null) {
+    const limit = long ? t.bbExtreme : 1 - t.bbExtreme;
+    if (long ? s.bbPercentB > limit : s.bbPercentB < limit) {
+      return `BB %B ${s.bbPercentB.toFixed(2)} past ${limit.toFixed(2)}`;
+    }
+  }
+  if (t.bbWidthMin != null && s.bbWidth != null && s.bbWidth < t.bbWidthMin) {
+    return `BB width ${(s.bbWidth * 100).toFixed(2)}% under ${(t.bbWidthMin * 100).toFixed(2)}%`;
+  }
+  if (t.stochExtreme != null && s.stochK != null) {
+    const limit = long ? t.stochExtreme : 100 - t.stochExtreme;
+    if (long ? s.stochK > limit : s.stochK < limit) {
+      return `Stoch %K ${s.stochK.toFixed(0)} past ${limit.toFixed(0)}`;
+    }
+  }
+  if (t.requireVwapSide && s.vwapDevPct != null && (long ? s.vwapDevPct < 0 : s.vwapDevPct > 0)) {
+    return `wrong side of VWAP (${(s.vwapDevPct * 100).toFixed(2)}%)`;
+  }
+  if (t.requireLc && s.lc) {
+    const agrees = long ? s.lc.signal === 1 && s.lc.kernelBullish : s.lc.signal === -1 && s.lc.kernelBearish;
+    if (!agrees) return `LC disagrees (${s.lc.prediction > 0 ? "+" : ""}${s.lc.prediction})`;
+  }
+  if (t.requireValueArea && s.vpPos != null && s.vpPos !== 0) {
+    return `price ${s.vpPos > 0 ? "above" : "below"} the value area`;
+  }
+  if (t.requireSweep && s.sweep !== side) {
+    return s.sweep ? `liquidity sweep points ${s.sweep}` : "no recent liquidity sweep";
+  }
+  return null;
 }
 
 /** One-line indicator context for "no setup" diagnostics on the strategy path. */
@@ -148,7 +255,7 @@ export async function scanSymbol(
   const { k: stochKArr, d: stochDArr } = stochastic(candles, 14, 3, 3);
   const stochK = last(stochKArr);
   const stochD = last(stochDArr);
-  const vwapArr = anchoredVWAP(candles, dailyAnchor);
+  const vwapArr = anchoredVWAP(candles, anchorFor(candles));
   const vwap = last(vwapArr);
   const vwapDevPct = vwap != null && vwap !== 0 ? (price - vwap) / vwap : null;
 
@@ -156,6 +263,7 @@ export async function scanSymbol(
     price, sma20: s20, sma50: s50, rsi: r, adx: adxVal, plusDI: pDI, minusDI: mDI, macdHist: hist, atr: atrVal,
     bbPercentB, bbWidth, stochK, stochD, vwapDevPct,
     lc: lorentzianLast(candles),
+    ...structureFields(candles, candles.length - 1, price),
   };
 
   // Entry decision: the chosen registry strategy on the full history, or the

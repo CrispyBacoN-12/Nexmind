@@ -9,8 +9,10 @@
 //   loss. Live fills are friendlier, so real results should skew better, not worse.
 // - One open position per symbol (mirrors the live dedupe rule).
 
-import { sma, rsi, macd, atr, adx, type Candle } from "@/lib/indicators";
-import { decideSetup, DEFAULT_THRESHOLDS, type ScanSnapshot, type SetupThresholds } from "@/lib/trading/scanner";
+import {
+  sma, rsi, macd, atr, adx, bollinger, stochastic, anchoredVWAP, anchorFor, type Candle,
+} from "@/lib/indicators";
+import { decideSetup, structureFields, DEFAULT_THRESHOLDS, type ScanSnapshot, type SetupThresholds } from "@/lib/trading/scanner";
 import { decideAction, type LadderState, type OpenPosition, type TrailConfig } from "@/lib/trading/positionRules";
 import { lorentzianSeries } from "@/lib/lc/lorentzian";
 import { computeStats } from "@/lib/trading/stats";
@@ -70,8 +72,17 @@ export interface BacktestResult {
   openAtEnd: boolean;
 }
 
-/** Per-bar indicator snapshots, computed once over the whole series (all causal). */
-function snapshots(candles: Candle[]): ScanSnapshot[] {
+/**
+ * Per-bar indicator snapshots, computed once over the whole series (all causal).
+ *
+ * This used to stop at the nine indicators the base setup reads. Everything the
+ * scanner also computes — Bollinger, Stochastic, VWAP, the volume profile, the
+ * sweep — was simply absent here, so any confluence filter added to decideSetup
+ * would have been inert in the backtest and reported "no effect" no matter what
+ * it actually did to live entries. A filter you cannot measure is worse than one
+ * you never added.
+ */
+export function barSnapshots(candles: Candle[]): ScanSnapshot[] {
   const closes = candles.map((c) => c.c);
   const s20 = sma(closes, 20);
   const s50 = sma(closes, 50);
@@ -79,24 +90,42 @@ function snapshots(candles: Candle[]): ScanSnapshot[] {
   const { histogram } = macd(closes);
   const atrArr = atr(candles, 14);
   const { adx: adxArr, plusDI, minusDI } = adx(candles, 14);
+  const { upper: bbU, middle: bbM, lower: bbL } = bollinger(closes, 20, 2);
+  const { k: stochK, d: stochD } = stochastic(candles, 14, 3, 3);
+  // anchorFor, not dailyAnchor: on daily bars a per-day reset makes every bar its
+  // own session and the deviation is ~0 everywhere. Same chooser the live scanner
+  // uses, so a 1h backtest still anchors exactly the way the desk does.
+  const vwapArr = anchoredVWAP(candles, anchorFor(candles));
   const lc = lorentzianSeries(candles); // confluence filter, same as the live scanner
-  return candles.map((c, i) => ({
-    price: c.c,
-    sma20: s20[i],
-    sma50: s50[i],
-    rsi: r[i],
-    adx: adxArr[i],
-    plusDI: plusDI[i],
-    minusDI: minusDI[i],
-    macdHist: histogram[i],
-    atr: atrArr[i],
-    lc: {
-      prediction: lc.prediction[i],
-      signal: lc.signal[i],
-      kernelBullish: lc.kernelBullish[i],
-      kernelBearish: lc.kernelBearish[i],
-    },
-  }));
+  return candles.map((c, i) => {
+    const u = bbU[i];
+    const l = bbL[i];
+    const m = bbM[i];
+    const vwap = vwapArr[i];
+    return {
+      price: c.c,
+      sma20: s20[i],
+      sma50: s50[i],
+      rsi: r[i],
+      adx: adxArr[i],
+      plusDI: plusDI[i],
+      minusDI: minusDI[i],
+      macdHist: histogram[i],
+      atr: atrArr[i],
+      bbPercentB: u != null && l != null && u !== l ? (c.c - l) / (u - l) : null,
+      bbWidth: u != null && l != null && m ? (u - l) / m : null,
+      stochK: stochK[i],
+      stochD: stochD[i],
+      vwapDevPct: vwap != null && vwap !== 0 ? (c.c - vwap) / vwap : null,
+      lc: {
+        prediction: lc.prediction[i],
+        signal: lc.signal[i],
+        kernelBullish: lc.kernelBullish[i],
+        kernelBearish: lc.kernelBearish[i],
+      },
+      ...structureFields(candles, i, c.c),
+    };
+  });
 }
 
 export interface SimPosition extends OpenPosition {
@@ -243,8 +272,12 @@ export function backtestCandles(
   costs: CostModel = NO_COSTS,
   slMult = ATR_SL_MULT,
   trail?: { activateMult: number; offsetMult: number },
+  /** Snapshots for exactly these candles, when the caller already built them.
+   *  Sweeps re-run the same series under a dozen threshold sets; recomputing the
+   *  Lorentzian series each time costs more than the rest of the backtest. */
+  precomputed?: ScanSnapshot[],
 ): BacktestResult {
-  const snaps = snapshots(candles);
+  const snaps = precomputed ?? barSnapshots(candles);
   const trades: SimTrade[] = [];
   let signals = 0;
   let open: SimPosition | null = null;
