@@ -9,6 +9,7 @@ import { manageOpenTrades, type ManageSummary } from "@/lib/trading/manage";
 import { getStrategy } from "@/lib/trading/strategies";
 import { getResearchStrategy } from "@/lib/research/adapter";
 import { fetchCandlesBatch } from "@/lib/marketData";
+import { adx } from "@/lib/indicators";
 import { getWatchlist } from "@/lib/trading/watchlist";
 import { UNIVERSES, prepareSymbols } from "@/lib/trading/universe";
 import { getScanTimeframe, getPortfolioStrategy, getPortfolioUniverse, isGlobalTradingHalt, getDrawdownHaltPct, getSetting, setSetting } from "@/lib/settings";
@@ -42,8 +43,16 @@ async function scanWatchlist(p: Portfolio, tf: TF, log: (m: string) => void, ove
   }
 }
 
-/** Universe mode: cheap Scanner pre-filter, then spend AI on every setup found
- *  (no cap on concurrent open positions). */
+/** Universe mode: cheap Scanner pre-filter, then spend AI on the setups that
+ *  can still become positions.
+ *
+ *  The free-slot budget is checked here, before HAWK, not only inside the Iron
+ *  Rules after it. A state-based entry rule (trend-pullback is true for as long
+ *  as the trend and the RSI band hold) keeps every one of its setups alive for
+ *  the whole bar, so on a 1wk desk scanned every 15 minutes the same ~60 S&P
+ *  names re-qualify on every tick all week. Letting them all through would spend
+ *  four analyst calls each only for the Iron Rules to reject them for a cap that
+ *  was already known before the first call was made. */
 async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: string) => void) {
   const uni = UNIVERSES[universeKey];
   if (!uni) { log(`#${p.id} ${p.name} unknown universe "${universeKey}" — skipped`); return; }
@@ -51,27 +60,51 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: 
   const open = await prisma.trade.findMany({ where: { status: "open", portfolioId: p.id }, select: { symbol: true } });
   const held = new Set(open.map((t) => t.symbol));
 
+  let slots = p.maxOpenPositions - open.length;
+  if (slots <= 0) {
+    log(`#${p.id} ${p.name} universe=${universeKey}: ${open.length}/${p.maxOpenPositions} positions open, no free slot — not scanning`);
+    return;
+  }
+
   const strategy = await getPortfolioStrategy(p.id);
   const strat = getStrategy(strategy) ?? await getResearchStrategy(strategy);
   const symbols = prepareSymbols(uni.symbols, 200).filter((s) => !held.has(s));
 
   const candleMap = await fetchCandlesBatch(symbols, tf.range, tf.interval);
-  const candidates: string[] = [];
+  const candidates: { symbol: string; adx: number }[] = [];
   for (const s of symbols) {
     const resp = candleMap.get(s);
     if (!resp || !strat || resp.candles.length < 60) continue;
     const sig = strat.build(resp.candles)(resp.candles.length - 1);
-    if (sig?.side) candidates.push(resp.symbol);
+    if (sig?.side) {
+      const a = adx(resp.candles, 14).adx;
+      candidates.push({ symbol: resp.symbol, adx: a[a.length - 1] ?? 0 });
+    }
   }
-  log(`#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${candleMap.size} fetched`);
+  // Which setups get the free slots. Iterating the universe in its own order
+  // hands them to the same alphabetical head every week (AAPL, ABBV, ACN, ...),
+  // which is not a neutral sample of the rule — it is a five-name portfolio.
+  // Strongest trend first is at least a property of the setup rather than of the
+  // ticker's spelling. It is a tie-break among setups the rule already accepted,
+  // NOT a filter: it cannot remove a trade, only reorder who is served first.
+  // Untested as a ranking — worth its own sweep before anyone trusts it.
+  candidates.sort((a, b) => b.adx - a.adx);
+  log(`#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${candleMap.size} fetched, ${slots} slot(s) free`);
 
-  for (const s of candidates) {
+  for (const [n, c] of candidates.entries()) {
+    if (slots <= 0) {
+      log(`#${p.id} ${p.name} position cap ${p.maxOpenPositions} reached — ${candidates.length - n} setup(s) left unspent`);
+      break;
+    }
     try {
-      const r = await runTradeTick(s, p.id, { range: tf.range, interval: tf.interval });
-      log(`#${p.id} ${p.name} ${s} -> ${r.outcome}${r.tradeId ? ` trade#${r.tradeId}` : ""}`);
-      if (r.outcome === "executed" && r.tradeId) await notifyTradeOpened(p.name, s, r.tradeId);
+      const r = await runTradeTick(c.symbol, p.id, { range: tf.range, interval: tf.interval });
+      log(`#${p.id} ${p.name} ${c.symbol} -> ${r.outcome}${r.tradeId ? ` trade#${r.tradeId}` : ""}`);
+      if (r.outcome === "executed" && r.tradeId) {
+        slots--;
+        await notifyTradeOpened(p.name, c.symbol, r.tradeId);
+      }
     } catch (e) {
-      log(`#${p.id} ${p.name} ${s} ERROR ${String(e)}`);
+      log(`#${p.id} ${p.name} ${c.symbol} ERROR ${String(e)}`);
     }
   }
 }
