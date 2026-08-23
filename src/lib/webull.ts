@@ -88,7 +88,7 @@ export function parseWebullBars(json: unknown, symbol: string, range: Range, int
       o: Number(b.open), h: Number(b.high), l: Number(b.low), c: Number(b.close), v: Number(b.volume) || 0,
     }))
     .sort((a, b) => a.t - b.t);
-  return { symbol, range, interval, price: candles.at(-1)?.c, candles };
+  return { symbol, range, interval, provider: "webull", price: candles.at(-1)?.c, candles };
 }
 
 const CATEGORY = "US_STOCK";

@@ -6,6 +6,11 @@
 // the x-access-token exchange that some endpoints/environments require).
 import { createHmac, createHash, randomUUID } from "node:crypto";
 
+/** How long any single Webull call may take before it is aborted. Short on
+ *  purpose: every caller has a fallback provider, so waiting is worse than
+ *  failing. */
+const WEBULL_TIMEOUT_MS = 5000;
+
 /** Pure: `YYYY-MM-DDTHH:MM:SSZ` — seconds precision, no milliseconds. This is
  *  the ISO-8601 format Webull's signing spec requires for `x-timestamp`. */
 export function isoTimestamp(now: Date): string {
@@ -105,7 +110,15 @@ async function doSignedFetch(path: string, opts: SignedFetchOptions, retried: bo
   if (opts.accessToken) headers["x-access-token"] = opts.accessToken;
   if (bodyStr !== undefined) headers["content-type"] = "application/json";
 
-  const res = await fetch(url.toString(), { method, headers, ...(bodyStr !== undefined ? { body: bodyStr } : {}) });
+  // Bounded so an unreachable Webull host fails fast and callers can fall back to
+  // another provider. Without this, an unroutable host burns Node's full TCP
+  // connect timeout (~10s) on every request and the price chart just hangs.
+  const res = await fetch(url.toString(), {
+    method,
+    headers,
+    signal: AbortSignal.timeout(WEBULL_TIMEOUT_MS),
+    ...(bodyStr !== undefined ? { body: bodyStr } : {}),
+  });
 
   if (res.status === 401) {
     const errBody = await res.json().catch(() => ({}));

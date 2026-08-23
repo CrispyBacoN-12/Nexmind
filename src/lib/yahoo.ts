@@ -19,6 +19,9 @@ export interface CandleResponse {
   currency?: string;
   exchangeName?: string;
   price?: number;
+  // Which upstream actually served these bars. Callers fall back Webull -> Alpaca
+  // -> Yahoo, so the UI cannot assume the source it asked for is the one it got.
+  provider?: "webull" | "alpaca" | "yahoo";
   candles: Candle[];
 }
 
@@ -100,6 +103,7 @@ export function parseYahooChart(
     exchangeName: result.meta?.exchangeName,
     // The live quote is a real, present-day price and is never adjusted.
     price: result.meta?.regularMarketPrice ?? candles.at(-1)?.c,
+    provider: "yahoo",
     candles,
   };
 }

@@ -1,4 +1,4 @@
-import { fetchWebullCandles } from "@/lib/webull";
+import { fetchCandles } from "@/lib/marketData";
 
 export const dynamic = "force-dynamic";
 
@@ -6,7 +6,7 @@ interface Quote { symbol: string; price: number; prevClose: number; changePct: n
 
 async function quoteOne(symbol: string): Promise<Quote | null> {
   try {
-    const resp = await fetchWebullCandles(symbol, "5d", "1d");
+    const resp = await fetchCandles(symbol, "5d", "1d");
     const bars = resp.candles;
     const last = bars.at(-1);
     if (!last) return null;

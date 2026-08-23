@@ -58,6 +58,7 @@ export function parseAlpacaBars(
     symbol,
     range,
     interval,
+    provider: "alpaca",
     price: candles.at(-1)?.c,
     candles,
   };
@@ -120,7 +121,7 @@ export function parseAlpacaBatch(
   for (const [symbol, bars] of Object.entries(bySym)) {
     if (!bars || bars.length === 0) continue;
     const candles = bars.map(toCandle);
-    out.set(symbol, { symbol, range, interval, price: candles.at(-1)?.c, candles });
+    out.set(symbol, { symbol, range, interval, provider: "alpaca", price: candles.at(-1)?.c, candles });
   }
   return out;
 }

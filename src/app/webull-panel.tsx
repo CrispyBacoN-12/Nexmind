@@ -14,16 +14,8 @@ import {
 import { Card, CardTitle, Stat, Button, Empty } from "@/components/ui";
 import { cn, fmtMoney, fmtNumber, colorForChange } from "@/lib/utils";
 import type { Candle } from "@/lib/indicators";
-import type { Range, Interval } from "@/lib/yahoo";
+import type { Range, Interval, CandleResponse } from "@/lib/yahoo";
 import { WatchlistStrip } from "./webull/watchlist-strip";
-
-interface CandleResponse {
-  symbol: string;
-  range: Range;
-  interval: Interval;
-  price?: number;
-  candles: Candle[];
-}
 
 // "time": single trading day, axis shows only time-of-day. "datetime": spans
 // multiple days at intraday resolution, so the axis needs the date too or
@@ -51,8 +43,8 @@ function formatAxisTick(t: number, axisFormat: AxisFormat) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// Webull's shared public sandbox occasionally emits bars whose price has
-// diverged into an obviously synthetic random-walk (seen on TSLA/5y: real
+// Some upstreams (Webull's shared public sandbox especially) occasionally emit
+// bars whose price has diverged into an obviously synthetic random-walk (seen on TSLA/5y: real
 // bars around $200-300 followed by bars in the millions). Drop anything far
 // from the sample median rather than let one bad bar wreck the chart scale.
 function dropOutlierCandles(candles: Candle[]): Candle[] {
@@ -87,9 +79,9 @@ function ChartTooltip({ active, payload, intraday }: { active?: boolean; payload
   );
 }
 
-/** Webull live market data (quotes, chart, volume) — embedded directly in War
- *  Room so the desk and the tape live on one screen. Same data source as the
- *  former standalone /webull page. */
+/** Live market data (quotes, chart, volume) — embedded directly in War Room so
+ *  the desk and the tape live on one screen. Bars come from whichever provider
+ *  answers first (Webull -> Alpaca -> Yahoo); the header shows which one did. */
 export function WebullPanel() {
   const [symbolInput, setSymbolInput] = useState("AAPL");
   const [activeSymbol, setActiveSymbol] = useState("AAPL");
@@ -112,7 +104,7 @@ export function WebullPanel() {
       })
       .then((body) => {
         const candles = dropOutlierCandles(body.candles);
-        if (candles.length === 0) throw new Error("Webull sandbox returned only anomalous bars for this symbol/period");
+        if (candles.length === 0) throw new Error("Provider returned only anomalous bars for this symbol/period");
         if (!cancelled) setData({ ...body, candles });
       })
       .catch((e) => { if (!cancelled) { setError(e instanceof Error ? e.message : String(e)); setData(null); } })
@@ -144,7 +136,12 @@ export function WebullPanel() {
   return (
     <Card>
       <div className="flex items-center justify-between gap-2 mb-3">
-        <CardTitle className="mb-0">📈 Webull Tape</CardTitle>
+        <CardTitle className="mb-0">📈 Live Tape</CardTitle>
+        {data?.provider && (
+          <span className="rounded-md bg-(--color-border)/40 px-2 py-1 text-[11px] font-mono uppercase tracking-wide text-(--color-muted)">
+            {data.provider}
+          </span>
+        )}
       </div>
 
       <div className="mb-4">
@@ -180,7 +177,7 @@ export function WebullPanel() {
       {loading && <div className="h-72 flex items-center justify-center text-sm text-(--color-muted)">Loading {activeSymbol}…</div>}
 
       {!loading && error && (
-        <Empty title={`Couldn't load ${activeSymbol} from Webull`} hint={error} />
+        <Empty title={`Couldn't load ${activeSymbol}`} hint={error} />
       )}
 
       {!loading && !error && data && stats && (
