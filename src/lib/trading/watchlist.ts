@@ -3,11 +3,11 @@
 
 import { prisma } from "@/lib/db";
 
+// Stocks-only pivot (68becb9/6b54dee) narrowed the app to equities, but this
+// seed still listed gold/crypto/forex/index tickers until 2026-08-24 — any
+// portfolio created since the pivot would have been seeded with instruments
+// the app no longer supports. Seed single-name equities only.
 export const DEFAULT_WATCHLIST: { symbol: string; label: string }[] = [
-  { symbol: "GC=F", label: "Gold" },
-  { symbol: "BTC-USD", label: "Bitcoin" },
-  { symbol: "EURUSD=X", label: "EUR/USD" },
-  { symbol: "^GSPC", label: "S&P 500" },
   { symbol: "AAPL", label: "Apple" },
   { symbol: "NVDA", label: "NVIDIA" },
   { symbol: "PTT.BK", label: "PTT (SET)" },
