@@ -37,7 +37,8 @@ Hard context the code does not state:
 | AI backend on every trade ever | `mock` (45) or null (2) — **HAWK/SAGE have never decided a real trade** |
 | As of 08-25 | desk **opens nothing** without a real backend (§3); runtime moved **local**, where the CLI backend is live-verified |
 | `Counterfactual` rows | 3 (was 0 — the arm recorder finally fires; sample far too small) |
-| `ResearchStrategy` | **6 approved** / 168 rejected / 37 demoted / 1 proposed (34 mock rows demoted 08-25) |
+| `ResearchStrategy` | **6 approved** / 171 rejected / 37 demoted / 1 proposed (34 mock rows demoted 08-25) |
+| First real research round | run **#110**, 08-25, local Task Scheduler — QUANT proposed three genuine mechanisms (research-213/214/215), all `rejected` on 4–5 backtest trades. The 109 rounds before it banked `Mock *`. |
 | …the 6 survivors | all on **BTC-USD / GC=F / NG=F** — none on a stock; none has a blind test |
 | Schema | `blindTest`, `exitLadder`, `demotedReason` columns are pushed and live |
 
@@ -92,7 +93,13 @@ node --env-file=.env --import tsx scripts/tmp-state.mts
   round: the run is banked `status: "skipped"` with zero strategies instead of persisting
   the three hardcoded `Mock *` snippets as approvable research. Manual candidates are exempt
   (they skip the proposer by design). The cron log names the skip; the research page renders
-  a `skipped` badge rather than falling through to green `done`. Then the backlog was purged —
+  a `skipped` badge rather than falling through to green `done`. **Proven live on
+  2026-08-25**: run #110, fired through Task Scheduler (not from a shell), came back
+  `status: done` with three novel mechanism labels — the first time the AI proposer has ever
+  actually run on this project. All three were rejected by `autoReview` on 4–5 backtest
+  trades, which is the in-sample gate working, not a failure. **Caveat for future sessions:
+  `costUsd = 0` no longer proves a round was mock** — the CLI backend runs on subscription
+  auth and also bills $0. Check the labels against `mockCandidates()`, or the run's backend, not the cost. Then the backlog was purged —
   all 87 mock rows identified by **exact code match** against `mockCandidates()` (label prefix
   agreed on all 87, zero disagreement), the 34 still `approved` demoted with a
   `demotedReason`; none was live on a portfolio. **This is the code half only** — see §6.
@@ -199,17 +206,15 @@ It replaced alphabetical order — better, but never swept as a ranking.
 
 ## 6. Blocked on the user (still open)
 
-- **Register the local Task Scheduler jobs** — this is what actually runs the product now
-  (§3). Only the owner can touch Windows scheduled tasks. Two parts:
-  - Drop the four dead desks still firing at a stocks-only app (they log "no matching
-    portfolios" every 15 min): `Unregister-ScheduledTask -TaskName 'NEXMIND Bitcoin scan','NEXMIND Gold scan','NEXMIND Intraday scan','NEXMIND Options scan' -Confirm:$false`
-  - **There is no local research task at all.** `scripts/research-round.cmd` exists and works;
-    nothing is scheduled to call it, so QUANT proposes nothing until one is registered.
-
-  Keep `NEXMIND Stocks scan` (`scan.cmd 11`, daily 05:00 — desk #11 is `1wk/5y` on `sp500`,
-  so daily is ample) and `NEXMIND Manage positions` (every 15 min).
-
-  The cloud credential question is **deferred, not solved**: Vercel has no
+- ~~Register the local Task Scheduler jobs~~ — **done 2026-08-25 by the owner.** The four dead
+  desks (`NEXMIND Bitcoin/Gold/Intraday/Options scan`, firing at a stocks-only app every 15
+  min) are unregistered, and `NEXMIND Research round` now exists (`wscript //B run-hidden.vbs
+  research-round.cmd`, daily 06:00) — previously `scripts/research-round.cmd` existed but
+  nothing called it, so QUANT proposed nothing. Exactly three tasks remain: `NEXMIND Stocks
+  scan` (`scan.cmd 11`, daily 05:00 — desk #11 is `1wk/5y` on `sp500`, so daily is ample),
+  `NEXMIND Manage positions` (every 15 min), and `NEXMIND Research round`. The chain was
+  verified through Task Scheduler itself, not from a shell — see §3 run #110.
+- The cloud credential question is **deferred, not solved**: Vercel has no
   `ANTHROPIC_API_KEY`, and the GH runner installs the CLI and passes
   `CLAUDE_CODE_OAUTH_TOKEN` yet still produced `mock` — unexplained. Diagnose
   `aiBackend()`'s CLI probe on the runner before re-enabling either schedule.
