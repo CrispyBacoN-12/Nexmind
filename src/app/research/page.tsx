@@ -48,6 +48,7 @@ function strategyBadge(status: string, safetyFlag: boolean) {
   if (safetyFlag) return <Badge tone="warning">flagged</Badge>;
   if (status === "approved") return <Badge tone="positive">approved</Badge>;
   if (status === "rejected") return <Badge tone="neutral">rejected</Badge>;
+  if (status === "demoted") return <Badge tone="negative">demoted</Badge>;
   return <Badge tone="info">proposed</Badge>;
 }
 

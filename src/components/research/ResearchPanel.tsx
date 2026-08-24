@@ -7,7 +7,7 @@ interface ResearchStrategyRow {
   id: number;
   label: string;
   code: string;
-  status: "proposed" | "approved" | "rejected";
+  status: "proposed" | "approved" | "rejected" | "demoted";
   iterations: string; // JSON
   backtestSummary: string; // JSON
   safetyFlag: boolean;
@@ -142,7 +142,7 @@ export default function ResearchPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold">{s.label}</span>
-                    <Badge tone={s.status === "approved" ? "positive" : s.status === "rejected" ? "negative" : "neutral"}>{s.status}</Badge>
+                    <Badge tone={s.status === "approved" ? "positive" : s.status === "rejected" ? "negative" : s.status === "demoted" ? "negative" : "neutral"}>{s.status}</Badge>
                     {s.safetyFlag && <Badge tone="warning">safety-flagged</Badge>}
                   </div>
                   <div className="flex items-center gap-2">
