@@ -55,7 +55,7 @@ export function wrapAsStrategy(researchStrategy: { id: number; label: string; co
       preferredExit = { tp1Mult: parsed.tp1Mult, slMult: parsed.slMult, singleTarget: !!parsed.singleTarget };
     }
   } catch {
-    // malformed JSON — fall back to the engine's hardcoded RESEARCH_ATR_* ladder (preferredExit stays undefined)
+    // malformed JSON — fall back to the engine's hardcoded RESEARCH_ATR_* ladder in src/lib/trading/engine.ts (preferredExit stays undefined)
   }
 
   return {

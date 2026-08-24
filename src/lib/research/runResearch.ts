@@ -11,7 +11,7 @@ import { computeSnapshots } from "./adapter";
 import { proposeCandidates, refineCandidate, fixUnsafeCode, type Candidate } from "./propose";
 import { exportStrategyNote } from "@/lib/obsidian/export";
 import { autoReviewStatus } from "./autoReview";
-import { runBlindTest, applyBlindTestVerdict } from "./blindTest";
+import { runBlindTest, applyBlindTestVerdict, blindTestOrchestrationFailure } from "./blindTest";
 import type { Candle } from "@/lib/indicators";
 import type { ScanSnapshot } from "@/lib/trading/scanner";
 
@@ -214,12 +214,30 @@ export async function runResearch(
       // and it would just be a wasted deep-history fetch.
       let finalRow = created;
       if (created.status === "approved") {
-        const verdict = await runBlindTest(created.id);
-        const applied = applyBlindTestVerdict(created.status as "approved" | "rejected", verdict);
-        finalRow = await prisma.researchStrategy.update({
-          where: { id: created.id },
-          data: { status: applied.status, blindTest: applied.blindTestJson },
-        });
+        try {
+          const verdict = await runBlindTest(created.id);
+          const applied = applyBlindTestVerdict(created.status, verdict);
+          finalRow = await prisma.researchStrategy.update({
+            where: { id: created.id },
+            data: { status: applied.status, blindTest: applied.blindTestJson },
+          });
+        } catch (e) {
+          // runBlindTest()/update() threw instead of returning normally (e.g.
+          // a Neon connection hiccup on a shared serverless instance hit every
+          // 2h) — fail closed exactly like the `{error: ...}` BlindTestResult
+          // branch: an unverifiable candidate does not get to stay "approved".
+          // This update-on-catch must not itself be able to abort the loop —
+          // same reasoning as the Obsidian export below — so it's defensive too.
+          const failed = blindTestOrchestrationFailure(e);
+          try {
+            finalRow = await prisma.researchStrategy.update({
+              where: { id: created.id },
+              data: { status: failed.status, blindTest: failed.blindTestJson },
+            });
+          } catch (e2) {
+            console.error(`failed to persist blind-test-orchestration-failure status for strategy ${created.id}:`, e2);
+          }
+        }
       }
 
       // Vault export is a best-effort side note for browsing in Obsidian, never

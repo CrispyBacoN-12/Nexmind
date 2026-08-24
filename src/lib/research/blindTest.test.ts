@@ -1,7 +1,7 @@
 import "dotenv/config"; // blindTest.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateHoldout, applyBlindTestVerdict } from "./blindTest";
+import { evaluateHoldout, applyBlindTestVerdict, blindTestOrchestrationFailure } from "./blindTest";
 import type { BacktestSummary } from "@/lib/backtest/engine";
 
 function summary(overrides: Partial<BacktestSummary> = {}): BacktestSummary {
@@ -99,4 +99,32 @@ test("applyBlindTestVerdict: an unfetchable/error verdict rejects conservatively
 test("applyBlindTestVerdict: a candidate already rejected in-sample passes through unchanged (blind test is never run for it)", () => {
   const applied = applyBlindTestVerdict("rejected", { error: "should not matter — status was never approved" });
   assert.equal(applied.status, "rejected");
+});
+
+// ---- blindTestOrchestrationFailure ----
+// Covers runResearch.ts's catch path around runBlindTest()/update(): if that
+// sequence throws (e.g. a Neon connection hiccup) instead of runBlindTest()
+// returning its normal `{error}` result, the candidate must still end up
+// rejected with an error-shaped blindTest payload — never left "approved"
+// with an empty/default blindTest column indistinguishable from a real pass.
+
+test("blindTestOrchestrationFailure: rejects and records a thrown Error's message", () => {
+  const failed = blindTestOrchestrationFailure(new Error("Connection terminated unexpectedly"));
+  assert.equal(failed.status, "rejected");
+  const parsed = JSON.parse(failed.blindTestJson);
+  assert.ok(/Lean conservative/.test(parsed.reasons[0]));
+  assert.ok(/Connection terminated unexpectedly/.test(parsed.error));
+});
+
+test("blindTestOrchestrationFailure: handles a non-Error thrown value without crashing", () => {
+  const failed = blindTestOrchestrationFailure("boom");
+  assert.equal(failed.status, "rejected");
+  const parsed = JSON.parse(failed.blindTestJson);
+  assert.ok(/boom/.test(parsed.error));
+});
+
+test("blindTestOrchestrationFailure produces the same shape as applyBlindTestVerdict's own {error} branch", () => {
+  const viaOrchestrationFailure = blindTestOrchestrationFailure(new Error("db down"));
+  const viaDirectError = applyBlindTestVerdict("approved", { error: "blind-test orchestration threw: db down" });
+  assert.deepEqual(viaOrchestrationFailure, viaDirectError);
 });

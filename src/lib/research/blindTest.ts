@@ -189,3 +189,17 @@ export function applyBlindTestVerdict(
   }
   return { status: verdict.passed ? "approved" : "rejected", blindTestJson: JSON.stringify(verdict) };
 }
+
+/**
+ * What to persist when the runBlindTest()/update() sequence around an
+ * in-sample approval throws instead of producing a BlindTestResult (e.g. a
+ * Neon connection hiccup on the shared serverless DB) — as opposed to
+ * runBlindTest() returning its normal `{ error }` result. Fails closed the
+ * same way applyBlindTestVerdict's `{ error }` branch does: a candidate whose
+ * blind test could not be completed does not get to stay "approved" with an
+ * empty blindTest column indistinguishable from a real pass.
+ */
+export function blindTestOrchestrationFailure(err: unknown): { status: "approved" | "rejected"; blindTestJson: string } {
+  const message = err instanceof Error ? err.message : String(err);
+  return applyBlindTestVerdict("approved", { error: `blind-test orchestration threw: ${message}` });
+}
