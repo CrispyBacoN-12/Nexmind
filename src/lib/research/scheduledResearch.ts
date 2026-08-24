@@ -26,8 +26,14 @@ interface RotationEntry {
 // to re-propose the same idea. All entries are US equities on 1d/2y, matching
 // the US Stocks Desk's own cadence — the gold and BTC rotations were dropped
 // when the app narrowed to stocks-only.
+// Deliberately says nothing about the take-profit: sweepLadder picks each
+// candidate's ladder from LADDER_OPTIONS on avgR and writes it to exitLadder, so
+// naming a target here only biases the entry design toward a geometry the
+// candidate may not end up with. It used to read "TP=1.2xATR", which since
+// a70c1c4 is not even an option any more — 1.0 and 1.2 were removed from
+// LADDER_TP_MULTS as sub-1:1 against the 1.5 ATR stop.
 const MOMENTUM_LADDER =
-  "tight single-target ladder (SL=1.5xATR, TP=1.2xATR), risk 1% per trade, win rate >50% with profit stable across both halves of the sample (not just a good average)";
+  "risk 1% per trade, exit geometry swept separately, win rate >50% with profit stable across both halves of the sample (not just a good average)";
 
 export const RESEARCH_ROTATION: RotationEntry[] = [
   {
