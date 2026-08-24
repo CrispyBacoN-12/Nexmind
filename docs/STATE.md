@@ -108,11 +108,30 @@ Older entries are compressed to one line each; their reasoning is in the commit 
 
 ## 4. Next steps, highest value first
 
-### a. Pin Yahoo's bar count — the held-out set is not reproducible
+### a. Pin the bar window — the held-out set is still not reproducible
 
-Yahoo returned **3473 then 7984 bars** for the identical `AAPL 2y/1h` request minutes apart
-(extended-hours inclusion flipping). A held-out result that isn't reproducible bar-for-bar
-isn't really held out, and the new retention bar (§3) is a ratio between two such runs.
+Corrected 2026-08-25: this used to be filed as a *Yahoo* problem (3473 then 7984 bars for an
+identical `AAPL 2y/1h`). That measurement predates `778bfeb`/`36a9b35`, which put Webull at the
+front of the chain. A probe of all five shapes the desk and the research loop actually request
+(`2y/1d`, `5y/1d`, `3mo/1d`, `2y/1h`) returns **Webull every time** — Yahoo is now only the tail
+fallback for symbols Webull and Alpaca both miss. Do not re-cite the Yahoo numbers.
+
+The reproducibility problem moved rather than went away, and it is Webull's now.
+`rangeToWebullCount` (`src/lib/webull.ts:53`) asks for **N bars counted back from now**, not a
+date range. Three consequences, measured:
+
+1. **The window slides one bar per trading day.** `AAPL 2y/1d` today and tomorrow are different
+   series, so the in-sample/held-out cutoff moves with them. Re-running a blind test on a later
+   day does not reproduce its own verdict.
+2. **The 1200 cap truncates silently.** `5y/1d` returns 1200 bars = 1745 days (4.8y), not 5y.
+   `coversDays` cannot catch it: it only compares against `minDays`, which is 400.
+3. **The range label is wrong.** `2y/1d` returns 731 *bars* = 1064 calendar days (~2.9y). Every
+   in-sample backtest recorded as "2y" ran on nearly three years.
+
+(3) lands directly on the retention bar added in §3 — both sides of that ratio come from a
+window that is not the one requested. Fix by requesting an explicit date range, or by pinning
+the end timestamp so a re-run reproduces the same bars.
+
 Also unfixed and harmless: strategy **212 is still `rejected`** on the old data error — a
 smoke test, not a verdict.
 
