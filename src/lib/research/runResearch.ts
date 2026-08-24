@@ -12,6 +12,8 @@ import { proposeCandidates, refineCandidate, fixUnsafeCode, type Candidate } fro
 import { exportStrategyNote } from "@/lib/obsidian/export";
 import { autoReviewStatus } from "./autoReview";
 import { runBlindTest, applyBlindTestVerdict } from "./blindTest";
+import type { Candle } from "@/lib/indicators";
+import type { ScanSnapshot } from "@/lib/trading/scanner";
 
 export const MAX_CANDIDATES = 3;
 export const MAX_REFINEMENT_ROUNDS = 2;
@@ -23,6 +25,40 @@ export const COST_CIRCUIT_BREAKER_USD = 2;
 // judged against identical friction — see that constant's comment for the
 // rationale.
 export const RESEARCH_COST_MODEL: CostModel = DEFAULT_COST_MODEL;
+
+// Every research candidate's own validated exit ladder, swept once after
+// refinement finishes (not per refinement round — refinement rounds compare
+// candidates against each other under the SAME fixed 1.2 ladder above, so a
+// round's improvement is judged independent of ladder choice; only once the
+// code is locked in does each candidate get its own ratio). Fixed SL, varying
+// TP: matches this codebase's existing sweep convention (scripts/sweep-rr.ts).
+export const LADDER_TP_MULTS = [1.0, 1.2, 1.5, 2.0, 2.5, 3.0];
+export const LADDER_SL_MULT = 1.5;
+
+/** Sweep LADDER_TP_MULTS against a fixed SL, picking the best by profit factor
+ *  (ties broken by expectancy). Pure with respect to its inputs — no DB/network. */
+export function sweepLadder(
+  code: string,
+  bars: Candle[],
+  snaps: ScanSnapshot[],
+): { ladder: { tp1Mult: number; slMult: number; singleTarget: true }; summary: BacktestSummary } {
+  const compiled = compileStrategy(code);
+  const entry = (i: number) => compiled.invoke(bars, snaps, i)?.side ?? null;
+
+  let best: { ladder: { tp1Mult: number; slMult: number; singleTarget: true }; summary: BacktestSummary } | null = null;
+  for (const tp1Mult of LADDER_TP_MULTS) {
+    const bt = backtestCandles("sweep", bars, 0.1, undefined, entry, true, tp1Mult, RESEARCH_COST_MODEL, LADDER_SL_MULT);
+    const summary = summarizeBacktest(bt.trades);
+    const pf = summary.profitFactor ?? -Infinity;
+    const bestPf = best ? best.summary.profitFactor ?? -Infinity : -Infinity;
+    const better =
+      !best ||
+      pf > bestPf ||
+      (pf === bestPf && (summary.expectancy ?? -Infinity) > (best.summary.expectancy ?? -Infinity));
+    if (better) best = { ladder: { tp1Mult, slMult: LADDER_SL_MULT, singleTarget: true }, summary };
+  }
+  return best!; // LADDER_TP_MULTS is non-empty, so a candidate is always assigned
+}
 
 interface Iteration { code: string; note: string; backtestSummary?: BacktestSummary }
 
@@ -37,6 +73,7 @@ async function runOneCandidate(
   status: "approved" | "rejected";
   iterations: Iteration[];
   backtestSummary: BacktestSummary;
+  exitLadder: { tp1Mult: number; slMult: number; singleTarget: true };
   safetyFlag: boolean;
   costUsd: number;
 }> {
@@ -65,7 +102,16 @@ async function runOneCandidate(
   }
 
   if (!safe) {
-    return { label: candidate.label, code, status: "rejected", iterations, backtestSummary: summarizeBacktest([]), safetyFlag, costUsd };
+    return {
+      label: candidate.label,
+      code,
+      status: "rejected",
+      iterations,
+      backtestSummary: summarizeBacktest([]),
+      exitLadder: { tp1Mult: 1.2, slMult: 1.5, singleTarget: true },
+      safetyFlag,
+      costUsd,
+    };
   }
 
   // Research candidates use a tight single target (TP1 = 1.2x ATR, no farther
@@ -104,12 +150,19 @@ async function runOneCandidate(
     iterations.push({ code, note: refined.note, backtestSummary: summary });
   }
 
+  // Final ladder sweep on the finalized code only — see sweepLadder's comment
+  // for why this runs once, after refinement, rather than per round.
+  const swept = sweepLadder(code, bars, snaps);
+  summary = swept.summary;
+  iterations.push({ code, note: "final exit-ladder sweep", backtestSummary: summary });
+
   return {
     label: candidate.label,
     code,
     status: autoReviewStatus(summary, safetyFlag),
     iterations,
     backtestSummary: summary,
+    exitLadder: swept.ladder,
     safetyFlag,
     costUsd,
   };
@@ -152,6 +205,7 @@ export async function runResearch(
           status: r.status,
           iterations: JSON.stringify(r.iterations),
           backtestSummary: JSON.stringify(r.backtestSummary),
+          exitLadder: JSON.stringify(r.exitLadder),
           safetyFlag: r.safetyFlag,
         },
       });

@@ -47,10 +47,21 @@ export function computeSnapshots(bars: Candle[]): ScanSnapshot[] {
   });
 }
 
-export function wrapAsStrategy(researchStrategy: { id: number; label: string; code: string }): Strategy {
+export function wrapAsStrategy(researchStrategy: { id: number; label: string; code: string; exitLadder?: string }): Strategy {
+  let preferredExit: Strategy["preferredExit"];
+  try {
+    const parsed = JSON.parse(researchStrategy.exitLadder || "{}");
+    if (typeof parsed.tp1Mult === "number" && typeof parsed.slMult === "number") {
+      preferredExit = { tp1Mult: parsed.tp1Mult, slMult: parsed.slMult, singleTarget: !!parsed.singleTarget };
+    }
+  } catch {
+    // malformed JSON — fall back to the engine's hardcoded RESEARCH_ATR_* ladder (preferredExit stays undefined)
+  }
+
   return {
     key: `research-${researchStrategy.id}`,
     label: `${researchStrategy.label} (research)`,
+    preferredExit,
     build(bars: Candle[]): StrategyEvaluator {
       const snaps = computeSnapshots(bars);
       const compiled = compileStrategy(researchStrategy.code);

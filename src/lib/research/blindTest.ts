@@ -26,10 +26,14 @@ const HOLDOUT_CUTOFF_DAYS = 365;
 
 // Same eval contract runOneCandidate() uses for every research candidate's
 // in-sample backtest, so held-out numbers are directly comparable to the
-// stored backtestSummary: lot 0.1, single tight target (tp1Mult 1.2), the
-// live desk's disclosed cost model.
+// stored backtestSummary: lot 0.1, the candidate's own swept exit ladder
+// (single tight target), the live desk's disclosed cost model.
 const RESEARCH_LOT = 0.1;
-const RESEARCH_TP1_MULT = 1.2;
+// Pre-Feature-3 rows (approved before per-candidate ladders existed) have no
+// exitLadder yet — fall back to the ladder every candidate used to be
+// uniformly validated against.
+const LEGACY_TP1_MULT = 1.2;
+const LEGACY_SL_MULT = 1.5;
 
 export interface HoldoutVerdict {
   passed: boolean;
@@ -123,7 +127,20 @@ export async function runBlindTest(strategyId: number): Promise<BlindTestResult>
   const snaps = computeSnapshots(holdoutBars);
   const compiled = compileStrategy(strategy.code);
   const entry: EntryRule = (i) => compiled.invoke(holdoutBars, snaps, i)?.side ?? null;
-  const bt = backtestCandles(symbol, holdoutBars, RESEARCH_LOT, undefined, entry, true, RESEARCH_TP1_MULT, DEFAULT_COST_MODEL);
+
+  let ladderTp1Mult = LEGACY_TP1_MULT;
+  let ladderSlMult = LEGACY_SL_MULT;
+  try {
+    const parsed = JSON.parse(strategy.exitLadder || "{}");
+    if (typeof parsed.tp1Mult === "number") {
+      ladderTp1Mult = parsed.tp1Mult;
+      ladderSlMult = typeof parsed.slMult === "number" ? parsed.slMult : LEGACY_SL_MULT;
+    }
+  } catch {
+    // malformed JSON — fall back to the legacy ladder
+  }
+
+  const bt = backtestCandles(symbol, holdoutBars, RESEARCH_LOT, undefined, entry, true, ladderTp1Mult, DEFAULT_COST_MODEL, ladderSlMult);
   const holdout = summarizeBacktest(bt.trades);
   const holdoutDays = (holdoutBars[holdoutBars.length - 1].t - holdoutBars[0].t) / 86400;
 
