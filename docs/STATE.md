@@ -108,6 +108,11 @@ Older entries are compressed to one line each; their reasoning is in the commit 
 
 ## 4. Next steps, highest value first
 
+Read **(f) first** — it was measured on 2026-08-25 and it reprioritises this whole list. It
+absorbs most of (a): once backtests read the bar cache instead of the provider API, the
+Webull-vs-Alpaca window question mostly stops mattering. (a)–(e) below are unchanged and still
+true; they are just no longer the top of the list.
+
 ### a. Pin the bar window — the held-out set is still not reproducible
 
 Corrected 2026-08-25: this used to be filed as a *Yahoo* problem (3473 then 7984 bars for an
@@ -178,6 +183,61 @@ as well — do not present 1.5/1.5 as an optimum.
 
 It replaced alphabetical order — better, but never swept as a ranking.
 
+### f. The validation set is too small AND not held out — full proposal in `docs/PROPOSAL-panel-validation.md`
+
+Two findings, both measured 2026-08-25, both previously undocumented.
+
+**The daily research loop cannot produce a decidable sample.** Of the 128 non-mock candidates
+with a backtest, the 18 on a `1d` interval have a **median of 4 trades** and exactly 1 clears
+`MIN_TRADES = 20` (`autoReview.ts`). That set already includes `5y/1d` and `max/1d` runs, so
+**depth is not the binding constraint — single-symbol scope is** (`runResearch.ts:300` backtests
+one symbol). Run #110 the same day is the pattern again: three candidates, 4/4/5 trades, all
+auto-rejected without any of their mechanisms being evaluated.
+
+Breadth is not a free substitute for depth, though. On `.cache/bars/sp500-1d.json` (491 symbols,
+2016-01-04..2026-08-14, 1,277,489 bars), names disagree hugely in magnitude but barely in
+direction:
+
+| window | symbols | % up | ret p10 / med / p90 | avg pairwise corr | N_eff |
+|---|---|---|---|---|---|
+| 2016–2018 | 470 | 83% | −12 / 39 / 101% | 0.312 | 3.2 |
+| 2019–2020 | 477 | 87% | −7 / 46 / 127% | 0.467 | 2.1 |
+| 2021–2022 | 483 | 72% | −26 / 16 / 66% | 0.350 | 2.8 |
+| 2023–2024 | 488 | 75% | −20 / 23 / 108% | 0.242 | 4.1 |
+| last 2y | 489 | 69% | −27 / 17 / 94% | 0.345 | 2.9 |
+
+`N_eff = N / (1 + (N−1)ρ)`: 491 correlated names ≈ **3 independent observations** of market
+direction. That is the pessimistic bound — exact for a pure direction bet, too harsh for a
+strategy with genuinely dispersed entry timing — but all four rotation briefs
+(`scheduledResearch.ts:38`) ask for long-biased daily swing entries, which sits near it. So
+**breadth buys trade count, depth buys regime count, and they are not interchangeable.** ρ itself
+moves with the regime (0.467 in COVID, 0.242 in 2023–2024), which is the evidence that separate
+time windows really are separate markets.
+
+Corollary worth remembering: 69–87% of names are up in *every* window measured. A long-biased
+rule shows positive avgR from beta alone, so any panel result needs a matched random-entry
+control before it means anything.
+
+**The blind test overlaps its own training data by 66%.** `blindTest.ts:208` cuts the held-out
+set at `last − 365d` of a `5y` fetch, but compares it against the stored `backtestSummary` from
+a `2y` fetch. On AAPL:
+
+```
+in-sample  (2y/1d)   2023-09-22 .. 2026-08-21   (2.9y — see (a): "2y" is a bar count)
+deep fetch (5y/1d)   2021-11-10 .. 2026-08-21   (4.8y — Webull's 1200-bar ceiling)
+cutoff = last − 365d                2025-08-21
+held-out             2021-11-10 .. 2025-08-21
+overlap              2023-09-22 .. 2025-08-21   =  1.92y  =  66% of in-sample
+```
+
+So `MIN_HOLDOUT_RETENTION = 0.5`, shipped in `158df23`, compares two samples that overlap by two
+thirds. Retention reads artificially high and the gate is weaker than its docstring claims. This
+is a design fault, not a bug to patch in place — the fix requires choosing a whole new window
+policy, which is what the proposal doc is for.
+
+**Blocked on the owner.** Any fix invalidates every stored `backtestSummary` as a basis for
+comparison. Do not change code until a window policy is picked.
+
 ## 5. Traps — read before touching these areas
 
 - **`scanner.ts:274`** — a portfolio with a `strategy` key set bypasses `decideSetup()`
@@ -212,6 +272,11 @@ It replaced alphabetical order — better, but never swept as a ranking.
   locally off `.env`, where the key is set. It matters again the day a schedule is re-enabled:
   `gh secret set FINNHUB_API_KEY --repo CrispyBacoN-12/Nexmind` (user runs it — do not handle
   the key).
+- **Pick a window policy** before any research code changes — see §4f and
+  `docs/PROPOSAL-panel-validation.md`. The proposal is a walk-forward panel over all 491 cached
+  symbols with three disjoint folds (train / select / test), a matched random-entry control, and
+  a monthly block bootstrap. Adopting it makes every stored `backtestSummary` non-comparable, so
+  it is the owner's call, not a refactor.
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
 - Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`
   (`scripts/revert-stocks-desk-to-default.ts` sets `trend-pullback`; something set combo-vote
