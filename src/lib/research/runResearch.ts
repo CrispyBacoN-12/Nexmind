@@ -11,6 +11,7 @@ import { computeSnapshots } from "./adapter";
 import { proposeCandidates, refineCandidate, fixUnsafeCode, type Candidate } from "./propose";
 import { exportStrategyNote } from "@/lib/obsidian/export";
 import { autoReviewStatus } from "./autoReview";
+import { runBlindTest, applyBlindTestVerdict } from "./blindTest";
 
 export const MAX_CANDIDATES = 3;
 export const MAX_REFINEMENT_ROUNDS = 2;
@@ -154,12 +155,25 @@ export async function runResearch(
           safetyFlag: r.safetyFlag,
         },
       });
+      // Held-out validation only runs for in-sample approvals — a candidate
+      // rejected on its own in-sample numbers gains nothing from a blind test
+      // and it would just be a wasted deep-history fetch.
+      let finalRow = created;
+      if (created.status === "approved") {
+        const verdict = await runBlindTest(created.id);
+        const applied = applyBlindTestVerdict(created.status as "approved" | "rejected", verdict);
+        finalRow = await prisma.researchStrategy.update({
+          where: { id: created.id },
+          data: { status: applied.status, blindTest: applied.blindTestJson },
+        });
+      }
+
       // Vault export is a best-effort side note for browsing in Obsidian, never
       // load-bearing - a filesystem hiccup here must not fail the research run.
       try {
-        exportStrategyNote(created, run);
+        exportStrategyNote(finalRow, run);
       } catch (e) {
-        console.error(`obsidian export failed for strategy ${created.id}:`, e);
+        console.error(`obsidian export failed for strategy ${finalRow.id}:`, e);
       }
     }
 

@@ -319,6 +319,9 @@ export const ResearchStrategyScalarFieldEnum = {
   iterations: 'iterations',
   backtestSummary: 'backtestSummary',
   safetyFlag: 'safetyFlag',
+  blindTest: 'blindTest',
+  exitLadder: 'exitLadder',
+  demotedReason: 'demotedReason',
   createdAt: 'createdAt'
 } as const
 

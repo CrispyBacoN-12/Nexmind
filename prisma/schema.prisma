@@ -255,10 +255,13 @@ model ResearchStrategy {
   runId           Int
   label           String
   code            String // AI-generated source, sandbox-only, never require()'d
-  status          String      @default("proposed") // proposed | approved | rejected
+  status          String      @default("proposed") // proposed | approved | rejected | demoted
   iterations      String      @default("[]") // JSON: [{ code, backtestSummary, note }]
   backtestSummary String      @default("{}") // JSON: final summarizeBacktest() result
   safetyFlag      Boolean     @default(false) // ever failed the deny-list scan
+  blindTest       String      @default("{}") // JSON: BlindTestResult from the held-out validation gate
+  exitLadder      String      @default("{}") // JSON: { tp1Mult, slMult, singleTarget } this candidate's own swept ladder
+  demotedReason   String? // set when a re-vet sweep drops status from approved to demoted
   createdAt       DateTime    @default(now())
 }
 

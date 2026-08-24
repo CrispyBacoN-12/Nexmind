@@ -142,3 +142,33 @@ export async function runBlindTest(strategyId: number): Promise<BlindTestResult>
     reasons,
   };
 }
+
+/**
+ * Pure decision layer between a blind-test run and the persisted status.
+ * Lean conservative: a candidate whose held-out data could not be fetched or
+ * validated (the `{ error }` branch of BlindTestResult) does not get to trade
+ * live on an unverified in-sample claim — it is rejected, not left approved.
+ * A candidate that was already rejected in-sample never reaches this path in
+ * practice (runResearch only calls runBlindTest for in-sample approvals), but
+ * this stays a total function over both inputs rather than assuming that.
+ */
+export function applyBlindTestVerdict(
+  inSampleStatus: "approved" | "rejected",
+  verdict: BlindTestResult,
+): { status: "approved" | "rejected"; blindTestJson: string } {
+  if (inSampleStatus !== "approved") {
+    return { status: inSampleStatus, blindTestJson: JSON.stringify(verdict) };
+  }
+  if ("error" in verdict) {
+    return {
+      status: "rejected",
+      blindTestJson: JSON.stringify({
+        error: verdict.error,
+        reasons: [
+          `Lean conservative: a candidate whose held-out data we could not fetch/validate does not get to trade live on an unverified claim. (${verdict.error})`,
+        ],
+      }),
+    };
+  }
+  return { status: verdict.passed ? "approved" : "rejected", blindTestJson: JSON.stringify(verdict) };
+}

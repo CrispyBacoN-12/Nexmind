@@ -1,7 +1,7 @@
 import "dotenv/config"; // blindTest.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateHoldout } from "./blindTest";
+import { evaluateHoldout, applyBlindTestVerdict } from "./blindTest";
 import type { BacktestSummary } from "@/lib/backtest/engine";
 
 function summary(overrides: Partial<BacktestSummary> = {}): BacktestSummary {
@@ -52,4 +52,51 @@ test("evaluateHoldout: a negative held-out result is not also flagged as inverte
   assert.equal(v.passed, false);
   assert.equal(v.reasons.length, 1);
   assert.ok(/held-out expectancy is not positive/.test(v.reasons[0]));
+});
+
+test("applyBlindTestVerdict: a passing verdict keeps an approved candidate approved", () => {
+  const verdict = {
+    strategy: { id: 1, label: "X" },
+    symbol: "AAPL",
+    range: "2y" as const,
+    totalBars: 500,
+    holdoutBars: 120,
+    holdoutDays: 365,
+    inSample: summary(),
+    holdout: summary(),
+    passed: true,
+    reasons: [],
+  };
+  const applied = applyBlindTestVerdict("approved", verdict);
+  assert.equal(applied.status, "approved");
+  assert.deepEqual(JSON.parse(applied.blindTestJson), verdict);
+});
+
+test("applyBlindTestVerdict: a failing verdict demotes an approved candidate to rejected", () => {
+  const verdict = {
+    strategy: { id: 1, label: "X" },
+    symbol: "AAPL",
+    range: "2y" as const,
+    totalBars: 500,
+    holdoutBars: 120,
+    holdoutDays: 365,
+    inSample: summary(),
+    holdout: summary({ expectancy: -1 }),
+    passed: false,
+    reasons: ["held-out expectancy is not positive (-1)"],
+  };
+  const applied = applyBlindTestVerdict("approved", verdict);
+  assert.equal(applied.status, "rejected");
+});
+
+test("applyBlindTestVerdict: an unfetchable/error verdict rejects conservatively rather than trusting the in-sample pass", () => {
+  const applied = applyBlindTestVerdict("approved", { error: "AAPL: could not fetch enough deep history" });
+  assert.equal(applied.status, "rejected");
+  const parsed = JSON.parse(applied.blindTestJson);
+  assert.ok(/Lean conservative/.test(parsed.reasons[0]));
+});
+
+test("applyBlindTestVerdict: a candidate already rejected in-sample passes through unchanged (blind test is never run for it)", () => {
+  const applied = applyBlindTestVerdict("rejected", { error: "should not matter — status was never approved" });
+  assert.equal(applied.status, "rejected");
 });
