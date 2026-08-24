@@ -11,9 +11,22 @@ name: AI research round (daily)
 # need a human to run scripts/approve-strategy.ts's blind test gate and port
 # the code into strategies.ts by hand — this workflow only keeps the
 # candidate pipeline fed, it does not deploy anything on its own.
+#
+# SCHEDULE DISABLED 2026-08-25 (owner's call: run locally until the system
+# settles). Unlike swing-scan.yml this job does not run the loop itself — it
+# curls the Vercel deployment, which has no ANTHROPIC_API_KEY and cannot host a
+# `claude login` session. All 109 rounds it triggered cost $0 and produced the
+# hardcoded mock candidates; since 08-25 those rounds bank as `skipped`
+# instead, so the schedule would only manufacture empty runs.
+#
+# Local equivalent, same entry point, working CLI backend:
+#   scripts/research-round.cmd   ->  node --env-file=.env --import tsx scripts/research-round.mts
+#
+# Re-enable by uncommenting the two `schedule` lines once Vercel actually has a
+# credential. `workflow_dispatch` stays on for a manual run.
 on:
-  schedule:
-    - cron: "0 3 * * *"
+  # schedule:
+  #   - cron: "0 3 * * *"
   workflow_dispatch: {}
 
 jobs:

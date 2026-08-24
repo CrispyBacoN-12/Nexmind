@@ -24,9 +24,24 @@ name: Swing scan (all desks)
 #   3. The token is not tied to this workflow's schedule — if it ever
 #      expires or is revoked, re-run `claude setup-token` and update the
 #      secret.
+#
+# SCHEDULE DISABLED 2026-08-25 (owner's call: run locally until the system
+# settles). The premise above did not hold in practice — the runner installs
+# the CLI, `claude --version` passes, and trades still came out
+# `aiBackend = "mock"`, unexplained. Since 08-25 the desk refuses to open on a
+# mock backend, so leaving this on the 15-minute schedule would just burn a
+# runner every quarter hour to log "no-ai-backend" over and over.
+#
+# The Windows box runs the same scripts/scan.mts through Task Scheduler
+# (scripts/scan.cmd) with a working CLI — verified 2026-08-25 by a live
+# `callAgent` returning `cli:haiku`, not merely by a --version probe.
+#
+# Re-enable by uncommenting the two `schedule` lines below — but diagnose the
+# runner's backend first, or it will scan and refuse and nothing will change.
+# `workflow_dispatch` stays on, so a manual run is still one click away.
 on:
-  schedule:
-    - cron: "*/15 * * * *"
+  # schedule:
+  #   - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 jobs:
