@@ -54,6 +54,48 @@ test("evaluateHoldout: a negative held-out result is not also flagged as inverte
   assert.ok(/held-out expectancy is not positive/.test(v.reasons[0]));
 });
 
+test("evaluateHoldout: fails when the held-out profit factor is below the in-sample bar", () => {
+  const v = evaluateHoldout(summary(), summary({ trades: 50, profitFactor: 1.04 }));
+  assert.equal(v.passed, false);
+  assert.ok(v.reasons.some((r) => /held-out profit factor 1\.04 is below the 1\.1 bar/.test(r)));
+});
+
+test("evaluateHoldout: a null held-out profit factor means zero losing trades, not a low ratio", () => {
+  const v = evaluateHoldout(summary(), summary({ trades: 50, profitFactor: null }));
+  assert.equal(v.passed, true);
+});
+
+test("evaluateHoldout: fails when the held-out edge keeps less than half of in-sample", () => {
+  // The case this bar exists for: in-sample avgR 0.63 -> held-out 0.063, a 10x
+  // collapse that the old expectancy>0 gate passed.
+  const v = evaluateHoldout(summary({ avgR: 0.63 }), summary({ trades: 50, avgR: 0.063 }));
+  assert.equal(v.passed, false);
+  assert.ok(v.reasons.some((r) => /held-out avgR kept only 10% of in-sample \(0\.630 → 0\.063\)/.test(r)));
+});
+
+test("evaluateHoldout: retention exactly at the floor passes", () => {
+  const v = evaluateHoldout(summary({ avgR: 0.4 }), summary({ trades: 50, avgR: 0.2 }));
+  assert.equal(v.passed, true);
+});
+
+test("evaluateHoldout: a held-out edge stronger than in-sample is not penalised", () => {
+  const v = evaluateHoldout(summary({ avgR: 0.2 }), summary({ trades: 50, avgR: 0.5 }));
+  assert.equal(v.passed, true);
+});
+
+test("evaluateHoldout: falls back to expectancy when either side predates avgR", () => {
+  const v = evaluateHoldout(summary({ avgR: null, expectancy: 20 }), summary({ trades: 50, avgR: null, expectancy: 4 }));
+  assert.equal(v.passed, false);
+  assert.ok(v.reasons.some((r) => /held-out expectancy kept only 20% of in-sample \(20\.00 → 4\.00\)/.test(r)));
+});
+
+test("evaluateHoldout: a negative held-out result is not also reported as poor retention", () => {
+  const v = evaluateHoldout(summary({ avgR: 0.63 }), summary({ trades: 50, avgR: -0.4, expectancy: -2 }));
+  assert.equal(v.passed, false);
+  assert.equal(v.reasons.length, 1);
+  assert.ok(/held-out expectancy is not positive/.test(v.reasons[0]));
+});
+
 test("applyBlindTestVerdict: a passing verdict keeps an approved candidate approved", () => {
   const verdict = {
     strategy: { id: 1, label: "X" },
