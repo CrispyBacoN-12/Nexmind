@@ -88,3 +88,6 @@ obsidian-vault/Claude Skills/
 # One-off DB backups taken before destructive migrations. Recovery artifacts,
 # not source: they hold full trade history and run to tens of MB.
 backup-*.json
+
+# scheduled research-round log (same category as scripts/scan.log above)
+scripts/research-round.log
