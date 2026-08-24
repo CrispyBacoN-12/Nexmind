@@ -76,7 +76,10 @@ export async function POST(req: Request) {
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, symbols.length) }, worker));
 
-  const setups = results.filter((r) => ["executed", "vetoed", "no-consensus", "rules-blocked"].includes(r.outcome));
+  // "no-ai-backend" belongs here: the Scanner DID find a setup, it was just
+  // passed on because no analyst could look at it. Leaving it out would report
+  // an AI outage as a quiet market.
+  const setups = results.filter((r) => ["executed", "vetoed", "no-consensus", "rules-blocked", "no-ai-backend"].includes(r.outcome));
   return Response.json({
     source,
     scanned: results.length,

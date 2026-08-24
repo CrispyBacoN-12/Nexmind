@@ -17,6 +17,7 @@ import { isSwingKind, canPortfolioTrade } from "@/lib/portfolioGuards";
 import { SECONDARY_PASSES } from "@/lib/trading/secondaryPasses";
 import { getCurrentDrawdownPct } from "@/lib/trading/circuitBreaker";
 import { sendDiscordNotification } from "@/lib/notify/discord";
+import { aiEnabled, aiOutageReason } from "@/lib/anthropic";
 import type { Interval, Range } from "@/lib/yahoo";
 
 type Portfolio = Awaited<ReturnType<typeof prisma.portfolio.findMany>>[number];
@@ -119,6 +120,15 @@ export async function runScheduledScan(ids?: number[]): Promise<string[]> {
   const log = (m: string) => lines.push(`[${new Date().toISOString()}] ${m}`);
 
   if (await isGlobalTradingHalt()) { log("global trading halt is ON — skipping scan"); return persistAndReturn(lines); }
+
+  // Say it once, up front. Without a backend every tick below returns
+  // "no-ai-backend", and a hundred identical lines buried in the log read as
+  // "quiet market" rather than "the desk is not trading". Open positions are
+  // still managed and closed — manageOpenTrades() is pure code.
+  if (!aiEnabled()) {
+    log(`NO AI BACKEND (${aiOutageReason() ?? "not configured in this environment"}) — no new positions will be opened this scan; open trades are still managed. Fix the credential to resume trading.`);
+  }
+
   const portfolios = await prisma.portfolio.findMany({
     where: ids && ids.length ? { id: { in: ids } } : { status: "active", kind: "swing" },
   });

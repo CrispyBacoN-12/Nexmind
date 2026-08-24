@@ -23,7 +23,7 @@ import { isResearchStrategyKey } from "@/lib/research/adapter";
 export interface TickStep { stage: string; note: string; data?: Record<string, unknown> }
 export interface TickResult {
   symbol: string;
-  outcome: "no-setup" | "already-open" | "no-consensus" | "vetoed" | "rules-blocked" | "executed";
+  outcome: "no-setup" | "already-open" | "no-ai-backend" | "no-consensus" | "vetoed" | "rules-blocked" | "executed";
   steps: TickStep[];
   tradeId?: number;
   costUsd: number;
@@ -128,16 +128,28 @@ export async function runTradeTick(
 
   // 2) HAWK ×3
   //
-  // The AI stages degrade rather than fail: a desk with an expired login still
-  // scans and still respects the Iron Rules, it just decides on rules alone.
-  // What it must never do is pass a mock verdict off as an analyst verdict, so
-  // the backend that actually decided is logged on the step and stored on the
-  // trade — see the aiBackend column.
+  // The AI stages used to degrade rather than fail: a desk with no backend
+  // still scanned, still respected the Iron Rules, and decided on rules alone —
+  // honestly labelled `aiBackend = "mock"`, never passed off as an analyst
+  // verdict. That was deliberate, and on 2026-08-25 it was overruled by the
+  // owner, because of what it added up to in practice: 45 of 45 trades ever
+  // opened were mock, −$378.87 realised, and not one position had been seen by
+  // HAWK or SAGE. A rule-only desk is a different product from the one being
+  // built, and it was quietly running as if it were the same one.
+  //
+  // So: no backend, no NEW position. This deliberately does NOT touch position
+  // management — open trades still get managed and closed on the pure-code exit
+  // path, since stranding a live position with no exit logic is strictly worse
+  // than the problem being fixed. The scan above still runs and is still logged,
+  // so the War Room keeps showing which setups were passed on and why.
   const newsDigest = await latestNewsDigest();
   const exitOverride = resolveExitOverride(scan, isResearch);
-  let backend: AiBackend = aiBackend();
+  const backend: AiBackend = aiBackend();
   if (backend === "mock") {
-    steps.push({ stage: "ai", note: `no AI — rule-only decision (${aiOutageReason() ?? "no backend configured"})` });
+    const why = aiOutageReason() ?? "no backend configured";
+    steps.push({ stage: "ai", note: `no AI backend (${why}) — refusing to open a new position; HAWK/SAGE never saw this setup` });
+    await prisma.signal.update({ where: { id: signal.id }, data: { status: "discarded" } });
+    return { symbol, outcome: "no-ai-backend", steps, costUsd };
   }
 
   // The counterfactual arm. What the deterministic mock would have done with
@@ -151,16 +163,16 @@ export async function runTradeTick(
     ...mockRaw,
     entry: applySlippage(scan.side === "long" ? "buy" : "sell", mockRaw.entry, DEFAULT_COST_MODEL.slippageBps ?? 0),
   };
-  const cfLot = backend === "mock" ? 0 : await counterfactualLot(portfolioId, mockLevels);
+  const cfLot = await counterfactualLot(portfolioId, mockLevels);
   const logCf = async (
     aiOutcome: "executed" | "no-consensus" | "vetoed" | "rules-blocked",
     aiReason: string,
     aiLevels: ProposedLevels | null,
     tradeId?: number,
   ) => {
-    // On a mock tick both arms are literally the same decision — nothing to compare.
-    // Read at call time, so a mid-flight fallback to mock suppresses the row too.
-    if (backend === "mock") return;
+    // No mock guard here any more: the only way to reach this point is with a
+    // real backend, and a mid-flight analyst failure returns instead of
+    // falling back, so the two arms can never be the same decision.
     await recordCounterfactual({
       portfolioId, symbol, timeframe: scan.timeframe, aiBackend: backend,
       scanSide: scan.side!, scanNote: scan.note,
@@ -170,22 +182,20 @@ export async function runTradeTick(
 
   // Built once and shared: HAWK's three personas and SAGE all judge the same
   // facts, so a disagreement means they read the market differently rather than
-  // that one of them was handed a different market. Skipped entirely on the mock
-  // path — nothing there reads it, and the extras cost two network round-trips.
-  const context =
-    backend === "mock" ? undefined : buildAnalystContext(scan, { ...(await fetchAnalystExtras(symbol)), newsDigest });
+  // that one of them was handed a different market.
+  const context = buildAnalystContext(scan, { ...(await fetchAnalystExtras(symbol)), newsDigest });
 
   let hawk: HawkVerdict;
-  if (backend === "mock") {
-    hawk = mockHawk(scan, exitOverride);
-  } else {
-    try {
-      hawk = await runHawk(scan, { context, ...exitOverride });
-    } catch (e) {
-      backend = "mock";
-      hawk = mockHawk(scan, exitOverride);
-      steps.push({ stage: "ai", note: `HAWK unavailable — rule-only decision (${errText(e)})` });
-    }
+  try {
+    hawk = await runHawk(scan, { context, ...exitOverride });
+  } catch (e) {
+    // Was: fall back to mockHawk and keep going. Same refusal as the no-backend
+    // guard above and for the same reason — a position opened on the rule-only
+    // fallback is indistinguishable from one the analysts approved once it is
+    // in the book, which is how 45 mock trades accumulated unnoticed.
+    steps.push({ stage: "ai", note: `HAWK unavailable — refusing to open a new position (${errText(e)})` });
+    await prisma.signal.update({ where: { id: signal.id }, data: { status: "discarded" } });
+    return { symbol, outcome: "no-ai-backend", steps, costUsd };
   }
   costUsd += hawk.totalCostUsd;
   steps.push({
@@ -199,19 +209,17 @@ export async function runTradeTick(
     return { symbol, outcome: "no-consensus", steps, costUsd };
   }
 
-  // 3) SAGE — mock approves everything, so a silent fall-through here would turn
-  // the risk veto into a rubber stamp without anyone noticing. Hence the log line.
+  // 3) SAGE — mockSage approves everything, so the old fall-through turned the
+  // risk veto into a rubber stamp at exactly the moment risk review was
+  // unavailable. Refuse instead: an unreviewed position is the one case where
+  // "trade anyway" is worst.
   let sage: SageVerdict;
-  if (backend === "mock") {
-    sage = mockSage(hawk.levels);
-  } else {
-    try {
-      sage = await runSage(scan, hawk.side, hawk.levels, { context, lessons: await latestLessons() });
-    } catch (e) {
-      backend = "mock";
-      sage = mockSage(hawk.levels);
-      steps.push({ stage: "ai", note: `SAGE unavailable — risk veto not applied (${errText(e)})` });
-    }
+  try {
+    sage = await runSage(scan, hawk.side, hawk.levels, { context, lessons: await latestLessons() });
+  } catch (e) {
+    steps.push({ stage: "ai", note: `SAGE unavailable — refusing to open a new position, risk veto could not be applied (${errText(e)})` });
+    await prisma.signal.update({ where: { id: signal.id }, data: { status: "discarded" } });
+    return { symbol, outcome: "no-ai-backend", steps, costUsd };
   }
   costUsd += sage.costUsd;
   steps.push({ stage: "sage", note: `${sage.approved ? "approve" : "VETO"} — ${sage.reason}` });
@@ -378,9 +386,10 @@ function errText(e: unknown): string {
   return (e instanceof Error ? e.message : String(e)).slice(0, 160);
 }
 
-// ---- mock path (no AI backend): deterministic so the pipeline stays demoable.
-// Everything below is a stand-in, not an opinion. Trades decided here are
-// stamped aiBackend="mock" so they are never mistaken for analyst calls. ----
+// ---- The deterministic rule-only arm. As of 2026-08-25 this NO LONGER decides
+// any trade: its sole remaining caller is the counterfactual baseline, i.e. the
+// "what would rules alone have done?" column the analysts are measured against.
+// Nothing below is an opinion, and nothing below can open a position. ----
 
 function mockHawk(scan: ScanResult, exit: ExitOverride): HawkVerdict {
   const side = scan.side!;
