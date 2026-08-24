@@ -85,33 +85,36 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   before; all 109 prior rounds banked mocks. All three were rejected by `autoReview` on 4–5
   trades, which is the in-sample gate working. **Trap: `costUsd = 0` no longer proves a round
   was mock** — the CLI backend bills $0 too. Check labels against `mockCandidates()` instead.
+- **Blind-test pass bar raised** (158df23). It ran, but asked almost nothing: ≥20 held-out
+  trades and `expectancy > 0`, which passed a candidate that fell from **in-sample avgR 0.63
+  to held-out 0.063**. `evaluateHoldout` now also requires held-out PF ≥ `MIN_PROFIT_FACTOR`
+  (the same 1.1 `autoReview` applies in-sample — asking it only of the fitted half was asking
+  the easy question twice) and held-out ≥ **50%** of the in-sample edge
+  (`MIN_HOLDOUT_RETENTION`), compared on **avgR** where both sides have it because dollar
+  expectancy scales with the period's ATR level. 0.5 was **pre-registered before looking at
+  any further candidate** and is the conventional walk-forward bar, chosen for being
+  conventional rather than fitted here. The 6 legacy approvals were *not* re-vetted against
+  it — they have no blind test at all (§4b).
 - **Runtime moved local** (6eab8bf). Both Actions `schedule:` triggers are commented out
   (`workflow_dispatch` kept, and each file carries its re-enable condition); `vercel.json`
   crons were already `[]`, so **nothing in the cloud can open a trade or bank a strategy** —
   Vercel is the read-only UI. (`cleanup-signals.yml` is still scheduled weekly by design; it
   curls Vercel for pure DB maintenance and decides nothing.) The backend was verified by a
-  live `callAgent` returning
-  `cli:haiku`, *not* by a `claude --version` probe, which passes on an expired login. Three
-  scheduled tasks remain, all intended: `Stocks scan` 05:00, `Manage positions` /15min,
-  `Research round` 06:00; the four dead desk tasks are unregistered. `~/.local/bin` is on the
-  persisted **User** PATH, so Task Scheduler resolves the CLI too.
+  live `callAgent` returning `cli:haiku`, *not* by a `claude --version` probe, which passes on
+  an expired login. Three scheduled tasks remain, all intended: `Stocks scan` 05:00,
+  `Manage positions` /15min, `Research round` 06:00; the four dead desk tasks are
+  unregistered. `~/.local/bin` is on the persisted **User** PATH, so Task Scheduler resolves
+  the CLI too.
 
 ## 4. Next steps, highest value first
 
-### a. The blind test runs now — but its pass bar is far too low
+### a. Pin Yahoo's bar count — the held-out set is not reproducible
 
-`evaluateHoldout` passes anything with ≥20 held-out trades and **expectancy > 0**. On the
-first real run a candidate degraded from **in-sample avgR 0.63 → held-out 0.063** (PF 2.14 →
-1.06, Sharpe 5.7 → 0.50) and still `passed: true`. A 10× degradation is the textbook overfit
-signature and this gate waves it through. Options: require held-out PF to clear
-`MIN_PROFIT_FACTOR` (1.1) the way `autoReview` already requires in-sample, and/or reject when
-held-out expectancy falls below some fraction of in-sample. Pick a rule **before** looking at
-more candidates, or it is fitted to them.
-
-Two smaller things found in the same pass, neither fixed: Yahoo returned **3473 then 7984
-bars** for the identical `AAPL 2y/1h` request minutes apart (extended-hours inclusion
-flipping — a held-out result that isn't reproducible bar-for-bar isn't really held out), and
-strategy **212 is still `rejected`** on the old data error, a smoke test only, not a verdict.
+Yahoo returned **3473 then 7984 bars** for the identical `AAPL 2y/1h` request minutes apart
+(extended-hours inclusion flipping). A held-out result that isn't reproducible bar-for-bar
+isn't really held out, and the new retention bar (§3) is a ratio between two such runs.
+Also unfixed and harmless: strategy **212 is still `rejected`** on the old data error — a
+smoke test, not a verdict.
 
 ### b. The approved pool is empty for this app's actual universe
 
@@ -155,6 +158,9 @@ It replaced alphabetical order — better, but never swept as a ranking.
   8 weeks; sd(R) ≈ 1.39 → SE ±0.31R against an effect size ~0.04R. n comes from the sweep
   harness, not from waiting. Live runs verify plumbing, nothing else.
 - **Blind-test a research strategy before approving it — every time, without asking.**
+- **`MIN_HOLDOUT_RETENTION` is pre-registered.** Its value (0.5) was fixed before any
+  candidate was measured against it. Re-tuning it after seeing a candidate fail turns the
+  gate into a rubber stamp with extra steps — that is what "pre-registered" is protecting.
 - **Never restore a mock fallback that can decide something.** Both halves were cut on
   2026-08-25 (§3). `mockHawk`/`mockSage` and `mockCandidates` still exist — as the
   counterfactual baseline and as the purge script's fingerprint — but the moment either can
