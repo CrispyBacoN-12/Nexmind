@@ -100,22 +100,40 @@ export async function runBlindTest(strategyId: number): Promise<BlindTestResult>
 
   let bars: Awaited<ReturnType<typeof fetchCandles>>["candles"] | null = null;
   let usedRange: (typeof DEEP_RANGES)[number] | null = null;
+  // Why each range was rejected. The old code swallowed this: a provider
+  // outage, a Yahoo 422 (it refuses 5y at an intraday granularity), a
+  // newly-listed symbol and a silently-truncated response all produced the
+  // same "could not fetch enough deep history" string. Since the verdict for
+  // all four is a fail-closed *rejection* of the candidate, the message has to
+  // say which one happened or the gate is unfalsifiable from the outside.
+  const attempts: string[] = [];
   for (const range of DEEP_RANGES) {
     try {
-      const resp = await fetchCandles(symbol, range, interval);
-      if (!resp.candles.length) continue;
+      // minDays: a provider that caps its response (Webull truncates every
+      // request to 1200 bars) must count as a miss here, not as data — at 1h
+      // that cap is ~256 calendar days, which can never clear MIN_TOTAL_DAYS
+      // no matter which range is asked for, so without this the gate rejects
+      // every intraday candidate forever and looks like rigor while doing it.
+      const resp = await fetchCandles(symbol, range, interval, MIN_TOTAL_DAYS);
+      if (!resp.candles.length) {
+        attempts.push(`${range}: no candles returned`);
+        continue;
+      }
       const totalDays = (resp.candles[resp.candles.length - 1].t - resp.candles[0].t) / 86400;
       if (totalDays >= MIN_TOTAL_DAYS) {
         bars = resp.candles;
         usedRange = range;
         break;
       }
-    } catch {
-      // try the next, shallower range
+      attempts.push(`${range}: only ${Math.round(totalDays)}d of history (${resp.candles.length} bars)`);
+    } catch (e) {
+      attempts.push(`${range}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   if (!bars || !usedRange) {
-    return { error: `${symbol}: could not fetch enough deep history (need >=${MIN_TOTAL_DAYS} days) for a held-out test` };
+    return {
+      error: `${symbol} @ ${interval}: could not fetch enough deep history (need >=${MIN_TOTAL_DAYS} days) for a held-out test — ${attempts.join("; ")}`,
+    };
   }
 
   const cutoffTs = bars[bars.length - 1].t - HOLDOUT_CUTOFF_DAYS * 86400;

@@ -18,6 +18,22 @@ export function shouldTryWebull(env: { WEBULL_PAPER_APP_KEY?: string; WEBULL_PAP
   return Boolean(env.WEBULL_PAPER_APP_KEY && env.WEBULL_PAPER_APP_SECRET);
 }
 
+/**
+ * Pure: does a response cover at least `minDays` of calendar span?
+ *
+ * Providers truncate silently. Webull caps every request at 1200 bars
+ * (`rangeToWebullCount`), so a 5y/1h request comes back a perfectly valid,
+ * non-empty 256-day series with nothing to distinguish it from real data —
+ * and the caller that asked for five years accepts it. A caller that needs
+ * *depth* rather than just *bars* has to state that, or it silently validates
+ * on a fraction of the history it asked for.
+ */
+export function coversDays(candles: { t: number }[], minDays: number): boolean {
+  if (minDays <= 0) return true;
+  if (!candles.length) return false;
+  return (candles[candles.length - 1].t - candles[0].t) / 86400 >= minDays;
+}
+
 /** Retry an async fetch once on a transient failure (network blip / 5xx). */
 async function withRetry<T>(fn: () => Promise<T>, attempts = 2, delayMs = 400): Promise<T> {
   let lastErr: unknown;
@@ -37,16 +53,25 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 2, delayMs = 400): 
  * configured; Yahoo as the fallback (and the only provider when no key is set).
  * The Yahoo path is retried once so a transient "fetch failed" network blip
  * doesn't fail the whole scan tick.
+ *
+ * `minDays` makes a *truncated* provider response count as a miss rather than
+ * a success, so the fallback chain is tried instead of silently returning less
+ * history than was asked for. Yahoo is last, so its response is returned even
+ * when short — a genuinely young listing has no deeper history anywhere, and
+ * the caller can tell the difference by measuring the span itself.
  */
 export async function fetchCandles(
   symbol: string,
   range: Range = "1mo",
   interval: Interval = "1h",
+  minDays = 0,
 ): Promise<CandleResponse> {
   const webullEnv = { WEBULL_PAPER_APP_KEY: process.env.WEBULL_PAPER_APP_KEY, WEBULL_PAPER_APP_SECRET: process.env.WEBULL_PAPER_APP_SECRET };
   if (shouldTryWebull(webullEnv)) {
     try {
-      return await fetchWebullCandles(symbol, range, interval);
+      const resp = await fetchWebullCandles(symbol, range, interval);
+      if (coversDays(resp.candles, minDays)) return resp;
+      console.warn(`marketData: Webull truncated ${symbol} ${range}/${interval} to ${resp.candles.length} bars (< ${minDays}d); using Alpaca/Yahoo`);
     } catch (e) {
       console.warn(`marketData: Webull miss for ${symbol} (${e instanceof Error ? e.message : e}); using Alpaca/Yahoo`);
     }
@@ -58,7 +83,9 @@ export async function fetchCandles(
   };
   if (shouldTryAlpaca(env)) {
     try {
-      return await fetchAlpacaCandles(symbol, range, interval);
+      const resp = await fetchAlpacaCandles(symbol, range, interval);
+      if (coversDays(resp.candles, minDays)) return resp;
+      console.warn(`marketData: Alpaca truncated ${symbol} ${range}/${interval} to ${resp.candles.length} bars (< ${minDays}d); using Yahoo`);
     } catch (e) {
       // Expected for non-equity symbols (futures/crypto/forex) Alpaca's stock feed
       // doesn't serve — fall back to Yahoo. Log one concise line, not a stack.
