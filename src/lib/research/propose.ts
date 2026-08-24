@@ -2,7 +2,7 @@
 // against its own backtest results. Mirrors the callAgentJSON pattern used by
 // HAWK/SAGE/the Secretary (src/lib/anthropic.ts).
 
-import { callAgentJSON, aiEnabled } from "@/lib/anthropic";
+import { callAgentJSON, aiEnabled, aiBackend, type AiBackend } from "@/lib/anthropic";
 import type { BacktestSummary } from "@/lib/backtest/engine";
 
 export interface Candidate { label: string; code: string; rationale: string }
@@ -50,12 +50,22 @@ const REFINE_SCHEMA = {
   required: ["code", "note"],
 };
 
+/**
+ * Reports which backend produced the candidates alongside them.
+ *
+ * The mock fallback is indistinguishable downstream otherwise: runResearch used
+ * to persist `Mock Momentum` / `Mock Mean-Reversion` / `Mock Breakout` as
+ * ordinary ResearchStrategy rows with no record of what proposed them, and 34
+ * of them reached `approved` — activatable on the live desk. A caller that must
+ * refuse to bank a mock round has to be told, not left to pattern-match labels.
+ */
 export async function proposeCandidates(
   brief: string,
   symbol: string,
   interval: string,
-): Promise<{ candidates: Candidate[]; costUsd: number }> {
-  if (!aiEnabled()) return { candidates: mockCandidates(brief), costUsd: 0 };
+): Promise<{ candidates: Candidate[]; costUsd: number; backend: AiBackend }> {
+  const backend = aiBackend();
+  if (!aiEnabled()) return { candidates: mockCandidates(brief), costUsd: 0, backend };
 
   const { data, costUsd } = await callAgentJSON<{ candidates: Candidate[] }>({
     tier: "sonnet",
@@ -64,7 +74,7 @@ export async function proposeCandidates(
     jsonSchema: CANDIDATES_SCHEMA,
     maxTokens: 3000,
   });
-  return { candidates: data.candidates, costUsd };
+  return { candidates: data.candidates, costUsd, backend };
 }
 
 export async function refineCandidate(
@@ -99,8 +109,10 @@ export async function fixUnsafeCode(
   return { code: data.code, costUsd };
 }
 
-/** Deterministic mock candidates — used when aiEnabled() is false. Real sandbox + backtest still run on these. */
-function mockCandidates(brief: string): Candidate[] {
+/** Deterministic mock candidates — used when aiEnabled() is false. Exported so a
+ *  cleanup pass can identify already-persisted mock rows by exact code match
+ *  rather than by guessing from the "Mock " label prefix. */
+export function mockCandidates(brief: string): Candidate[] {
   return [
     {
       label: "Mock Momentum",

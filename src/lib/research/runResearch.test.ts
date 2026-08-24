@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
 import { backtestCandles, summarizeBacktest, DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 import { computeSnapshots } from "./adapter";
-import { sweepLadder, LADDER_TP_MULTS, LADDER_SL_MULT, LADDER_TRAILS, LADDER_OPTIONS, type ExitLadder } from "./runResearch";
+import { sweepLadder, isBankableRound, LADDER_TP_MULTS, LADDER_SL_MULT, LADDER_TRAILS, LADDER_OPTIONS, type ExitLadder } from "./runResearch";
 import { MIN_TRADES } from "./autoReview";
 
 /** Mirrors sweepLadder's own selection, but only ever calls backtestCandles /
@@ -193,4 +193,30 @@ test("ExitLadder round-trips through JSON exactly as the DB stores it", () => {
     const parsed = JSON.parse(JSON.stringify(ladder)) as ExitLadder;
     assert.deepEqual(parsed, ladder);
   }
+});
+
+test("a mock-proposed round is never bankable, and a manual round always is", () => {
+  // The regression this guards: 109 scheduled rounds ran on an environment with
+  // no AI credential, proposeCandidates() returned its three hardcoded
+  // fallbacks every time, and runResearch persisted them as ordinary
+  // ResearchStrategy rows — 34 of which reached `approved` and were therefore
+  // activatable on the live desk.
+  assert.equal(isBankableRound(false, "mock"), false);
+
+  // Manual candidates are hand-authored and skip the proposer entirely, so
+  // they carry no backend. Refusing them would break every dispatch-*.mts
+  // script and the /api/research manualCandidates path.
+  assert.equal(isBankableRound(true, null), true);
+  // Belt and braces: the manual exemption must not be reachable *through* a
+  // mock backend, or the exemption becomes the bypass.
+  assert.equal(isBankableRound(true, "mock"), true);
+
+  // A real backend of either kind banks normally.
+  for (const backend of ["api", "cli"] as const) {
+    assert.equal(isBankableRound(false, backend), true, `${backend} rounds must still bank`);
+  }
+
+  // A non-manual round with no backend reported at all is refused rather than
+  // waved through — same fail-closed default as applyBlindTestVerdict.
+  assert.equal(isBankableRound(false, null), false);
 });

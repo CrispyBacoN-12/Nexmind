@@ -241,7 +241,7 @@ model ResearchRun {
   symbol     String
   interval   String             @default("1h")
   range      String             @default("3mo")
-  status     String             @default("running") // running | done | failed
+  status     String             @default("running") // running | done | failed | skipped (no AI backend — see runResearch)
   costUsd    Float              @default(0)
   strategies ResearchStrategy[]
   createdAt  DateTime           @default(now())

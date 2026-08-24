@@ -12,6 +12,7 @@ import { proposeCandidates, refineCandidate, fixUnsafeCode, type Candidate } fro
 import { exportStrategyNote } from "@/lib/obsidian/export";
 import { autoReviewStatus, MIN_TRADES } from "./autoReview";
 import { runBlindTest, applyBlindTestVerdict, blindTestOrchestrationFailure } from "./blindTest";
+import type { AiBackend } from "@/lib/anthropic";
 import type { Candle } from "@/lib/indicators";
 import type { ScanSnapshot } from "@/lib/trading/scanner";
 
@@ -240,6 +241,32 @@ async function runOneCandidate(
   };
 }
 
+/**
+ * Pure: may this round's candidates be persisted as research?
+ *
+ * Fails closed on the mock proposer, the same way applyBlindTestVerdict fails
+ * closed on unverifiable held-out data.
+ *
+ * When no AI backend is configured, proposeCandidates() returns three
+ * hardcoded candidates ("Mock Momentum" / "Mock Mean-Reversion" / "Mock
+ * Breakout") and runResearch used to persist them as ordinary
+ * ResearchStrategy rows: real sandbox, real backtest, real autoReview, real
+ * approved/rejected status — and nothing anywhere recording that no AI
+ * proposed them. Scheduled rounds run on Vercel, which has no AI credential,
+ * so 109 rounds at $0 cost produced 34 `Mock *` rows sitting at `approved`,
+ * i.e. activatable on the live desk. Re-backtesting the same three RSI and
+ * breakout snippets is not research; banking it as research is what made the
+ * pool look like it held 40 validated strategies.
+ *
+ * `backend` is null for a manual round, which is exempt: those candidates are
+ * hand-authored by a human (or by Claude in conversation) and deliberately
+ * skip the proposer entirely.
+ */
+export function isBankableRound(isManual: boolean, backend: AiBackend | null): boolean {
+  if (isManual) return true;
+  return backend !== null && backend !== "mock";
+}
+
 export async function runResearch(
   brief: string,
   symbol: string,
@@ -250,14 +277,25 @@ export async function runResearch(
   // no cost. They also skip auto-refinement, since that's an AI call too; to
   // refine a manual candidate, ask for a revision and dispatch it as a new run.
   manualCandidates?: Candidate[],
-): Promise<{ runId: number }> {
+): Promise<{ runId: number; skipped?: "no-ai-backend" }> {
   const run = await prisma.researchRun.create({ data: { brief, symbol, interval, range, status: "running" } });
 
   try {
     const isManual = !!manualCandidates?.length;
-    const { candidates, costUsd: proposeCost } = isManual
-      ? { candidates: manualCandidates!, costUsd: 0 }
-      : await proposeCandidates(brief, symbol, interval);
+    const proposed = isManual ? null : await proposeCandidates(brief, symbol, interval);
+
+    // See isBankableRound above for why a mock-proposed round is refused.
+    if (!isBankableRound(isManual, proposed?.backend ?? null)) {
+      console.warn(`research run ${run.id}: no AI backend — skipping instead of banking mock candidates (${symbol} ${interval}/${range})`);
+      await prisma.researchRun.update({
+        where: { id: run.id },
+        data: { status: "skipped", finishedAt: new Date() },
+      });
+      return { runId: run.id, skipped: "no-ai-backend" };
+    }
+
+    const candidates = proposed?.candidates ?? manualCandidates!;
+    const proposeCost = proposed?.costUsd ?? 0;
     const budget = { spent: proposeCost };
     const resp = await fetchCandles(symbol, range, interval);
 

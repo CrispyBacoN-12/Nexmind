@@ -18,7 +18,7 @@ interface ResearchRunRow {
   symbol: string;
   interval: string;
   range: string;
-  status: "running" | "done" | "failed";
+  status: "running" | "done" | "failed" | "skipped";
   costUsd: number;
   strategies: ResearchStrategyRow[];
 }

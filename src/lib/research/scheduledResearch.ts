@@ -83,9 +83,15 @@ export async function runScheduledResearchRound(override?: ScheduledResearchOver
 
   const lines: string[] = [`research round [${label}] ${symbol} ${interval}/${range}`];
 
-  const { runId } = await runResearch(brief, symbol, interval, range);
+  const { runId, skipped } = await runResearch(brief, symbol, interval, range);
   const run = await prisma.researchRun.findUnique({ where: { id: runId } });
   lines.push(`run #${runId} status: ${run?.status}`);
+  // The cron log is where this is noticed. A skipped round is silent otherwise:
+  // status "skipped" plus zero strategy lines looks the same as a bad round.
+  if (skipped === "no-ai-backend") {
+    lines.push(`SKIPPED: no AI backend configured in this environment — QUANT proposed nothing rather than banking mock candidates. Set ANTHROPIC_API_KEY (or make the Claude Code CLI reachable) wherever this cron runs.`);
+    return lines;
+  }
 
   const strategies = await prisma.researchStrategy.findMany({ where: { runId }, orderBy: { id: "asc" } });
   for (const s of strategies) {

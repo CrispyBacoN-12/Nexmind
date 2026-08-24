@@ -41,6 +41,10 @@ function reviewChecks(bt: BacktestSummary, safetyFlag: boolean) {
 function runBadge(status: string, stale: boolean) {
   if (status === "running") return <Badge tone={stale ? "negative" : "warning"}>{stale ? "stalled" : "running"}</Badge>;
   if (status === "failed") return <Badge tone="negative">failed</Badge>;
+  // A round the mock proposer would have filled is banked as "skipped", not
+  // "done" — see runResearch(). Without this branch it falls through to the
+  // green "done" badge and reads as a successful round that produced nothing.
+  if (status === "skipped") return <Badge tone="warning">skipped</Badge>;
   return <Badge tone="positive">done</Badge>;
 }
 
