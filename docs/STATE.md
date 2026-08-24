@@ -4,8 +4,9 @@
 Auto-loaded every session via `CLAUDE.md`. Dated deep-dives live in `docs/quant/`;
 this file is the current bar, not the archive.
 
-_Last verified against the live DB + working tree: **2026-08-24**, branch `stocks-only-pivot`.
-DB state in §2 last queried at HEAD `565fd55`; §3 and §4 updated after the exit-ladder work below._
+_Last verified against the live DB + working tree: **2026-08-25**, branch `stocks-only-pivot`.
+§2 re-queried after the mock purge below; §3 and §4 updated after the exit-ladder,
+blind-test-gate and mock-cycle work._
 
 ---
 
@@ -25,7 +26,7 @@ Hard context the code does not state:
 - Go-Live is deferred and unscheduled. Nothing goes live until an arm comparison shows the
   analysts beat the rule-only baseline.
 
-## 2. Live state (verified by query, 2026-08-24)
+## 2. Live state (verified by query, 2026-08-25)
 
 | Thing | Value |
 |---|---|
@@ -33,10 +34,11 @@ Hard context the code does not state:
 | Desk #11 strategy | **`combo-vote`** (built-in) — no longer `research-29` |
 | Open trades | 4 (KO, AZO, XOM, KMX), all `aiBackend = "mock"` |
 | Closed trades | 35, cumulative **−$378.87** |
-| AI backend on every trade ever | `mock` (37) or null (2) — **HAWK/SAGE have never decided a real trade** |
+| AI backend on every trade ever | `mock` (45) or null (2) — **HAWK/SAGE have never decided a real trade** |
+| As of 08-25 | desk **opens nothing** without a real backend (§3); runtime moved **local**, where the CLI backend is live-verified |
 | `Counterfactual` rows | 3 (was 0 — the arm recorder finally fires; sample far too small) |
-| `ResearchStrategy` | 40 approved / 168 rejected / 3 demoted / 1 proposed |
-| …of the 40 approved | **34 are labelled `Mock *`** — junk from the mock backend, still approved |
+| `ResearchStrategy` | **6 approved** / 168 rejected / 37 demoted / 1 proposed (34 mock rows demoted 08-25) |
+| …the 6 survivors | all on **BTC-USD / GC=F / NG=F** — none on a stock; none has a blind test |
 | Schema | `blindTest`, `exitLadder`, `demotedReason` columns are pushed and live |
 
 Re-verify with a throwaway script under `scripts/` (delete it afterwards):
@@ -74,24 +76,79 @@ node --env-file=.env --import tsx scripts/tmp-state.mts
   1.5 ATR stop — §4c below is now only about legacy rows), and the old
   `profitFactor ?? -Infinity` ranked a zero-loss ladder as strictly *worst*, which is why
   no trail could ever have won that comparison.
+- **Blind-test gate was broken; fixed and now demonstrably runs.** §4a's fear was correct.
+  Root cause was **silent provider truncation**, not the 400-day floor: `fetchWebullCandles`
+  caps every request at 1200 bars (`rangeToWebullCount`), which at `1h` is ~256 calendar
+  days, and `fetchCandles` accepted that non-empty response as data. Both `DEEP_RANGES`
+  hit the same cap, so **every intraday candidate was rejected forever**, and because Webull
+  is flaky the verdict flipped with whichever provider answered — a *non-deterministic*
+  gate, worse than a dead one. Fix: `fetchCandles` takes `minDays` and treats a short
+  response as a provider miss (Yahoo stays last, so a genuinely young listing still returns);
+  the deep-fetch loop stops swallowing errors and names why each range failed. Verified end
+  to end — `runBlindTest(212)` now returns **236 held-out trades over 3981 bars / 364 days**
+  instead of `{ error }`.
+- **Research half of the mock cycle cut.** `proposeCandidates` now reports its `backend`, and
+  `isBankableRound` (pure, tested) makes `runResearch` **fail closed** on a mock-proposed
+  round: the run is banked `status: "skipped"` with zero strategies instead of persisting
+  the three hardcoded `Mock *` snippets as approvable research. Manual candidates are exempt
+  (they skip the proposer by design). The cron log names the skip; the research page renders
+  a `skipped` badge rather than falling through to green `done`. Then the backlog was purged —
+  all 87 mock rows identified by **exact code match** against `mockCandidates()` (label prefix
+  agreed on all 87, zero disagreement), the 34 still `approved` demoted with a
+  `demotedReason`; none was live on a portfolio. **This is the code half only** — see §6.
+- **Desk half of the mock cycle cut: no AI backend, no new position.** Owner's call on
+  2026-08-25, overruling the previous session's deliberate "degrade rather than fail". The
+  rule-only fallback was honest (`aiBackend = "mock"` on every row) but it meant 45 of 45
+  trades and −$378.87 were decided by nobody. `runTradeTick` now returns the new outcome
+  **`no-ai-backend`** instead of opening, and the two *mid-flight* fallbacks (HAWK throws →
+  mockHawk, SAGE throws → mockSage, which approves everything) refuse the same way — the
+  SAGE one had been turning the risk veto into a rubber stamp exactly when risk review was
+  unavailable. `mockHawk`/`mockSage` survive only as the counterfactual baseline and can no
+  longer decide anything. **Position management is untouched** (`manage.ts` has no AI
+  dependency at all — verified), so open trades still exit normally; stranding a live
+  position would be worse than the problem. `runScheduledScan` logs one loud banner up front
+  rather than N identical per-symbol lines, and `scan-universe` counts `no-ai-backend` as a
+  *setup* so an outage cannot be misread as a quiet market.
+- **The loops now run on the local Windows box, not in the cloud.** Owner's call on
+  2026-08-25: stay local until the system settles. Both GitHub Actions `schedule:` triggers
+  are commented out (`swing-scan.yml`, `research-round.yml`); `workflow_dispatch` is kept so
+  either is one click from returning, and each file carries the reason and the re-enable
+  condition. With `vercel.json` crons already `[]`, **nothing in the cloud can now open a
+  trade or bank a strategy** — the Vercel deployment is the read-only UI. (`cleanup-signals.yml`
+  still curls Vercel weekly; it is pure DB maintenance and decides nothing.) The local
+  backend was verified properly this time — not a `claude --version` probe but a live
+  `callAgent`, which returned `cli:haiku` at $0 on subscription auth. `C:\Users\Kannithi\.local\bin`
+  is on the persisted **User** PATH, so Task Scheduler sees the CLI too.
 
 ## 4. Next steps, highest value first
 
-### a. The blind-test gate has never passed a real candidate — check it isn't broken
+### a. The blind test runs now — but its pass bar is far too low
 
-The one live run of the new gate (strategy 212) returned
-`"AAPL: could not fetch enough deep history (need >=400 days)"` → rejected by the
-fail-closed branch. That is the correct policy on a *data* failure, but if the deep fetch
-(`DEEP_RANGES = ["5y","2y"]` in `src/lib/research/blindTest.ts`) never succeeds, the gate
-rejects **everything** forever and the research loop is dead in a way that looks like rigor.
-Run `runBlindTest` on a known-good symbol and confirm the 5y daily fetch really returns
-≥400 days through `src/lib/marketData.ts`.
+Fixed and verified (§3). The gate is no longer inert; the open question is what it *asks*.
+`evaluateHoldout` passes anything with ≥20 held-out trades and **expectancy > 0**. On the
+first real run the candidate degraded from **in-sample avgR 0.63 → held-out 0.063** (PF
+2.14 → 1.06, Sharpe 5.7 → 0.50) and still `passed: true`. A 10× degradation is the textbook
+overfit signature and this gate waves it through. Options: require the held-out PF to clear
+`MIN_PROFIT_FACTOR` (1.1) the way `autoReview` already requires in-sample, and/or reject
+when held-out expectancy is below some fraction of in-sample. Pick a rule **before** looking
+at more candidates, or it is fitted to them.
 
-### b. Purge the 34 `Mock *` approvals
+Two smaller things found in the same pass, neither fixed:
 
-They cleared the old bar under the mock backend and are still `approved`, i.e. still
-activatable. The re-vet script only demoted 3 rows. Either widen the re-vet or reject the
-mock-labelled ones outright — nothing decided by the mock path should be approvable.
+- Yahoo returned **3473 bars then 7984 bars** for the identical `AAPL 2y/1h` request
+  minutes apart (~4.8 vs ~11 bars/day — extended-hours inclusion flipping). A held-out
+  result that is not reproducible bar-for-bar is not really held out. Worth pinning.
+- Strategy **212 is still `rejected`** in the DB on the old data error. It is only a
+  smoke test, so it was left alone — do not read that row as a verdict.
+
+### b. The approved pool is now empty for this app's actual universe
+
+The purge is done (§3), and what it uncovered is the real problem: the 6 surviving approvals
+are **BTC-USD, GC=F, NG=F** — instruments the stocks-only pivot removed — and **not one of
+them has a blind test**. There is no validated stock strategy in the pool at all. Until the
+loop can propose again (§6), the only route to one is a hand-authored candidate through
+`runResearch`'s `manualCandidates` path. Decide whether the 6 get demoted as off-universe or
+re-validated on stocks; do not read "6 approved" as "6 usable".
 
 ### c. Retire the legacy 0.8:1 research ladder — **legacy rows only, now**
 
@@ -130,19 +187,36 @@ It replaced alphabetical order — better, but never swept as a ranking.
   8 weeks; sd(R) ≈ 1.39 → SE ±0.31R against an effect size ~0.04R. n comes from the sweep
   harness, not from waiting. Live runs verify plumbing, nothing else.
 - **Blind-test a research strategy before approving it — every time, without asking.**
+- **Never restore a mock fallback that can decide something.** Both halves were cut on
+  2026-08-25 (§3). `mockHawk`/`mockSage` and `mockCandidates` still exist — as the
+  counterfactual baseline and as the purge script's fingerprint respectively — but the
+  moment either can open a trade or bank a strategy, the whole record becomes unreadable
+  again. The failure mode is not dishonesty (the old code labelled everything correctly);
+  it is that a correctly-labelled placeholder accumulates into the majority of the dataset
+  while nobody is reading labels.
 - Next.js 16 here has breaking changes vs. training data; read `node_modules/next/dist/docs/`
   before writing app code (`AGENTS.md`).
 
 ## 6. Blocked on the user (still open)
 
-- `FINNHUB_API_KEY` is set in local `.env` but **empty as a GitHub Actions secret**, so
-  `fundamentalsLine()` and the INTEL news block reach HAWK/SAGE as empty strings in
-  production: `gh secret set FINNHUB_API_KEY --repo CrispyBacoN-12/Nexmind`.
-  (User must run it — do not handle the key; `gh` also has no network from the sandbox.)
-- Dead Windows scheduled tasks are still registered and firing at a stocks-only app —
-  `NEXMIND Bitcoin scan`, `NEXMIND Gold scan`, `NEXMIND Intraday scan`, `NEXMIND Options scan`
-  (keep `NEXMIND Stocks scan` and `NEXMIND Manage positions`):
-  `Unregister-ScheduledTask -TaskName 'NEXMIND Bitcoin scan','NEXMIND Gold scan','NEXMIND Intraday scan','NEXMIND Options scan' -Confirm:$false`
+- **Register the local Task Scheduler jobs** — this is what actually runs the product now
+  (§3). Only the owner can touch Windows scheduled tasks. Two parts:
+  - Drop the four dead desks still firing at a stocks-only app (they log "no matching
+    portfolios" every 15 min): `Unregister-ScheduledTask -TaskName 'NEXMIND Bitcoin scan','NEXMIND Gold scan','NEXMIND Intraday scan','NEXMIND Options scan' -Confirm:$false`
+  - **There is no local research task at all.** `scripts/research-round.cmd` exists and works;
+    nothing is scheduled to call it, so QUANT proposes nothing until one is registered.
+
+  Keep `NEXMIND Stocks scan` (`scan.cmd 11`, daily 05:00 — desk #11 is `1wk/5y` on `sp500`,
+  so daily is ample) and `NEXMIND Manage positions` (every 15 min).
+
+  The cloud credential question is **deferred, not solved**: Vercel has no
+  `ANTHROPIC_API_KEY`, and the GH runner installs the CLI and passes
+  `CLAUDE_CODE_OAUTH_TOKEN` yet still produced `mock` — unexplained. Diagnose
+  `aiBackend()`'s CLI probe on the runner before re-enabling either schedule.
+- `FINNHUB_API_KEY` is **empty as a GitHub Actions secret** — parked, not urgent, while the
+  loops run locally off `.env` where the key is set. It matters again the day a schedule is
+  re-enabled: `gh secret set FINNHUB_API_KEY --repo CrispyBacoN-12/Nexmind` (user runs it —
+  do not handle the key).
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
 - Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`
   (`scripts/revert-stocks-desk-to-default.ts` sets `trend-pullback`; something set combo-vote
