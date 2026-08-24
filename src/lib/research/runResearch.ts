@@ -10,7 +10,7 @@ import { compileStrategy, SandboxSafetyError } from "./sandbox";
 import { computeSnapshots } from "./adapter";
 import { proposeCandidates, refineCandidate, fixUnsafeCode, type Candidate } from "./propose";
 import { exportStrategyNote } from "@/lib/obsidian/export";
-import { autoReviewStatus } from "./autoReview";
+import { autoReviewStatus, MIN_TRADES } from "./autoReview";
 import { runBlindTest, applyBlindTestVerdict, blindTestOrchestrationFailure } from "./blindTest";
 import type { Candle } from "@/lib/indicators";
 import type { ScanSnapshot } from "@/lib/trading/scanner";
@@ -32,32 +32,100 @@ export const RESEARCH_COST_MODEL: CostModel = DEFAULT_COST_MODEL;
 // round's improvement is judged independent of ladder choice; only once the
 // code is locked in does each candidate get its own ratio). Fixed SL, varying
 // TP: matches this codebase's existing sweep convention (scripts/sweep-rr.ts).
-export const LADDER_TP_MULTS = [1.0, 1.2, 1.5, 2.0, 2.5, 3.0];
+//
+// 1.0 and 1.2 were REMOVED from this list on 2026-08-24. Against a 1.5 ATR
+// stop they are 0.67:1 and 0.8:1 reward-to-risk, needing a 60% / 55.6% win
+// rate merely to break even, and the exit-geometry sweep measured
+// `single 1.2 ATR` as the WORST of its 20 variants on the desk's own entry
+// rule — worst while carrying the highest win rate of all of them, which is
+// exactly how a sub-1:1 ladder fails. A candidate whose in-sample optimum is a
+// sub-1:1 target has bought its expectancy with a win rate that has to hold to
+// the decimal; there is no reason to leave that in the menu.
+// See docs/quant/2026-08-24-exit-geometry-sweep-results.md §5.
+export const LADDER_TP_MULTS = [1.5, 2.0, 2.5, 3.0];
 export const LADDER_SL_MULT = 1.5;
 
-/** Sweep LADDER_TP_MULTS against a fixed SL, picking the best by profit factor
- *  (ties broken by expectancy). Pure with respect to its inputs — no DB/network. */
+// The two ATR trailing geometries that passed the full pre-registered protocol
+// in that same study — out-of-sample confirmed, held at 3x sample and on a
+// second timeframe, positive in 10 of 10 weekly calendar years, against a
+// pre-registered control that failed everywhere. Both are here, and neither is
+// presented as the optimum: 1.0/1.5 performs nearly as well as 1.5/1.5, which
+// is what says the cell is not a tuned spike. Before this they were unreachable
+// to a research candidate — the only exit geometry in this repo with a real
+// out-of-sample pedigree was the one geometry the loop could not choose.
+export const LADDER_TRAILS = [
+  { activateMult: 1.0, offsetMult: 1.5 },
+  { activateMult: 1.5, offsetMult: 1.5 },
+] as const;
+
+// A trail REPLACES tp1/tp2 targeting outright (positionRules.decideAction
+// short-circuits to decideTrailingAction), so tp1Mult on a trailing option is
+// never an exit level. It survives only as the nominal R:R the Iron Rules gate
+// reads, and 2.5/1.5 = 1.67 clears the 1.5 floor — correct for an exit whose
+// upside is unbounded and which therefore has no fixed target to quote.
+const TRAIL_NOMINAL_TP_MULT = 2.5;
+
+export type ExitLadder = {
+  tp1Mult: number;
+  slMult: number;
+  singleTarget: true;
+  trail?: { activateMult: number; offsetMult: number };
+};
+
+export const LADDER_OPTIONS: ExitLadder[] = [
+  ...LADDER_TP_MULTS.map((tp1Mult) => ({ tp1Mult, slMult: LADDER_SL_MULT, singleTarget: true as const })),
+  ...LADDER_TRAILS.map((trail) => ({
+    tp1Mult: TRAIL_NOMINAL_TP_MULT,
+    slMult: LADDER_SL_MULT,
+    singleTarget: true as const,
+    trail: { ...trail },
+  })),
+];
+
+/** Sweep LADDER_OPTIONS, picking the best by avgR among options that cleared
+ *  MIN_TRADES. Pure with respect to its inputs — no DB/network. */
 export function sweepLadder(
   code: string,
   bars: Candle[],
   snaps: ScanSnapshot[],
-): { ladder: { tp1Mult: number; slMult: number; singleTarget: true }; summary: BacktestSummary } {
+): { ladder: ExitLadder; summary: BacktestSummary } {
   const compiled = compileStrategy(code);
   const entry = (i: number) => compiled.invoke(bars, snaps, i)?.side ?? null;
 
-  let best: { ladder: { tp1Mult: number; slMult: number; singleTarget: true }; summary: BacktestSummary } | null = null;
-  for (const tp1Mult of LADDER_TP_MULTS) {
-    const bt = backtestCandles("sweep", bars, 0.1, undefined, entry, true, tp1Mult, RESEARCH_COST_MODEL, LADDER_SL_MULT);
-    const summary = summarizeBacktest(bt.trades);
-    const pf = summary.profitFactor ?? -Infinity;
-    const bestPf = best ? best.summary.profitFactor ?? -Infinity : -Infinity;
-    const better =
-      !best ||
-      pf > bestPf ||
-      (pf === bestPf && (summary.expectancy ?? -Infinity) > (best.summary.expectancy ?? -Infinity));
-    if (better) best = { ladder: { tp1Mult, slMult: LADDER_SL_MULT, singleTarget: true }, summary };
-  }
-  return best!; // LADDER_TP_MULTS is non-empty, so a candidate is always assigned
+  const scored = LADDER_OPTIONS.map((ladder) => {
+    const bt = backtestCandles(
+      "sweep", bars, 0.1, undefined, entry, true, ladder.tp1Mult,
+      RESEARCH_COST_MODEL, ladder.slMult, ladder.trail,
+    );
+    return { ladder, summary: summarizeBacktest(bt.trades) };
+  });
+
+  // Selection is on avgR, not on the dollar profit factor this used to rank by.
+  // Every backtest here runs a fixed lot, so a dollar ratio silently weights
+  // each trade by its own stop width — trades opened while ATR was wide count
+  // for more than trades opened while it was tight, for no reason the desk
+  // cares about. The live desk sizes to constant dollar risk (computeLot:
+  // riskUsd / slDistance), under which a trade's dollar P&L is its R times one
+  // fixed constant. avgR is therefore the quantity that actually compounds,
+  // and it is the only one comparable across options with different stop
+  // widths. (The exit-geometry sweep hit the same contradiction head-on: on
+  // daily in-sample it reported PF 0.97 against totalR +399.)
+  //
+  // Prefer options that cleared the same trade floor approval is gated on:
+  // maximising avgR over a handful of trades is how a 3-trade ladder wins a
+  // sweep. If nothing clears it the best of a thin field is still returned —
+  // autoReviewStatus rejects the candidate on trade count immediately after.
+  const eligible = scored.filter((s) => s.summary.trades >= MIN_TRADES);
+  const field = eligible.length ? eligible : scored;
+
+  return field.reduce((best, s) => {
+    const a = s.summary.avgR ?? -Infinity;
+    const b = best.summary.avgR ?? -Infinity;
+    // More trades breaks a tie: same expectancy per unit risk, more chances to
+    // collect it, and a tighter standard error on the estimate.
+    if (a > b || (a === b && s.summary.trades > best.summary.trades)) return s;
+    return best;
+  });
 }
 
 interface Iteration { code: string; note: string; backtestSummary?: BacktestSummary }
@@ -73,7 +141,7 @@ async function runOneCandidate(
   status: "approved" | "rejected";
   iterations: Iteration[];
   backtestSummary: BacktestSummary;
-  exitLadder: { tp1Mult: number; slMult: number; singleTarget: true };
+  exitLadder: ExitLadder;
   safetyFlag: boolean;
   costUsd: number;
 }> {
@@ -108,7 +176,11 @@ async function runOneCandidate(
       status: "rejected",
       iterations,
       backtestSummary: summarizeBacktest([]),
-      exitLadder: { tp1Mult: 1.2, slMult: 1.5, singleTarget: true },
+      // Never traded — this candidate is rejected on the safety scan and never
+      // reaches a backtest. It still carries a ladder from the current menu
+      // rather than the retired 0.8:1 one, so no path in this file can write
+      // that geometry to the database.
+      exitLadder: LADDER_OPTIONS[0],
       safetyFlag,
       costUsd,
     };

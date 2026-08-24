@@ -4,7 +4,8 @@
 Auto-loaded every session via `CLAUDE.md`. Dated deep-dives live in `docs/quant/`;
 this file is the current bar, not the archive.
 
-_Last verified against the live DB + working tree: **2026-08-24**, branch `stocks-only-pivot`, HEAD `565fd55`._
+_Last verified against the live DB + working tree: **2026-08-24**, branch `stocks-only-pivot`.
+DB state in §2 last queried at HEAD `565fd55`; §3 and §4 updated after the exit-ladder work below._
 
 ---
 
@@ -60,6 +61,19 @@ node --env-file=.env --import tsx scripts/tmp-state.mts
     ("re-vet 2026-08-24: no longer clears the bar (trades=8)"), along with #7 and #28,
   - each candidate sweeps and carries **its own exit ladder** (`exitLadder` → `preferredExit`).
 - Desk #11 taken off research-29 — the pending DB write from the old handoff **is done**.
+- **Exit sweep risk-normalised** — `score()` in `exit-geometry-sweep.mts` computes PF over
+  R instead of over lot-1 dollars, so the PF and totalR columns stopped contradicting each
+  other. Both OOS tables re-run: weekly baseline 1.09 → trail **1.16**, daily baseline
+  0.97 → **1.02**, trail 1.09 → **1.14**. Direction unchanged. Caveat 3 of the sweep doc
+  is closed.
+- **Research loop can now choose the validated trail.** `sweepLadder` sweeps
+  `LADDER_OPTIONS` (4 fixed targets + `trail 1.0/1.5` and `trail 1.5/1.5`) and selects on
+  **avgR**, not dollar profit factor. `wrapAsStrategy` and `runBlindTest` carry `trail`
+  through, so a swept trail reaches the desk and is validated as a trail. Two side effects
+  worth knowing: **1.0 and 1.2 are gone from `LADDER_TP_MULTS`** (sub-1:1 against the
+  1.5 ATR stop — §4c below is now only about legacy rows), and the old
+  `profitFactor ?? -Infinity` ranked a zero-loss ladder as strictly *worst*, which is why
+  no trail could ever have won that comparison.
 
 ## 4. Next steps, highest value first
 
@@ -79,23 +93,24 @@ They cleared the old bar under the mock backend and are still `approved`, i.e. s
 activatable. The re-vet script only demoted 3 rows. Either widen the re-vet or reject the
 mock-labelled ones outright — nothing decided by the mock path should be approvable.
 
-### c. Retire the legacy 0.8:1 research ladder
+### c. Retire the legacy 0.8:1 research ladder — **legacy rows only, now**
 
-`RESEARCH_ATR_TP_MULT = 1.2` / `SL 1.5` (`src/lib/trading/engine.ts:49-51`) is still the
-fallback for approved rows that predate `exitLadder`. In the weekly sweep, `single 1.2 ATR`
-was the **worst of 20 variants** despite the highest win rate. New candidates carry their own
-ladder now, so the remaining job is to stop legacy rows trading the known-bad one — backfill
-their `exitLadder`, or refuse to activate a row without one. Do **not** simply swap 1.2 → 2.5:
-that variant failed OOS as a pick. The defensible claim is only "0.8:1 is measurably bad".
+New candidates can no longer be assigned a sub-1:1 ladder (1.0 and 1.2 removed from
+`LADDER_TP_MULTS`). What is left: `RESEARCH_ATR_TP_MULT = 1.2` / `SL 1.5`
+(`src/lib/trading/engine.ts:49-51`) is still the fallback in `resolveExitOverride` for
+approved rows persisted before `exitLadder` existed, and `LEGACY_TP1_MULT` is the same
+fallback in `blindTest.ts`. Backfill those rows' `exitLadder` by re-sweeping them, or refuse
+to activate a row without one. Do **not** simply swap 1.2 → 2.5: that variant failed OOS as
+a pick. The defensible claim is only "0.8:1 is measurably bad".
 
-### d. Risk-normalise the sweep, then decide on the trailing stop
+### d. Decide whether the desk's own default exit becomes a trail
 
-`scripts/exit-geometry-sweep.mts` sizes every trade at lot 1, so its PF column is a dollar
-ratio dominated by high-priced, high-ATR names (on daily IS it contradicts totalR outright).
-The live desk sizes to constant dollar risk (`computeLot`), under which summing R *is*
-summing dollars — so totalR is the honest column today and PF is noise. Fix the sizing before
-quoting PF, then reconsider shipping `trail 1.5/1.5` (+0.021 avgR, ~36% more trades on
-weekly). Blockers on shipping it: idealised stop fills (gaps aren't modelled) and survivorship
+The sweep is risk-normalised (§3) and the research loop can now pick a trail, but
+**`resolveExitOverride`'s no-override path and the backtest engine's `ATR_TP_MULT` are
+untouched** — a built-in strategy like the `combo-vote` desk #11 actually runs still exits
+on the 1.5/2.5 ladder. On weekly, the desk's timeframe, the trail is +0.021 avgR and ~36%
+more trades. Blockers before shipping it as the default: idealised stop fills (gaps aren't
+modelled, and a trail exits at a stop far more often than a ladder does) and survivorship
 bias in `.cache/bars/sp500-1d.json`. `1.0/1.5` performs nearly as well — do not present
 1.5/1.5 as an optimum.
 

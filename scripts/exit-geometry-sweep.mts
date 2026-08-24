@@ -206,8 +206,16 @@ interface Row { label: string; trades: number; winRate: number; avgR: number; sd
 function score(label: string, trades: SimTrade[]): Row {
   const rs = trades.map((t) => t.rMultiple).filter((r): r is number => r != null);
   const wins = trades.filter((t) => t.outcome === "win").length;
-  const gross = trades.reduce((a, t) => a + Math.max(0, t.pnl), 0);
-  const loss = trades.reduce((a, t) => a + Math.max(0, -t.pnl), 0);
+  // Profit factor over R, not over dollars. The engine runs lot=1 for every
+  // trade, so a dollar PF is a ratio dominated by whichever names happen to be
+  // expensive and high-ATR, and it can contradict totalR outright (daily IS:
+  // PF 0.97 against totalR +399). The live desk sizes to constant dollar risk
+  // (computeLot: riskUsd / slDistance), under which each trade's dollar P&L is
+  // its R times one fixed constant — so won-R over lost-R IS the profit factor
+  // the desk experiences. Caveat: computeLot clamps to [minLot, maxLotPerTrade],
+  // so risk is constant only for trades that do not hit a clamp.
+  const gross = rs.reduce((a, r) => a + Math.max(0, r), 0);
+  const loss = rs.reduce((a, r) => a + Math.max(0, -r), 0);
   const avgR = rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 0;
   // avgR is unreadable without its dispersion: R-multiples scatter with sd near
   // 1, so even on a few thousand trades the standard error is ~0.03 — the same

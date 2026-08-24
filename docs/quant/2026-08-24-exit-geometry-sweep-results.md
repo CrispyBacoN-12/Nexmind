@@ -31,12 +31,12 @@ new variant selected.
 
 ## 2. Weekly, full 491-symbol universe, OOS
 
-| | trades | win% | avgR | ΔavgR | t | totalR |
-|---|---|---|---|---|---|---|
-| baseline | 3492 | 26.1 | +0.058 | | 2.45 | 201.0 |
-| trail 1.5/1.5 | 4878 | 51.3 | +0.076 | +0.019 | **3.97** | 371.9 |
-| trail 1.0/1.5 | 5444 | 44.1 | +0.064 | +0.007 | 3.86 | 350.0 |
-| single 2.5 ATR | 4458 | 39.5 | +0.053 | −0.005 | 2.70 | 234.7 |
+| | trades | win% | avgR | ΔavgR | t | totalR | PF |
+|---|---|---|---|---|---|---|---|
+| baseline | 3492 | 26.1 | +0.058 | | 2.45 | 201.0 | 1.09 |
+| trail 1.5/1.5 | 4878 | 51.3 | +0.076 | +0.019 | **3.97** | 371.9 | **1.16** |
+| trail 1.0/1.5 | 5444 | 44.1 | +0.064 | +0.007 | 3.86 | 350.0 | 1.15 |
+| single 2.5 ATR | 4458 | 39.5 | +0.053 | −0.005 | 2.70 | 234.7 | 1.09 |
 
 ## 3. Daily bars, 246 symbols (`--every=2`) — the sharpest result
 
@@ -49,10 +49,15 @@ test, not the easier one.
 | **IS** trail 1.0/1.5 | 22479 | 42.9 | +0.024 | +0.042 | 2.95 | 544.3 | 0.99 |
 | **IS** trail 1.5/1.5 | 20420 | 49.2 | +0.020 | +0.037 | 2.11 | 399.3 | 0.97 |
 | **IS** single 2.5 ATR | 18734 | 37.1 | −0.016 | +0.002 | −1.67 | −295.2 | 0.95 |
-| **OOS** baseline | 8300 | 24.2 | +0.015 | | 0.98 | 122.0 | 0.97 |
-| **OOS** trail 1.0/1.5 | 12657 | 43.7 | +0.061 | +0.046 | **5.54** | 769.6 | 1.09 |
-| **OOS** trail 1.5/1.5 | 11390 | 50.6 | +0.064 | **+0.049** | **5.12** | 727.8 | 1.08 |
-| **OOS** single 2.5 ATR | 10423 | 38.3 | +0.017 | +0.002 | 1.33 | 176.1 | 0.99 |
+| **OOS** baseline | 8300 | 24.2 | +0.015 | | 0.98 | 122.0 | 1.02 |
+| **OOS** trail 1.0/1.5 | 12657 | 43.7 | +0.061 | +0.046 | **5.54** | 769.6 | **1.14** |
+| **OOS** trail 1.5/1.5 | 11390 | 50.6 | +0.064 | **+0.049** | **5.12** | 727.8 | 1.13 |
+| **OOS** single 2.5 ATR | 10423 | 38.3 | +0.017 | +0.002 | 1.33 | 176.1 | 1.03 |
+
+The OOS PF column above is the re-run one (risk-normalised, see caveat 3). The
+in-sample PF values in the four rows above it are the original dollar figures —
+they are the ones that contradicted totalR, and they are left in place as the
+evidence for why the column had to change.
 
 The daily ΔavgR barely shrinks across the split — +0.037/+0.042 in-sample,
 +0.049/+0.046 out — on 15k and 8k baseline trades. A fitted parameter shrinks
@@ -140,13 +145,20 @@ Caveat 1 below is therefore answered, and answered in the trail's favour.
    underlying daily prices; weekly is resampled from it. The trade sets differ a
    lot (8300 vs 3492 baseline entries, different holding periods), but the
    confirmation is correlated, not a second experiment.
-3. **Ignore the PF column.** The sweep runs `lot = 1` for every trade, so PF is
-   a dollar ratio dominated by high-priced, high-ATR names. The live desk sizes
-   to constant dollar risk (`computeLot`: `riskUsd / slDistance`), under which
-   summing R *is* summing dollars. Where PF and totalR disagree — and on daily
-   IS they disagree flatly, PF 0.97 against totalR +399 — totalR is the one that
-   describes the desk. The sweep should eventually run risk-normalised lots so
-   the two columns stop contradicting each other.
+3. ~~**Ignore the PF column.**~~ **Fixed 2026-08-24, after this study first
+   published.** The sweep ran `lot = 1` for every trade, so PF was a dollar
+   ratio dominated by high-priced, high-ATR names, and it contradicted totalR
+   outright on daily IS (PF 0.97 against totalR +399). The live desk sizes to
+   constant dollar risk (`computeLot`: `riskUsd / slDistance`), under which a
+   trade's dollar P&L is its R times one fixed constant — so the honest profit
+   factor is won-R over lost-R, and `score()` now computes it that way rather
+   than re-simulating with variable lots, which would give the same answer up
+   to `computeLot`'s min/max clamps. Re-running the two OOS tables moved every
+   row up and, more to the point, stopped the columns disagreeing: weekly
+   baseline 1.09 → trail **1.16**; daily baseline 0.97 → **1.02**, trail 1.09 →
+   **1.14**. The direction of the result did not change, which is the outcome
+   that was in question. On daily OOS the baseline crosses from PF < 1 to
+   PF > 1 purely from correcting the weighting.
 4. **Fills are assumed exactly at the stop level.** Gaps through a stop are not
    modelled. The baseline's hard SL makes the same assumption, so the comparison
    is fair, but both absolute levels are optimistic. A trailing stop exits at a
@@ -162,8 +174,13 @@ Caveat 1 below is therefore answered, and answered in the trail's favour.
 ## Status
 
 Nothing has been changed on any desk. `ATR_SL_MULT`, `ATR_TP_MULT` and
-`TP2_FACTOR` are untouched, and `resolveExitOverride` still hands research
-strategies the 1.2/1.5 ladder.
+`TP2_FACTOR` are untouched.
+
+`RESEARCH_ATR_TP_MULT = 1.2` is also untouched, but it is now reachable by
+fewer paths: 1.0 and 1.2 were removed from `LADDER_TP_MULTS`, so no *new*
+candidate can be assigned a sub-1:1 ladder. It remains the fallback in
+`resolveExitOverride` for approved rows persisted before `exitLadder` existed.
+Those legacy rows are the remaining exposure.
 
 ## What this does and does not license
 
@@ -176,10 +193,15 @@ is **+0.021 avgR per trade and ~36% more trades**, which roughly matches the
 +0.044 OOS baseline in size. That is not a large edge. It is a real one.
 
 **Does not:** this is still a single entry rule on a survivorship-biased S&P 500
-cache with idealised stop fills (caveats 4-5). Before it goes on a live desk it
-should be re-run on risk-normalised lots so the R and dollar columns agree, and
-the 1.5/1.5 cell should not be treated as tuned — 1.0/1.5 performs nearly as
-well, which is reassuring for robustness and means neither cell is special.
+cache with idealised stop fills (caveats 4-5). The 1.5/1.5 cell should not be
+treated as tuned — 1.0/1.5 performs nearly as well, which is reassuring for
+robustness and means neither cell is special.
+
+**Acted on 2026-08-24:** both trailing geometries were added to the research
+loop's exit menu (`LADDER_TRAILS` in `src/lib/research/runResearch.ts`), which
+until then could only choose among fixed single targets — the one geometry in
+this repo with an out-of-sample pedigree was the one the loop could not pick.
+Nothing was changed on the live desk's own default ladder.
 
 The strongest single takeaway is section 5: the live research ladder is 0.8:1
 and measured worst-of-20. That should be fixed regardless of what happens with

@@ -27,3 +27,35 @@ test("wrapAsStrategy leaves preferredExit undefined for the schema default empty
   const strat = wrapAsStrategy({ id: 45, label: "Default", code: "return null;", exitLadder: "{}" });
   assert.equal(strat.preferredExit, undefined);
 });
+
+test("wrapAsStrategy carries a swept trailing ladder through to preferredExit", () => {
+  // The whole point of sweeping trails: positionRules.decideAction short-
+  // circuits to the trail and ignores tp1Mult, so dropping `trail` here would
+  // quietly trade a validated trailing strategy as a fixed 2.5 ATR target.
+  const strat = wrapAsStrategy({
+    id: 46,
+    label: "Trailer",
+    code: "return null;",
+    exitLadder: JSON.stringify({ tp1Mult: 2.5, slMult: 1.5, singleTarget: true, trail: { activateMult: 1.5, offsetMult: 1.5 } }),
+  });
+  assert.deepEqual(strat.preferredExit, {
+    tp1Mult: 2.5,
+    slMult: 1.5,
+    singleTarget: true,
+    trail: { activateMult: 1.5, offsetMult: 1.5 },
+  });
+});
+
+test("wrapAsStrategy drops a half-specified trail rather than trading a broken one", () => {
+  // A trail missing either multiple is not a trail. Falling back to the fixed
+  // ladder is recoverable; handing positionRules an undefined offset is not.
+  for (const trail of [{ activateMult: 1.5 }, { offsetMult: 1.5 }, { activateMult: "1.5", offsetMult: 1.5 }]) {
+    const strat = wrapAsStrategy({
+      id: 47,
+      label: "Half trail",
+      code: "return null;",
+      exitLadder: JSON.stringify({ tp1Mult: 2.5, slMult: 1.5, singleTarget: true, trail }),
+    });
+    assert.deepEqual(strat.preferredExit, { tp1Mult: 2.5, slMult: 1.5, singleTarget: true });
+  }
+});

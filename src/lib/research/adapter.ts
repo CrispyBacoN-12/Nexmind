@@ -53,6 +53,15 @@ export function wrapAsStrategy(researchStrategy: { id: number; label: string; co
     const parsed = JSON.parse(researchStrategy.exitLadder || "{}");
     if (typeof parsed.tp1Mult === "number" && typeof parsed.slMult === "number") {
       preferredExit = { tp1Mult: parsed.tp1Mult, slMult: parsed.slMult, singleTarget: !!parsed.singleTarget };
+      // A swept trailing ladder has to survive the round trip or the live desk
+      // silently trades the tp1Mult instead — which, on a trailing option, is
+      // only a nominal R:R figure for the Iron Rules gate and was never an exit
+      // level (see LADDER_TRAILS in runResearch.ts). Both multiples are
+      // required: a half-specified trail is not a trail.
+      const trail = parsed.trail;
+      if (trail && typeof trail.activateMult === "number" && typeof trail.offsetMult === "number") {
+        preferredExit.trail = { activateMult: trail.activateMult, offsetMult: trail.offsetMult };
+      }
     }
   } catch {
     // malformed JSON — fall back to the engine's hardcoded RESEARCH_ATR_* ladder in src/lib/trading/engine.ts (preferredExit stays undefined)

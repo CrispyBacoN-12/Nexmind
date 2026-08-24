@@ -130,17 +130,25 @@ export async function runBlindTest(strategyId: number): Promise<BlindTestResult>
 
   let ladderTp1Mult = LEGACY_TP1_MULT;
   let ladderSlMult = LEGACY_SL_MULT;
+  // A trailing ladder must be honoured here too, or the held-out test validates
+  // a geometry the desk will not trade — the candidate would be measured on a
+  // fixed 2.5 ATR target and then run with a trailing stop.
+  let ladderTrail: { activateMult: number; offsetMult: number } | undefined;
   try {
     const parsed = JSON.parse(strategy.exitLadder || "{}");
     if (typeof parsed.tp1Mult === "number") {
       ladderTp1Mult = parsed.tp1Mult;
       ladderSlMult = typeof parsed.slMult === "number" ? parsed.slMult : LEGACY_SL_MULT;
+      const trail = parsed.trail;
+      if (trail && typeof trail.activateMult === "number" && typeof trail.offsetMult === "number") {
+        ladderTrail = { activateMult: trail.activateMult, offsetMult: trail.offsetMult };
+      }
     }
   } catch {
     // malformed JSON — fall back to the legacy ladder
   }
 
-  const bt = backtestCandles(symbol, holdoutBars, RESEARCH_LOT, undefined, entry, true, ladderTp1Mult, DEFAULT_COST_MODEL, ladderSlMult);
+  const bt = backtestCandles(symbol, holdoutBars, RESEARCH_LOT, undefined, entry, true, ladderTp1Mult, DEFAULT_COST_MODEL, ladderSlMult, ladderTrail);
   const holdout = summarizeBacktest(bt.trades);
   const holdoutDays = (holdoutBars[holdoutBars.length - 1].t - holdoutBars[0].t) / 86400;
 
