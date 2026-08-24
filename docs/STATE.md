@@ -123,14 +123,27 @@ date range. Three consequences, measured:
 1. **The window slides one bar per trading day.** `AAPL 2y/1d` today and tomorrow are different
    series, so the in-sample/held-out cutoff moves with them. Re-running a blind test on a later
    day does not reproduce its own verdict.
-2. **The 1200 cap truncates silently.** `5y/1d` returns 1200 bars = 1745 days (4.8y), not 5y.
-   `coversDays` cannot catch it: it only compares against `minDays`, which is 400.
+2. **The 1200-bar cap is the real daily ceiling.** A `count` above 1200 is a 417
+   `ILLEGAL_PARAMETER`, and `timestamp`/`endTime` are ignored (both probed) — there is no
+   paging, so 1200 daily bars = **4.8y** is all Webull will ever give at `1d`. `5y/1d` returns
+   4.8y, not 5y, and `coversDays` cannot catch it: it only compares against `minDays` = 400.
+   (Weekly reaches 2003, monthly and yearly 1980. The API also serves `M120`, `M240`, `M`, `Y`,
+   which `intervalToWebullTimespan` does not map.)
 3. **The range label is wrong.** `2y/1d` returns 731 *bars* = 1064 calendar days (~2.9y). Every
    in-sample backtest recorded as "2y" ran on nearly three years.
 
 (3) lands directly on the retention bar added in §3 — both sides of that ratio come from a
-window that is not the one requested. Fix by requesting an explicit date range, or by pinning
-the end timestamp so a re-run reproduces the same bars.
+window that is not the one requested.
+
+**The fix is probably not to patch Webull.** Alpaca is already configured in `.env` and is
+better on every axis that matters here, measured the same day: it asks by **date range**, so
+`2y/1d` returns exactly 2.0y (500 bars) with a label that does not lie, and `max/1d` reaches
+**10.6y** against Webull's 4.8y ceiling. It is never reached, because `fetchCandles` tries
+Webull first (`src/lib/marketData.ts:70`) and Webull always succeeds at `1d`. So the research
+loop validates on the shallower provider with the sliding window while the deeper, stable one
+sits behind it. Options: prefer Alpaca for research/backtest depth while leaving Webull first
+for live quotes, or keep the order and pin an explicit end timestamp. Either changes what every
+stored `backtestSummary` means, so it is the owner's call.
 
 Also unfixed and harmless: strategy **212 is still `rejected`** on the old data error — a
 smoke test, not a verdict.
