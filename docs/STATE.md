@@ -82,7 +82,7 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   the risk veto into a rubber stamp exactly when risk review was unavailable. `manage.ts` has
   no AI dependency and is untouched, so open positions still exit normally.
 
-- **Validation replaced with a walk-forward panel** — the whole of §4f and the §6 window-policy
+- **Validation replaced with a walk-forward panel** (70fcec6) — the whole of §4f and the §6 window-policy
   blocker, closed. `docs/PROPOSAL-panel-validation.md` is now a record of what was built, not a
   request. Seven steps, all shipped:
   `panel.ts` (491-symbol cache, five disjoint folds, 250-bar Wilder warm-up, never falls back to
