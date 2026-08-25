@@ -28,6 +28,36 @@ const POINT_VALUE = 1;
 // would be matched on count but not on opportunity.
 export const WARMUP = 60;
 
+/**
+ * Smallest stop distance, as a fraction of entry price, that counts as risk.
+ *
+ * The old guard was `risk > 0`, which is not a guard. A frozen placeholder bar
+ * (o==h==l==c with zero volume — the panel cache holds 1,886 of them across six
+ * symbols) has no range, so ATR decays toward zero, so the ATR-multiple stop
+ * lands ~1e-14 from the entry, so pnl/risk comes out at -5.6e10. Three such
+ * trades were enough to drag a 17,600-trade fold's avgR to -8,952,720. The
+ * number is not an outlier to be winsorized; it is a division by something that
+ * was never a price.
+ *
+ * 1bp of entry sits below any stop a 1.5x ATR rule can produce and above every
+ * degenerate one — a tenth of a cent on a $10 name, narrower than the tick the
+ * exchange quotes in. Below it the honest answer is `null`: a trade that cannot
+ * be measured in R, which every consumer already filters out, rather than a
+ * trade with a spectacular R, which none of them can survive.
+ */
+export const MIN_RISK_FRACTION = 1e-4;
+
+/**
+ * R-multiple, or null when the inputs cannot support one. Shared with the live
+ * position manager so a degenerate stop degrades the same way in both places.
+ */
+export function rMultipleOf(pnl: number, entry: number, risk: number, lot: number): number | null {
+  if (![pnl, entry, risk, lot].every(Number.isFinite)) return null;
+  if (entry <= 0 || lot <= 0 || risk < entry * MIN_RISK_FRACTION) return null;
+  const r = pnl / (risk * lot * POINT_VALUE);
+  return Number.isFinite(r) ? r : null;
+}
+
 export interface SimTrade {
   symbol: string;
   side: "long" | "short";
@@ -212,7 +242,7 @@ export function stepPosition(pos: SimPosition, bar: Candle): StepResult {
         tp1Hit: pos.ladder.tp1Hit ?? false,
         pnl,
         grossPnl,
-        rMultiple: risk > 0 ? pnl / (risk * pos.lot * POINT_VALUE) : null,
+        rMultiple: rMultipleOf(pnl, pos.entry, risk, pos.lot),
         openedAt: pos.openedAt,
         closedAt: new Date(bar.t * 1000),
       },

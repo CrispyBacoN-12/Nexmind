@@ -3,9 +3,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   foldSlice, FOLDS, FIT_FOLD, SELECT_FOLD, TEST_FOLDS, PANEL_WARMUP_BARS,
-  PANEL_VALIDATION, LEGACY_VALIDATION, type Fold,
+  PANEL_VALIDATION, LEGACY_VALIDATION, isPlaceholderBar, sanitizeSeries,
+  loadPanel, resetPanelCache, type Fold,
 } from "./panel";
 
 const DAY = 86_400;
@@ -105,4 +109,65 @@ test("the two validation tags are distinct and legacy is the one the DB defaults
   assert.notEqual(PANEL_VALIDATION, LEGACY_VALIDATION);
   assert.equal(PANEL_VALIDATION, "panel-v1");
   assert.equal(LEGACY_VALIDATION, "legacy-single-symbol");
+});
+
+// ---- placeholder bars ----
+
+const frozen = (t: number, price: number): Candle => ({ t, o: price, h: price, l: price, c: price, v: 0 });
+
+test("isPlaceholderBar matches only the unambiguous shape: no range AND no volume", () => {
+  // The two half-matches are real market events, not filler. A zero-range bar
+  // with volume is a limit-up/halt print; a zero-volume bar with range is a
+  // stale quote that still moved. Roughly 400 bars in the live cache are one of
+  // those, and guessing about them would repeat the mistake being fixed here.
+  assert.equal(isPlaceholderBar(frozen(0, 3.15)), true);
+  assert.equal(isPlaceholderBar({ t: 0, o: 10, h: 10, l: 10, c: 10, v: 5000 }), false, "halted but traded");
+  assert.equal(isPlaceholderBar({ t: 0, o: 10, h: 11, l: 9, c: 10, v: 0 }), false, "no volume but a range");
+  assert.equal(isPlaceholderBar({ t: 0, o: 10, h: 11, l: 9, c: 10.5, v: 1000 }), false);
+});
+
+test("sanitizeSeries removes placeholders and leaves a gap rather than bridging it", () => {
+  // The gap is the honest record: the symbol was not trading. Interpolating a
+  // price nobody traded at would put invented history inside a TEST fold.
+  const t0 = epoch("2023-06-01");
+  const rows: Candle[] = [
+    { t: t0, o: 100, h: 101, l: 99, c: 100, v: 1000 },
+    frozen(t0 + DAY, 100),
+    frozen(t0 + 2 * DAY, 100),
+    { t: t0 + 3 * DAY, o: 115, h: 116, l: 113, c: 115, v: 3000 },
+  ];
+  const { candles, dropped } = sanitizeSeries(rows);
+  assert.equal(dropped, 2);
+  assert.deepEqual(candles.map((b) => b.t), [t0, t0 + 3 * DAY]);
+  assert.deepEqual(sanitizeSeries([]), { candles: [], dropped: 0 });
+});
+
+test("loadPanel applies the sanitizer itself and reports what each symbol lost", () => {
+  // Filtering at the call sites instead would mean a verdict depends on which
+  // script ran. loadPanel is the only door into the panel, so it is the door
+  // that has to hold.
+  const t0 = epoch("2023-06-01");
+  const good = dailyBars("2023-06-01", 5);
+  const dir = mkdtempSync(join(tmpdir(), "nexmind-panel-"));
+  const path = join(dir, "fixture.json");
+  writeFileSync(path, JSON.stringify({
+    fetchedAt: "2026-08-16T20:39:45.212Z",
+    bars: {
+      CLEAN: good,
+      DIRTY: [good[0], frozen(t0 + DAY, 100), good[2], frozen(t0 + 3 * DAY, 100)],
+      ALLFAKE: [frozen(t0, 5), frozen(t0 + DAY, 5)],
+    },
+  }));
+
+  resetPanelCache();
+  const panel = loadPanel(path);
+  try {
+    assert.deepEqual(panel.symbols, ["CLEAN", "DIRTY"], "a series that was entirely placeholder is not history");
+    assert.equal(panel.bars.CLEAN.length, 5);
+    assert.deepEqual(panel.bars.DIRTY.map((b) => b.t), [t0, t0 + 2 * DAY]);
+    assert.deepEqual(panel.droppedBars, { DIRTY: 2 }, "only symbols that lost bars are listed");
+    assert.ok(panel.bars.DIRTY.every((b) => !isPlaceholderBar(b)));
+  } finally {
+    resetPanelCache();
+  }
 });

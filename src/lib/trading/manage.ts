@@ -10,7 +10,7 @@ import { fetchCandles } from "@/lib/marketData";
 import { decideAction, applySlippage, type LadderState } from "./positionRules";
 import { generateLesson, type LessonInput } from "./memo";
 import { Prisma, type Trade } from "@/generated/prisma/client";
-import { DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
+import { DEFAULT_COST_MODEL, rMultipleOf } from "@/lib/backtest/engine";
 
 // Simplified paper P/L: USD per 1.0 price-point per lot. Real instruments differ
 // (contract sizes, pip values); this keeps the demo consistent and transparent.
@@ -118,7 +118,7 @@ export async function manageOpenTrades(portfolioId: number): Promise<ManageSumma
     const commission = notional * ((DEFAULT_COST_MODEL.commissionBps ?? 0) / 10000);
     const pnl = grossPnl - commission;
     const risk = Math.abs(t.entry - (ladder.origSl ?? t.sl));
-    const rMultiple = risk > 0 ? pnl / (risk * t.lot * POINT_VALUE) : null;
+    const rMultiple = rMultipleOf(pnl, t.entry, risk, t.lot);
 
     log.push({
       stage: "manage",

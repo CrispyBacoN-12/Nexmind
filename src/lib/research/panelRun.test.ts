@@ -27,7 +27,7 @@ function uptrend(startIso: string, n: number, step = 1): Candle[] {
 }
 
 function panelOf(bars: Record<string, Candle[]>): Panel {
-  return { fetchedAt: "2026-08-14T00:00:00.000Z", cachePath: ".cache/bars/test.json", symbols: Object.keys(bars), bars };
+  return { fetchedAt: "2026-08-14T00:00:00.000Z", cachePath: ".cache/bars/test.json", symbols: Object.keys(bars), bars, droppedBars: {} };
 }
 
 /** Signals with a long entry on the given indices, ATR fixed at 1 so stops are exact. */

@@ -1,7 +1,7 @@
 import "dotenv/config"; // engine.ts -> trading/scanner.ts -> research/adapter.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { backtestCandles, openPosition, stepPosition, summarizeBacktest, type SimTrade } from "./engine";
+import { backtestCandles, openPosition, stepPosition, summarizeBacktest, rMultipleOf, MIN_RISK_FRACTION, type SimTrade } from "./engine";
 import { decideSetup, type ScanSnapshot } from "@/lib/trading/scanner";
 import type { Candle } from "@/lib/indicators";
 
@@ -311,4 +311,31 @@ test("summarizeBacktest: totalCostsUsd aggregates grossPnl - pnl drag across tra
   ];
   const s = summarizeBacktest(trades);
   assert.ok(Math.abs(s.totalCostsUsd - 17) < 1e-9); // (112-100) + (-25 - -30) = 12 + 5
+});
+
+// ---- rMultipleOf ----
+
+test("rMultipleOf divides pnl by risk when the stop is a real distance", () => {
+  assert.equal(rMultipleOf(-150, 100, 1.5, 1), -100 / 1);
+  assert.equal(rMultipleOf(30, 100, 1.5, 10), 30 / 15);
+  assert.equal(rMultipleOf(0, 100, 1.5, 1), 0, "a breakeven trade is 0R, not null");
+});
+
+test("rMultipleOf returns null for a stop too tight to be a price, not a huge number", () => {
+  // The frozen-placeholder case, at the numbers it actually produced: entry
+  // 3.1501575 with a stop 8.3e-15 away gave R = -5.6e10, and three such trades
+  // moved a 17,600-trade fold's avgR to -8,952,720. Every consumer of rMultiple
+  // filters nulls; none of them survives a 1e10.
+  assert.equal(rMultipleOf(-470, 3.1501575, 8.3e-15, 1), null);
+  const floor = 100 * MIN_RISK_FRACTION;
+  assert.equal(rMultipleOf(-1, 100, floor * 0.999, 1), null, "just under the floor is refused");
+  assert.ok(rMultipleOf(-1, 100, floor, 1) != null, "the floor itself is allowed");
+});
+
+test("rMultipleOf refuses non-finite and non-positive inputs instead of propagating them", () => {
+  assert.equal(rMultipleOf(NaN, 100, 1.5, 1), null);
+  assert.equal(rMultipleOf(10, 100, Infinity, 1), null);
+  assert.equal(rMultipleOf(10, 0, 1.5, 1), null, "a zero entry has no scale to measure risk against");
+  assert.equal(rMultipleOf(10, -5, 1.5, 1), null);
+  assert.equal(rMultipleOf(10, 100, 1.5, 0), null, "a zero lot cannot have risked anything");
 });

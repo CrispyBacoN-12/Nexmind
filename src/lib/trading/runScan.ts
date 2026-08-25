@@ -8,7 +8,7 @@ import { runTradeTick } from "@/lib/trading/engine";
 import { manageOpenTrades, type ManageSummary } from "@/lib/trading/manage";
 import { getStrategy } from "@/lib/trading/strategies";
 import { getResearchStrategy } from "@/lib/research/adapter";
-import { fetchCandlesBatch } from "@/lib/marketData";
+import { fetchCandles, fetchCandlesBatch } from "@/lib/marketData";
 import { adx } from "@/lib/indicators";
 import { getWatchlist } from "@/lib/trading/watchlist";
 import { UNIVERSES, prepareSymbols } from "@/lib/trading/universe";
@@ -16,6 +16,7 @@ import { getScanTimeframe, getPortfolioStrategy, getPortfolioUniverse, isGlobalT
 import { isSwingKind, canPortfolioTrade } from "@/lib/portfolioGuards";
 import { SECONDARY_PASSES } from "@/lib/trading/secondaryPasses";
 import { getCurrentDrawdownPct } from "@/lib/trading/circuitBreaker";
+import { readMarketGate } from "@/lib/market/marketGate";
 import { sendDiscordNotification } from "@/lib/notify/discord";
 import { aiEnabled, aiOutageReason } from "@/lib/anthropic";
 import type { Interval, Range } from "@/lib/yahoo";
@@ -64,6 +65,18 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: 
   let slots = p.maxOpenPositions - open.length;
   if (slots <= 0) {
     log(`#${p.id} ${p.name} universe=${universeKey}: ${open.length}/${p.maxOpenPositions} positions open, no free slot — not scanning`);
+    return;
+  }
+
+  // The market gate runs BEFORE the universe fetch, not after: a risk-off
+  // session should not cost 200 symbol requests to discover that nothing may be
+  // opened. It only ever narrows `slots`, so an outage that blinds it leaves the
+  // desk exactly as it was — see gateSlots' fail-open note.
+  const gate = await readMarketGate(slots, { fetchCandles, getSetting });
+  log(`#${p.id} ${p.name} ${gate.note}`);
+  slots = gate.slots;
+  if (slots <= 0) {
+    log(`#${p.id} ${p.name} universe=${universeKey}: market gate allows no new positions — not scanning (open trades are still managed)`);
     return;
   }
 

@@ -143,6 +143,38 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   `list-approved` tags each row DESK-ELIGIBLE / not eligible. **Live state 08-25: 0 survivors,
   0 `panel-v1` rows, 6 legacy approvals.**
 
+- **The panel cache was serving fake bars, and one of them owned a whole fold.** Found while
+  measuring the market gate: TEST2's avgR read **-8,952,720**. Cause was three trades on frozen
+  placeholder bars (`o==h==l==c`, zero volume) — no range → ATR ~0 → an ATR-multiple stop
+  landing ~1e-14 from entry → `pnl/risk` = -5.6e10. The old guard `risk > 0` is not a guard;
+  `1e-14 > 0`. The cache holds **1,886 such bars across 6 symbols** (PARA 946 including a run of
+  **652 consecutive**, FI 421, SMCI 349, CTRA 167, BIIB 2, DXCM 1) out of 1,277,489. Fixed in two
+  layers: `loadPanel` drops them on load and reports `droppedBars` per symbol (a gap is the
+  truth — the symbol was not trading; interpolating would put invented history inside a TEST
+  fold), and `rMultipleOf` in `backtest/engine.ts` requires risk ≥ `MIN_RISK_FRACTION` (1bp) of
+  entry, so bad data degrades to `rMultiple: null` — which every consumer already filters —
+  instead of a number no average survives. `trading/manage.ts` uses the same helper, so the live
+  desk degrades identically. TEST2 now reads **-0.024**. Timing was deliberate: this changes
+  every panel number, and the DB holds **0 `panel-v1` rows**, so the blast radius is zero. Only
+  the unambiguous shape is dropped — ~98 zero-range-with-volume (halts) and ~310
+  zero-volume-with-range (stale quotes) bars are left alone on purpose.
+- **Market gate shipped — one leg of the three that were measured.** `src/lib/market/regime.ts`
+  (pure: SPY-vs-SMA200, breadth, 20d realized vol) + `scripts/regime-conditional.mts`, which
+  buckets all 91,236 baseline trades across all five folds by the regime on their **entry** day.
+  Verdict, in `scripts/regime-conditional.log`:
+  **SPY vs its own SMA200 is the only leg that survives** — avgR above/below is
+  `+0.017/-0.071` (FIT), `+0.002/-0.293` (SELECT), `+0.012/-0.004` (TEST1), `+0.018/-0.077`
+  (TEST2), `-0.004/-0.109` (TEST3): same sign 5/5. **Breadth and realized vol both fail** (§5).
+  `marketGate.ts` ships that one leg, wired into `scanUniverse` **before** the universe fetch and
+  logging its reading on every scan; kill switch is the `marketGate` setting (`"off"`).
+  Three things to carry forward: **(1)** the surviving feature is the only one with **no free
+  parameter to fit** — "above its own trailing mean" is self-normalising, and the two features
+  with a number in them are the two that died. **(2)** it **removes a loss, it does not create an
+  edge**: gated fold avgR is `{+0.017, +0.002, +0.012, +0.018, -0.004}`, i.e. ~0, and TEST3 is
+  still negative. **(3)** it fails **open** — a blind benchmark passes slots through with a
+  `BLIND` log line, because a data outage silently halting the desk is worse than missing a
+  filter worth ~0.02R. Opposite of how the research gates fail, and intentional.
+
 ## 4. Next steps, highest value first
 
 **(f) is now resolved** (§3) and it absorbed most of (a): research and every blind test read
@@ -227,6 +259,18 @@ approved alone is not the survivor condition (§3).
   regime checks on an already-chosen variant. Never select anything with it.
 - **Do not re-tune the 13 confluence filters, cross-sectional mean reversion, or
   cross-sectional momentum.** All three loops are closed and documented as rejected.
+- **Do not re-tune breadth or realized vol as regime features.** Measured on all five folds and
+  rejected: breadth is monotone in FIT then inverts in SELECT and TEST3; vol's top bucket is
+  consistently bad but its Q1–Q4 ordering holds nowhere. Both died the same way — **FIT-derived
+  absolute cut points do not transfer.** The breadth quintile holding 17% of FIT's trades holds
+  **79%** of TEST2's, and TEST2's top quintile is empty. A threshold fitted on 2016-2018 is
+  measuring a different market by 2022. Evidence: `scripts/regime-conditional.log`.
+- **The market gate's sample is ~a dozen episodes, not 91,236 trades.** Its variable changes only
+  when SPY crosses its 200-day mean. Five folds of ONE benchmark series are not five independent
+  observations. Never quote the trade counts as the evidence base.
+- **`MIN_RISK_FRACTION` exists because `risk > 0` let 1e-14 through.** Do not relax it, and do not
+  "fix" a null `rMultiple` by winsorizing — null means the trade cannot be measured in R, which is
+  the honest report of a bar that never traded.
 - **Live trading cannot measure an edge.** 5 slots on weekly bars ≈ 15–25 closed trades per
   8 weeks; sd(R) ≈ 1.39 → SE ±0.31R against an effect size ~0.04R. n comes from the sweep
   harness, not from waiting. Live runs verify plumbing, nothing else.

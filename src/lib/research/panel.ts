@@ -86,6 +86,49 @@ export interface Panel {
   cachePath: string;
   symbols: string[];
   bars: Record<string, Candle[]>;
+  /** placeholder bars removed on load, per symbol; only symbols that lost some appear */
+  droppedBars: Record<string, number>;
+}
+
+/**
+ * A bar the provider emitted to fill a hole in its calendar, not a session that
+ * traded: open, high, low and close all identical, and no volume.
+ *
+ * They are not rare and not harmless. This cache carries 1,886 of them across
+ * six names — PARA alone has 946, in a run of 652 consecutive sessions, so
+ * roughly a third of its history is a flat line at one price. A run like that
+ * drives every range-based indicator to zero, and a zero-range ATR turns an
+ * ATR-multiple stop into a division by ~1e-14. See MIN_RISK_FRACTION in
+ * backtest/engine.ts for what that did to TEST2.
+ *
+ * Only the unambiguous shape is matched. A zero-range bar WITH volume can be a
+ * real limit-up halt, and a zero-volume bar WITH range can be a stale-quote
+ * artifact that still carries information; roughly 400 bars in the cache are one
+ * or the other and are deliberately left alone. Guessing about those would be
+ * the same class of mistake as keeping these.
+ */
+export function isPlaceholderBar(b: Candle): boolean {
+  return b.o === b.h && b.h === b.l && b.l === b.c && !b.v;
+}
+
+/**
+ * Drop placeholder bars from one symbol's history.
+ *
+ * Dropping leaves a gap in the series, and the gap is the truth: the symbol was
+ * not trading. Every consumer here is gap-tolerant already — indicators run on
+ * bar index, foldSlice cuts on timestamp, and regime breadth counts per session
+ * — so a name that vanishes for a stretch simply stops participating, which is
+ * what actually happened. The alternative, interpolating a price nobody traded
+ * at, would put invented history inside the folds a verdict is measured on.
+ */
+export function sanitizeSeries(bars: Candle[]): { candles: Candle[]; dropped: number } {
+  let dropped = 0;
+  const candles: Candle[] = [];
+  for (const b of bars) {
+    if (isPlaceholderBar(b)) dropped++;
+    else candles.push(b);
+  }
+  return { candles, dropped };
 }
 
 export interface FoldSlice {
@@ -156,14 +199,29 @@ export function loadPanel(cachePath: string = PANEL_CACHE_PATH): Panel {
     throw new Error(`panel cache at ${cachePath} has no 'bars' map — expected { fetchedAt, bars: { SYMBOL: Candle[] } }`);
   }
 
-  const symbols = Object.keys(raw.bars).filter((s) => Array.isArray(raw.bars![s]) && raw.bars![s].length > 0).sort();
+  // Sanitize on load rather than at the call sites: every path into the panel
+  // goes through here, and a filter that one script remembers to apply is a
+  // filter that decides verdicts by which script ran.
+  const bars: Record<string, Candle[]> = {};
+  const droppedBars: Record<string, number> = {};
+  for (const symbol of Object.keys(raw.bars)) {
+    const rows = raw.bars[symbol];
+    if (!Array.isArray(rows) || !rows.length) continue;
+    const { candles, dropped } = sanitizeSeries(rows);
+    if (!candles.length) continue; // a series that was entirely placeholder is not history
+    bars[symbol] = candles;
+    if (dropped) droppedBars[symbol] = dropped;
+  }
+
+  const symbols = Object.keys(bars).sort();
   if (!symbols.length) throw new Error(`panel cache at ${cachePath} is empty`);
 
   cached = {
     fetchedAt: raw.fetchedAt ?? "unknown",
     cachePath,
     symbols,
-    bars: raw.bars,
+    bars,
+    droppedBars,
   };
   return cached;
 }
