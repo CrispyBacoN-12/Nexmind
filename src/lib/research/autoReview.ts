@@ -11,9 +11,16 @@ import type { BacktestSummary } from "@/lib/backtest/engine";
 export const MIN_TRADES = 20;
 export const MIN_PROFIT_FACTOR = 1.1;
 
-export function autoReviewStatus(bt: BacktestSummary, safetyFlag: boolean): "approved" | "rejected" {
+/**
+ * `minTrades` is a parameter because the floor depends on what produced the
+ * sample. 20 is right for one symbol; a panel of 491 correlated names needs an
+ * order of magnitude more before its count means the same thing (see
+ * MIN_PANEL_TRADES in panelRun.ts). The floor moves up, never down — no caller
+ * may pass something below MIN_TRADES.
+ */
+export function autoReviewStatus(bt: BacktestSummary, safetyFlag: boolean, minTrades: number = MIN_TRADES): "approved" | "rejected" {
   if (safetyFlag) return "rejected";
-  if (bt.trades < MIN_TRADES) return "rejected";
+  if (bt.trades < Math.max(minTrades, MIN_TRADES)) return "rejected";
   // expectancy has existed on every schema version this project has used
   // (profitFactor was added later - older rows simply lack the key, which
   // must not be read the same as "zero losing trades"), so it's the one

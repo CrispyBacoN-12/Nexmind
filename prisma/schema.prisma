@@ -261,6 +261,11 @@ model ResearchStrategy {
   safetyFlag      Boolean     @default(false) // ever failed the deny-list scan
   blindTest       String      @default("{}") // JSON: BlindTestResult from the held-out validation gate
   exitLadder      String      @default("{}") // JSON: { tp1Mult, slMult, singleTarget } this candidate's own swept ladder
+  /// Which window policy produced this row: legacy-single-symbol | panel-v1.
+  /// Defaults to legacy so existing rows describe themselves truthfully rather
+  /// than being backfilled into a validation they never had. Only panel-v1 rows
+  /// are activatable on a portfolio (see adapter.getResearchStrategy).
+  validation      String      @default("legacy-single-symbol")
   demotedReason   String? // set when a re-vet sweep drops status from approved to demoted
   createdAt       DateTime    @default(now())
 }

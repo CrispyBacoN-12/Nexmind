@@ -3,9 +3,24 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
 import { backtestCandles, summarizeBacktest, DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
-import { computeSnapshots } from "./adapter";
+import { panelSignalsForCode } from "./adapter";
 import { sweepLadder, isBankableRound, LADDER_TP_MULTS, LADDER_SL_MULT, LADDER_TRAILS, LADDER_OPTIONS, type ExitLadder } from "./runResearch";
 import { MIN_TRADES } from "./autoReview";
+import { FOLDS } from "./panel";
+import type { PreparedSymbol } from "./panelRun";
+
+// sweepLadder now sweeps a prepared PANEL, not a (code, bars, snaps) triple, so
+// every fixture below is wrapped as a one-symbol panel. One symbol is enough:
+// the sweep's job is picking a ladder, and it picks it from the pooled trades
+// however many symbols produced them. entryFrom 0 leaves the engine's own
+// WARMUP as the only entry floor, which is what the old call did too.
+function onePanel(bars: Candle[], code: string = PERIODIC_LONG_CODE): PreparedSymbol[] {
+  return [{ symbol: "EXPECT", candles: bars, entryFrom: 0, signals: panelSignalsForCode(code)("EXPECT", bars) }];
+}
+
+// Any fold works here — sliceFold already cut the bars, so simulateFold only
+// carries the fold through to the FoldRun for labelling.
+const FIXTURE_FOLD = FOLDS.fit;
 
 /** Mirrors sweepLadder's own selection, but only ever calls backtestCandles /
  *  summarizeBacktest directly — it never invokes sweepLadder, so every test
@@ -91,14 +106,13 @@ test("the ladder menu has retired every sub-1:1 target and offers both validated
 
 test("sweepLadder picks the highest-avgR option, matching an independently recomputed sweep", () => {
   const bars = triangleBars(700);
-  const snaps = computeSnapshots(bars);
   const { best, eligible } = recomputeSweep(bars, periodicEntry);
 
   // The fixture has to exercise the eligibility branch that actually ships,
   // otherwise this test would silently only cover the thin-field fallback.
   assert.ok(eligible.length > 0, `no ladder option reached MIN_TRADES=${MIN_TRADES} on this fixture`);
 
-  const result = sweepLadder(PERIODIC_LONG_CODE, bars, snaps);
+  const result = sweepLadder(onePanel(bars), FIXTURE_FOLD);
 
   // deepEqual, not a tp1Mult comparison: a trailing winner and a fixed-target
   // winner can share a tp1Mult (TRAIL_NOMINAL_TP_MULT is 2.5, which is also a
@@ -110,9 +124,8 @@ test("sweepLadder picks the highest-avgR option, matching an independently recom
 
 test("sweepLadder selects on avgR, not on the dollar profit factor it used to rank by", () => {
   const bars = triangleBars(700);
-  const snaps = computeSnapshots(bars);
   const { scored } = recomputeSweep(bars, periodicEntry);
-  const result = sweepLadder(PERIODIC_LONG_CODE, bars, snaps);
+  const result = sweepLadder(onePanel(bars), FIXTURE_FOLD);
 
   const eligible = scored.filter((s) => s.summary.trades >= MIN_TRADES);
   const bestAvgR = Math.max(...eligible.map((s) => s.summary.avgR ?? -Infinity));
@@ -136,8 +149,7 @@ test("sweepLadder selects on avgR, not on the dollar profit factor it used to ra
 
 test("sweepLadder returns a ladder from the published menu that actually produced trades", () => {
   const bars = triangleBars(250);
-  const snaps = computeSnapshots(bars);
-  const result = sweepLadder(PERIODIC_LONG_CODE, bars, snaps);
+  const result = sweepLadder(onePanel(bars), FIXTURE_FOLD);
   assert.ok(
     LADDER_OPTIONS.some((o) => o.tp1Mult === result.ladder.tp1Mult && o.trail?.activateMult === result.ladder.trail?.activateMult),
     "the winner must come from LADDER_OPTIONS",
@@ -151,12 +163,11 @@ test("sweepLadder still returns a ladder when no option reaches MIN_TRADES", () 
   // It must still return the avgR maximum rather than throwing on an empty
   // reduce — autoReviewStatus rejects the candidate on trade count right after.
   const bars = uptrendBars(90, 2);
-  const snaps = computeSnapshots(bars);
   const { scored, eligible, best } = recomputeSweep(bars, periodicEntry);
   assert.equal(eligible.length, 0, `fixture must stay under MIN_TRADES=${MIN_TRADES} for this to test the fallback`);
   assert.ok(scored.some((s) => s.summary.trades > 0), "fixture must still produce some trades");
 
-  const result = sweepLadder(PERIODIC_LONG_CODE, bars, snaps);
+  const result = sweepLadder(onePanel(bars), FIXTURE_FOLD);
   assert.deepEqual(result.ladder, best.ladder);
 });
 
@@ -172,9 +183,8 @@ test("a trailing option survives the sweep intact when it wins", () => {
     price += i % 40 < 34 ? 1.2 : -0.4;
     bars.push(bar(i * 3600, price));
   }
-  const snaps = computeSnapshots(bars);
   const { best } = recomputeSweep(bars, periodicEntry);
-  const result = sweepLadder(PERIODIC_LONG_CODE, bars, snaps);
+  const result = sweepLadder(onePanel(bars), FIXTURE_FOLD);
 
   assert.deepEqual(result.ladder, best.ladder);
   if (best.ladder.trail) {

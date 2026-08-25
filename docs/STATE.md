@@ -39,7 +39,8 @@ Hard context the code does not state:
 | `ResearchStrategy` | **6 approved** / 171 rejected / 37 demoted / 1 proposed (34 mock rows demoted 08-25) |
 | …the 6 survivors | all on **BTC-USD / GC=F / NG=F** — none on a stock; none has a blind test |
 | `ResearchRun` | 109 rows, 102 `done` — but only **#110** was ever AI-proposed (§3) |
-| Schema | `blindTest`, `exitLadder`, `demotedReason` columns are pushed and live |
+| Schema | `blindTest`, `exitLadder`, `demotedReason`, **`validation`** columns are pushed and live |
+| `validation` on every existing row | `legacy-single-symbol` (the column default) — so **0 rows are desk-eligible** until one passes a panel round (§3) |
 
 Re-verify with a throwaway script under `scripts/` (delete it afterwards) querying
 `portfolio.findMany` (the field is `status`, **not** `active`),
@@ -80,6 +81,29 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   opening, and both *mid-flight* fallbacks refuse the same way — the SAGE one had been turning
   the risk veto into a rubber stamp exactly when risk review was unavailable. `manage.ts` has
   no AI dependency and is untouched, so open positions still exit normally.
+
+- **Validation replaced with a walk-forward panel** — the whole of §4f and the §6 window-policy
+  blocker, closed. `docs/PROPOSAL-panel-validation.md` is now a record of what was built, not a
+  request. Seven steps, all shipped:
+  `panel.ts` (491-symbol cache, five disjoint folds, 250-bar Wilder warm-up, never falls back to
+  a live fetch) · entry/exit separation in the sweep · `control.ts` (matched random-entry control
+  + monthly block bootstrap, both on a fixed `PANEL_SEED` so a verdict reproduces from the cache
+  alone) · research fits on **FIT 2016-2018** and is gated on **SELECT 2019** ·
+  `runBlindTest` measures **TEST 2020-21 / 2022-23 / 2024-26** and requires **all three**, ANDed
+  not averaged (research-29 is why) · a `validation` column with `getResearchStrategy` as the
+  single enforcement point · the rotation moved to weekly.
+  Three things worth carrying forward:
+  **(1)** the proposal's expanding-window layout was *not* shipped — split 3's TRAIN contained
+  splits 1-2's TEST windows, so a candidate required to pass all three splits would have been
+  fitted to the folds it had already survived. One FIT + one SELECT + three later TEST folds is
+  the only layout that keeps every TEST fold untouched at once.
+  **(2)** a round measures **8-10 min**, not the 1-2 h the proposal estimated, so weekly rests on
+  **multiple testing** (3/week ≈ 156 tests/yr vs 3/day ≈ 1,100 against a p95 bar), not on cost.
+  **(3)** every removed parameter **refuses** rather than being ignored: `runResearch` lost its
+  `symbol`/`interval`/`range` params, `POST /api/research` 400s on them, the UI pickers are gone,
+  and seven `scripts/dispatch-*.ts` one-offs were deleted (git retains them).
+  Tests: **356 pass / 0 fail**; `panel.test.ts` asserts the folds are disjoint and correctly
+  ordered, so the layout cannot drift silently.
 - **First real research round** — run **#110**, 08-25, fired through Task Scheduler:
   `status: done` with three novel mechanism labels. The proposer had never actually run
   before; all 109 prior rounds banked mocks. All three were rejected by `autoReview` on 4–5
@@ -108,54 +132,38 @@ Older entries are compressed to one line each; their reasoning is in the commit 
 
 ## 4. Next steps, highest value first
 
-Read **(f) first** — it was measured on 2026-08-25 and it reprioritises this whole list. It
-absorbs most of (a): once backtests read the bar cache instead of the provider API, the
-Webull-vs-Alpaca window question mostly stops mattering. (a)–(e) below are unchanged and still
-true; they are just no longer the top of the list.
+**(f) is now resolved** (§3) and it absorbed most of (a): research and every blind test read
+`.cache/bars/sp500-1d.json`, so the provider's window policy no longer decides what a stored
+`backtestSummary` means. (a) is kept because the desk's *live* path still fetches from Webull,
+but it is no longer blocking research. **(b) is the top of the list now**, and the panel has
+made it sharper rather than softer: the eligible pool is not just off-universe, it is empty.
 
-### a. Pin the bar window — the held-out set is still not reproducible
+### a. Pin the bar window — for the live desk path only, now
 
-Corrected 2026-08-25: this used to be filed as a *Yahoo* problem (3473 then 7984 bars for an
-identical `AAPL 2y/1h`). That measurement predates `778bfeb`/`36a9b35`, which put Webull at the
-front of the chain. A probe of all five shapes the desk and the research loop actually request
-(`2y/1d`, `5y/1d`, `3mo/1d`, `2y/1h`) returns **Webull every time** — Yahoo is now only the tail
-fallback for symbols Webull and Alpaca both miss. Do not re-cite the Yahoo numbers.
+Downgraded 2026-08-25: research and blind tests read the pinned cache, so none of this touches a
+stored research verdict any more. What is left is the live quote/scan path, where the desk still
+fetches from Webull. Do **not** re-cite the old Yahoo bar-count numbers — a probe of all five
+shapes the desk requests returns Webull every time; Yahoo is only the tail fallback.
 
-The reproducibility problem moved rather than went away, and it is Webull's now.
-`rangeToWebullCount` (`src/lib/webull.ts:53`) asks for **N bars counted back from now**, not a
-date range. Three consequences, measured:
+Webull's `rangeToWebullCount` (`src/lib/webull.ts:53`) asks for **N bars counted back from now**,
+not a date range. Measured consequences: the window **slides one bar per trading day**, so a
+range label is never the same series twice; **1200 bars is a hard cap** (a higher `count` is a
+417 `ILLEGAL_PARAMETER`, `timestamp`/`endTime` are ignored, no paging), which makes 4.8y the
+daily ceiling and silently truncates `5y/1d`; and the **labels are wrong** (`2y/1d` returns 731
+bars = ~2.9y). Alpaca, already configured in `.env`, asks by date range, returns exactly 2.0y for
+`2y/1d`, and reaches 10.6y at `max/1d` — it is simply never reached, because `fetchCandles` tries
+Webull first (`src/lib/marketData.ts:70`) and Webull always succeeds at `1d`. Either prefer
+Alpaca for depth or pin an explicit end timestamp. Owner's call; it now affects live scans only.
 
-1. **The window slides one bar per trading day.** `AAPL 2y/1d` today and tomorrow are different
-   series, so the in-sample/held-out cutoff moves with them. Re-running a blind test on a later
-   day does not reproduce its own verdict.
-2. **The 1200-bar cap is the real daily ceiling.** A `count` above 1200 is a 417
-   `ILLEGAL_PARAMETER`, and `timestamp`/`endTime` are ignored (both probed) — there is no
-   paging, so 1200 daily bars = **4.8y** is all Webull will ever give at `1d`. `5y/1d` returns
-   4.8y, not 5y, and `coversDays` cannot catch it: it only compares against `minDays` = 400.
-   (Weekly reaches 2003, monthly and yearly 1980. The API also serves `M120`, `M240`, `M`, `Y`,
-   which `intervalToWebullTimespan` does not map.)
-3. **The range label is wrong.** `2y/1d` returns 731 *bars* = 1064 calendar days (~2.9y). Every
-   in-sample backtest recorded as "2y" ran on nearly three years.
+Also unfixed and harmless: strategy **212 is still `rejected`** on the old data error — a smoke
+test, not a verdict.
 
-(3) lands directly on the retention bar added in §3 — both sides of that ratio come from a
-window that is not the one requested.
+### b. The approved pool is empty — now literally, not just effectively
 
-**The fix is probably not to patch Webull.** Alpaca is already configured in `.env` and is
-better on every axis that matters here, measured the same day: it asks by **date range**, so
-`2y/1d` returns exactly 2.0y (500 bars) with a label that does not lie, and `max/1d` reaches
-**10.6y** against Webull's 4.8y ceiling. It is never reached, because `fetchCandles` tries
-Webull first (`src/lib/marketData.ts:70`) and Webull always succeeds at `1d`. So the research
-loop validates on the shallower provider with the sliding window while the deeper, stable one
-sits behind it. Options: prefer Alpaca for research/backtest depth while leaving Webull first
-for live quotes, or keep the order and pin an explicit end timestamp. Either changes what every
-stored `backtestSummary` means, so it is the owner's call.
-
-Also unfixed and harmless: strategy **212 is still `rejected`** on the old data error — a
-smoke test, not a verdict.
-
-### b. The approved pool is empty for this app's actual universe
-
-The 6 surviving approvals are on **BTC-USD, GC=F, NG=F** — instruments the pivot removed —
+As of the panel change every row carries `validation = "legacy-single-symbol"`, and
+`getResearchStrategy` requires `panel-v1`, so **no research strategy can be attached to a desk at
+all** until one passes a panel round. That is intended. The older statement of the same problem:
+the 6 surviving approvals are on **BTC-USD, GC=F, NG=F** — instruments the pivot removed —
 and **not one has a blind test**. There is no validated stock strategy at all. Decide whether
 the 6 get demoted as off-universe or re-validated on stocks; do not read "6 approved" as "6
 usable". Until the loop produces one, the other route is a hand-authored candidate through
@@ -166,8 +174,9 @@ usable". Until the loop produces one, the other route is a hand-authored candida
 New candidates can no longer be assigned a sub-1:1 ladder. What is left: `RESEARCH_ATR_TP_MULT
 = 1.2` / `SL 1.5` (`src/lib/trading/engine.ts:49-51`) is still `resolveExitOverride`'s
 fallback for rows persisted before `exitLadder` existed, and `LEGACY_TP1_MULT` is the same
-fallback in `blindTest.ts`. Backfill those rows by re-sweeping, or refuse to activate a row
-without a ladder. Do **not** simply swap 1.2 → 2.5: that variant failed OOS as a pick. The
+fallback in `blindTest.ts` — though that one is nearly dead, since only pre-ladder rows reach it
+and every pre-ladder row is `legacy-single-symbol`, which `runBlindTest` now refuses outright.
+Backfill those rows by re-sweeping, or refuse to activate a row without a ladder. Do **not** simply swap 1.2 → 2.5: that variant failed OOS as a pick. The
 defensible claim is only "0.8:1 is measurably bad".
 
 ### d. Decide whether the desk's own default exit becomes a trail
@@ -183,60 +192,17 @@ as well — do not present 1.5/1.5 as an optimum.
 
 It replaced alphabetical order — better, but never swept as a ranking.
 
-### f. The validation set is too small AND not held out — full proposal in `docs/PROPOSAL-panel-validation.md`
+### f. ~~The validation set is too small AND not held out~~ — **RESOLVED 2026-08-25**, see §3
 
-Two findings, both measured 2026-08-25, both previously undocumented.
+Both findings (median 4 trades per candidate; the blind test overlapping its own training window
+by 66%) are fixed by the panel. The measurements that motivated it — the per-window %-up /
+correlation / N_eff table, and the AAPL overlap arithmetic — are preserved in
+`docs/PROPOSAL-panel-validation.md` §1, which is where to look before re-deriving any of it.
 
-**The daily research loop cannot produce a decidable sample.** Of the 128 non-mock candidates
-with a backtest, the 18 on a `1d` interval have a **median of 4 trades** and exactly 1 clears
-`MIN_TRADES = 20` (`autoReview.ts`). That set already includes `5y/1d` and `max/1d` runs, so
-**depth is not the binding constraint — single-symbol scope is** (`runResearch.ts:300` backtests
-one symbol). Run #110 the same day is the pattern again: three candidates, 4/4/5 trades, all
-auto-rejected without any of their mechanisms being evaluated.
-
-Breadth is not a free substitute for depth, though. On `.cache/bars/sp500-1d.json` (491 symbols,
-2016-01-04..2026-08-14, 1,277,489 bars), names disagree hugely in magnitude but barely in
-direction:
-
-| window | symbols | % up | ret p10 / med / p90 | avg pairwise corr | N_eff |
-|---|---|---|---|---|---|
-| 2016–2018 | 470 | 83% | −12 / 39 / 101% | 0.312 | 3.2 |
-| 2019–2020 | 477 | 87% | −7 / 46 / 127% | 0.467 | 2.1 |
-| 2021–2022 | 483 | 72% | −26 / 16 / 66% | 0.350 | 2.8 |
-| 2023–2024 | 488 | 75% | −20 / 23 / 108% | 0.242 | 4.1 |
-| last 2y | 489 | 69% | −27 / 17 / 94% | 0.345 | 2.9 |
-
-`N_eff = N / (1 + (N−1)ρ)`: 491 correlated names ≈ **3 independent observations** of market
-direction. That is the pessimistic bound — exact for a pure direction bet, too harsh for a
-strategy with genuinely dispersed entry timing — but all four rotation briefs
-(`scheduledResearch.ts:38`) ask for long-biased daily swing entries, which sits near it. So
-**breadth buys trade count, depth buys regime count, and they are not interchangeable.** ρ itself
-moves with the regime (0.467 in COVID, 0.242 in 2023–2024), which is the evidence that separate
-time windows really are separate markets.
-
-Corollary worth remembering: 69–87% of names are up in *every* window measured. A long-biased
-rule shows positive avgR from beta alone, so any panel result needs a matched random-entry
-control before it means anything.
-
-**The blind test overlaps its own training data by 66%.** `blindTest.ts:208` cuts the held-out
-set at `last − 365d` of a `5y` fetch, but compares it against the stored `backtestSummary` from
-a `2y` fetch. On AAPL:
-
-```
-in-sample  (2y/1d)   2023-09-22 .. 2026-08-21   (2.9y — see (a): "2y" is a bar count)
-deep fetch (5y/1d)   2021-11-10 .. 2026-08-21   (4.8y — Webull's 1200-bar ceiling)
-cutoff = last − 365d                2025-08-21
-held-out             2021-11-10 .. 2025-08-21
-overlap              2023-09-22 .. 2025-08-21   =  1.92y  =  66% of in-sample
-```
-
-So `MIN_HOLDOUT_RETENTION = 0.5`, shipped in `158df23`, compares two samples that overlap by two
-thirds. Retention reads artificially high and the gate is weaker than its docstring claims. This
-is a design fault, not a bug to patch in place — the fix requires choosing a whole new window
-policy, which is what the proposal doc is for.
-
-**Blocked on the owner.** Any fix invalidates every stored `backtestSummary` as a basis for
-comparison. Do not change code until a window policy is picked.
+What is left of this item, and it is not small: **the pool is empty by construction.** Every
+existing row is `legacy-single-symbol`, so nothing is desk-eligible. The next step is to run a
+panel round and see whether anything clears a bar that is, deliberately, much harder than the one
+84 rows cleared. Expect most rounds to produce nothing; that is the gate working, not a fault.
 
 ## 5. Traps — read before touching these areas
 
@@ -250,6 +216,8 @@ comparison. Do not change code until a window policy is picked.
   8 weeks; sd(R) ≈ 1.39 → SE ±0.31R against an effect size ~0.04R. n comes from the sweep
   harness, not from waiting. Live runs verify plumbing, nothing else.
 - **Blind-test a research strategy before approving it — every time, without asking.**
+- **`PANEL_SEED` is a constant, not a parameter.** A caller who can choose the seed is a caller
+  who can re-roll until the random-entry control loses. Same reasoning as the next bullet.
 - **`MIN_HOLDOUT_RETENTION` is pre-registered.** Its value (0.5) was fixed before any
   candidate was measured against it. Re-tuning it after seeing a candidate fail turns the
   gate into a rubber stamp with extra steps — that is what "pre-registered" is protecting.
@@ -272,11 +240,18 @@ comparison. Do not change code until a window policy is picked.
   locally off `.env`, where the key is set. It matters again the day a schedule is re-enabled:
   `gh secret set FINNHUB_API_KEY --repo CrispyBacoN-12/Nexmind` (user runs it — do not handle
   the key).
-- **Pick a window policy** before any research code changes — see §4f and
-  `docs/PROPOSAL-panel-validation.md`. The proposal is a walk-forward panel over all 491 cached
-  symbols with three disjoint folds (train / select / test), a matched random-entry control, and
-  a monthly block bootstrap. Adopting it makes every stored `backtestSummary` non-comparable, so
-  it is the owner's call, not a refactor.
+- ~~**Pick a window policy**~~ — **answered and implemented** (§3). Adopting it made every stored
+  `backtestSummary` non-comparable, exactly as warned; that is what the `validation` column
+  records rather than hides.
+- **Register the weekly research schedule.** The code rotates per week; the Windows task still
+  fires daily at 06:00. Changing a scheduled task is a system setting — run it yourself:
+
+  ```
+  schtasks /Change /TN "Research round" /SC WEEKLY /D SUN /ST 06:00
+  ```
+
+  Verify with `schtasks /Query /TN "Research round" /FO LIST`. Until this runs, the loop tests
+  ~7x more candidates against a fixed p95 bar than the multiple-testing argument in §3 assumes.
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
 - Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`
   (`scripts/revert-stocks-desk-to-default.ts` sets `trend-pullback`; something set combo-vote

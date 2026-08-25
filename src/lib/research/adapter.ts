@@ -5,8 +5,10 @@
 import { sma, rsi, macd, atr, adx, bollinger, stochastic, anchoredVWAP, dailyAnchor, type Candle } from "@/lib/indicators";
 import type { ScanSnapshot } from "@/lib/trading/scanner";
 import type { Strategy, StrategyEvaluator } from "@/lib/trading/strategies";
+import { computeEntrySignals, type EntrySignals } from "@/lib/backtest/engine";
 import { prisma } from "@/lib/db";
 import { compileStrategy, SandboxSafetyError } from "./sandbox";
+import { PANEL_VALIDATION } from "./panel";
 
 const last = <T,>(arr: (T | null)[], i: number): T | null => arr[i] ?? null;
 
@@ -86,14 +88,49 @@ export function isResearchStrategyKey(key: string | null | undefined): boolean {
   return !!key && RESEARCH_KEY_RE.test(key);
 }
 
-/** Async fallback for getStrategy() — only approved research strategies are ever activatable. */
+/**
+ * Async fallback for getStrategy() — only approved research strategies are ever
+ * activatable, and as of 2026-08-25 only ones validated on the panel.
+ *
+ * The `validation` filter is the enforcement point for the whole panel change.
+ * Everything upstream of it — folds, controls, bootstrap — is just measurement;
+ * this line is what stops a row that was fitted and "held out" on a single
+ * symbol over a window overlapping itself by 66% from being attached to a
+ * portfolio. The 84 legacy rows already in the pool keep their status and their
+ * history, they simply stop being eligible. Re-running one through a panel round
+ * is the only way back in, which is the intended cost.
+ */
 export async function getResearchStrategy(key: string): Promise<Strategy | null> {
   const match = RESEARCH_KEY_RE.exec(key);
   if (!match) return null;
   const id = Number(match[1]);
-  const row = await prisma.researchStrategy.findFirst({ where: { id, status: "approved" } });
+  const row = await prisma.researchStrategy.findFirst({
+    where: { id, status: "approved", validation: PANEL_VALIDATION },
+  });
   if (!row) return null;
   return wrapAsStrategy(row);
 }
 
 export { SandboxSafetyError };
+
+/**
+ * Turn a candidate's source into the SignalSource the panel runner wants:
+ * compile the sandbox once, then per symbol produce that symbol's entry signals.
+ *
+ * Lives here rather than in panelRun.ts to keep the panel gate free of the
+ * sandbox — and, through it, of prisma — so the gate stays unit-testable
+ * without a database.
+ *
+ * Note what is NOT passed to computeEntrySignals: `precomputed`. With a custom
+ * entry rule the engine only needs each bar's ATR, so it takes the ~5ms
+ * `atr(candles, 14)` path instead of building a full ScanSnapshot array it would
+ * throw away. On a 2669-bar symbol that alone was 210ms of the 431ms a backtest
+ * used to cost. The snapshots the *strategy* reads are the ones computed here.
+ */
+export function panelSignalsForCode(code: string): (symbol: string, candles: Candle[]) => EntrySignals {
+  const compiled = compileStrategy(code);
+  return (_symbol, candles) => {
+    const snaps = computeSnapshots(candles);
+    return computeEntrySignals(candles, undefined, (i) => compiled.invoke(candles, snaps, i)?.side ?? null);
+  };
+}

@@ -35,9 +35,6 @@ function parseSummary(json: string): Summary | null {
 
 export default function ResearchPanel() {
   const [brief, setBrief] = useState("");
-  const [symbol, setSymbol] = useState("AAPL");
-  const [interval, setInterval_] = useState("1h");
-  const [range, setRange] = useState("3mo");
   const [running, setRunning] = useState(false);
   const [run, setRun] = useState<ResearchRunRow | null>(null);
   const [reviewing, setReviewing] = useState<number | null>(null);
@@ -56,14 +53,14 @@ export default function ResearchPanel() {
   }, []);
 
   async function dispatch() {
-    if (!brief.trim() || !symbol.trim() || running) return;
+    if (!brief.trim() || running) return;
     setRunning(true);
     setRun(null);
     try {
       const res = await fetch("/api/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brief, symbol, interval, range }),
+        body: JSON.stringify({ brief }),
       });
       const { runId, error } = await res.json();
       if (error) { alert(error); return; }
@@ -106,27 +103,13 @@ export default function ResearchPanel() {
         rows={2}
         className="w-full rounded-md border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm focus:outline-none focus:border-(--color-accent)/50"
       />
+      {/* No symbol/interval/range pickers any more: a round is always the whole
+          S&P 500 panel on daily bars over the FIT fold. Offering a symbol box
+          would let the operator ask for a run the pipeline no longer performs. */}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <input
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value)}
-          placeholder="Symbol"
-          className="w-28 rounded-md border border-(--color-border) bg-(--color-background) px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-(--color-accent)/50"
-        />
-        <select
-          value={interval}
-          onChange={(e) => setInterval_(e.target.value)}
-          className="rounded-md border border-(--color-border) bg-(--color-background) px-2 py-1.5 text-xs"
-        >
-          {["5m", "15m", "1h", "1d"].map((v) => <option key={v} value={v}>{v}</option>)}
-        </select>
-        <select
-          value={range}
-          onChange={(e) => setRange(e.target.value)}
-          className="rounded-md border border-(--color-border) bg-(--color-background) px-2 py-1.5 text-xs"
-        >
-          {["5d", "1mo", "3mo", "1y"].map((v) => <option key={v} value={v}>{v}</option>)}
-        </select>
+        <span className="rounded-md border border-(--color-border) px-2 py-1.5 text-xs font-mono text-(--color-muted)">
+          S&amp;P 500 panel · 1d · fit 2016–2018
+        </span>
         <Button onClick={dispatch} disabled={running}>{running ? "Researching…" : "Dispatch QUANT"}</Button>
         {run && <span className="text-xs text-(--color-muted) font-mono">cost ${run.costUsd.toFixed(4)}</span>}
       </div>

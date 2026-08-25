@@ -22,7 +22,11 @@ const ATR_SL_MULT = 1.5;
 const ATR_TP_MULT = 2.5;
 const TP2_FACTOR = 1.6; // tp2 = tpMult * 1.6 * atr
 const POINT_VALUE = 1;
-const WARMUP = 60; // bars needed before sma50/ADX values are meaningful
+// Bars needed before sma50/ADX values are meaningful. Exported because the
+// random-entry control has to draw its fake entries from exactly the bars the
+// real rule was allowed to fire on — a control that could enter during warm-up
+// would be matched on count but not on opportunity.
+export const WARMUP = 60;
 
 export interface SimTrade {
   symbol: string;
@@ -260,6 +264,131 @@ export function openPosition(
 // pluggable strategy evaluator instead to compare alternatives.
 export type EntryRule = (i: number) => "long" | "short" | null;
 
+/**
+ * One symbol's entry decisions, decoupled from the exit geometry that trades them.
+ *
+ * `sides[i]` is what the entry rule said on bar i (null = stand aside) and
+ * `atrs[i]` is the ATR used to place that bar's stop and target. Both are
+ * index-aligned with the candle array they were built from.
+ *
+ * The point of splitting this out is that the entry side is by far the expensive
+ * half — a sandboxed research strategy re-slices the whole history on every bar —
+ * while the exit side is a cheap walk over highs and lows. The ladder sweep runs
+ * eight exit geometries over ONE entry signal, and used to pay the entry cost
+ * eight times over. So does the random-entry control in research/control.ts,
+ * which reuses `atrs` verbatim and only replaces `sides`.
+ */
+export interface EntrySignals {
+  sides: ("long" | "short" | null)[];
+  atrs: number[];
+}
+
+export interface ExitOptions {
+  lot?: number;
+  singleTarget?: boolean;
+  tp1Mult?: number;
+  costs?: CostModel;
+  slMult?: number;
+  trail?: { activateMult: number; offsetMult: number };
+  /**
+   * First index at which a new position may open. Defaults to 0 (i.e. WARMUP).
+   *
+   * The panel passes a warm-up prefix of bars from *before* the fold it is
+   * measuring, so that ATR/ADX/SMA50 at the fold's first bar are seeded from
+   * real history instead of from the slice boundary — Wilder smoothing carries
+   * a long memory, and a fold cut cold reads as a different market for its
+   * first few hundred bars. Those prefix bars must inform the indicators
+   * without ever being traded, which is exactly what this index expresses.
+   */
+  entryFrom?: number;
+}
+
+/**
+ * Evaluate the entry rule once per bar and record what it said.
+ *
+ * Two deliberate differences from the loop this replaced:
+ *
+ * 1. The rule is now consulted on EVERY bar past warm-up, where the old inline
+ *    version skipped bars on which a position happened to be open. For a pure
+ *    rule (every built-in one, and every research candidate that behaves like a
+ *    function of `(bars, snaps, i)`) the resulting signals are identical. For a
+ *    rule that secretly carries state between calls the sequence it sees is now
+ *    the same regardless of exit geometry — which is the property that makes an
+ *    entry signal reusable across ladders at all, and arguably the more correct
+ *    reading of "entry rule" either way.
+ *
+ * 2. The full ScanSnapshot array is built only when the built-in `decideSetup`
+ *    is the entry rule. A caller-supplied EntryRule computes its own view of the
+ *    bar, and the only field this function then needs is `.atr` — but
+ *    barSnapshots() also builds the Lorentzian series and per-bar structure
+ *    fields, which measured 210ms of a 431ms full-history AAPL backtest, every
+ *    millisecond of it discarded.
+ */
+export function computeEntrySignals(
+  candles: Candle[],
+  thresholds: SetupThresholds = DEFAULT_THRESHOLDS,
+  entry?: EntryRule,
+  precomputed?: ScanSnapshot[],
+): EntrySignals {
+  const snaps = precomputed ?? (entry ? null : barSnapshots(candles));
+  const atrArr: (number | null)[] = snaps ? snaps.map((s) => s.atr) : atr(candles, 14);
+
+  const sides: ("long" | "short" | null)[] = new Array(candles.length).fill(null);
+  const atrs: number[] = new Array(candles.length).fill(0);
+  for (let i = 0; i < candles.length; i++) {
+    atrs[i] = atrArr[i] ?? candles[i].c * 0.005;
+    if (i < WARMUP) continue;
+    sides[i] = entry ? entry(i) : decideSetup(snaps![i], thresholds).side;
+  }
+  return { sides, atrs };
+}
+
+/** Trade a precomputed entry signal under one exit geometry. Cheap and pure. */
+export function simulateExits(
+  symbol: string,
+  candles: Candle[],
+  signals: EntrySignals,
+  opts: ExitOptions = {},
+): BacktestResult {
+  const {
+    lot = 0.1,
+    singleTarget = false,
+    tp1Mult = ATR_TP_MULT,
+    costs = NO_COSTS,
+    slMult = ATR_SL_MULT,
+    trail,
+    entryFrom = 0,
+  } = opts;
+
+  const trades: SimTrade[] = [];
+  let signalCount = 0;
+  let open: SimPosition | null = null;
+
+  // Nothing can be open before the first tradable bar, so starting the manage
+  // step here too is equivalent to starting it at WARMUP.
+  for (let i = Math.max(WARMUP, entryFrom); i < candles.length; i++) {
+    const bar = candles[i];
+
+    // 1) Manage any open position first (mirrors the bot's manage-before-scan order).
+    if (open) {
+      const r = stepPosition(open, bar);
+      if (r.status === "closed") {
+        trades.push({ symbol, ...r.trade });
+        open = null;
+      }
+      if (open) continue; // still holding — one position per symbol, no new entries
+    }
+
+    // 2) Take this bar's signal, if there was one.
+    const side = signals.sides[i];
+    if (!side) continue;
+    signalCount++;
+    open = openPosition(side, bar.c, signals.atrs[i], lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs, slMult, trail);
+  }
+
+  return { symbol, bars: candles.length, signals: signalCount, trades, openAtEnd: open != null };
+}
+
 /** Run the rule-based strategy over one symbol's candles. */
 export function backtestCandles(
   symbol: string,
@@ -277,34 +406,9 @@ export function backtestCandles(
    *  Lorentzian series each time costs more than the rest of the backtest. */
   precomputed?: ScanSnapshot[],
 ): BacktestResult {
-  const snaps = precomputed ?? barSnapshots(candles);
-  const trades: SimTrade[] = [];
-  let signals = 0;
-  let open: SimPosition | null = null;
-
-  for (let i = WARMUP; i < candles.length; i++) {
-    const bar = candles[i];
-
-    // 1) Manage any open position first (mirrors the bot's manage-before-scan order).
-    if (open) {
-      const r = stepPosition(open, bar);
-      if (r.status === "closed") {
-        trades.push({ symbol, ...r.trade });
-        open = null;
-      }
-      if (open) continue; // still holding — one position per symbol, no new entries
-    }
-
-    // 2) Look for a fresh setup on this bar.
-    const side = entry ? entry(i) : decideSetup(snaps[i], thresholds).side;
-    if (!side) continue;
-    signals++;
-
-    const a = snaps[i].atr ?? bar.c * 0.005;
-    open = openPosition(side, bar.c, a, lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs, slMult, trail);
-  }
-
-  return { symbol, bars: candles.length, signals, trades, openAtEnd: open != null };
+  return simulateExits(symbol, candles, computeEntrySignals(candles, thresholds, entry, precomputed), {
+    lot, singleTarget, tp1Mult, costs, slMult, trail,
+  });
 }
 
 export interface BacktestSummary {

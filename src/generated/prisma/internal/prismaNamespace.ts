@@ -1878,6 +1878,7 @@ export const ResearchStrategyScalarFieldEnum = {
   safetyFlag: 'safetyFlag',
   blindTest: 'blindTest',
   exitLadder: 'exitLadder',
+  validation: 'validation',
   demotedReason: 'demotedReason',
   createdAt: 'createdAt'
 } as const

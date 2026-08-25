@@ -1,20 +1,23 @@
 // Driver for one round of the self-directed research loop: calls runResearch()
-// with a fresh brief/symbol, then prints the resulting researchStrategy rows
-// (label, status, backtest summary) so the caller can decide what to blind-test.
-// Usage: npx tsx scripts/run-research-round.mts "<brief>" <symbol> [interval] [range]
+// with a fresh brief, then prints the resulting researchStrategy rows (label,
+// status, backtest summary) so the caller can decide what to blind-test.
+//
+// The run itself is always the S&P 500 panel over the FIT fold — there is no
+// symbol argument any more, because there is no single symbol being fitted.
+// Usage: npx tsx scripts/run-research-round.mts "<brief>"
 
 import "dotenv/config";
 import { runResearch } from "../src/lib/research/runResearch";
 import { prisma } from "../src/lib/db";
 
 async function main() {
-  const [brief, symbol, interval, range] = process.argv.slice(2);
-  if (!brief || !symbol) {
-    console.log('usage: npx tsx scripts/run-research-round.mts "<brief>" <symbol> [interval] [range]');
+  const brief = process.argv.slice(2).join(" ").trim();
+  if (!brief) {
+    console.log('usage: npx tsx scripts/run-research-round.mts "<brief>"');
     return;
   }
-  console.log(`Running research: ${symbol} ${interval ?? "1h"}/${range ?? "3mo"}\nBrief: ${brief}\n`);
-  const { runId } = await runResearch(brief, symbol, (interval as any) ?? "1h", (range as any) ?? "3mo");
+  console.log(`Running research on the S&P 500 panel, FIT fold\nBrief: ${brief}\n`);
+  const { runId } = await runResearch(brief);
   const run = await prisma.researchRun.findUnique({ where: { id: runId } });
   console.log(`Run #${runId} status: ${run?.status}${run?.status === "failed" ? "" : ""}`);
   const strategies = await prisma.researchStrategy.findMany({ where: { runId }, orderBy: { id: "asc" } });

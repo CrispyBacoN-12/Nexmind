@@ -1,10 +1,12 @@
 // Generic approve helper for one-off research review during exploration
 // sessions - same effect as PATCH /api/research/[id]/review {status:
 // "approved"}, done directly against the DB for batch/scripted use.
-// Runs the deep-data blind test (src/lib/research/blindTest.ts) automatically
-// first and refuses to approve on a failing verdict unless --force is given,
-// so a candidate can't get ported toward strategies.ts on a short in-sample
-// backtest alone.
+// Runs the panel blind test (src/lib/research/blindTest.ts) automatically first
+// and refuses to approve on a failing verdict unless --force is given, so a
+// candidate can't get ported toward strategies.ts on an in-sample backtest
+// alone. Since 2026-08-25 that means all three held-out TEST folds, each beating
+// a matched random-entry control — so --force now overrides considerably more
+// than it used to.
 // Usage: npx tsx scripts/approve-strategy.ts <id> [<id> ...] [--force]
 import { prisma } from "../src/lib/db";
 import { exportStrategyNote } from "../src/lib/obsidian/export";
@@ -31,7 +33,16 @@ async function main() {
     }
     console.log(
       bt.passed
-        ? `research-${id} (${existing.label}): PASSED blind test (held-out trades=${bt.holdout.trades}, pf=${bt.holdout.profitFactor?.toFixed(2) ?? "n/a"})`
+        ? `research-${id} (${existing.label}): PASSED all ${bt.folds.length} held-out folds\n` +
+          bt.folds
+            .map(
+              (f) =>
+                `  ${f.fold} ${f.from}..${f.to} (${f.regime}): trades=${f.summary.trades} ` +
+                `symbols=${f.symbolsTraded}/${f.symbolsInFold} avgR=${f.summary.avgR?.toFixed(3) ?? "n/a"} ` +
+                `vs control p95 ${f.control?.p95.toFixed(3) ?? "n/a"} ` +
+                `pf=${f.summary.profitFactor?.toFixed(2) ?? "n/a"} bootstrap p5=${f.bootstrap?.p5.toFixed(3) ?? "n/a"}`,
+            )
+            .join("\n")
         : `research-${id} (${existing.label}): blind test FAILED but --force given - approving anyway\n  - ${bt.reasons.join("\n  - ")}`,
     );
 

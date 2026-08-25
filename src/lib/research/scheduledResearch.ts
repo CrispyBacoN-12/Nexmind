@@ -10,22 +10,34 @@
 // has to clear scripts/approve-strategy.ts's blind test (see blindTest.ts)
 // and get manually ported, same human-in-the-loop gate as before. This just
 // removes the "someone has to remember to kick off a round" step.
+//
+// Cadence changed daily -> WEEKLY on 2026-08-25 (docs/PROPOSAL-panel-validation.md §7).
+// Not for cost — a panel round measures at 8-10 minutes, so daily would be
+// affordable. For multiple testing. Every round proposes three candidates and
+// each gets a pass/fail against a pre-registered bar, so the rate at which this
+// loop draws from the hypothesis space is the rate at which it manufactures
+// false positives. 3/day is ~1,100 tests a year; 3/week is ~156. With the pool
+// already holding 84 rows and exactly one live result to show for them, the
+// binding constraint on this project is not how many ideas get tried, it is how
+// many survive contact with data they have never seen. Slowing the draw is the
+// cheapest way to raise the share of survivors that are real.
 import { runResearch } from "./runResearch";
 import { prisma } from "@/lib/db";
-import type { Interval, Range } from "@/lib/yahoo";
 
 interface RotationEntry {
   label: string;
-  symbol: string;
-  interval: Interval;
-  range: Range;
   brief: string;
 }
 
-// One entry per (name, mechanism angle) so repeated rounds don't just ask the AI
-// to re-propose the same idea. All entries are US equities on 1d/2y, matching
-// the US Stocks Desk's own cadence — the gold and BTC rotations were dropped
-// when the app narrowed to stocks-only.
+// One entry per mechanism angle so repeated rounds don't just ask the AI to
+// re-propose the same idea.
+//
+// No symbol/interval/range any more: every round now runs the full S&P 500
+// panel on daily bars over the FIT fold, so naming "AAPL 1d/2y" here would be
+// describing a run that no longer happens. The old per-entry symbols (AAPL,
+// AAPL, MSFT, NVDA) were also three names carrying four mechanisms — which is
+// the single-symbol overfitting this whole change exists to end.
+//
 // Deliberately says nothing about the take-profit: sweepLadder picks each
 // candidate's ladder from LADDER_OPTIONS on avgR and writes it to exitLadder, so
 // naming a target here only biases the entry design toward a geometry the
@@ -33,63 +45,56 @@ interface RotationEntry {
 // a70c1c4 is not even an option any more — 1.0 and 1.2 were removed from
 // LADDER_TP_MULTS as sub-1:1 against the 1.5 ATR stop.
 const MOMENTUM_LADDER =
-  "risk 1% per trade, exit geometry swept separately, win rate >50% with profit stable across both halves of the sample (not just a good average)";
+  "risk 1% per trade, exit geometry swept separately, edge that holds across the whole cross-section (many names contributing, not one) and across both halves of the sample";
 
 export const RESEARCH_ROTATION: RotationEntry[] = [
   {
     label: "stocks-momentum",
-    symbol: "AAPL",
-    interval: "1d",
-    range: "2y",
     brief: `Momentum/breakout entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
   },
   {
     label: "stocks-meanrev",
-    symbol: "AAPL",
-    interval: "1d",
-    range: "2y",
     brief: `Mean-reversion entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
   },
   {
     label: "stocks-trend-pullback",
-    symbol: "MSFT",
-    interval: "1d",
-    range: "2y",
     brief: `Pullback-within-uptrend entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
   },
   {
     label: "stocks-volatility",
-    symbol: "NVDA",
-    interval: "1d",
-    range: "2y",
     brief: `Volatility-contraction / range-expansion entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
   },
 ];
 
-/** Deterministic day-of-cycle pick so a daily cron works through the whole rotation before repeating. */
-export function pickRotationEntry(daysSinceEpoch: number = Math.floor(Date.now() / 86_400_000)): RotationEntry {
-  return RESEARCH_ROTATION[daysSinceEpoch % RESEARCH_ROTATION.length];
+const MS_PER_WEEK = 7 * 86_400_000;
+
+/**
+ * Deterministic week-of-cycle pick, so a weekly cron works through all four
+ * mechanisms before repeating (a full cycle is now ~28 days, not 4).
+ *
+ * Keyed on weeks rather than days because the cron fires weekly; keying on days
+ * would advance the rotation seven steps between runs and, with four entries,
+ * land on entries 0, 3, 2, 1, 0... — a cycle that still covers everything but
+ * for no reason anyone reading it could predict.
+ */
+export function pickRotationEntry(weeksSinceEpoch: number = Math.floor(Date.now() / MS_PER_WEEK)): RotationEntry {
+  const n = RESEARCH_ROTATION.length;
+  return RESEARCH_ROTATION[((weeksSinceEpoch % n) + n) % n];
 }
 
 export interface ScheduledResearchOverride {
-  symbol?: string;
-  interval?: Interval;
-  range?: Range;
   brief?: string;
 }
 
-/** Runs one research round (rotation pick, or an explicit override) and returns log lines. */
+/** Runs one research round (rotation pick, or an explicit brief override) and returns log lines. */
 export async function runScheduledResearchRound(override?: ScheduledResearchOverride): Promise<string[]> {
   const pick = pickRotationEntry();
-  const symbol = override?.symbol ?? pick.symbol;
-  const interval = override?.interval ?? pick.interval;
-  const range = override?.range ?? pick.range;
   const brief = override?.brief ?? pick.brief;
-  const label = override ? "manual-override" : pick.label;
+  const label = override?.brief ? "manual-override" : pick.label;
 
-  const lines: string[] = [`research round [${label}] ${symbol} ${interval}/${range}`];
+  const lines: string[] = [`research round [${label}] S&P 500 panel, FIT fold`];
 
-  const { runId, skipped } = await runResearch(brief, symbol, interval, range);
+  const { runId, skipped } = await runResearch(brief);
   const run = await prisma.researchRun.findUnique({ where: { id: runId } });
   lines.push(`run #${runId} status: ${run?.status}`);
   // The cron log is where this is noticed. A skipped round is silent otherwise:

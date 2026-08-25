@@ -47,6 +47,7 @@ export type ResearchStrategyMinAggregateOutputType = {
   safetyFlag: boolean | null
   blindTest: string | null
   exitLadder: string | null
+  validation: string | null
   demotedReason: string | null
   createdAt: Date | null
 }
@@ -62,6 +63,7 @@ export type ResearchStrategyMaxAggregateOutputType = {
   safetyFlag: boolean | null
   blindTest: string | null
   exitLadder: string | null
+  validation: string | null
   demotedReason: string | null
   createdAt: Date | null
 }
@@ -77,6 +79,7 @@ export type ResearchStrategyCountAggregateOutputType = {
   safetyFlag: number
   blindTest: number
   exitLadder: number
+  validation: number
   demotedReason: number
   createdAt: number
   _all: number
@@ -104,6 +107,7 @@ export type ResearchStrategyMinAggregateInputType = {
   safetyFlag?: true
   blindTest?: true
   exitLadder?: true
+  validation?: true
   demotedReason?: true
   createdAt?: true
 }
@@ -119,6 +123,7 @@ export type ResearchStrategyMaxAggregateInputType = {
   safetyFlag?: true
   blindTest?: true
   exitLadder?: true
+  validation?: true
   demotedReason?: true
   createdAt?: true
 }
@@ -134,6 +139,7 @@ export type ResearchStrategyCountAggregateInputType = {
   safetyFlag?: true
   blindTest?: true
   exitLadder?: true
+  validation?: true
   demotedReason?: true
   createdAt?: true
   _all?: true
@@ -236,6 +242,7 @@ export type ResearchStrategyGroupByOutputType = {
   safetyFlag: boolean
   blindTest: string
   exitLadder: string
+  validation: string
   demotedReason: string | null
   createdAt: Date
   _count: ResearchStrategyCountAggregateOutputType | null
@@ -274,6 +281,7 @@ export type ResearchStrategyWhereInput = {
   safetyFlag?: Prisma.BoolFilter<"ResearchStrategy"> | boolean
   blindTest?: Prisma.StringFilter<"ResearchStrategy"> | string
   exitLadder?: Prisma.StringFilter<"ResearchStrategy"> | string
+  validation?: Prisma.StringFilter<"ResearchStrategy"> | string
   demotedReason?: Prisma.StringNullableFilter<"ResearchStrategy"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ResearchStrategy"> | Date | string
   run?: Prisma.XOR<Prisma.ResearchRunScalarRelationFilter, Prisma.ResearchRunWhereInput>
@@ -290,6 +298,7 @@ export type ResearchStrategyOrderByWithRelationInput = {
   safetyFlag?: Prisma.SortOrder
   blindTest?: Prisma.SortOrder
   exitLadder?: Prisma.SortOrder
+  validation?: Prisma.SortOrder
   demotedReason?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   run?: Prisma.ResearchRunOrderByWithRelationInput
@@ -309,6 +318,7 @@ export type ResearchStrategyWhereUniqueInput = Prisma.AtLeast<{
   safetyFlag?: Prisma.BoolFilter<"ResearchStrategy"> | boolean
   blindTest?: Prisma.StringFilter<"ResearchStrategy"> | string
   exitLadder?: Prisma.StringFilter<"ResearchStrategy"> | string
+  validation?: Prisma.StringFilter<"ResearchStrategy"> | string
   demotedReason?: Prisma.StringNullableFilter<"ResearchStrategy"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ResearchStrategy"> | Date | string
   run?: Prisma.XOR<Prisma.ResearchRunScalarRelationFilter, Prisma.ResearchRunWhereInput>
@@ -325,6 +335,7 @@ export type ResearchStrategyOrderByWithAggregationInput = {
   safetyFlag?: Prisma.SortOrder
   blindTest?: Prisma.SortOrder
   exitLadder?: Prisma.SortOrder
+  validation?: Prisma.SortOrder
   demotedReason?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.ResearchStrategyCountOrderByAggregateInput
@@ -348,6 +359,7 @@ export type ResearchStrategyScalarWhereWithAggregatesInput = {
   safetyFlag?: Prisma.BoolWithAggregatesFilter<"ResearchStrategy"> | boolean
   blindTest?: Prisma.StringWithAggregatesFilter<"ResearchStrategy"> | string
   exitLadder?: Prisma.StringWithAggregatesFilter<"ResearchStrategy"> | string
+  validation?: Prisma.StringWithAggregatesFilter<"ResearchStrategy"> | string
   demotedReason?: Prisma.StringNullableWithAggregatesFilter<"ResearchStrategy"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ResearchStrategy"> | Date | string
 }
@@ -361,6 +373,7 @@ export type ResearchStrategyCreateInput = {
   safetyFlag?: boolean
   blindTest?: string
   exitLadder?: string
+  validation?: string
   demotedReason?: string | null
   createdAt?: Date | string
   run: Prisma.ResearchRunCreateNestedOneWithoutStrategiesInput
@@ -377,6 +390,7 @@ export type ResearchStrategyUncheckedCreateInput = {
   safetyFlag?: boolean
   blindTest?: string
   exitLadder?: string
+  validation?: string
   demotedReason?: string | null
   createdAt?: Date | string
 }
@@ -390,6 +404,7 @@ export type ResearchStrategyUpdateInput = {
   safetyFlag?: Prisma.BoolFieldUpdateOperationsInput | boolean
   blindTest?: Prisma.StringFieldUpdateOperationsInput | string
   exitLadder?: Prisma.StringFieldUpdateOperationsInput | string
+  validation?: Prisma.StringFieldUpdateOperationsInput | string
   demotedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   run?: Prisma.ResearchRunUpdateOneRequiredWithoutStrategiesNestedInput
@@ -406,6 +421,7 @@ export type ResearchStrategyUncheckedUpdateInput = {
   safetyFlag?: Prisma.BoolFieldUpdateOperationsInput | boolean
   blindTest?: Prisma.StringFieldUpdateOperationsInput | string
   exitLadder?: Prisma.StringFieldUpdateOperationsInput | string
+  validation?: Prisma.StringFieldUpdateOperationsInput | string
   demotedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -421,6 +437,7 @@ export type ResearchStrategyCreateManyInput = {
   safetyFlag?: boolean
   blindTest?: string
   exitLadder?: string
+  validation?: string
   demotedReason?: string | null
   createdAt?: Date | string
 }
@@ -434,6 +451,7 @@ export type ResearchStrategyUpdateManyMutationInput = {
   safetyFlag?: Prisma.BoolFieldUpdateOperationsInput | boolean
   blindTest?: Prisma.StringFieldUpdateOperationsInput | string
   exitLadder?: Prisma.StringFieldUpdateOperationsInput | string
+  validation?: Prisma.StringFieldUpdateOperationsInput | string
   demotedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -449,6 +467,7 @@ export type ResearchStrategyUncheckedUpdateManyInput = {
   safetyFlag?: Prisma.BoolFieldUpdateOperationsInput | boolean
   blindTest?: Prisma.StringFieldUpdateOperationsInput | string
   exitLadder?: Prisma.StringFieldUpdateOperationsInput | string
+  validation?: Prisma.StringFieldUpdateOperationsInput | string
   demotedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -474,6 +493,7 @@ export type ResearchStrategyCountOrderByAggregateInput = {
   safetyFlag?: Prisma.SortOrder
   blindTest?: Prisma.SortOrder
   exitLadder?: Prisma.SortOrder
+  validation?: Prisma.SortOrder
   demotedReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -494,6 +514,7 @@ export type ResearchStrategyMaxOrderByAggregateInput = {
   safetyFlag?: Prisma.SortOrder
   blindTest?: Prisma.SortOrder
   exitLadder?: Prisma.SortOrder
+  validation?: Prisma.SortOrder
   demotedReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -509,6 +530,7 @@ export type ResearchStrategyMinOrderByAggregateInput = {
   safetyFlag?: Prisma.SortOrder
   blindTest?: Prisma.SortOrder
   exitLadder?: Prisma.SortOrder
+  validation?: Prisma.SortOrder
   demotedReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -569,6 +591,7 @@ export type ResearchStrategyCreateWithoutRunInput = {
   safetyFlag?: boolean
   blindTest?: string
   exitLadder?: string
+  validation?: string
   demotedReason?: string | null
   createdAt?: Date | string
 }
@@ -583,6 +606,7 @@ export type ResearchStrategyUncheckedCreateWithoutRunInput = {
   safetyFlag?: boolean
   blindTest?: string
   exitLadder?: string
+  validation?: string
   demotedReason?: string | null
   createdAt?: Date | string
 }
@@ -627,6 +651,7 @@ export type ResearchStrategyScalarWhereInput = {
   safetyFlag?: Prisma.BoolFilter<"ResearchStrategy"> | boolean
   blindTest?: Prisma.StringFilter<"ResearchStrategy"> | string
   exitLadder?: Prisma.StringFilter<"ResearchStrategy"> | string
+  validation?: Prisma.StringFilter<"ResearchStrategy"> | string
   demotedReason?: Prisma.StringNullableFilter<"ResearchStrategy"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ResearchStrategy"> | Date | string
 }
@@ -641,6 +666,7 @@ export type ResearchStrategyCreateManyRunInput = {
   safetyFlag?: boolean
   blindTest?: string
   exitLadder?: string
+  validation?: string
   demotedReason?: string | null
   createdAt?: Date | string
 }
@@ -654,6 +680,7 @@ export type ResearchStrategyUpdateWithoutRunInput = {
   safetyFlag?: Prisma.BoolFieldUpdateOperationsInput | boolean
   blindTest?: Prisma.StringFieldUpdateOperationsInput | string
   exitLadder?: Prisma.StringFieldUpdateOperationsInput | string
+  validation?: Prisma.StringFieldUpdateOperationsInput | string
   demotedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -668,6 +695,7 @@ export type ResearchStrategyUncheckedUpdateWithoutRunInput = {
   safetyFlag?: Prisma.BoolFieldUpdateOperationsInput | boolean
   blindTest?: Prisma.StringFieldUpdateOperationsInput | string
   exitLadder?: Prisma.StringFieldUpdateOperationsInput | string
+  validation?: Prisma.StringFieldUpdateOperationsInput | string
   demotedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -682,6 +710,7 @@ export type ResearchStrategyUncheckedUpdateManyWithoutRunInput = {
   safetyFlag?: Prisma.BoolFieldUpdateOperationsInput | boolean
   blindTest?: Prisma.StringFieldUpdateOperationsInput | string
   exitLadder?: Prisma.StringFieldUpdateOperationsInput | string
+  validation?: Prisma.StringFieldUpdateOperationsInput | string
   demotedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -699,6 +728,7 @@ export type ResearchStrategySelect<ExtArgs extends runtime.Types.Extensions.Inte
   safetyFlag?: boolean
   blindTest?: boolean
   exitLadder?: boolean
+  validation?: boolean
   demotedReason?: boolean
   createdAt?: boolean
   run?: boolean | Prisma.ResearchRunDefaultArgs<ExtArgs>
@@ -715,6 +745,7 @@ export type ResearchStrategySelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   safetyFlag?: boolean
   blindTest?: boolean
   exitLadder?: boolean
+  validation?: boolean
   demotedReason?: boolean
   createdAt?: boolean
   run?: boolean | Prisma.ResearchRunDefaultArgs<ExtArgs>
@@ -731,6 +762,7 @@ export type ResearchStrategySelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   safetyFlag?: boolean
   blindTest?: boolean
   exitLadder?: boolean
+  validation?: boolean
   demotedReason?: boolean
   createdAt?: boolean
   run?: boolean | Prisma.ResearchRunDefaultArgs<ExtArgs>
@@ -747,11 +779,12 @@ export type ResearchStrategySelectScalar = {
   safetyFlag?: boolean
   blindTest?: boolean
   exitLadder?: boolean
+  validation?: boolean
   demotedReason?: boolean
   createdAt?: boolean
 }
 
-export type ResearchStrategyOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "runId" | "label" | "code" | "status" | "iterations" | "backtestSummary" | "safetyFlag" | "blindTest" | "exitLadder" | "demotedReason" | "createdAt", ExtArgs["result"]["researchStrategy"]>
+export type ResearchStrategyOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "runId" | "label" | "code" | "status" | "iterations" | "backtestSummary" | "safetyFlag" | "blindTest" | "exitLadder" | "validation" | "demotedReason" | "createdAt", ExtArgs["result"]["researchStrategy"]>
 export type ResearchStrategyInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   run?: boolean | Prisma.ResearchRunDefaultArgs<ExtArgs>
 }
@@ -778,6 +811,13 @@ export type $ResearchStrategyPayload<ExtArgs extends runtime.Types.Extensions.In
     safetyFlag: boolean
     blindTest: string
     exitLadder: string
+    /**
+     * Which window policy produced this row: legacy-single-symbol | panel-v1.
+     * Defaults to legacy so existing rows describe themselves truthfully rather
+     * than being backfilled into a validation they never had. Only panel-v1 rows
+     * are activatable on a portfolio (see adapter.getResearchStrategy).
+     */
+    validation: string
     demotedReason: string | null
     createdAt: Date
   }, ExtArgs["result"]["researchStrategy"]>
@@ -1214,6 +1254,7 @@ export interface ResearchStrategyFieldRefs {
   readonly safetyFlag: Prisma.FieldRef<"ResearchStrategy", 'Boolean'>
   readonly blindTest: Prisma.FieldRef<"ResearchStrategy", 'String'>
   readonly exitLadder: Prisma.FieldRef<"ResearchStrategy", 'String'>
+  readonly validation: Prisma.FieldRef<"ResearchStrategy", 'String'>
   readonly demotedReason: Prisma.FieldRef<"ResearchStrategy", 'String'>
   readonly createdAt: Prisma.FieldRef<"ResearchStrategy", 'DateTime'>
 }
