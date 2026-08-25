@@ -23,6 +23,11 @@
 // cheapest way to raise the share of survivors that are real.
 import { runResearch } from "./runResearch";
 import { prisma } from "@/lib/db";
+import type { BacktestSummary } from "@/lib/backtest/engine";
+import type { PanelBlindTestReport, PanelFoldReport } from "./blindTest";
+
+/** What the blindTest column can hold: a full report, the error branch, or "{}" for a row that never reached the gate. */
+type StoredVerdict = Partial<PanelBlindTestReport> & { error?: string };
 
 interface RotationEntry {
   label: string;
@@ -106,11 +111,59 @@ export async function runScheduledResearchRound(override?: ScheduledResearchOver
 
   const strategies = await prisma.researchStrategy.findMany({ where: { runId }, orderBy: { id: "asc" } });
   for (const s of strategies) {
-    const bt = s.backtestSummary ? JSON.parse(s.backtestSummary) : null;
+    const bt = safeParse<BacktestSummary>(s.backtestSummary);
+    // Labelled `fit=` deliberately. These are FIT-fold numbers — the window the
+    // candidate was tuned on. Printing them bare next to an [approved] status
+    // reads as evidence for the approval, when the evidence is the fold lines
+    // below and these are the thing those folds are checked against.
     lines.push(
       `research-${s.id} [${s.status}]${s.safetyFlag ? " SAFETY-FLAGGED" : ""} "${s.label}"` +
-        (bt ? ` trades=${bt.trades} win%=${bt.winRate?.toFixed?.(1)} pnl=$${bt.totalPnl?.toFixed?.(0)} pf=${bt.profitFactor?.toFixed?.(2)}` : ""),
+        (bt ? ` fit=[trades=${bt.trades} win%=${fx(bt.winRate, 1)} pnl=$${fx(bt.totalPnl, 0)} pf=${fx(bt.profitFactor, 2)}]` : ""),
     );
+    for (const l of blindTestLines(s.blindTest)) lines.push(l);
   }
   return lines;
+}
+
+/** The blindTest / backtestSummary columns are free-text JSON; never let a malformed one abort a round's log. */
+function safeParse<T>(json: string): T | null {
+  try {
+    const v = JSON.parse(json || "{}");
+    return v && typeof v === "object" ? (v as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+const fx = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v.toFixed(d) : "—");
+
+/**
+ * The held-out result, in the log, next to the status it produced.
+ *
+ * Without this the weekly log line for a survivor and for a candidate that lost
+ * on every fold differ by one word, and both quote FIT numbers. The log file is
+ * where a round is actually noticed — a verdict that only exists as JSON in a
+ * database column is a verdict nobody reads.
+ */
+function blindTestLines(json: string): string[] {
+  const v = safeParse<StoredVerdict>(json);
+  if (!v) return [];
+  // Fails closed on purpose (see applyBlindTestVerdict): a candidate whose gate
+  // could not be run is rejected, but it is re-runnable and a real failure is
+  // not. The log has to keep those apart or a Neon hiccup looks like a verdict.
+  if (typeof v.error === "string") return [`    blind test DID NOT COMPLETE — ${v.error}`];
+  const folds = v.folds ?? [];
+  if (!folds.length) return [];
+  const out = folds.map((f: PanelFoldReport) => {
+    const ctrl = f.control ? `ctrl-p95 ${fx(f.control.p95, 2)}` : "ctrl UNVERIFIED";
+    const boot = f.bootstrap ? `boot-p5 ${fx(f.bootstrap.p5, 2)}` : "boot UNVERIFIED";
+    const why = f.passed ? "" : ` — ${f.reasons[0] ?? "no reason recorded"}`;
+    return (
+      `    ${f.passed ? "PASS" : "FAIL"} ${f.fold} ${f.from}..${f.to} ` +
+      `trades=${f.summary.trades} symbols=${f.symbolsTraded}/${f.symbolsInFold} ` +
+      `avgR=${fx(f.summary.avgR, 2)} ${ctrl} ${boot}${why}`
+    );
+  });
+  if (v.passed) out.push(`    SURVIVOR — cleared all ${folds.length} TEST folds and is now desk-eligible`);
+  return out;
 }

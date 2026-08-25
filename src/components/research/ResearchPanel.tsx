@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardTitle, Button, Badge } from "@/components/ui";
+// Type-only, so nothing from the server module (prisma, the panel cache loader)
+// is pulled into the client bundle.
+import type { PanelBlindTestReport, PanelFoldReport } from "@/lib/research/blindTest";
 
 interface ResearchStrategyRow {
   id: number;
@@ -10,6 +13,8 @@ interface ResearchStrategyRow {
   status: "proposed" | "approved" | "rejected" | "demoted";
   iterations: string; // JSON
   backtestSummary: string; // JSON
+  blindTest: string; // JSON: the held-out verdict, or the error branch, or "{}"
+  validation: string; // panel-v1 | legacy-single-symbol
   safetyFlag: boolean;
 }
 interface ResearchRunRow {
@@ -29,8 +34,64 @@ interface Summary {
   totalCostsUsd: number;
 }
 
+/** What the blindTest column can hold: a full report, the error branch, or "{}" for a row that never reached the gate. */
+type StoredVerdict = Partial<PanelBlindTestReport> & { error?: string; reasons?: string[] };
+
 function parseSummary(json: string): Summary | null {
   try { return JSON.parse(json); } catch { return null; }
+}
+
+function parseVerdict(json: string): StoredVerdict | null {
+  try {
+    const v = JSON.parse(json || "{}");
+    return v && typeof v === "object" && Object.keys(v).length ? v : null;
+  } catch { return null; }
+}
+
+const fx = (v: number | null | undefined, d = 2) =>
+  typeof v === "number" && Number.isFinite(v) ? v.toFixed(d) : "—";
+
+/**
+ * The held-out result, rendered next to the status it produced.
+ *
+ * The status badge alone cannot distinguish the three ways a row gets here: it
+ * cleared all three TEST folds, it lost on one of them, or the gate never ran
+ * (a mid-round DB failure fails closed to "rejected" — see applyBlindTestVerdict).
+ * Only the last is worth re-running, so the panel has to say which happened.
+ */
+function BlindTest({ verdict }: { verdict: StoredVerdict }) {
+  if (verdict.error) {
+    return (
+      <div className="mt-2 rounded border border-(--color-border) p-2 text-xs">
+        <Badge tone="warning">blind test did not complete</Badge>
+        <p className="mt-1 text-(--color-muted)">{verdict.error}</p>
+        <p className="mt-1 text-(--color-muted)">Re-runnable — this is not a verdict on the strategy.</p>
+      </div>
+    );
+  }
+  const folds: PanelFoldReport[] = verdict.folds ?? [];
+  if (!folds.length) return null;
+  return (
+    <div className="mt-2 rounded border border-(--color-border) p-2 text-xs">
+      <div className="mb-1 flex items-center gap-2">
+        <Badge tone={verdict.passed ? "positive" : "negative"}>
+          {verdict.passed ? `survivor — cleared all ${folds.length} TEST folds` : "failed the held-out bar"}
+        </Badge>
+      </div>
+      {folds.map((f) => (
+        <div key={f.fold} className="font-mono text-(--color-muted)">
+          <span className={f.passed ? "text-emerald-400" : "text-rose-400"}>
+            {f.passed ? "PASS" : "FAIL"}
+          </span>{" "}
+          {f.fold} {f.from}..{f.to} · trades {f.summary.trades} · symbols {f.symbolsTraded}/{f.symbolsInFold} ·
+          avgR {fx(f.summary.avgR)} · ctrl-p95 {f.control ? fx(f.control.p95) : "UNVERIFIED"} ·
+          boot-p5 {f.bootstrap ? fx(f.bootstrap.p5) : "UNVERIFIED"}
+          {!f.passed && f.reasons.length ? <span> — {f.reasons[0]}</span> : null}
+        </div>
+      ))}
+      {verdict.caveat && <p className="mt-1 text-(--color-muted)">{verdict.caveat}</p>}
+    </div>
+  );
 }
 
 export default function ResearchPanel() {
@@ -119,6 +180,7 @@ export default function ResearchPanel() {
           <div className="text-xs text-(--color-muted)">Run #{run.id} · {run.status} · {run.symbol} {run.interval}/{run.range}</div>
           {run.strategies.map((s) => {
             const summary = parseSummary(s.backtestSummary);
+            const verdict = parseVerdict(s.blindTest);
             const isOpen = expanded === s.id;
             return (
               <div key={s.id} className="rounded-md border border-(--color-border) p-3">
@@ -126,6 +188,9 @@ export default function ResearchPanel() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold">{s.label}</span>
                     <Badge tone={s.status === "approved" ? "positive" : s.status === "rejected" ? "negative" : s.status === "demoted" ? "negative" : "neutral"}>{s.status}</Badge>
+                    {/* Only panel-v1 rows are activatable (adapter.getResearchStrategy) —
+                        an "approved" legacy row is not the same thing as a survivor. */}
+                    {s.validation && s.validation !== "panel-v1" && <Badge tone="warning">{s.validation}</Badge>}
                     {s.safetyFlag && <Badge tone="warning">safety-flagged</Badge>}
                   </div>
                   <div className="flex items-center gap-2">
@@ -150,6 +215,10 @@ export default function ResearchPanel() {
                 </div>
                 {summary && (
                   <div className="mt-2 flex flex-wrap gap-3 text-xs font-mono text-(--color-muted)">
+                    {/* These are FIT-fold numbers — the window the candidate was tuned on.
+                        Unlabelled next to an "approved" badge they read as evidence for the
+                        approval; the evidence is the held-out block below. */}
+                    <span className="text-(--color-foreground)">fit fold</span>
                     <span>trades {summary.trades}</span>
                     <span>win% {summary.winRate.toFixed(0)}</span>
                     <span>avgR {summary.avgR == null ? "—" : summary.avgR.toFixed(2)}</span>
@@ -162,6 +231,7 @@ export default function ResearchPanel() {
                     <span>costs {summary.totalCostsUsd == null ? "—" : summary.totalCostsUsd.toFixed(2)}</span>
                   </div>
                 )}
+                {verdict && <BlindTest verdict={verdict} />}
                 {isOpen && (
                   <pre className="mt-2 max-h-64 overflow-auto rounded bg-(--color-background) p-2 text-[11px] font-mono whitespace-pre-wrap">{s.code}</pre>
                 )}

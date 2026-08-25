@@ -37,7 +37,7 @@ Hard context the code does not state:
 | As of 08-25 | desk **opens nothing** without a real backend (§3); runtime moved **local**, where the CLI backend is live-verified |
 | `Counterfactual` rows | 3 (was 0 — the arm recorder finally fires; sample far too small) |
 | `ResearchStrategy` | **6 approved** / 171 rejected / 37 demoted / 1 proposed (34 mock rows demoted 08-25) |
-| …the 6 survivors | all on **BTC-USD / GC=F / NG=F** — none on a stock; none has a blind test |
+| …those 6 | all `legacy-single-symbol`, on **BTC-USD / GC=F / NG=F** — **0 desk-eligible** (`npx tsx scripts/list-survivors.mts`) |
 | `ResearchRun` | 109 rows, 102 `done` — but only **#110** was ever AI-proposed (§3) |
 | Schema | `blindTest`, `exitLadder`, `demotedReason`, **`validation`** columns are pushed and live |
 | `validation` on every existing row | `legacy-single-symbol` (the column default) — so **0 rows are desk-eligible** until one passes a panel round (§3) |
@@ -129,6 +129,19 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   `Manage positions` /15min, `Research round` 06:00; the four dead desk tasks are
   unregistered. `~/.local/bin` is on the persisted **User** PATH, so Task Scheduler resolves
   the CLI too.
+- **The survivor condition is now readable from three places** — it was previously derivable
+  only by reading `adapter.ts`. It is `status="approved" AND validation="panel-v1"`, and it is
+  unforgeable: `applyBlindTestVerdict` rewrites status to `rejected` on anything short of
+  `passed` on all three TEST folds, **errors included** (fails closed), and
+  `adapter.getResearchStrategy` filters on the same pair — so the desk stays safe even if
+  nobody looks. `scripts/list-survivors.mts` (new) prints per-fold TEST numbers and, crucially,
+  **splits rows that failed the bar from rows whose gate never completed** (a mid-run
+  `NeonDbError` fails closed to `rejected`, which is correct but is *not* a verdict — those are
+  re-runnable). `runScheduledResearchRound` logs the same per-fold lines and now labels its
+  in-sample numbers `fit=[...]`; bare FIT numbers next to `[approved]` read as evidence for the
+  approval when the evidence is the fold lines. `/research` renders the three states distinctly.
+  `list-approved` tags each row DESK-ELIGIBLE / not eligible. **Live state 08-25: 0 survivors,
+  0 `panel-v1` rows, 6 legacy approvals.**
 
 ## 4. Next steps, highest value first
 
@@ -201,8 +214,10 @@ correlation / N_eff table, and the AAPL overlap arithmetic — are preserved in
 
 What is left of this item, and it is not small: **the pool is empty by construction.** Every
 existing row is `legacy-single-symbol`, so nothing is desk-eligible. The next step is to run a
-panel round and see whether anything clears a bar that is, deliberately, much harder than the one
-84 rows cleared. Expect most rounds to produce nothing; that is the gate working, not a fault.
+panel round and see whether anything clears a bar that is, deliberately, much harder than the
+one the 6 legacy approvals cleared. Expect most rounds to produce nothing; that is the gate
+working, not a fault. **Check with `npx tsx scripts/list-survivors.mts`**, not `list-approved` —
+approved alone is not the survivor condition (§3).
 
 ## 5. Traps — read before touching these areas
 
