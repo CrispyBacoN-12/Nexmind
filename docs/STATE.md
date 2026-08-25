@@ -259,14 +259,20 @@ approved alone is not the survivor condition (§3).
   `backtestSummary` non-comparable, exactly as warned; that is what the `validation` column
   records rather than hides.
 - **Register the weekly research schedule.** The code rotates per week; the Windows task still
-  fires daily at 06:00. Changing a scheduled task is a system setting — run it yourself:
+  fires daily at 06:00. Changing a scheduled task is a system setting — run it yourself. The
+  task is named **`NEXMIND Research round`** (all three carry the `NEXMIND ` prefix), and
+  `schtasks /Change` **cannot** do this — it edits `/ST`, `/TR`, `/RU`, not the schedule type.
+  `/Create /F` would work but requires re-quoting the nested `wscript //B ...vbs ...cmd`
+  command line; replacing only the trigger leaves the action and principal untouched:
 
   ```
-  schtasks /Change /TN "Research round" /SC WEEKLY /D SUN /ST 06:00
+  Set-ScheduledTask -TaskName "NEXMIND Research round" -Trigger (New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 6:00am)
   ```
 
-  Verify with `schtasks /Query /TN "Research round" /FO LIST`. Until this runs, the loop tests
-  ~7x more candidates against a fixed p95 bar than the multiple-testing argument in §3 assumes.
+  Verify with `(Get-ScheduledTask -TaskName "NEXMIND Research round").Triggers` — expect
+  `DaysOfWeek 1` / `WeeksInterval 1`; a surviving `DaysInterval` means it is still daily. Until
+  this runs, the loop tests ~7x more candidates against a fixed p95 bar than the
+  multiple-testing argument in §3 assumes.
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
 - Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`
   (`scripts/revert-stocks-desk-to-default.ts` sets `trend-pullback`; something set combo-vote
