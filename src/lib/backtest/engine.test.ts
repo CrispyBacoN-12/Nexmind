@@ -1,7 +1,7 @@
 import "dotenv/config"; // engine.ts -> trading/scanner.ts -> research/adapter.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { backtestCandles, openPosition, stepPosition, summarizeBacktest, rMultipleOf, MIN_RISK_FRACTION, type SimTrade } from "./engine";
+import { backtestCandles, openPosition, simulateExits, stepPosition, summarizeBacktest, rMultipleOf, WARMUP, MIN_RISK_FRACTION, type SimTrade } from "./engine";
 import { decideSetup, type ScanSnapshot } from "@/lib/trading/scanner";
 import type { Candle } from "@/lib/indicators";
 
@@ -338,4 +338,65 @@ test("rMultipleOf refuses non-finite and non-positive inputs instead of propagat
   assert.equal(rMultipleOf(10, 0, 1.5, 1), null, "a zero entry has no scale to measure risk against");
   assert.equal(rMultipleOf(10, -5, 1.5, 1), null);
   assert.equal(rMultipleOf(10, 100, 1.5, 0), null, "a zero lot cannot have risked anything");
+});
+
+// ---- entryAt: "open" (ExitOptions) ----
+//
+// Three properties, all of which the gap-fade-open row in
+// scripts/mechanism-screen.mts depends on holding exactly.
+
+/** A flat series past WARMUP with one long signal planted at `at`. */
+function openFillSeries(at: number, atrAt: (i: number) => number, len = WARMUP + 6) {
+  const candles: Candle[] = Array.from({ length: len }, (_, i) => ({
+    t: t0 + i * HOUR_S, o: 100, h: 101, l: 99, c: 100, v: 1000,
+  }));
+  return {
+    candles,
+    signals: {
+      sides: candles.map((_, i) => (i === at ? ("long" as const) : null)),
+      atrs: candles.map((_, i) => atrAt(i)),
+    },
+  };
+}
+
+const AT = WARMUP + 1;
+
+test('entryAt "open" fills at the bar open; "close" fills at the bar close', () => {
+  const { candles, signals } = openFillSeries(AT, () => 1);
+  // Open 90, close 110 — 20 apart, so the recorded entry names the price used.
+  candles[AT] = { ...candles[AT], o: 90, h: 110, l: 90, c: 110 };
+
+  const open = simulateExits("X", candles, signals, { entryAt: "open", slMult: 1.5, singleTarget: true });
+  const close = simulateExits("X", candles, signals, { entryAt: "close", slMult: 1.5, singleTarget: true });
+
+  assert.equal(open.trades.length, 1);
+  assert.equal(close.trades.length, 1);
+  assert.equal(open.trades[0].entry, 90);
+  assert.equal(close.trades[0].entry, 110);
+});
+
+test('entryAt "open" sizes the stop off atrs[i-1] — ATR at i is not known at the open', () => {
+  // atrs[i] = i, so the two candidate stops are far apart:
+  //   atrs[AT-1] = 60 → sl = 100 - 1.5*60 = 10      (correct)
+  //   atrs[AT]   = 61 → sl = 100 - 1.5*61 = 8.5     (lookahead)
+  const { candles, signals } = openFillSeries(AT, (i) => i);
+  // A later bar dipping to 9.2 reaches the correct stop and misses the peeking
+  // one, so the trade count alone separates the two implementations.
+  candles[AT + 2] = { ...candles[AT + 2], l: 9.2 };
+
+  const r = simulateExits("X", candles, signals, { entryAt: "open", slMult: 1.5, singleTarget: true });
+  assert.equal(r.trades.length, 1, "stop must sit at 10 (previous bar's ATR), not 8.5 (this bar's)");
+  assert.ok(r.trades[0].exit >= 9.2, `exit ${r.trades[0].exit} should be the 10 stop, not the bar low`);
+});
+
+test('entryAt "open" manages the entry bar; a close fill cannot be resolved by its own bar', () => {
+  const { candles, signals } = openFillSeries(AT, () => 1);
+  // Enter at the open of 100 with sl = 100 - 1.5 = 98.5; the same bar trades 98.
+  candles[AT] = { ...candles[AT], o: 100, h: 100, l: 98, c: 100 };
+
+  const open = simulateExits("X", candles, signals, { entryAt: "open", slMult: 1.5, singleTarget: true });
+  const close = simulateExits("X", candles, signals, { entryAt: "close", slMult: 1.5, singleTarget: true });
+
+  assert.equal(open.trades.length, 1, "same-session stop-out is booked on an open fill");
+  assert.equal(close.trades.length, 0, "the close fill is still open — the next bar never reaches 98.5");
 });

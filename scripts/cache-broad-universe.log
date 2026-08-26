@@ -1,0 +1,18 @@
+directory: 5671 common stocks listed, 5196 outside the S&P 500
+
+pass 1 - screening 5196 symbols on 1y liquidity ...
+  400/5196 screened, 192 pass the floor  800/5196 screened, 371 pass the floor  1200/5196 screened, 572 pass the floor  1600/5196 screened, 757 pass the floor  2000/5196 screened, 940 pass the floor  2400/5196 screened, 1121 pass the floor  2800/5196 screened, 1292 pass the floor  3200/5196 screened, 1474 pass the floor  3600/5196 screened, 1667 pass the floor  4000/5196 screened, 1847 pass the floor  4400/5196 screened, 2030 pass the floor  4800/5196 screened, 2234 pass the floor  5196/5196 screened, 2418 pass the floor
+  5196 screened in 82s - 2418 tradeable
+  keeping 1200 of 2418 (1 in 2.02, AA..ZVRA) into pass 2 (target 1200)
+
+pass 2 - fetching max history for 1201 symbols ...
+  200/1201 fetched, 194 kept  400/1201 fetched, 392 kept  600/1201 fetched, 586 kept  800/1201 fetched, 781 kept  1000/1201 fetched, 977 kept  1200/1201 fetched, 1172 kept  1201/1201 fetched, 1173 kept
+  done in 125s - 28 dropped for < 300 bars
+
+--- panel ---
+symbols: 1172 (+ SPY, 2676 bars)
+alphabet: AA..ZVRA covering ABCDEFGHIJKLMNOPQRSTUVWXYZ
+bars per symbol: min=301 median=2676 max=2676
+date span: 2016-01-04 .. 2026-08-25
+
+wrote .cache/bars/broad-1d.json

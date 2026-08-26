@@ -331,6 +331,36 @@ export interface ExitOptions {
    * without ever being traded, which is exactly what this index expresses.
    */
   entryFrom?: number;
+  /**
+   * Which price of the signal bar the position fills at. Default "close".
+   *
+   * "open" exists for rules whose signal is fully determined by the OPENING
+   * print — `gap-fade` is the only one so far: it compares bar i's open to bar
+   * i-1's high/low, so it is decidable at 09:30 and filling at 16:00 measures a
+   * different strategy than the one being described.
+   *
+   * DO NOT set this for a rule that reads bar i's close (decideSetup and every
+   * other screened mechanism do). Filling at the open on a close-derived signal
+   * is lookahead, full stop.
+   *
+   * Two consequences are handled below and are not optional:
+   *   - the stop is sized off `atrs[i-1]`, because ATR at i includes bar i's
+   *     own true range and is therefore unknown at the open (indicators.ts:182);
+   *   - the entry bar is managed like any other bar, since its whole high/low
+   *     range occurs after the opening print. stepPosition's existing
+   *     adverse-before-favorable rule applies, so a bar touching both SL and TP
+   *     books the loss.
+   *
+   * "open-unmanaged" is a DIAGNOSTIC, not a strategy, and must never be quoted
+   * as a result. It fills at the open but leaves the entry bar unmanaged, which
+   * is not implementable — a real stop sitting through that session either fires
+   * or does not. It exists for exactly one job: "open" changes two things at
+   * once (the fill price AND same-session management under the pessimistic
+   * adverse-before-favorable rule), and gap bars are high-range by construction,
+   * so the matched control cannot neutralise the second one — its entries land
+   * on ordinary bars. Running all three rows attributes the difference.
+   */
+  entryAt?: "close" | "open" | "open-unmanaged";
 }
 
 /**
@@ -388,6 +418,7 @@ export function simulateExits(
     slMult = ATR_SL_MULT,
     trail,
     entryFrom = 0,
+    entryAt = "close",
   } = opts;
 
   const trades: SimTrade[] = [];
@@ -413,7 +444,23 @@ export function simulateExits(
     const side = signals.sides[i];
     if (!side) continue;
     signalCount++;
-    open = openPosition(side, bar.c, signals.atrs[i], lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs, slMult, trail);
+    // On an open fill the sizing ATR must come from the PREVIOUS bar; see
+    // ExitOptions.entryAt. i is always >= WARMUP here, so i-1 exists.
+    const opensAtOpen = entryAt === "open" || entryAt === "open-unmanaged";
+    const atEntry = opensAtOpen ? bar.o : bar.c;
+    const atrAtEntry = opensAtOpen ? signals.atrs[i - 1] : signals.atrs[i];
+    open = openPosition(side, atEntry, atrAtEntry, lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs, slMult, trail);
+
+    // An open fill has the rest of the signal bar left to run, so that bar gets
+    // managed too — otherwise a same-day stop-out is invisible and a same-day
+    // target is unclaimable, which flatters and penalises the rule at once.
+    if (entryAt === "open") {
+      const r = stepPosition(open, bar);
+      if (r.status === "closed") {
+        trades.push({ symbol, ...r.trade });
+        open = null;
+      }
+    }
   }
 
   return { symbol, bars: candles.length, signals: signalCount, trades, openAtEnd: open != null };

@@ -1,0 +1,45 @@
+=== S&P 500 panel, fit only ===
+loading panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+  dropped 1886 placeholder bar(s) (o==h==l==c, no volume) across 6 symbol(s): PARA 946, FI 421, SMCI 349, CTRA 167, BIIB 2, DXCM 1
+ladder=flat "no trail"  control=200
+WARMUP=60 bars, 2 mechanism row(s), folds: fit
+  fit: 474 symbols participate
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        42474      471  -0.013   55.2%  -0.031   -0.025    0.012  beats-median
+    signs fit/select -  ·  all five -
+
+gap-fade-open
+  gap fade, filled at the OPEN — same rule, the price the mechanism actually describes
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        48730      471  -0.068   52.1%  -0.029   -0.023   -0.045  LOSES-to-median
+    signs fit/select -  ·  all five -
+
+reminder: FIT and SELECT are the screening folds. The TEST columns are printed for the
+audit trail — choosing a mechanism from them spends the only untouched data left.
+
+=== broad panel, fit only ===
+loading panel cache…
+panel .cache/bars/broad-1d.json — 1173 symbols, fetchedAt 2026-08-26T06:09:55.013Z
+  dropped 16750 placeholder bar(s) (o==h==l==c, no volume) across 140 symbol(s): BIOA 1667, MBLY 1296, LION 1040, OUST 837, SMX 828, IBTA 752, DCTH 660, FG 631, NBIS 622, FRMM 590, ADT 433, VIA 422, DFNS 354, MNTN 311, CORZ 276, TRMD 275, PRTH 260, CBL 251, BTU 246, BNAI 206, NEXT 206, HYMC 201, OPTX 201, WSC 201, CRML 199, SD 187, ACEL 186, TATT 179, CTOS 167, EXE 156, GCMG 135, MIR 134, SBET 129, DJCO 119, GPOR 117, BULL 115, LUNR 115, IMXI 113, BBOT 110, PACK 107, BV 102, BTDR 101, ARKO 95, SPRB 95, CHPT 89, NEGG 85, SMPL 81, MPB 70, ASTS 69, SOC 67, ABX 64, RUM 52, SMBK 50, FEIM 46, WEST 43, AIIO 41, PGY 37, PCT 33, PR 30, HIFS 24, XXI 24, BKSY 22, VRT 22, PRE 21, RGTI 21, SMMT 20, NBN 18, SEZL 18, BAR 17, TRNS 16, XMAX 15, LTRX 13, PHVS 13, JBI 12, CLMB 11, CLYM 11, VXX 10, DUOT 8, ALOY 6, CTEV 6, EVLV 6, MPTI 6, PESI 6, REPX 6, GPRK 5, IA 5, IRON 5, NIC 5, BFST 4, EH 4, EOSE 4, PLSE 4, TENX 4, CIVB 3, DAC 3, HPK 3, KRYS 3, NUVB 3, RRBI 3, SYM 3, ACAD 2, CMCL 2, CRNC 2, CSWC 2, FOR 2, GILT 2, IDA 2, LEU 2, MNPR 2, PGC 2, PL 2, TMDX 2, TRVI 2, ALRS 1, AMLX 1, ASGI 1, CAPR 1, CDNA 1, CGNT 1, CLSK 1, CRSP 1, CWBC 1, DSGR 1, FTRE 1, GH 1, IFS 1, IMNM 1, INOD 1, INVA 1, LIFE 1, MLR 1, NATH 1, NVAX 1, OPFI 1, RKLB 1, SIGA 1, STRO 1, TGLS 1, WTM 1, ZVRA 1
+ladder=flat "no trail"  control=200
+WARMUP=60 bars, 2 mechanism row(s), folds: fit
+  fit: 873 symbols participate
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        63276      864  -0.004   55.6%  -0.021   -0.016    0.012  beats-median
+    signs fit/select -  ·  all five -
+
+gap-fade-open
+  gap fade, filled at the OPEN — same rule, the price the mechanism actually describes
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        72488      864  -0.031   54.1%  -0.020   -0.015   -0.017  LOSES-to-median
+    signs fit/select -  ·  all five -
+
+reminder: FIT and SELECT are the screening folds. The TEST columns are printed for the
+audit trail — choosing a mechanism from them spends the only untouched data left.

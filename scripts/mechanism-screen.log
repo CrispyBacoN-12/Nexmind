@@ -1,0 +1,83 @@
+loading panel cache…
+panel 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+  dropped 1886 placeholder bar(s) (o==h==l==c, no volume) across 6 symbol(s): PARA 946, FI 421, SMCI 349, CTRA 167, BIIB 2, DXCM 1
+ladder=flat "no trail"  control=off
+WARMUP=60 bars, 6 mechanisms + 1 baseline reference, 5 folds
+  fit: 474 symbols participate
+  select: 476 symbols participate
+  test1: 483 symbols participate
+  test2: 488 symbols participate
+  test3: 491 symbols participate
+
+baseline
+  decideSetup() — the desk's trend-pullback rule, printed as the reference row
+    fold      trades  symbols    avgR     win%   ctrl p95   margin
+    fit        23445      471  -0.003   55.7%        —        —
+    select      8252      475  -0.034   54.0%        —        —
+    test1      17969      483   0.010   56.3%        —        —
+    test2      17572      487  -0.024   54.4%        —        —
+    test3      23998      491  -0.014   55.0%        —        —
+    signs fit/select --  ·  all five --+--
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols    avgR     win%   ctrl p95   margin
+    fit        17659      471   0.080   60.3%        —        —
+    select      5699      475   0.133   63.2%        —        —
+    test1      14216      482   0.152   64.2%        —        —
+    test2      15858      487   0.022   57.0%        —        —
+    test3      18593      491   0.108   61.8%        —        —
+    signs fit/select ++  ·  all five +++++  <- both screening folds positive
+
+nr7
+  volatility contraction: narrowest range of 7, direction from the symbol's own SMA50
+    fold      trades  symbols    avgR     win%   ctrl p95   margin
+    fit        27145      471   0.002   55.9%        —        —
+    select     10159      475   0.015   56.7%        —        —
+    test1      20367      482   0.007   56.2%        —        —
+    test2      21537      487  -0.028   54.2%        —        —
+    test3      27228      491  -0.027   54.3%        —        —
+    signs fit/select ++  ·  all five +++--  <- both screening folds positive
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols    avgR     win%   ctrl p95   margin
+    fit        42474      471  -0.013   55.2%        —        —
+    select     16150      475  -0.031   54.1%        —        —
+    test1      36766      482  -0.004   55.5%        —        —
+    test2      36259      487   0.001   55.8%        —        —
+    test3      45086      491  -0.014   55.0%        —        —
+    signs fit/select --  ·  all five ---+-
+
+turn-of-month
+  calendar: long on the last weekday of each month — zero parameters, zero price input
+    fold      trades  symbols    avgR     win%   ctrl p95   margin
+    fit        14735      471   0.093   61.0%        —        —
+    select      5163      475   0.051   58.7%        —        —
+    test1      10371      482   0.355   75.5%        —        —
+    test2      11035      487   0.035   57.8%        —        —
+    test3      14332      491  -0.013   55.1%        —        —
+    signs fit/select ++  ·  all five ++++-  <- both screening folds positive
+
+vol-dryup
+  volume dry-up: lowest volume of 20 while the close holds above its own SMA50
+    fold      trades  symbols    avgR     win%   ctrl p95   margin
+    fit         8792      471   0.108   61.9%        —        —
+    select      3718      472   0.083   60.5%        —        —
+    test1       6984      483   0.157   64.5%        —        —
+    test2       5485      485  -0.011   55.2%        —        —
+    test3       8200      490   0.019   56.9%        —        —
+    signs fit/select ++  ·  all five +++-+  <- both screening folds positive
+
+range-expand
+  range expansion: largest true range of 20, closing in the top/bottom quarter of its own bar
+    fold      trades  symbols    avgR     win%   ctrl p95   margin
+    fit        11445      471  -0.014   55.1%        —        —
+    select      3413      475   0.002   56.0%        —        —
+    test1       8837      482  -0.037   53.7%        —        —
+    test2       8861      487   0.067   59.5%        —        —
+    test3      11353      491  -0.023   54.5%        —        —
+    signs fit/select -+  ·  all five -+-+-
+
+reminder: FIT and SELECT are the screening folds. The TEST columns are printed for the
+audit trail — choosing a mechanism from them spends the only untouched data left.

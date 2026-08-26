@@ -1,0 +1,83 @@
+loading panel cache…
+panel 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+  dropped 1886 placeholder bar(s) (o==h==l==c, no volume) across 6 symbol(s): PARA 946, FI 421, SMCI 349, CTRA 167, BIIB 2, DXCM 1
+ladder=flat "no trail"  control=200
+WARMUP=60 bars, 7 mechanism row(s), folds: fit, select, test1, test2, test3
+  fit: 474 symbols participate
+  select: 476 symbols participate
+  test1: 483 symbols participate
+  test2: 488 symbols participate
+  test3: 491 symbols participate
+
+baseline
+  decideSetup() — the desk's trend-pullback rule, printed as the reference row
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        23445      471  -0.003   55.7%   0.010    0.017   -0.019  LOSES-to-median
+    select      8252      475  -0.034   54.0%   0.067    0.078   -0.112  LOSES-to-median
+    test1      17969      483   0.010   56.3%   0.032    0.040   -0.030  LOSES-to-median
+    test2      17572      487  -0.024   54.4%   0.001    0.009   -0.033  LOSES-to-median
+    test3      23998      491  -0.014   55.0%   0.014    0.020   -0.034  LOSES-to-median
+    signs fit/select --  ·  all five --+--
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        17659      471   0.080   60.3%   0.078    0.085   -0.005  beats-median
+    select      5699      475   0.133   63.2%   0.146    0.159   -0.026  LOSES-to-median
+    test1      14216      482   0.152   64.2%   0.096    0.105    0.047  beats-median
+    test2      15858      487   0.022   57.0%   0.012    0.020    0.002  beats-median
+    test3      18593      491   0.108   61.8%   0.061    0.068    0.040  beats-median
+    signs fit/select ++  ·  all five +++++  <- both screening folds positive
+
+nr7
+  volatility contraction: narrowest range of 7, direction from the symbol's own SMA50
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        27145      471   0.002   55.9%   0.020    0.028   -0.027  LOSES-to-median
+    select     10159      475   0.015   56.7%   0.069    0.083   -0.068  LOSES-to-median
+    test1      20367      482   0.007   56.2%   0.032    0.042   -0.035  LOSES-to-median
+    test2      21537      487  -0.028   54.2%  -0.000    0.009   -0.037  LOSES-to-median
+    test3      27228      491  -0.027   54.3%   0.011    0.019   -0.046  LOSES-to-median
+    signs fit/select ++  ·  all five +++--  <- both screening folds positive
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        42474      471  -0.013   55.2%  -0.031   -0.025    0.012  beats-median
+    select     16150      475  -0.031   54.1%  -0.063   -0.052    0.021  beats-median
+    test1      36766      482  -0.004   55.5%  -0.032   -0.023    0.019  beats-median
+    test2      36259      487   0.001   55.8%  -0.012   -0.004    0.005  beats-median
+    test3      45086      491  -0.014   55.0%  -0.024   -0.018    0.004  beats-median
+    signs fit/select --  ·  all five ---+-
+
+turn-of-month
+  calendar: long on the last weekday of each month — zero parameters, zero price input
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        14735      471   0.093   61.0%   0.084    0.095   -0.002  beats-median
+    select      5163      475   0.051   58.7%   0.158    0.176   -0.125  LOSES-to-median
+    test1      10371      482   0.355   75.5%   0.110    0.124    0.231  beats-median
+    test2      11035      487   0.035   57.8%   0.018    0.032    0.004  beats-median
+    test3      14332      491  -0.013   55.1%   0.067    0.079   -0.091  LOSES-to-median
+    signs fit/select ++  ·  all five ++++-  <- both screening folds positive
+
+vol-dryup
+  volume dry-up: lowest volume of 20 while the close holds above its own SMA50
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit         8792      471   0.108   61.9%   0.090    0.103    0.005  beats-median
+    select      3718      472   0.083   60.5%   0.170    0.186   -0.103  LOSES-to-median
+    test1       6984      483   0.157   64.5%   0.116    0.129    0.028  beats-median
+    test2       5485      485  -0.011   55.2%   0.023    0.040   -0.050  LOSES-to-median
+    test3       8200      490   0.019   56.9%   0.074    0.089   -0.070  LOSES-to-median
+    signs fit/select ++  ·  all five +++-+  <- both screening folds positive
+
+range-expand
+  range expansion: largest true range of 20, closing in the top/bottom quarter of its own bar
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    fit        11445      471  -0.014   55.1%  -0.021   -0.008   -0.005  beats-median
+    select      3413      475   0.002   56.0%  -0.019    0.007   -0.005  beats-median
+    test1       8837      482  -0.037   53.7%  -0.024   -0.007   -0.031  LOSES-to-median
+    test2       8861      487   0.067   59.5%  -0.009    0.008    0.059  beats-median
+    test3      11353      491  -0.023   54.5%  -0.016   -0.004   -0.019  LOSES-to-median
+    signs fit/select -+  ·  all five -+-+-
+
+reminder: FIT and SELECT are the screening folds. The TEST columns are printed for the
+audit trail — choosing a mechanism from them spends the only untouched data left.

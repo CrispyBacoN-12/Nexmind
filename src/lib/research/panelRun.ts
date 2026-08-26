@@ -77,6 +77,14 @@ export interface PanelExit {
   singleTarget?: boolean;
   lot?: number;
   costs?: CostModel;
+  /**
+   * Passed straight through to simulateExits. It lives on the EXIT object on
+   * purpose: runControl re-simulates through simulateFold with this same
+   * object, so the matched random control automatically fills at the same price
+   * the strategy does. A control filling at the close while the rule fills at
+   * the open would not be a control, it would be a second strategy.
+   */
+  entryAt?: "close" | "open" | "open-unmanaged";
 }
 
 export const PANEL_LOT = 0.1;
@@ -167,6 +175,7 @@ export function simulateFold(prepared: PreparedSymbol[], fold: Fold, exit: Panel
       trail: exit.trail,
       costs: exit.costs ?? DEFAULT_COST_MODEL,
       entryFrom: p.entryFrom,
+      entryAt: exit.entryAt,
     });
     signals += r.signals;
     if (r.trades.length) symbolsTraded++;

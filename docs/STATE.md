@@ -46,10 +46,43 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 08-25)
+## 3. Done recently (2026-08-23 → 08-26)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
+- **`gap-fade` closed — the last live mechanism. 2026-08-26**,
+  `docs/quant/2026-08-26-gap-fade-open-fill.md`. New `ExitOptions.entryAt` lets a rule fill
+  at the bar OPEN (stop sized off `atrs[i-1]`, since ATR at i includes bar i's own range;
+  entry session managed). Given the price it actually describes, `gap-fade` **loses to the
+  control median on both panels** (−0.045 S&P 500, −0.017 broad) against +0.012 at the close
+  fill — pre-registered to need MORE than +0.012 to survive. So buying the gapped open is
+  0.055R worse than buying that session's close: the edge was never "fade the gap", it was
+  "let the gap session finish, then take the reversion", and that version still only loses
+  less than random. A `-nomanage` diagnostic prices the intrabar ambiguity at ~0.001R, which
+  **closes intraday bars as a response to this** — see §4g.
+- **Replicated on a disjoint universe. 2026-08-26**,
+  `docs/quant/2026-08-26-broad-universe-rerun.md`. The same six mechanisms and the same
+  baseline, re-run unchanged on `.cache/bars/broad-1d.json` — 1,172 liquid US common stocks
+  sharing **not one ticker** with the S&P 500, same calendar, same folds, same `PANEL_SEED`.
+  **Not one verdict flipped.** The baseline loses to the control median in 5/5 folds there
+  too; the same five mechanisms fail; `gap-fade` passes again. So the eleven null results were
+  never a statement about where we were looking. Changing the universe is now closed as a
+  direction, and `decideSetup()` is closed as a research subject — §4g.
+- **The baseline entry rule loses to random. 2026-08-26**, `scripts/mechanism-screen.mts`,
+  full table in `docs/quant/2026-08-26-mechanism-screen-results.md`. Against the matched
+  random control — same symbols, same trade count, same long/short mix, same exits, same
+  costs, only the entry timing randomised — `decideSetup()`'s avgR is below the control
+  **MEDIAN in all five folds** (−0.003/−0.034/+0.010/−0.024/−0.014 vs med
+  +0.010/+0.067/+0.032/+0.001/+0.014). Not "roughly zero", which is how it was recorded
+  before: **negative-value entry timing, in every fold, including the two it was built on.**
+  Everything tuned around it — the exit ladder, the 13 vetoes, the market gate — was tuned
+  around that. Read this before spending another round on the same rule.
+- **Six new entry mechanisms screened, five rejected. 2026-08-26**, same run.
+  `mr-down3`, `nr7`, `turn-of-month`, `vol-dryup`, `range-expand` — **do not re-tune**, all
+  failed on the screening folds (fit/select). `gap-fade` is the only row beating the control
+  p95 in 5/5 folds, but its raw avgR is negative in 4/5 because its control is negative too:
+  an information result, not a tradeable one, and its entry fills at the CLOSE of the gap bar,
+  which is the wrong price for the mechanism. Open, undecided — §4g.
 - **Stocks-only pivot finished.** Gold/forex/crypto/options desks and watchlist seeds gone.
 - **All 13 confluence filters rejected** IS/OOS — loop closed (§5),
   `docs/quant/2026-08-23-confluence-filter-sweep-results.md`.
@@ -226,6 +259,12 @@ defensible claim is only "0.8:1 is measurably bad".
 
 ### d. Decide whether the desk's own default exit becomes a trail
 
+**Reweighted 2026-08-26 and probably not worth doing yet.** The trail's +0.021 avgR was
+measured on top of an entry rule now shown to be worse than random (§3). A better exit on a
+negative-value entry is still a negative-value strategy, so this is a refinement of the wrong
+layer. It stays on the list because the measurement is sound and cheap to ship later; it
+should not be worked before §4g.
+
 **`resolveExitOverride`'s no-override path and the backtest engine's `ATR_TP_MULT` are
 untouched** — a built-in strategy like desk #11's `combo-vote` still exits on the 1.5/2.5
 ladder. On weekly, the desk's timeframe, the trail is +0.021 avgR and ~36% more trades.
@@ -251,8 +290,68 @@ one the 6 legacy approvals cleared. Expect most rounds to produce nothing; that 
 working, not a fault. **Check with `npx tsx scripts/list-survivors.mts`**, not `list-approved` —
 approved alone is not the survivor condition (§3).
 
+### g. Change the input, not the rule — **run 2026-08-26, ANSWERED: it was not the universe**
+
+Ten mechanisms across five families had been measured against the matched control and none was
+tradeable. All ten were functions of daily OHLCV, and all ten were measured on the 491 most
+heavily analysed securities on earth. So the input was changed rather than the rule.
+
+`scripts/cache-broad-universe.mts` built `.cache/bars/broad-1d.json` — **1,172 liquid US
+common stocks disjoint from the S&P 500** (5,196 candidates from the NASDAQ symbol directory,
+floored at $2M median daily dollar volume and $5 close, sampled by an alphabetical stride so
+the kept set is not just the next-largest caps). Alpaca SIP, `adjustment=all`, span
+2016-01-04..2026-08-25 — identical to the existing panel, so `FOLDS` and `PANEL_WARMUP_BARS`
+transferred unchanged. The same six mechanisms, same baseline row, same folds, same ladder,
+same `PANEL_SEED`, same `--control=200`, via the new `--panel=` flag on
+`scripts/mechanism-screen.mts`. Only the universe differed.
+
+**Result — `docs/quant/2026-08-26-broad-universe-rerun.md`. Not one verdict flipped.**
+
+- **The baseline is dead independently of universe.** It loses to the control MEDIAN in 5/5
+  folds on the broad panel too (−0.024 / −0.119 / −0.016 / −0.011 / −0.042 vs the S&P 500's
+  −0.019 / −0.112 / −0.030 / −0.033 / −0.034). Ten fold-cells, two symbol sets with zero
+  overlap, never once positive. The pre-registered consequence, written before the run, was
+  "no further work belongs on it". **`decideSetup()` is closed as a research subject.**
+- **`gap-fade` replicated** — positive margin in 10/10 cells across both universes, and again
+  the only mechanism passing BOTH screening folds. Caveats in §5 and in the doc.
+- **The other five failed again, identically.** Do not re-tune them.
+- **Changing the universe is now itself closed.** Two disjoint equity universes produced the
+  same answers throughout, so further universe-swapping on daily OHLCV should not be funded.
+
+**Correction to how this was framed earlier in the day:** "find data without survivorship
+bias" was the wrong reason. The matched control re-places entries within the SAME symbols, so
+a name that is only in the cache because it survived and tripled helps the rule and the
+control equally — the margin was already survivorship-neutral, and broad-1d.json is in fact
+*more* survivorship-biased than sp500-1d.json, because small caps delist far more often. The
+real reason to change the universe was arbitrage intensity, not bias. Read margins off that
+panel; never levels.
+
+**The last thread, and it is now closed too.** `gap-fade` was re-run under a corrected fill
+(`entryAt: "open"`) the same day and **failed against its own control on both panels** —
+`docs/quant/2026-08-26-gap-fade-open-fill.md`. The pre-registration required it to beat
++0.012; it printed −0.045 and −0.017. **Intraday bars are closed as a response to this**: the
+`-nomanage` diagnostic shows the same-session ambiguity daily bars cannot resolve is worth
+~0.001R against a −0.045 effect, so a 5m/15m pipeline would settle a rounding error and could
+not turn a negative fill-price result positive. If intraday data is ever built it must be
+justified by a NEW mechanism that needs it, never by this one.
+
+**Where that leaves the programme:** ten mechanisms, five families, two disjoint universes,
+one corrected fill — nothing tradeable, and `decideSetup()` itself worse than random in 10/10
+fold-cells. There is no candidate left to promote and no queued direction that the evidence
+supports. That is a real state of the project, not a gap in it, and the next direction should
+be chosen deliberately rather than inherited.
+
 ## 5. Traps — read before touching these areas
 
+- **A raw avgR from the panel carries no information on its own.** Demonstrated three times
+  now (regime features, the mechanism screen, then the broad-universe re-run — where
+  `turn-of-month`, a rule that reads no price at all, again showed a test-fold avgR of +0.268
+  at 70.6% win while failing both screening folds). On this universe 69-87% of names rose in
+  every window, so any long-biased rule prints a good-looking number for free. On 2026-08-26
+  the three best raw rows were all long-only and all died to the control; `turn-of-month`,
+  which reads **no price at all**, showed test1 avgR **+0.355 at 75.5% win** against a control
+  p95 of +0.124. Quote the margin over the matched control (`src/lib/research/control.ts`) or
+  do not quote the number.
 - **`scanner.ts:274`** — a portfolio with a `strategy` key set bypasses `decideSetup()`
   entirely, confluence block included. Filters are unreachable in that path, not merely inert.
 - **`--split=all`** in the sweep script has **no held-out half**. It exists only for `--byYear`
@@ -291,32 +390,26 @@ approved alone is not the survivor condition (§3).
 
 ## 6. Blocked on the user (still open)
 
-- The cloud credential question is **deferred, not solved**: Vercel has no
-  `ANTHROPIC_API_KEY`, and the GH runner installs the CLI and passes
+**Not on this list: anything about cloud credentials.** The runtime is local by decision
+(§3), and locally `aiBackend()` resolves to `cli` — `claude.exe` is on the persisted User
+PATH, so Task Scheduler resolves it and the desk can decide. Both key items below are
+**dormant preconditions for re-enabling a cloud schedule**, not open questions, and must not
+be reported as blockers while the runtime stays local:
+
+- *(dormant)* Vercel has no `ANTHROPIC_API_KEY`, and the GH runner installs the CLI and passes
   `CLAUDE_CODE_OAUTH_TOKEN` yet still produced `mock` — unexplained. Diagnose `aiBackend()`'s
-  CLI probe on the runner before re-enabling either schedule.
-- `FINNHUB_API_KEY` is **empty as a GitHub Actions secret** — parked while the loops run
-  locally off `.env`, where the key is set. It matters again the day a schedule is re-enabled:
+  CLI probe on the runner **before** re-enabling either schedule. Nothing depends on it today.
+- *(dormant)* `FINNHUB_API_KEY` is empty as a GitHub Actions secret; the local loops read it
+  from `.env`, where it is set. It matters again the day a schedule is re-enabled:
   `gh secret set FINNHUB_API_KEY --repo CrispyBacoN-12/Nexmind` (user runs it — do not handle
   the key).
 - ~~**Pick a window policy**~~ — **answered and implemented** (§3). Adopting it made every stored
   `backtestSummary` non-comparable, exactly as warned; that is what the `validation` column
   records rather than hides.
-- **Register the weekly research schedule.** The code rotates per week; the Windows task still
-  fires daily at 06:00. Changing a scheduled task is a system setting — run it yourself. The
-  task is named **`NEXMIND Research round`** (all three carry the `NEXMIND ` prefix), and
-  `schtasks /Change` **cannot** do this — it edits `/ST`, `/TR`, `/RU`, not the schedule type.
-  `/Create /F` would work but requires re-quoting the nested `wscript //B ...vbs ...cmd`
-  command line; replacing only the trigger leaves the action and principal untouched:
-
-  ```
-  Set-ScheduledTask -TaskName "NEXMIND Research round" -Trigger (New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 6:00am)
-  ```
-
-  Verify with `(Get-ScheduledTask -TaskName "NEXMIND Research round").Triggers` — expect
-  `DaysOfWeek 1` / `WeeksInterval 1`; a surviving `DaysInterval` means it is still daily. Until
-  this runs, the loop tests ~7x more candidates against a fixed p95 bar than the
-  multiple-testing argument in §3 assumes.
+- ~~**Register the weekly research schedule.**~~ — **DONE 2026-08-26**, verified by
+  `(Get-ScheduledTask -TaskName "NEXMIND Research round").Triggers`: `DaysOfWeek 1` /
+  `WeeksInterval 1`, no surviving `DaysInterval`. The loop now tests ~156 candidates/yr against
+  the fixed p95 bar, which is the number the multiple-testing argument in §3 assumes.
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
 - Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`
   (`scripts/revert-stocks-desk-to-default.ts` sets `trend-pullback`; something set combo-vote
