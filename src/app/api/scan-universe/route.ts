@@ -5,6 +5,7 @@ import { screenUniverse } from "@/lib/trading/screener";
 import { prisma } from "@/lib/db";
 import { canPortfolioTrade, isSwingKind } from "@/lib/portfolioGuards";
 import { isGlobalTradingHalt, getScanTimeframe } from "@/lib/settings";
+import { ensureWebullTokenFresh } from "@/lib/webull/webullToken";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -27,6 +28,11 @@ export async function POST(req: Request) {
   if (!isSwingKind(portfolio.kind)) return Response.json({ error: "not a swing portfolio" }, { status: 409 });
   if (await isGlobalTradingHalt()) return Response.json({ error: "global trading halt is on" }, { status: 409 });
   const max = Math.min(typeof body.max === "number" ? body.max : MAX_SYMBOLS, MAX_SYMBOLS);
+
+  // Roll the Webull token forward while we are here. Nothing else runs daily,
+  // and the data path itself is not enough: Alpaca leads, so Webull is rarely
+  // called and the token would expire unnoticed. Never throws.
+  await ensureWebullTokenFresh();
 
   // First close any positions that have hit TP/SL.
   const managed = await manageOpenTrades(portfolioId);

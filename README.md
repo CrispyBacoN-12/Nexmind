@@ -66,14 +66,46 @@ spawned CLI child only, so resolution still picks path 2.
 
 NEXMIND reads candles and prices through a provider router
 (`src/lib/marketData.ts`). By default it uses Yahoo Finance (no key needed).
-If you set `WEBULL_PAPER_APP_KEY`/`WEBULL_PAPER_APP_SECRET`, Webull's sandbox is
-tried first; if you set `ALPACA_KEY`/`ALPACA_SECRET`, Alpaca is tried next; Yahoo
-is always the final fallback. Any provider failure (missing key, bad response,
-empty bars, or a Webull call slower than 5s) falls through to the next one
+If you set `ALPACA_KEY`/`ALPACA_SECRET`, Alpaca is tried first; if you set
+`WEBULL_BASE_URL` + `WEBULL_APP_KEY`/`WEBULL_APP_SECRET` **and** seed an access
+token (below), Webull is tried next; Yahoo is always the final fallback. Any
+provider failure (missing key, bad response, empty bars, a series that has
+stopped updating, or a Webull call slower than 5s) falls through to the next one
 automatically, and the response reports which provider actually answered.
 
-**Webull is data-only.** Its trading API cannot be reached unattended, so the
-PaperTrade shadow-execution path was removed on 2026-08-22 — orders are manual.
+Webull led until 2026-08-30, when it was measured against Alpaca and Yahoo on
+the same symbols and dates: its closes disagreed on 99.4% of SPY bars and 86.6%
+of AAPL's, and its SPY series turned out to be spliced from two instruments.
+Because it never threw, Alpaca was never reached. See `providerOrder()` for the
+full measurement.
+
+That measurement was against Webull's **sandbox** host, which is what the code
+signed against at the time and which serves a partially refreshed fixture set —
+15 of 50 large caps came back frozen (nine at 2026-07-15, five since 2024), with
+price errors up to 39.8%. `webull.ts` now signs against production, which
+matched Alpaca to the cent on every one of those symbols. Two guards stand
+behind that: `sanitizeResponse()` drops frozen `o=h=l=c` placeholder bars and
+re-quotes from what survives, and `isStale()` rejects a series whose newest bar
+is too old — `coversDays()` measures span, not recency, so every one of those
+frozen series passed it.
+
+**Webull access token.** Production market data needs an `x-access-token`, and
+minting one needs a tap in the Webull mobile app — once. Run:
+
+```bash
+node --env-file=.env --import tsx scripts/webull-seed-token.mts
+```
+
+and approve within ~6 minutes. The token lives 15 days and refreshes without a
+second approval, so `ensureWebullTokenFresh()` (called once per scan tick, since
+Alpaca leads and Webull is otherwise rarely reached) rolls it forward on its
+own. If a refresh starts failing, the War Room shows a banner with the days left
+before a human is needed again. The token is stored in `Setting` and never
+logged.
+
+**Webull is data-only.** The PaperTrade shadow-execution path was removed on
+2026-08-22 — orders are manual. `/openapi/trade/*` may well be reachable with a
+NORMAL token, but that is untested and deliberately out of scope.
 
 ### Measuring whether the analysts help
 

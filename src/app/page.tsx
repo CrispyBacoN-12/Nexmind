@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { aiOutageStatus } from "@/lib/anthropic";
+import { webullTokenOutage } from "@/lib/webull/webullToken";
 import { Card, CardTitle, Stat, Badge, PageHeader, Empty } from "@/components/ui";
 import { fmtMoney, fmtNumber, fmtAgo, colorForChange } from "@/lib/utils";
 import { TradeDeskPanel } from "./trade-desk-panel";
@@ -18,6 +19,12 @@ export default async function WarRoom() {
   // — but silently, it looks exactly like a working analyst team, which is how
   // 27 rule-only trades ended up on the page labelled as HAWK votes.
   const outage = await aiOutageStatus();
+
+  // Same reasoning one layer down: when the Webull token lapses the desk keeps
+  // working on Alpaca alone, which looks identical to a healthy two-provider
+  // chain right up until Alpaca has a bad day. The token is the one part of
+  // this that a human has to fix, so it has to be visible.
+  const webullOutage = await webullTokenOutage();
 
   const news = await prisma.newsItem.findMany({ orderBy: { createdAt: "desc" }, take: 8 });
 
@@ -52,6 +59,17 @@ export default async function WarRoom() {
             HAWK and SAGE are not running: {outage.reason}{outage.ageMs > 60_000 ? ` (${fmtAgo(new Date(Date.now() - outage.ageMs))})` : ""}.
             New trades still pass the Scanner and the Iron Rules, but the
             analyst votes and the risk veto are deterministic stand-ins and are marked <span className="font-mono">MOCK AI</span>.
+          </p>
+        </div>
+      )}
+
+      {webullOutage && (
+        <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm font-medium text-amber-300">⚠️ Webull market data is degraded</p>
+          <p className="mt-1 text-xs text-(--color-muted)">
+            {webullOutage.reason} ({fmtAgo(new Date(webullOutage.at))}). Prices still come from
+            Alpaca, and Yahoo behind it — nothing is trading on stale data — but the fallback chain
+            is one provider shorter until the token is re-approved.
           </p>
         </div>
       )}

@@ -60,14 +60,14 @@ test("parseWebullBars throws on empty or all-extended-hours bars (so the router 
 });
 
 test("fetchWebullCandles throws when no API key is configured", async () => {
-  const prevKey = process.env.WEBULL_PAPER_APP_KEY;
-  const prevSecret = process.env.WEBULL_PAPER_APP_SECRET;
-  delete process.env.WEBULL_PAPER_APP_KEY;
-  delete process.env.WEBULL_PAPER_APP_SECRET;
+  const prevKey = process.env.WEBULL_APP_KEY;
+  const prevSecret = process.env.WEBULL_APP_SECRET;
+  delete process.env.WEBULL_APP_KEY;
+  delete process.env.WEBULL_APP_SECRET;
   try {
-    await assert.rejects(() => fetchWebullCandles("AAPL", "1d", "5m"), /WEBULL_PAPER_APP_KEY/);
+    await assert.rejects(() => fetchWebullCandles("AAPL", "1d", "5m"), /WEBULL_APP_KEY/);
   } finally {
-    if (prevKey !== undefined) process.env.WEBULL_PAPER_APP_KEY = prevKey;
-    if (prevSecret !== undefined) process.env.WEBULL_PAPER_APP_SECRET = prevSecret;
+    if (prevKey !== undefined) process.env.WEBULL_APP_KEY = prevKey;
+    if (prevSecret !== undefined) process.env.WEBULL_APP_SECRET = prevSecret;
   }
 });

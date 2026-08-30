@@ -1,30 +1,37 @@
 // Webull market-data provider — same CandleResponse shape as alpaca.ts/
-// yahoo.ts so the router is provider-agnostic. Data-only, and necessarily so:
-// Webull is not usable as an execution venue from here (see below).
+// yahoo.ts so the router is provider-agnostic. Data-only by decision: orders
+// stay manual, and nothing here touches /openapi/trade/*.
 //
-// Signs against the sandbox/UAT host with the shared WEBULL_PAPER_APP_KEY/
-// SECRET pair, not the production WEBULL_APP_KEY/SECRET pair — verified
-// (scripts/webull-sandbox-smoke-test.mts) that GET /openapi/market-data/stock/bars
-// returns real market data on sandbox with plain AK/SK signing, no
-// x-access-token exchange required. Production requires that exchange to be
-// approved in the Webull mobile app per session, which doesn't suit an
-// unattended fetch path; sandbox needs no such approval.
+// Signs against PRODUCTION (WEBULL_BASE_URL + WEBULL_APP_KEY/SECRET) with an
+// x-access-token from webull/webullToken.ts.
 //
-// Why there is no order path here: the sandbox host serves only market-data
-// plus /openapi/account/list — every /openapi/trade/* route 404s at its
-// gateway. Those routes do exist on production (api.webull.co.th), but there
-// they answer INVALID_TOKEN without an x-access-token, i.e. they need the
-// same per-session mobile approval. A shadow paper-trade path used to live
-// in webull/paperTrade.ts + webull/symbols.ts; it never placed a single
-// order because it targeted Webull's legacy app API (/api/paper/order/*,
+// It used to sign against the sandbox/UAT host instead, on the grounds that
+// production's token needs a tap in the Webull mobile app "per session" and so
+// could not suit an unattended fetch path. Measured 2026-08-30, that premise
+// was wrong: a token lives 15 days and refreshes without a second approval, so
+// one human tap seeds it and webullToken.ts rolls it forward from there.
+//
+// Staying on sandbox was not the safe option it looked like. Its bars are a
+// partially refreshed fixture set: of 50 large caps, 15 came back stale — nine
+// frozen at 2026-07-15, and PM/CSX/HON/LOW/AXP frozen since 2024-09..2025-01 —
+// with price errors from 1.3% to 39.8% (RTX 127.50 against a real 211.71).
+// None of them threw, and all of them passed coversDays, because that measures
+// span and not recency. Production returned the correct close for every one.
+//
+// Why there is still no order path here: /openapi/trade/* does exist on
+// production and a NORMAL token may well satisfy it, but that is untested and
+// deliberately out of scope. A shadow paper-trade path used to live in
+// webull/paperTrade.ts + webull/symbols.ts; it never placed a single order
+// because it targeted Webull's legacy app API (/api/paper/order/*,
 // /api/openapi/quote/symbol-search), which does not exist on the OpenAPI
-// gateway at all. It was removed rather than ported, for the reason above.
+// gateway at all. It was removed rather than ported.
 //
 // Note for any future port: a symbol-search call is not needed — the bars
 // response already carries tickerId/instrument_id on every row.
 import type { Candle } from "./indicators";
 import type { CandleResponse, Range, Interval } from "./yahoo";
 import { signedFetch } from "./webull/auth";
+import { getWebullAccessToken } from "./webull/webullToken";
 
 /** Map our Interval to Webull's Timespan enum name (the wire value the SDK
  *  sends is the enum member's name, e.g. "D", "M60" — not its numeric code). */
@@ -92,21 +99,24 @@ export function parseWebullBars(json: unknown, symbol: string, range: Range, int
 }
 
 const CATEGORY = "US_STOCK";
-const DATA_HOST = () => process.env.WEBULL_PAPER_BASE_URL || "https://th-api.uat.webullbroker.com";
+const DATA_HOST = () => process.env.WEBULL_BASE_URL || "https://api.webull.co.th";
 
-/** Fetch candles from Webull. Throws on missing credentials, non-OK status,
- *  or an empty RTH bar set — callers fall back to Alpaca/Yahoo. */
+/** Fetch candles from Webull. Throws on missing credentials, an unavailable
+ *  access token, non-OK status, or an empty RTH bar set — callers fall back to
+ *  Yahoo (and reach this only after Alpaca has missed; see providerOrder in
+ *  marketData.ts). */
 export async function fetchWebullCandles(symbol: string, range: Range = "1mo", interval: Interval = "1h"): Promise<CandleResponse> {
-  const appKey = process.env.WEBULL_PAPER_APP_KEY;
-  const appSecret = process.env.WEBULL_PAPER_APP_SECRET;
+  const appKey = process.env.WEBULL_APP_KEY;
+  const appSecret = process.env.WEBULL_APP_SECRET;
   if (!appKey || !appSecret) {
-    throw new Error("webull: missing WEBULL_PAPER_APP_KEY / WEBULL_PAPER_APP_SECRET");
+    throw new Error("webull: missing WEBULL_APP_KEY / WEBULL_APP_SECRET");
   }
   const res = await signedFetch("/openapi/market-data/stock/bars", {
     baseUrl: DATA_HOST(),
     method: "GET",
     appKey,
     appSecret,
+    accessToken: await getWebullAccessToken(),
     params: {
       symbol,
       category: CATEGORY,
