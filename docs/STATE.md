@@ -322,23 +322,41 @@ research-218 [rejected] "Volume-Confirmed Range Breakout"   fit trades=363   win
 
 **The result worth keeping is not the three rejections — it is `status: done`.** No panel round had
 ever completed before, so "the pool is empty" had two possible causes: a strict gate, or a gate
-that had never run. It was the first. All three were killed **in-sample at the FIT fold**, so none
-of them reached SELECT or a TEST window.
+that had never run. It was the first.
 
-Do not read the rejections as a market finding. A 3-trade fit and a 0.70 profit factor are the
-proposer producing weak candidates, which is expected and cheap; the panel is doing exactly what it was built to do.
+**All three rejections are correct, and none of them was decided by the numbers printed above.**
+`runResearch.ts:311` decides `status` on `selectRun.summary` — the SELECT fold, 2019, held out from
+the refinement loop and the ladder sweep — while the row stores `backtestSummary = swept.summary`
+(FIT) and the round prints that. On the numbers that actually decided:
 
-**Two things this exposed, both small and both unfixed:**
+| | SELECT 2019 | verdict |
+|---|---|---|
+| research-216 | **0 trades**, 0/476 symbols | fires essentially never; rejected on the trade floor |
+| research-217 | 2869 trades, **avgR −0.040**, PF 0.777 | a real anti-edge, and safety-flagged besides |
+| research-218 | 90 trades, 85/476 symbols, **avgR −0.407**, PF 0.549 | thin participation, badly negative |
 
-1. **`list-survivors.mts` cannot tell a FIT-fold rejection from a TEST-fold rejection.** It buckets
-   on `blindTest.error`, so a row rejected in-sample (`blindTest = "{}"`) lands under **FAILED THE
-   BAR** reading `0 reason(s): (no reason recorded)` — identical to a candidate that actually lost
-   out-of-sample. Its own `inSampleOnly` counter keys on `status !== "rejected"` and therefore can
-   never fire. The distinction matters: one is strong evidence, the other is no evidence. Fix by
-   bucketing on an empty `blindTest` rather than on the absence of an `error` key.
-2. **Nothing records *why* a candidate was rejected at FIT.** The reason is printed to stdout and
-   then discarded; the row keeps only `backtestSummary`. Re-deriving a verdict from the numbers is
-   possible but it is not the same as reading the gate's own reason.
+Do not read them as a market finding — they are the proposer producing weak candidates, which is
+expected and cheap. But do read the *pattern*: not one of the three survived contact with a single
+held-out year, and 216 could not even fire.
+
+**The reporting defect this exposed — fix it before running another round:**
+
+1. **The headline numbers are not the deciding numbers.** The round prints `fit=[…]` and the row
+   stores the FIT summary, but approval is decided on SELECT. That is why 216 reads
+   "trades=3 win 100%" when its actual verdict was "0 trades in 2019". Anyone reading a round
+   without knowing this will re-tune against the wrong fold. The SELECT summary *is* persisted —
+   in `iterations`, under a note starting `select fold` — it simply is not what anything displays.
+2. **`list-survivors.mts` cannot tell a pre-blind-test rejection from a TEST-fold one.** It buckets
+   on `blindTest.error`, so a row rejected before the gate (`blindTest = "{}"`) lands under **FAILED
+   THE BAR** reading `0 reason(s): (no reason recorded)` — identical to a candidate that genuinely
+   lost out-of-sample. Its `inSampleOnly` counter keys on `status !== "rejected"` and so can never
+   fire. Bucket on an empty `blindTest` instead, and surface the SELECT line as the reason.
+
+Note also that the dollar columns in a fixed-lot backtest are not the ones to read: `runResearch.ts`
+already selects on avgR precisely because a fixed 0.1 lot makes expectancy and profit factor weight
+each trade by its own stop width. `autoReviewStatus` still gates on `expectancy`/`profitFactor`,
+which is a live inconsistency — it did not change any verdict here (all three were negative on avgR
+too, or had no trades) but it will eventually.
 
 **The direction question is now live**, and it is genuinely open: (b) says the eligible pool is
 empty, (g) says the daily-OHLCV mechanism space is exhausted across two disjoint universes. Writing
