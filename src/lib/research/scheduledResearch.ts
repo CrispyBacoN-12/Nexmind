@@ -32,55 +32,78 @@ type StoredVerdict = Partial<PanelBlindTestReport> & { error?: string };
 interface RotationEntry {
   label: string;
   brief: string;
+  /** The three angles proposeCandidates should spread its candidates across. */
+  angles?: string[];
 }
 
-// One entry per mechanism angle so repeated rounds don't just ask the AI to
-// re-propose the same idea.
+// Re-aimed 2026-08-31, after run #112 and the direction recorded in
+// docs/STATE.md §4.0b: stop researching entry *mechanisms*, research trade
+// geometry and risk instead.
 //
-// No symbol/interval/range any more: every round now runs the full S&P 500
-// panel on daily bars over the FIT fold, so naming "AAPL 1d/2y" here would be
-// describing a run that no longer happens. The old per-entry symbols (AAPL,
-// AAPL, MSFT, NVDA) were also three names carrying four mechanisms — which is
-// the single-symbol overfitting this whole change exists to end.
+// **Read this before adding an "exit rule" or "position sizing" entry here.**
+// The proposer cannot express either one. A candidate's code returns
+// `{ side, note } | null` per bar and adapter.ts:134 consumes exactly `?.side`
+// — nothing else it returns reaches the backtest. Exits come from sweepLadder
+// over the six fixed LADDER_OPTIONS, and the backtest lot is a fixed 0.1
+// (engine.ts:414). So a brief asking for a trailing-stop variant produces a
+// candidate that cannot implement one, and the round measures whatever entry
+// rule the model wrote instead. Widening the exit search means widening
+// LADDER_OPTIONS (no AI involved); researching sizing means making the engine
+// size to risk first. Both are outside this file.
+//
+// What IS expressible is *which bar you take the trade on*, and that is not a
+// cosmetic difference: entry price relative to a 1.5-ATR stop sets the R of
+// every trade that follows. Same trigger, entered three ways, is a genuine
+// risk-geometry experiment inside the existing contract.
+//
+// Deliberately NOT in the rotation: regime filters and confluence vetoes. That
+// is the family swept IS/OOS on 2026-08-23 — all 13 rejected, three
+// pre-registered picks all flipped sign out of sample
+// (docs/quant/2026-08-23-confluence-filter-sweep-results.md). Re-proposing them
+// through the AI loop would spend a round re-deriving a closed result.
 //
 // Deliberately says nothing about the take-profit: sweepLadder picks each
 // candidate's ladder from LADDER_OPTIONS on avgR and writes it to exitLadder, so
-// naming a target here only biases the entry design toward a geometry the
-// candidate may not end up with. It used to read "TP=1.2xATR", which since
-// a70c1c4 is not even an option any more — 1.0 and 1.2 were removed from
-// LADDER_TP_MULTS as sub-1:1 against the 1.5 ATR stop.
-const MOMENTUM_LADDER =
+// naming a target here only biases the design toward a geometry the candidate
+// may not end up with.
+const PANEL_TERMS =
   "risk 1% per trade, exit geometry swept separately, edge that holds across the whole cross-section (many names contributing, not one) and across both halves of the sample";
+
+// The baseline every entry below varies. It is weak on purpose to state: ~+0.04R
+// per trade at t=1.08 out-of-sample on weekly bars, which is the number any
+// result here has to beat, not a rule presented as working.
+const BASELINE = "the trend-pullback baseline (price above SMA50, pullback toward SMA20, resumption on the trigger bar)";
 
 export const RESEARCH_ROTATION: RotationEntry[] = [
   {
-    label: "stocks-momentum",
-    brief: `Momentum/breakout entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
+    label: "stocks-entry-timing",
+    brief: `Entry timing for US equities swing trading: same setup as ${BASELINE}, but vary WHICH bar the position is opened on. ${PANEL_TERMS}.`,
+    angles: [
+      "open immediately on the trigger bar's close, the baseline's own timing, as the control",
+      "require one confirmation close in the trade's direction before opening, accepting a worse entry price for a lower failure rate",
+      "wait for a pullback back toward the trigger bar's extreme and open there, accepting missed trades for a tighter entry relative to the stop",
+    ],
   },
   {
-    label: "stocks-meanrev",
-    brief: `Mean-reversion entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
-  },
-  {
-    label: "stocks-trend-pullback",
-    brief: `Pullback-within-uptrend entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
-  },
-  {
-    label: "stocks-volatility",
-    brief: `Volatility-contraction / range-expansion entry signal for US equities swing trading, ${MOMENTUM_LADDER}.`,
+    label: "stocks-trade-geometry",
+    brief: `Trade geometry for US equities swing trading: take ${BASELINE} only where the distance from entry to a 1.5-ATR stop is favourable relative to the room the move plausibly has. ${PANEL_TERMS}.`,
+    angles: [
+      "open only when the trigger bar's range is small relative to ATR, so the stop sits close to the entry",
+      "open only when price is far from the recent swing high it would have to reach for the trade to work, i.e. there is room ahead",
+      "scale participation by where the entry sits inside the trigger bar's range rather than always taking the close",
+    ],
   },
 ];
 
 const MS_PER_WEEK = 7 * 86_400_000;
 
 /**
- * Deterministic week-of-cycle pick, so a weekly cron works through all four
- * mechanisms before repeating (a full cycle is now ~28 days, not 4).
+ * Deterministic week-of-cycle pick, so a weekly cron works through the whole
+ * rotation before repeating (a full cycle is one week per entry).
  *
  * Keyed on weeks rather than days because the cron fires weekly; keying on days
- * would advance the rotation seven steps between runs and, with four entries,
- * land on entries 0, 3, 2, 1, 0... — a cycle that still covers everything but
- * for no reason anyone reading it could predict.
+ * would advance the rotation seven steps between runs, landing on a cycle that
+ * still covers everything but for no reason anyone reading it could predict.
  */
 export function pickRotationEntry(weeksSinceEpoch: number = Math.floor(Date.now() / MS_PER_WEEK)): RotationEntry {
   const n = RESEARCH_ROTATION.length;
@@ -91,15 +114,29 @@ export interface ScheduledResearchOverride {
   brief?: string;
 }
 
+/**
+ * What a round asks for: the brief, the log label, and the diversity axis.
+ *
+ * The axis is dropped on a manual override on purpose. `angles` are three reads
+ * of *this rotation entry's* brief; carrying them onto someone else's brief
+ * would send QUANT off to explore three angles of a question nobody asked,
+ * which is worse than giving it no axis at all.
+ */
+export function roundInputs(
+  override: ScheduledResearchOverride | undefined,
+  pick: RotationEntry,
+): { brief: string; label: string; angles?: string[] } {
+  if (override?.brief) return { brief: override.brief, label: "manual-override", angles: undefined };
+  return { brief: pick.brief, label: pick.label, angles: pick.angles };
+}
+
 /** Runs one research round (rotation pick, or an explicit brief override) and returns log lines. */
 export async function runScheduledResearchRound(override?: ScheduledResearchOverride): Promise<string[]> {
-  const pick = pickRotationEntry();
-  const brief = override?.brief ?? pick.brief;
-  const label = override?.brief ? "manual-override" : pick.label;
+  const { brief, label, angles } = roundInputs(override, pickRotationEntry());
 
   const lines: string[] = [`research round [${label}] S&P 500 panel, FIT fold`];
 
-  const { runId, skipped } = await runResearch(brief);
+  const { runId, skipped } = await runResearch(brief, undefined, angles);
   const run = await prisma.researchRun.findUnique({ where: { id: runId } });
   lines.push(`run #${runId} status: ${run?.status}`);
   // The cron log is where this is noticed. A skipped round is silent otherwise:

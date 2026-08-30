@@ -359,6 +359,10 @@ export async function runResearch(
   // no cost. They also skip auto-refinement, since that's an AI call too; to
   // refine a manual candidate, ask for a revision and dispatch it as a new run.
   manualCandidates?: Candidate[],
+  // The three angles the proposer should spread its candidates across. Comes
+  // from the rotation entry (scheduledResearch.ts); when absent the proposer
+  // asks only for three genuinely different reads of the brief.
+  angles?: string[],
 ): Promise<{ runId: number; skipped?: "no-ai-backend" }> {
   const run = await prisma.researchRun.create({
     data: { brief, symbol: PANEL_RUN_SYMBOL, interval: PANEL_RUN_INTERVAL, range: PANEL_RUN_RANGE, status: "running" },
@@ -366,7 +370,7 @@ export async function runResearch(
 
   try {
     const isManual = !!manualCandidates?.length;
-    const proposed = isManual ? null : await proposeCandidates(brief, PANEL_RUN_SYMBOL, PANEL_RUN_INTERVAL);
+    const proposed = isManual ? null : await proposeCandidates(brief, PANEL_RUN_SYMBOL, PANEL_RUN_INTERVAL, angles);
 
     // See isBankableRound above for why a mock-proposed round is refused.
     if (!isBankableRound(isManual, proposed?.backend ?? null)) {

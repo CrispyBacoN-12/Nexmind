@@ -1,7 +1,7 @@
 import "dotenv/config"; // scheduledResearch.ts imports prisma at module scope
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { strategyResultLine } from "./scheduledResearch";
+import { strategyResultLine, RESEARCH_ROTATION, pickRotationEntry, roundInputs } from "./scheduledResearch";
 
 // Run #112 (2026-08-31) is the worked example these fixtures come from. Every
 // candidate it rejected printed FIT numbers that looked nothing like the reason
@@ -78,4 +78,53 @@ test("malformed iterations JSON degrades to a note rather than aborting the roun
 test("the safety flag and status still lead the line", () => {
   const line = strategyResultLine(row({ safetyFlag: true }));
   assert.match(line, /^research-218 \[rejected\] SAFETY-FLAGGED "Volume-Confirmed Range Breakout"/);
+});
+
+// --- rotation ---------------------------------------------------------------
+
+test("every rotation entry supplies exactly three angles, matching CANDIDATES_SCHEMA", () => {
+  // proposeCandidates asks for exactly 3 and the schema enforces 3. A rotation
+  // entry listing two or four angles would put the prompt and the schema in
+  // conflict on every round it came up.
+  for (const e of RESEARCH_ROTATION) {
+    assert.equal(e.angles?.length, 3, `${e.label} must list 3 angles`);
+  }
+});
+
+test("the rotation no longer asks for entry mechanisms", () => {
+  // The 2026-08-31 direction: entry-rule research is closed (five straight
+  // rejections), so the rotation varies trade geometry on a fixed baseline.
+  const text = RESEARCH_ROTATION.map((e) => `${e.label} ${e.brief} ${(e.angles ?? []).join(" ")}`).join(" ");
+  assert.doesNotMatch(text, /mean-reversion|volatility-contraction/i);
+});
+
+test("the rotation does not re-propose the confluence filters already rejected", () => {
+  // 13 vetoes swept IS/OOS on 2026-08-23, all rejected, three pre-registered
+  // picks all flipped sign. Spending an AI round re-deriving that is waste.
+  const text = RESEARCH_ROTATION.map((e) => `${e.brief} ${(e.angles ?? []).join(" ")}`).join(" ");
+  assert.doesNotMatch(text, /bollinger|stochastic|vwap|lorentzian|volume.profile|liquidity sweep/i);
+});
+
+test("pickRotationEntry cycles through the whole rotation and wraps", () => {
+  const n = RESEARCH_ROTATION.length;
+  for (let w = 0; w < n * 2; w++) {
+    assert.equal(pickRotationEntry(w).label, RESEARCH_ROTATION[w % n].label);
+  }
+  assert.equal(pickRotationEntry(-1).label, RESEARCH_ROTATION[n - 1].label, "negative weeks must not index out of range");
+});
+
+test("a rotation round carries its angles through to the proposer", () => {
+  const inputs = roundInputs(undefined, RESEARCH_ROTATION[0]);
+  assert.equal(inputs.label, RESEARCH_ROTATION[0].label);
+  assert.deepEqual(inputs.angles, RESEARCH_ROTATION[0].angles);
+});
+
+test("a manual brief override drops the rotation's angles", () => {
+  // The angles describe the rotation entry's brief. Pairing them with a
+  // different brief would tell QUANT to explore three angles of a question
+  // nobody asked — worse than giving it no axis at all.
+  const inputs = roundInputs({ brief: "test a specific idea" }, RESEARCH_ROTATION[0]);
+  assert.equal(inputs.brief, "test a specific idea");
+  assert.equal(inputs.label, "manual-override");
+  assert.equal(inputs.angles, undefined);
 });

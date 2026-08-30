@@ -387,9 +387,43 @@ not to an entry. The baseline itself is weak (trend-pullback, ~+0.04R/trade at t
 bars), so the aim is not a new signal — it is to find whether exits, position sizing, or a regime
 filter can lift what the existing signal already produces.
 
-**Next concrete step:** re-aim the proposer. `RESEARCH_ROTATION` (`scheduledResearch.ts:55`) and the
-QUANT brief in `propose.ts` both currently ask for entry rules; they need to ask for exit/sizing/
-regime variations on the existing baseline instead. Nothing has been changed there yet.
+**The proposer was re-aimed on 2026-08-31 — and doing it surfaced a hard limit that changes what
+"research exits" can mean here.**
+
+**The proposer cannot express an exit rule or a position size. At all.** A candidate's code returns
+`{ side, note } | null` per bar, and `adapter.ts:134` consumes exactly `?.side` — nothing else it
+returns reaches the backtest. Exits come from `sweepLadder` over the six fixed `LADDER_OPTIONS`
+(4 TP mults + 2 ATR trails), and the backtest lot is a fixed `0.1` (`engine.ts:414`). A brief asking
+for a trailing-stop variant would produce a candidate that cannot implement one, and the round would
+silently measure whatever entry rule the model wrote instead. So the chosen direction splits into
+three separate pieces of work, only one of which lives in the proposer:
+
+| | reachable via the proposer? | what it actually takes |
+|---|---|---|
+| **Trade geometry / entry timing** | **yes** — done, see below | brief + angles; no engine change |
+| **Exit geometry** | no | widen `LADDER_OPTIONS` in `runResearch.ts:110`. No AI involved. Note the ladder is already picked per candidate on FIT, so every option added is another draw against the same fold — widening it is a multiple-testing decision, not a free improvement |
+| **Position sizing** | no | the engine must size to risk (`riskUsd / slDistance`, as `computeLot` already does live) before sizing is measurable at all |
+
+What *is* expressible is which bar the trade opens on — and that is not cosmetic: entry price
+relative to a 1.5-ATR stop sets the R of every trade that follows. That is genuine risk geometry
+inside the existing contract, and it is what the rotation now asks for.
+
+**Changed:**
+- `propose.ts` hardcoded `"one momentum, one mean-reversion, one breakout"` into the candidates
+  prompt. That sentence outranked the brief: re-aiming the loop by editing rotation text alone would
+  have been close to a no-op, because the prompt would have pulled the candidates back to entry
+  rules regardless. The diversity axis is now the caller's (`candidatesPrompt`, `angles`), threaded
+  rotation → `runResearch` → `proposeCandidates`, and dropped on a manual override.
+- `RESEARCH_ROTATION` went from four entry-mechanism slots (momentum / mean-rev / trend-pullback /
+  volatility) to two trade-geometry slots — `stocks-entry-timing` and `stocks-trade-geometry` — each
+  naming three explicit angles, all varying the *same* trend-pullback baseline.
+- **Regime filters are deliberately not in the rotation.** That is the confluence-veto family swept
+  IS/OOS on 2026-08-23: 13 tested, all rejected, and all three pre-registered picks flipped sign out
+  of sample. Proposing them through the AI loop would spend a round re-deriving a closed result.
+  There is a test asserting the rotation text never names them.
+
+Next round fires Sun 2026-09-06 06:00 and will run `stocks-entry-timing`. Nothing about the gate
+changed — the bar to beat is still ~+0.04R at t=1.08.
 
 **Costs no AI, still open:** `git rm -r --quiet rl mt5-bridge/__pycache__` (§6), and settling why
 desk #11 runs `combo-vote` rather than `trend-pullback` (§6 — whichever is intended, the other is a

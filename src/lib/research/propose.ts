@@ -63,6 +63,7 @@ export async function proposeCandidates(
   brief: string,
   symbol: string,
   interval: string,
+  angles?: string[],
 ): Promise<{ candidates: Candidate[]; costUsd: number; backend: AiBackend }> {
   const backend = aiBackend();
   if (!aiEnabled()) return { candidates: mockCandidates(brief), costUsd: 0, backend };
@@ -70,11 +71,36 @@ export async function proposeCandidates(
   const { data, costUsd } = await callAgentJSON<{ candidates: Candidate[] }>({
     tier: "sonnet",
     system: STRATEGY_CODE_RULES,
-    prompt: `Research brief: "${brief}"\nSymbol: ${symbol}\nInterval: ${interval}\n\nPropose exactly 3 diverse strategy candidates that explore genuinely different angles — one momentum, one mean-reversion, one breakout. Each must satisfy the code contract above.`,
+    prompt: candidatesPrompt({ brief, symbol, interval, angles }),
     jsonSchema: CANDIDATES_SCHEMA,
     maxTokens: 3000,
   });
   return { candidates: data.candidates, costUsd, backend };
+}
+
+/**
+ * The diversity axis belongs to the caller, not to this prompt.
+ *
+ * It used to end with a hardcoded "one momentum, one mean-reversion, one
+ * breakout". That sentence outranks the brief in practice: whatever
+ * RESEARCH_ROTATION asked for, QUANT was still instructed to return three entry
+ * mechanisms drawn from those three families. Re-aiming the research loop by
+ * editing the rotation's brief text would therefore have been close to a no-op
+ * — the prompt would have quietly pulled the candidates back to entry rules.
+ *
+ * The count stays pinned at three because CANDIDATES_SCHEMA enforces exactly
+ * three; the prompt and the schema have to agree or the call retries on a
+ * mismatch it cannot fix.
+ */
+export function candidatesPrompt(opts: { brief: string; symbol: string; interval: string; angles?: string[] }): string {
+  const { brief, symbol, interval, angles } = opts;
+  const axis = angles?.length
+    ? `Explore these three distinct angles, one per candidate:\n${angles.map((a, i) => `  ${i + 1}. ${a}`).join("\n")}`
+    : `Explore three genuinely different angles on the brief. Do not return three variants of the same idea with different thresholds.`;
+  return (
+    `Research brief: "${brief}"\nSymbol: ${symbol}\nInterval: ${interval}\n\n` +
+    `Propose exactly 3 strategy candidates. ${axis}\n\nEach must satisfy the code contract above.`
+  );
 }
 
 export async function refineCandidate(
