@@ -13,14 +13,17 @@ import "dotenv/config";
 //
 // The reason this script exists rather than `list-approved.mts` answering it:
 // that one filters on status alone, so the 84 pre-panel rows drown out a real
-// survivor. It also separates the two ways a row can read "rejected" — failing
-// the bar, versus a blind test that never completed (a Neon hiccup mid-round
-// fails closed, by design). The second kind is a candidate that deserves a
-// re-run, not a verdict, and the two are indistinguishable from the status
-// column alone.
+// survivor. It also separates the three ways a row can read "rejected" (see
+// classifyPanelRow): it failed the TEST folds; its blind test never completed
+// (a Neon hiccup mid-round fails closed, by design, and is re-runnable rather
+// than a verdict); or it was rejected on the SELECT fold and the gate never ran
+// at all. The status column cannot tell them apart, and until 2026-08-31 this
+// script filed the third kind under the first — reporting that the TEST folds
+// had weighed all three of run #112's candidates when none of them got there.
 import { prisma } from "@/lib/db";
 import { PANEL_VALIDATION, LEGACY_VALIDATION, TEST_FOLDS } from "@/lib/research/panel";
-import type { PanelBlindTestReport, PanelFoldReport } from "@/lib/research/blindTest";
+import { classifyPanelRow, type PanelBlindTestReport, type PanelFoldReport } from "@/lib/research/blindTest";
+import { strategyResultLine } from "@/lib/research/scheduledResearch";
 
 /** What the blindTest column can hold: a full report, an error branch, or "{}" for a row that never reached the gate. */
 type Stored = Partial<PanelBlindTestReport> & { error?: string; reasons?: string[] };
@@ -67,13 +70,13 @@ async function main() {
     where: { status: "approved", validation: LEGACY_VALIDATION },
   });
 
-  const survivors = rows.filter((r) => r.status === "approved");
-  const parsed = rows.map((r) => ({ row: r, verdict: parseVerdict(r.blindTest) }));
+  const parsed = rows.map((r) => ({ row: r, verdict: parseVerdict(r.blindTest), cls: classifyPanelRow(r.status, r.blindTest) }));
+  const survivors = parsed.filter((p) => p.cls === "survivor").map((p) => p.row);
   // Rejected because the gate could not be run at all, not because the numbers
   // lost. These are re-runnable; the ones below are not.
-  const unfinished = parsed.filter((p) => p.row.status === "rejected" && p.verdict.error);
-  const failed = parsed.filter((p) => p.row.status === "rejected" && !p.verdict.error);
-  const inSampleOnly = parsed.filter((p) => p.row.status !== "approved" && p.row.status !== "rejected");
+  const unfinished = parsed.filter((p) => p.cls === "blind-test-incomplete");
+  const failed = parsed.filter((p) => p.cls === "failed-bar");
+  const inSampleOnly = parsed.filter((p) => p.cls === "never-reached-gate");
 
   console.log(`=== SURVIVORS (approved + ${PANEL_VALIDATION}) — the only rows the desk can activate ===`);
   if (!survivors.length) {
@@ -100,9 +103,17 @@ async function main() {
   }
   if (!failed.length) console.log("  none.");
 
+  // Not a TEST-fold verdict: these died on SELECT (2019), held out from the
+  // refinement loop and the ladder sweep, so runBlindTest was never called. The
+  // line prints SELECT first for the reason strategyResultLine documents — the
+  // stored backtestSummary is FIT, and FIT is not what rejected them.
+  console.log(`\n=== NEVER REACHED THE GATE (${inSampleOnly.length}) — rejected on the SELECT fold, before the TEST folds ===`);
+  for (const { row } of inSampleOnly) console.log(`  ${strategyResultLine(row)}`);
+  if (!inSampleOnly.length) console.log("  none.");
+
   console.log(
     `\n${survivors.length} survivor(s) / ${rows.length} ${PANEL_VALIDATION} row(s)` +
-      (inSampleOnly.length ? ` · ${inSampleOnly.length} never reached the gate (rejected in-sample)` : "") +
+      (inSampleOnly.length ? ` · ${inSampleOnly.length} never reached the gate (rejected on SELECT)` : "") +
       `\n${legacyApproved} row(s) still read "approved" under ${LEGACY_VALIDATION} — none of them are desk-eligible.`,
   );
   await prisma.$disconnect();

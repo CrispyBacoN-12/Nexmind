@@ -111,19 +111,65 @@ export async function runScheduledResearchRound(override?: ScheduledResearchOver
 
   const strategies = await prisma.researchStrategy.findMany({ where: { runId }, orderBy: { id: "asc" } });
   for (const s of strategies) {
-    const bt = safeParse<BacktestSummary>(s.backtestSummary);
-    // Labelled `fit=` deliberately. These are FIT-fold numbers — the window the
-    // candidate was tuned on. Printing them bare next to an [approved] status
-    // reads as evidence for the approval, when the evidence is the fold lines
-    // below and these are the thing those folds are checked against.
-    lines.push(
-      `research-${s.id} [${s.status}]${s.safetyFlag ? " SAFETY-FLAGGED" : ""} "${s.label}"` +
-        (bt ? ` fit=[trades=${bt.trades} win%=${fx(bt.winRate, 1)} pnl=$${fx(bt.totalPnl, 0)} pf=${fx(bt.profitFactor, 2)}]` : ""),
-    );
+    lines.push(strategyResultLine(s));
     for (const l of blindTestLines(s.blindTest)) lines.push(l);
   }
   return lines;
 }
+
+/** The columns strategyResultLine reads; a subset of the ResearchStrategy row. */
+export interface StrategyLogRow {
+  id: number;
+  label: string;
+  status: string;
+  safetyFlag: boolean;
+  backtestSummary: string;
+  iterations: string;
+}
+
+/**
+ * One log line per candidate, leading with the fold that decided its status.
+ *
+ * `runResearch.ts:311` passes `selectRun.summary` to autoReviewStatus, but the
+ * row stores `backtestSummary = swept.summary` — FIT, the window the candidate
+ * was *tuned* on. This line used to print only that, so the headline numbers
+ * were never the deciding numbers. Run #112 is the worked example: research-216
+ * read `fit=[trades=3 win%=100.0]` and was rejected for trading 0 times in 2019;
+ * research-218 read `pf=0.23` but died on `avgR −0.407`. Recovering the real
+ * verdict meant hand-querying `iterations` in Neon, so in practice nobody did.
+ *
+ * SELECT is not on the return value in any consumable form, so it is read back
+ * out of `iterations` — the one place runResearch persists it (line 301).
+ * FIT stays on the line, after SELECT and labelled, because a candidate that
+ * looks strong on FIT and collapses on SELECT is the overfit signature worth
+ * seeing; it just must not be read first.
+ */
+export function strategyResultLine(s: StrategyLogRow): string {
+  const head = `research-${s.id} [${s.status}]${s.safetyFlag ? " SAFETY-FLAGGED" : ""} "${s.label}"`;
+  const sel = selectIteration(s.iterations);
+  const bt = safeParse<BacktestSummary>(s.backtestSummary);
+  const fit = bt ? ` fit=[trades=${bt.trades} win%=${fx(bt.winRate, 1)} pnl=$${fx(bt.totalPnl, 0)} pf=${fx(bt.profitFactor, 2)}]` : "";
+  // Said out loud rather than left blank. Legacy single-symbol rows never ran a
+  // select fold at all, and silently dropping the segment makes them read like
+  // a panel row that passed one.
+  if (!sel) return `${head} (no select fold recorded)${fit}`;
+  const b = sel.summary;
+  return (
+    `${head} select=[trades=${b.trades}${sel.participation ? ` symbols=${sel.participation}` : ""}` +
+    ` win%=${fx(b.winRate, 1)} avgR=${fx(b.avgR, 3)} pf=${fx(b.profitFactor, 2)}]${fit}`
+  );
+}
+
+/** The SELECT-fold entry runResearch appends last, plus the symbol count that lives only in its note. */
+function selectIteration(json: string): { summary: BacktestSummary; participation: string | null } | null {
+  const its = safeParse<Iteration[]>(json);
+  if (!Array.isArray(its)) return null;
+  const hit = its.find((i) => typeof i?.note === "string" && i.note.startsWith("select fold") && i.backtestSummary);
+  if (!hit?.backtestSummary) return null;
+  return { summary: hit.backtestSummary, participation: /(\d+\/\d+) symbols traded/.exec(hit.note)?.[1] ?? null };
+}
+
+interface Iteration { note: string; backtestSummary?: BacktestSummary }
 
 /** The blindTest / backtestSummary columns are free-text JSON; never let a malformed one abort a round's log. */
 function safeParse<T>(json: string): T | null {

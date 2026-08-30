@@ -1,7 +1,7 @@
 import "dotenv/config"; // blindTest.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateHoldout, applyBlindTestVerdict, blindTestOrchestrationFailure, type PanelBlindTestReport } from "./blindTest";
+import { evaluateHoldout, applyBlindTestVerdict, blindTestOrchestrationFailure, classifyPanelRow, type PanelBlindTestReport } from "./blindTest";
 import { PANEL_VALIDATION, TEST_FOLDS } from "./panel";
 import type { BacktestSummary } from "@/lib/backtest/engine";
 
@@ -185,4 +185,31 @@ test("blindTestOrchestrationFailure produces the same shape as applyBlindTestVer
   const viaOrchestrationFailure = blindTestOrchestrationFailure(new Error("db down"));
   const viaDirectError = applyBlindTestVerdict("approved", { error: "blind-test orchestration threw: db down" });
   assert.deepEqual(viaOrchestrationFailure, viaDirectError);
+});
+
+// --- classifyPanelRow -------------------------------------------------------
+// list-survivors.mts bucketed on the *absence* of `.error`, so a row rejected
+// before the gate ever ran (blindTest = "{}") landed under "FAILED THE BAR" and
+// printed "0 reason(s): (no reason recorded)". All three of run #112's
+// candidates read that way, which says the gate weighed them and it did not.
+
+test("a row rejected before the gate ran is not counted as having failed the bar", () => {
+  assert.equal(classifyPanelRow("rejected", "{}"), "never-reached-gate");
+});
+
+test("a row whose gate could not complete stays re-runnable, not a verdict", () => {
+  assert.equal(classifyPanelRow("rejected", JSON.stringify({ error: "Neon connection lost" })), "blind-test-incomplete");
+});
+
+test("a row rejected with fold reasons did fail the bar", () => {
+  const json = JSON.stringify({ passed: false, reasons: ["2020-21: avgR below control p95"], folds: [{ fold: "test-1" }] });
+  assert.equal(classifyPanelRow("rejected", json), "failed-bar");
+});
+
+test("an approved row is a survivor", () => {
+  assert.equal(classifyPanelRow("approved", JSON.stringify({ passed: true, folds: [{ fold: "test-1" }] })), "survivor");
+});
+
+test("unparseable blindTest JSON is treated as never having reached the gate", () => {
+  assert.equal(classifyPanelRow("rejected", "{not json"), "never-reached-gate");
 });

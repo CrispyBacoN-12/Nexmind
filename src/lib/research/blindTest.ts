@@ -237,3 +237,33 @@ export function blindTestOrchestrationFailure(err: unknown): { status: "approved
   const message = err instanceof Error ? err.message : String(err);
   return applyBlindTestVerdict("approved", { error: `blind-test orchestration threw: ${message}` });
 }
+
+/** How a panel-v1 row came to hold the status it holds. */
+export type PanelRowClass = "survivor" | "blind-test-incomplete" | "failed-bar" | "never-reached-gate";
+
+/**
+ * Why "rejected" is four different things, and why the blindTest column has to
+ * be read to tell them apart.
+ *
+ * A candidate is rejected in-sample by autoReviewStatus *before* runBlindTest is
+ * ever called, and its blindTest column stays "{}". That row has no `.error` and
+ * no folds, so any classifier keying on the absence of `.error` files it under
+ * "failed the bar" — reporting that the TEST folds weighed it when the gate
+ * never saw it. All three of run #112's candidates were miscounted that way.
+ *
+ * The `{ error }` branch is kept separate for the reason applyBlindTestVerdict
+ * fails closed: a gate that could not run is re-runnable, and a Neon hiccup must
+ * not read as a market verdict.
+ */
+export function classifyPanelRow(status: string, blindTestJson: string): PanelRowClass {
+  if (status === "approved") return "survivor";
+  let v: { error?: unknown; folds?: unknown[] } | null = null;
+  try {
+    const parsed = JSON.parse(blindTestJson || "{}");
+    v = parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    v = null;
+  }
+  if (typeof v?.error === "string") return "blind-test-incomplete";
+  return Array.isArray(v?.folds) && v.folds.length > 0 ? "failed-bar" : "never-reached-gate";
+}

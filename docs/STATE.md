@@ -339,18 +339,27 @@ Do not read them as a market finding — they are the proposer producing weak ca
 expected and cheap. But do read the *pattern*: not one of the three survived contact with a single
 held-out year, and 216 could not even fire.
 
-**The reporting defect this exposed — fix it before running another round:**
+**The reporting defect this exposed — both halves FIXED 2026-08-31, before any new round:**
 
-1. **The headline numbers are not the deciding numbers.** The round prints `fit=[…]` and the row
-   stores the FIT summary, but approval is decided on SELECT. That is why 216 reads
-   "trades=3 win 100%" when its actual verdict was "0 trades in 2019". Anyone reading a round
-   without knowing this will re-tune against the wrong fold. The SELECT summary *is* persisted —
-   in `iterations`, under a note starting `select fold` — it simply is not what anything displays.
-2. **`list-survivors.mts` cannot tell a pre-blind-test rejection from a TEST-fold one.** It buckets
-   on `blindTest.error`, so a row rejected before the gate (`blindTest = "{}"`) lands under **FAILED
-   THE BAR** reading `0 reason(s): (no reason recorded)` — identical to a candidate that genuinely
-   lost out-of-sample. Its `inSampleOnly` counter keys on `status !== "rejected"` and so can never
-   fire. Bucket on an empty `blindTest` instead, and surface the SELECT line as the reason.
+1. **The headline numbers were not the deciding numbers.** The round printed `fit=[…]` and the row
+   stores the FIT summary, but approval is decided on SELECT. That is why 216 read
+   "trades=3 win 100%" when its actual verdict was "0 trades in 2019" — anyone reading a round
+   without knowing that would re-tune against the wrong fold. Fixed: `strategyResultLine`
+   (`scheduledResearch.ts`, tested in `scheduledResearch.test.ts`) reads SELECT back out of
+   `iterations` — the one place `runResearch.ts:301` persists it — and leads with it. FIT stays on
+   the line, after SELECT and labelled, because FIT-strong/SELECT-collapsed is the overfit
+   signature worth seeing; it just must not be read first. Run #112 now renders as:
+   ```
+   research-216 [rejected] "MACD Momentum Continuation" select=[trades=0 symbols=0/476 win%=0.0 avgR=— pf=—] fit=[trades=3 win%=100.0 pnl=$1 pf=—]
+   research-218 [rejected] "Volume-Confirmed Range Breakout" select=[trades=90 symbols=85/476 win%=31.1 avgR=-0.407 pf=0.55] fit=[trades=363 win%=48.2 pnl=$-150 pf=0.23]
+   ```
+2. **`list-survivors.mts` could not tell a pre-blind-test rejection from a TEST-fold one.** It
+   bucketed on `blindTest.error`, so a row rejected before the gate (`blindTest = "{}"`) landed
+   under **FAILED THE BAR** reading `0 reason(s): (no reason recorded)` — indistinguishable from a
+   candidate that genuinely lost out-of-sample, which is how all three of run #112's rows were
+   filed. Fixed: `classifyPanelRow` (`blindTest.ts`, tested) names the three ways a row can read
+   rejected — `failed-bar` / `blind-test-incomplete` / `never-reached-gate` — and the script grew a
+   fourth section that prints the SELECT line as the reason.
 
 Note also that the dollar columns in a fixed-lot backtest are not the ones to read: `runResearch.ts`
 already selects on avgR precisely because a fixed 0.1 lot makes expectancy and profit factor weight
@@ -358,10 +367,29 @@ each trade by its own stop width. `autoReviewStatus` still gates on `expectancy`
 which is a live inconsistency — it did not change any verdict here (all three were negative on avgR
 too, or had no trades) but it will eventually.
 
-**The direction question is now live**, and it is genuinely open: (b) says the eligible pool is
-empty, (g) says the daily-OHLCV mechanism space is exhausted across two disjoint universes. Writing
-another rule from that space is the low-value move — the round above is a fair sample of what the
-proposer generates unprompted. Choose deliberately rather than by momentum.
+### 0b. Direction, decided 2026-08-31: **stop researching entries; research exits and risk**
+
+The question was genuinely open — (b) says the eligible pool is empty, (g) says the daily-OHLCV
+mechanism space is exhausted across two disjoint universes — and the owner chose deliberately.
+Writing another entry rule is the low-value move: run #112 is a fair sample of what the proposer
+generates unprompted, and the track record is one-sided.
+
+| entry-rule research | exit / risk research |
+|---|---|
+| cross-sectional mean reversion — rejected | ATR trail 1.5/1.5 — **passed IS *and* OOS, 10/10 weekly years** |
+| cross-sectional momentum — rejected | |
+| 13 confluence filters — all failed OOS | |
+| Donchian / breakout — dead on gold | |
+| run #112's three — none survived one held-out year | |
+
+The one change that ever cleared a full IS/OOS gate in this project was a change to exit geometry,
+not to an entry. The baseline itself is weak (trend-pullback, ~+0.04R/trade at t=1.08 OOS on weekly
+bars), so the aim is not a new signal — it is to find whether exits, position sizing, or a regime
+filter can lift what the existing signal already produces.
+
+**Next concrete step:** re-aim the proposer. `RESEARCH_ROTATION` (`scheduledResearch.ts:55`) and the
+QUANT brief in `propose.ts` both currently ask for entry rules; they need to ask for exit/sizing/
+regime variations on the existing baseline instead. Nothing has been changed there yet.
 
 **Costs no AI, still open:** `git rm -r --quiet rl mt5-bridge/__pycache__` (§6), and settling why
 desk #11 runs `combo-vote` rather than `trend-pullback` (§6 — whichever is intended, the other is a
