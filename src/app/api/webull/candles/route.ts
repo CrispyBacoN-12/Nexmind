@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 // GET ?symbol=AAPL&range=3mo&interval=1d — candles for the price chart.
 //
-// Goes through the shared provider router (Webull → Alpaca → Yahoo) rather than
+// Goes through the shared provider router (Alpaca → Webull → Yahoo) rather than
 // calling Webull directly. It used to be Webull-only, to surface Webull's own
 // data in the UI; that made the chart the one screen in the app with a single
 // point of failure, and it went blank for good the day the Webull sandbox host

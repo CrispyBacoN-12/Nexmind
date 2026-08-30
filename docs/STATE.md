@@ -5,7 +5,7 @@ Auto-loaded every session via `CLAUDE.md`. Dated deep-dives live in `docs/quant/
 reasoning behind each change lives in its commit body. This file is the current bar, not
 the archive.
 
-_Last verified against the live DB + working tree: **2026-08-25**, branch `stocks-only-pivot`._
+_Last verified against the live DB + working tree: **2026-08-30**, branch `stocks-only-pivot`._
 
 ---
 
@@ -25,30 +25,86 @@ Hard context the code does not state:
 - Go-Live is deferred and unscheduled. Nothing goes live until an arm comparison shows the
   analysts beat the rule-only baseline.
 
-## 2. Live state (verified by query, 2026-08-25)
+## 2. Live state (verified by query, 2026-08-30)
 
 | Thing | Value |
 |---|---|
 | Portfolios | **one**: #11 "US Stocks Desk", active, kill switch off, 5 slots, $10k paper |
 | Desk #11 strategy | **`combo-vote`** (built-in) — no longer `research-29` |
-| Open trades | 4 (KO, AZO, XOM, KMX), all `aiBackend = "mock"` |
-| Closed trades | 35, cumulative **−$378.87** |
-| AI backend on every trade ever | `mock` (45) or null (2) — **HAWK/SAGE have never decided a real trade** |
-| As of 08-25 | desk **opens nothing** without a real backend (§3); runtime moved **local**, where the CLI backend is live-verified |
-| `Counterfactual` rows | 3 (was 0 — the arm recorder finally fires; sample far too small) |
-| `ResearchStrategy` | **6 approved** / 171 rejected / 37 demoted / 1 proposed (34 mock rows demoted 08-25) |
-| …those 6 | all `legacy-single-symbol`, on **BTC-USD / GC=F / NG=F** — **0 desk-eligible** (`npx tsx scripts/list-survivors.mts`) |
-| `ResearchRun` | 109 rows, 102 `done` — but only **#110** was ever AI-proposed (§3) |
-| Schema | `blindTest`, `exitLadder`, `demotedReason`, **`validation`** columns are pushed and live |
-| `validation` on every existing row | `legacy-single-symbol` (the column default) — so **0 rows are desk-eligible** until one passes a panel round (§3) |
+| Open trades | 4 (KO, AZO, XOM, KMX), all `aiBackend = "mock"`, **all opened on or before 08-24** |
+| Closed trades | 44, cumulative **-$386.82** |
+| AI backend on every trade ever | `mock` (46) or null (2) — **no trade has ever been opened by a real backend** |
+| Since the mock cutoff (08-25) | **0 trades opened.** The desk runs, decides with `cli`, and declines |
+| `Counterfactual` rows | **50, every one `aiBackend = "cli"`** (was 3): **44 no-consensus / 6 SAGE veto / 0 fills** |
+| …by day | 08-23 (3), 08-26 (10), 08-27 (12), 08-29 (12), 08-30 (13) — the loop is running daily |
+| `Signal` rows since 08-26 | 50 discarded, 6 vetoed, 0 traded |
+| `ResearchStrategy` | 6 approved / 1 proposed / 37 demoted / 171 rejected — **all 215 rows `validation = "legacy-single-symbol"`** |
+| Desk-eligible strategies | **0** — not one `panel-v1` row exists (`npx tsx scripts/list-survivors.mts`) |
+| `ResearchRun` | last row is still **#110, 2026-08-24**. **No panel round has ever completed** (§6) |
+| Market gate | **live and readable again** since 08-30: `SPY 769.35 > SMA200 707.41` (+8.8%) on Alpaca bars (§3) |
 
 Re-verify with a throwaway script under `scripts/` (delete it afterwards) querying
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 08-26)
+## 3. Done recently (2026-08-23 → 08-30)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
+
+- **The live bar feed is fixed: Alpaca leads, placeholders are dropped, the gate can be wrong
+  again. 2026-08-30.** Three changes, each with a test that failed first:
+  **(1) provider order** — `providerOrder()` in `marketData.ts` puts Alpaca ahead of Webull, and
+  `fetchCandles`/`fetchCandlesBatch` both walk that order. Webull led before, never threw, and so
+  Alpaca was never reached. **(2) placeholder drop in the live path** — `isPlaceholderBar` /
+  `sanitizeSeries` moved out of `research/panel.ts` into **`src/lib/bars.ts`** (panel re-exports
+  them, so nothing research-side changed) and every provider response now goes through
+  `sanitizeResponse`, which also **re-quotes `price` from the surviving bars** — a dropped last
+  bar could otherwise leave an invented quote in front of sizing and the facts sheet.
+  **(3) the gate refuses an impossible series** — `MAX_TREND_EXTENSION = 0.5` in `marketGate.ts`;
+  a benchmark further than 50% from its own SMA200 takes the existing **fail-OPEN BLIND** branch
+  instead of reporting a reading. Not a chosen number: SPY's own extension across 2016-2026
+  (2,679 Alpaca bars) ran **-25.8%** (2020-03-23) to **+17.8%** (2020-12-04), so no real regime
+  can trip it, while the spliced series sat at **+117%**.
+  Verified live, not just in tests: `fetchCandles("SPY","2y","1d",300)` now returns **500 Alpaca
+  bars, 2024-08-30 → 2026-08-28, closes 489.57–777.88, 0 placeholders** (was 731 Webull bars,
+  19.04–771.10), `readMarketGate` reads `SPY 769.35 > SMA200 707.41`, and feeding it the raw
+  Webull series still produces `market gate BLIND — SPY 769.35 sits 116% from its own SMA200
+  356.49`. All four open positions (KO/AZO/XOM/KMX) now get clean weekly series; **KMX had no
+  Webull bar at all after 2024-12**. 393/393 tests pass, typecheck clean.
+
+- **What Webull actually returns, measured 2026-08-30** — the evidence behind the change above,
+  and the reason not to re-promote it. Depth is real: 1200 bars is a hard cap, so `1d` reaches
+  ~5.11y (`5y` and `max` are the same response), `1h` 0.69y, `5m` 21d, and range labels are
+  wrong throughout (`2y/1d` → 731 bars ≈ 3.05y). **The content is not.** Against Alpaca on the
+  same dates (Alpaca and Yahoo agree to the cent), closes differ by >1% on **99.4% of SPY bars,
+  86.6% of AAPL, 71.3% of KO, 58.0% of NVDA, 28.9% of MSFT**. SPY is a splice, not a
+  mis-adjustment: real SPY to 2021-12-22, a different instrument in the $16–33 band for 84% of
+  the series, real SPY again from 2026-04-14 (x0.046 down, x20.27 back). SPY's 2025-01 is
+  **0 bars** against Alpaca's 20. AZO's "2y" pull is mostly 2019–2022 with a hole from 2022-07 to
+  2026-06; **KMX ends at 2024-12**. Frozen `o=h=l=c` counts in one 2y daily pull: WMT 181,
+  JNJ 180, AZO 147, XOM 130 — which is what SAGE was vetoing. Alpaca, same probe: `max/1d`
+  **2,679 bars = 10.65y, 0 frozen**; `2y/1h` **8,006 bars = 2.00y** against Webull's 0.69y.
+
+- **HAWK and SAGE decide for real now — and they have opened nothing. 2026-08-26 → 08-30.**
+  47 new `Counterfactual` rows, every one `aiBackend = "cli"`: **44 no-consensus, 6 SAGE veto,
+  0 fills.** This is the first stretch in the project's history where the analysts actually
+  decided rather than the mock path deciding for them, so the arm recorder is finally
+  collecting the sample §4b and `/scoreboard` were built for. Do **not** read it as evidence
+  that the team is appropriately cautious: **5 of the 6 vetoes are about the bar data, not the
+  setup** — SAGE is rejecting frozen placeholder prints (`o=h=l=c`, volume 0.23x average,
+  multi-month calendar gaps) in the live weekly series, which is the same corruption
+  `loadPanel` was taught to drop on 2026-08-25. The live path never got that guard. Next
+  entry.
+- **The live bar feed is broken, and the market gate is inert because of it. Found 08-30.**
+  `fetchCandles("SPY", "2y", "1d", 300)` — the exact call `readMarketGate` makes — returns
+  **731 Webull bars whose closes run from $20.67 (2023-08-10) to $769.35 (2026-08-28)**:
+  635 of the 731 are below $500. That is not SPY's history at any split adjustment; it is a
+  spliced or mis-adjusted series. The consequence is arithmetic: SMA200 computes to **356.49**
+  against a $769 close, so `benchAbove` is **true unconditionally** and the one regime leg that
+  survived the panel (f890a9d) can never fire. Every gate line since it shipped reads
+  `market gate risk-on (SPY 769.35 > SMA200 356.49)`. The gate is not wrong about today's
+  regime — it is incapable of being wrong, which is the same thing as not being on. The
+  research path is unaffected: it reads `.cache/bars/sp500-1d.json`, never a live fetch.
 
 - **`gap-fade` closed — the last live mechanism. 2026-08-26**,
   `docs/quant/2026-08-26-gap-fade-open-fill.md`. New `ExitOptions.entryAt` lets a rule fill
@@ -210,28 +266,32 @@ Older entries are compressed to one line each; their reasoning is in the commit 
 
 ## 4. Next steps, highest value first
 
-**(f) is now resolved** (§3) and it absorbed most of (a): research and every blind test read
+**(a) and (f) are both resolved** (§3). Research and every blind test read
 `.cache/bars/sp500-1d.json`, so the provider's window policy no longer decides what a stored
-`backtestSummary` means. (a) is kept because the desk's *live* path still fetches from Webull,
-but it is no longer blocking research. **(b) is the top of the list now**, and the panel has
-made it sharper rather than softer: the eligible pool is not just off-universe, it is empty.
+`backtestSummary` means; and as of 2026-08-30 the live path is on Alpaca, drops placeholder bars,
+and the gate refuses a series it cannot believe. **(b) is now the top of the list**, and the panel
+has made it sharper rather than softer: the eligible pool is not just off-universe, it is empty.
 
-### a. Pin the bar window — for the live desk path only, now
+### a. ~~Fix the live bar feed~~ — **RESOLVED 2026-08-30**, see §3
 
-Downgraded 2026-08-25: research and blind tests read the pinned cache, so none of this touches a
-stored research verdict any more. What is left is the live quote/scan path, where the desk still
-fetches from Webull. Do **not** re-cite the old Yahoo bar-count numbers — a probe of all five
-shapes the desk requests returns Webull every time; Yahoo is only the tail fallback.
+Both halves are done: the live path prefers Alpaca, `sanitizeResponse` drops frozen prints before
+any consumer sees them, and `gateSlots` takes its BLIND branch on an implausible benchmark rather
+than reporting a reading off a broken series. Re-probe with `fetchCandles("SPY","2y","1d",300)`
+— a healthy answer is ~500 Alpaca bars whose closes stay inside a plausible band.
 
-Webull's `rangeToWebullCount` (`src/lib/webull.ts:53`) asks for **N bars counted back from now**,
-not a date range. Measured consequences: the window **slides one bar per trading day**, so a
-range label is never the same series twice; **1200 bars is a hard cap** (a higher `count` is a
-417 `ILLEGAL_PARAMETER`, `timestamp`/`endTime` are ignored, no paging), which makes 4.8y the
-daily ceiling and silently truncates `5y/1d`; and the **labels are wrong** (`2y/1d` returns 731
-bars = ~2.9y). Alpaca, already configured in `.env`, asks by date range, returns exactly 2.0y for
-`2y/1d`, and reaches 10.6y at `max/1d` — it is simply never reached, because `fetchCandles` tries
-Webull first (`src/lib/marketData.ts:70`) and Webull always succeeds at `1d`. Either prefer
-Alpaca for depth or pin an explicit end timestamp. Owner's call; it now affects live scans only.
+Two things survive this item and are worth keeping in view:
+
+**Webull's window policy is unchanged and still wrong**, it just no longer decides anything.
+`rangeToWebullCount` (`src/lib/webull.ts:53`) asks for **N bars counted back from now**, not a
+date range, so the window slides one bar per trading day and a range label is never the same
+series twice; **1200 bars is a hard cap** (higher `count` → 417 `ILLEGAL_PARAMETER`,
+`timestamp`/`endTime` ignored, no paging). Do **not** re-cite the old Yahoo bar-count numbers —
+Yahoo is only the tail fallback.
+
+**Webull is still second in the chain, not deleted.** With Alpaca healthy it is never reached for
+a US equity, and the two guards above catch the shapes that hurt. Removing it outright is a
+reasonable call — it is the only provider here that is also the broker, which is the only reason
+it is still there — but it should be taken explicitly, not by leaving it first.
 
 Also unfixed and harmless: strategy **212 is still `rejected`** on the old data error — a smoke
 test, not a verdict.
@@ -410,6 +470,15 @@ be reported as blockers while the runtime stays local:
   `(Get-ScheduledTask -TaskName "NEXMIND Research round").Triggers`: `DaysOfWeek 1` /
   `WeeksInterval 1`, no surviving `DaysInterval`. The loop now tests ~156 candidates/yr against
   the fixed p95 bar, which is the number the multiple-testing argument in §3 assumes.
+- **The weekly research round has not run once.** `NEXMIND Research round` is registered
+  correctly (weekly, Sunday 06:00) but its last firing — Sun **2026-08-30 21:04** — returned
+  **0x800710E0**, "the operator or administrator has refused the request", which is what Task
+  Scheduler reports when `DisallowStartIfOnBatteries` / `StopIfGoingOnBatteries` (both `True`
+  on this task) veto a run. The machine was on battery at 06:00 and asleep besides;
+  `StartWhenAvailable` is `False`, so there is no catch-up either. Next attempt **2026-09-06
+  06:00**. Until this is settled the panel gate has had nothing to gate: the DB's newest
+  `ResearchRun` is still #110 from 08-24, and 0 `panel-v1` rows exist. Owner's call — either
+  clear those two battery settings and set `StartWhenAvailable`, or run a round by hand.
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
 - Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`
   (`scripts/revert-stocks-desk-to-default.ts` sets `trend-pullback`; something set combo-vote

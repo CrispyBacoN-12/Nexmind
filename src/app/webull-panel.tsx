@@ -81,7 +81,7 @@ function ChartTooltip({ active, payload, intraday }: { active?: boolean; payload
 
 /** Live market data (quotes, chart, volume) — embedded directly in War Room so
  *  the desk and the tape live on one screen. Bars come from whichever provider
- *  answers first (Webull -> Alpaca -> Yahoo); the header shows which one did. */
+ *  answers first (Alpaca -> Webull -> Yahoo); the header shows which one did. */
 export function WebullPanel() {
   const [symbolInput, setSymbolInput] = useState("AAPL");
   const [activeSymbol, setActiveSymbol] = useState("AAPL");

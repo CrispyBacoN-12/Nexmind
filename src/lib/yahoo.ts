@@ -19,7 +19,7 @@ export interface CandleResponse {
   currency?: string;
   exchangeName?: string;
   price?: number;
-  // Which upstream actually served these bars. Callers fall back Webull -> Alpaca
+  // Which upstream actually served these bars. Callers fall back Alpaca -> Webull
   // -> Yahoo, so the UI cannot assume the source it asked for is the one it got.
   provider?: "webull" | "alpaca" | "yahoo";
   candles: Candle[];

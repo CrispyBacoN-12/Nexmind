@@ -71,6 +71,23 @@ export const DEFAULT_MARKET_GATE: MarketGateConfig = { enabled: true, slotsBelow
 /** DB key for the manual override. Anything other than "off" leaves the gate on. */
 export const MARKET_GATE_SETTING = "marketGate";
 
+/**
+ * How far the benchmark may sit from its own SMA200 before the series is read as
+ * unreadable rather than as extreme.
+ *
+ * Measured, not chosen: SPY's own extension across 2016-2026 (2,679 daily bars)
+ * ran from -25.8% (2020-03-23, the covid low) to +17.8% (2020-12-04). 50% is
+ * roughly double the furthest SPY has ever been from its own trailing mean, so
+ * no real regime — including a crash — can trip it.
+ *
+ * What it does catch is the fault found on 2026-08-30: the live feed returned a
+ * SPY series spliced together from two different instruments, whose SMA200 came
+ * out at 356.49 against a 769.35 close. That is +117%, and it made `benchAbove`
+ * true unconditionally. A gate that cannot report risk-off is not a gate, and it
+ * had been reporting risk-on on every scan since it shipped.
+ */
+export const MAX_TREND_EXTENSION = 0.5;
+
 export interface GateDecision {
   /** new positions permitted this scan — never more than the caller already had free */
   slots: number;
@@ -113,6 +130,23 @@ export function gateSlots(
   }
 
   const close = closes[last];
+
+  // A benchmark cannot be half or double its own 200-day mean. When it is, the
+  // series is not a market state — it is a broken fetch, and the gate must say
+  // so rather than read a number off it. Same fail-OPEN branch as an empty
+  // response: loud, and it does not stop the desk.
+  const extension = trend > 0 ? close / trend - 1 : Infinity;
+  if (!Number.isFinite(extension) || Math.abs(extension) > MAX_TREND_EXTENSION) {
+    return {
+      slots: freeSlots,
+      benchAbove: null,
+      note:
+        `market gate BLIND — ${BENCHMARK} ${close.toFixed(2)} sits ${(extension * 100).toFixed(0)}% from its own ` +
+        `SMA${TREND_PERIOD} ${trend.toFixed(2)}, an implausible series (max ${(MAX_TREND_EXTENSION * 100).toFixed(0)}%); ` +
+        `passing ${freeSlots} slot(s) through ungated`,
+    };
+  }
+
   const above = close > trend;
   const reading = `${BENCHMARK} ${close.toFixed(2)} ${above ? ">" : "<"} SMA${TREND_PERIOD} ${trend.toFixed(2)}`;
 

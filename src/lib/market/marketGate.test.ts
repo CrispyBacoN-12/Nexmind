@@ -112,3 +112,31 @@ test("readMarketGate fails open when the benchmark fetch throws", async () => {
   assert.match(d.note, /BLIND/);
   assert.match(d.note, /provider 503/, "the reason belongs in the log, not swallowed");
 });
+
+test("a benchmark that cannot be its own series reads BLIND rather than risk-on", () => {
+  // Measured 2026-08-30. fetchCandles("SPY","2y","1d",300) — readMarketGate's own
+  // call — returned 731 bars whose closes ran $19.04 to $771.10: real SPY at both
+  // ends with a different instrument spliced across the middle 84%. SMA200 came
+  // out at 356.49 against a $769 close, so `benchAbove` was true unconditionally
+  // and the one leg that survived the panel could never fire. The gate was not
+  // wrong about the regime; it had become incapable of being wrong.
+  const spliced = bars(TREND_PERIOD + 100, (i) => (i < TREND_PERIOD + 90 ? 30 : 769));
+  const d = gateSlots(spliced, 5);
+  assert.equal(d.benchAbove, null, "an impossible series is no reading at all");
+  assert.equal(d.slots, 5, "the gate still fails OPEN — a data fault must not halt the desk");
+  assert.match(d.note, /BLIND/);
+  assert.match(d.note, /implausible|extension/i);
+});
+
+test("the sanity check leaves real trends alone", () => {
+  // SPY's own extension from its SMA200 over 2016-2026 (2679 Alpaca bars) ran
+  // -25.8% (2020-03-23) to +17.8% (2020-12-04). Both of these are further from
+  // the mean than SPY has ever been, and both must still produce a reading.
+  assert.equal(gateSlots(uptrend(), 5).benchAbove, true);
+  assert.equal(gateSlots(downtrend(), 5).benchAbove, false);
+
+  const crash = bars(TREND_PERIOD + 100, (i) => (i < TREND_PERIOD + 90 ? 100 : 70));
+  const d = gateSlots(crash, 5);
+  assert.equal(d.benchAbove, false, "-30% below trend is a crash, not a corrupt feed");
+  assert.match(d.note, /risk-off/);
+});
