@@ -7,11 +7,12 @@ the archive.
 
 _Last verified against the live DB + working tree: **2026-08-31**, branch `stocks-only-pivot`._
 
-> **PAUSED, and the reason is external.** The AI budget is spent — every backend call returns
-> `You've hit your monthly spend limit`, so HAWK, SAGE and the research proposer are all dead
-> until the owner raises it at `claude.ai/settings/usage` or the month rolls. Everything that
-> could be fixed on this side has been: the scheduler block is gone, the failure now latches
-> and shows a banner, and the data feed underneath is clean. **Resume at §4.0.**
+> **The panel gate has now run end to end (2026-08-31, run #112, `status: done`).** The budget
+> that had paused everything came back the same day. The round proposed 3 strategies and rejected
+> all 3 at the FIT fold — **the first `panel-v1` rows the project has ever produced**, and the
+> answer to the question that had been open since the gate was built: it works, and it says no.
+> The eligible pool is still empty, but that is now a verdict rather than an untested claim.
+> **Resume at §4.0.**
 
 ---
 
@@ -44,13 +45,13 @@ Hard context the code does not state:
 | `Counterfactual` rows | **51, every one `aiBackend = "cli"`**: no-consensus dominant, a handful of SAGE vetoes, **0 fills** |
 | …by day | 08-23 (3), 08-26 (10), 08-27 (12), 08-29 (12), 08-30 (13) — the loop is running daily |
 | `Signal` rows since 08-26 | 50 discarded, 6 vetoed, 0 traded |
-| `ResearchStrategy` | 6 approved / 1 proposed / 37 demoted / 171 rejected — **all 215 rows `validation = "legacy-single-symbol"`** |
-| Desk-eligible strategies | **0** — not one `panel-v1` row exists (`npx tsx scripts/list-survivors.mts`) |
-| `ResearchRun` | newest is **#111, 2026-08-30 16:39, `status: failed`** — the hand-run round that hit the spend limit. **No panel round has ever completed** (§4.0) |
+| `ResearchStrategy` | 218 rows: **3 are `panel-v1`** (216-218, all rejected at FIT on 08-31), the other 215 `legacy-single-symbol` (6 of them still read "approved" — none desk-eligible) |
+| Desk-eligible strategies | **0** — but as of 08-31 that is a *verdict*: 3 candidates were panel-tested and all 3 failed (`npx tsx scripts/list-survivors.mts`) |
+| `ResearchRun` | newest is **#112, 2026-08-31, `status: done`** — **the first panel round ever to complete.** 491 symbols, FIT fold, 3 proposals, 3 rejections (#111 was the spend-limit failure the day before) |
 | `Setting` rows | only `fearGreed` and `webull:accessToken` (expires **2026-09-14**). **No `ai:outage` row** — the spend limit predates the latch fix, so it was never recorded |
 | Market gate | **live and readable again** since 08-30: `SPY 769.35 > SMA200 707.41` (+8.8%) on Alpaca bars (§3) |
 | Scheduled tasks | all three (`Stocks scan` 05:00, `Manage positions` /15min, `Research round` Sun 06:00) now share the same power settings; next research fire **2026-09-06 06:00** |
-| Working tree | **clean**, 3 commits ahead of origin and **not pushed**: `4fc29ce` feed, `e1282ed` Webull production, `fb39e58` spend-limit latch |
+| Working tree | **clean**, 4 commits ahead of origin and **not pushed**: `4fc29ce` feed, `e1282ed` Webull production, `fb39e58` spend-limit latch, `7d993d5` state refresh |
 
 Re-verify with a throwaway script under `scripts/` (delete it afterwards) querying
 `portfolio.findMany` (the field is `status`, **not** `active`),
@@ -301,40 +302,52 @@ Older entries are compressed to one line each; their reasoning is in the commit 
 **(a) and (f) are both resolved** (§3). Research and every blind test read
 `.cache/bars/sp500-1d.json`, so the provider's window policy no longer decides what a stored
 `backtestSummary` means; and as of 2026-08-30 the live path is on Alpaca, drops placeholder bars,
-and the gate refuses a series it cannot believe. **(b) would be the top of the list — but as of
-2026-08-31 nothing on this list can move at all until the AI budget is restored, so start at §0.**
-When it is restored, (b) is where the queue resumes, and the panel has made it sharper rather than
-softer: the eligible pool is not just off-universe, it is empty.
+and the gate refuses a series it cannot believe. **(b) is the top of the list**, and §0 records
+what the first completed panel round did to it: the eligible pool is still empty, but it is now
+empty because three candidates were tested and lost, not because the gate had never run.
 
-### 0. RESUME HERE — the one thing that unblocks everything else
+### 0. The panel gate ran, and it works — **DONE 2026-08-31**
 
-Owner's chosen direction on 2026-08-30 was **"unlock the research round first"**. Half of it is
-done (the Task Scheduler block, §6); the other half is not ours to do. In order:
+Owner's chosen direction on 2026-08-30 was **"unlock the research round first"**. Both halves are
+now done: the Task Scheduler block (§6) and, on 08-31, the AI budget came back and a hand-run
+round completed. What it produced:
 
-1. **Check the budget is actually back** before anything else:
-   ```
-   node --env-file=.env --import tsx scripts/research-round.mts
-   ```
-   If it prints `You've hit your monthly spend limit` again, **stop** — no AI path in this repo
-   can work, and every further step here is wasted. A healthy run instead logs
-   `research round [<theme>]` and takes **8–10 minutes**.
-2. **Do not wait for 2026-09-06.** The schedule is fixed, but a hand-run round settles in ten
-   minutes whether the panel gate works end to end, which has still never been observed.
-3. **Read the verdict with `npx tsx scripts/list-survivors.mts`**, not `list-approved` — approved
-   alone is not the survivor condition (§3). It also separates rows that *failed the bar* from
-   rows whose *gate never completed*; the second kind are re-runnable, and a mid-run
-   `NeonDbError` produces exactly that (run #110 ended in one).
-4. **Expect nothing to pass.** That is the gate working, not a fault. What the round proves is
-   that the loop can complete at all — the first `panel-v1` row in the project's history, even a
-   rejected one, is the result worth having.
-5. **Only then is the direction question live again**, and it is genuinely open: §b says the
-   eligible pool is empty, §g says the daily-OHLCV mechanism space is exhausted across two
-   disjoint universes. Writing another rule from that space is the low-value move; choose
-   deliberately.
+```
+research run 112: panel 491 symbols — fit 474, select 476
+run #112 status: done
+research-216 [rejected] "MACD Momentum Continuation"        fit trades=3     win 100%  pnl $1
+research-217 [rejected] SAFETY-FLAGGED "RSI Extreme Reversion"  fit trades=8401  win 48.7%  pf 0.70
+research-218 [rejected] "Volume-Confirmed Range Breakout"   fit trades=363   win 48.2%  pf 0.23
+```
 
-**Available meanwhile, costs no AI:** `git rm -r --quiet rl mt5-bridge/__pycache__` (§6), and
-settling why desk #11 runs `combo-vote` rather than `trend-pullback` (§6 — whichever is
-intended, the other is a silent mismatch). Also unpushed: three commits on `stocks-only-pivot`.
+**The result worth keeping is not the three rejections — it is `status: done`.** No panel round had
+ever completed before, so "the pool is empty" had two possible causes: a strict gate, or a gate
+that had never run. It was the first. All three were killed **in-sample at the FIT fold**, so none
+of them reached SELECT or a TEST window.
+
+Do not read the rejections as a market finding. A 3-trade fit and a 0.70 profit factor are the
+proposer producing weak candidates, which is expected and cheap; the panel is doing exactly what it was built to do.
+
+**Two things this exposed, both small and both unfixed:**
+
+1. **`list-survivors.mts` cannot tell a FIT-fold rejection from a TEST-fold rejection.** It buckets
+   on `blindTest.error`, so a row rejected in-sample (`blindTest = "{}"`) lands under **FAILED THE
+   BAR** reading `0 reason(s): (no reason recorded)` — identical to a candidate that actually lost
+   out-of-sample. Its own `inSampleOnly` counter keys on `status !== "rejected"` and therefore can
+   never fire. The distinction matters: one is strong evidence, the other is no evidence. Fix by
+   bucketing on an empty `blindTest` rather than on the absence of an `error` key.
+2. **Nothing records *why* a candidate was rejected at FIT.** The reason is printed to stdout and
+   then discarded; the row keeps only `backtestSummary`. Re-deriving a verdict from the numbers is
+   possible but it is not the same as reading the gate's own reason.
+
+**The direction question is now live**, and it is genuinely open: (b) says the eligible pool is
+empty, (g) says the daily-OHLCV mechanism space is exhausted across two disjoint universes. Writing
+another rule from that space is the low-value move — the round above is a fair sample of what the
+proposer generates unprompted. Choose deliberately rather than by momentum.
+
+**Costs no AI, still open:** `git rm -r --quiet rl mt5-bridge/__pycache__` (§6), and settling why
+desk #11 runs `combo-vote` rather than `trend-pullback` (§6 — whichever is intended, the other is a
+silent mismatch). Also unpushed: four commits on `stocks-only-pivot`.
 
 ### a. ~~Fix the live bar feed~~ — **RESOLVED 2026-08-30**, see §3
 
