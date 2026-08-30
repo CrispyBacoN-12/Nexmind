@@ -5,7 +5,13 @@ Auto-loaded every session via `CLAUDE.md`. Dated deep-dives live in `docs/quant/
 reasoning behind each change lives in its commit body. This file is the current bar, not
 the archive.
 
-_Last verified against the live DB + working tree: **2026-08-30**, branch `stocks-only-pivot`._
+_Last verified against the live DB + working tree: **2026-08-31**, branch `stocks-only-pivot`._
+
+> **PAUSED, and the reason is external.** The AI budget is spent — every backend call returns
+> `You've hit your monthly spend limit`, so HAWK, SAGE and the research proposer are all dead
+> until the owner raises it at `claude.ai/settings/usage` or the month rolls. Everything that
+> could be fixed on this side has been: the scheduler block is gone, the failure now latches
+> and shows a banner, and the data feed underneath is clean. **Resume at §4.0.**
 
 ---
 
@@ -25,7 +31,7 @@ Hard context the code does not state:
 - Go-Live is deferred and unscheduled. Nothing goes live until an arm comparison shows the
   analysts beat the rule-only baseline.
 
-## 2. Live state (verified by query, 2026-08-30)
+## 2. Live state (verified by query, 2026-08-31)
 
 | Thing | Value |
 |---|---|
@@ -35,13 +41,16 @@ Hard context the code does not state:
 | Closed trades | 44, cumulative **-$386.82** |
 | AI backend on every trade ever | `mock` (46) or null (2) — **no trade has ever been opened by a real backend** |
 | Since the mock cutoff (08-25) | **0 trades opened.** The desk runs, decides with `cli`, and declines |
-| `Counterfactual` rows | **50, every one `aiBackend = "cli"`** (was 3): **44 no-consensus / 6 SAGE veto / 0 fills** |
+| `Counterfactual` rows | **51, every one `aiBackend = "cli"`**: no-consensus dominant, a handful of SAGE vetoes, **0 fills** |
 | …by day | 08-23 (3), 08-26 (10), 08-27 (12), 08-29 (12), 08-30 (13) — the loop is running daily |
 | `Signal` rows since 08-26 | 50 discarded, 6 vetoed, 0 traded |
 | `ResearchStrategy` | 6 approved / 1 proposed / 37 demoted / 171 rejected — **all 215 rows `validation = "legacy-single-symbol"`** |
 | Desk-eligible strategies | **0** — not one `panel-v1` row exists (`npx tsx scripts/list-survivors.mts`) |
-| `ResearchRun` | last row is still **#110, 2026-08-24**. **No panel round has ever completed** (§6) |
+| `ResearchRun` | newest is **#111, 2026-08-30 16:39, `status: failed`** — the hand-run round that hit the spend limit. **No panel round has ever completed** (§4.0) |
+| `Setting` rows | only `fearGreed` and `webull:accessToken` (expires **2026-09-14**). **No `ai:outage` row** — the spend limit predates the latch fix, so it was never recorded |
 | Market gate | **live and readable again** since 08-30: `SPY 769.35 > SMA200 707.41` (+8.8%) on Alpaca bars (§3) |
+| Scheduled tasks | all three (`Stocks scan` 05:00, `Manage positions` /15min, `Research round` Sun 06:00) now share the same power settings; next research fire **2026-09-06 06:00** |
+| Working tree | **clean**, 3 commits ahead of origin and **not pushed**: `4fc29ce` feed, `e1282ed` Webull production, `fb39e58` spend-limit latch |
 
 Re-verify with a throwaway script under `scripts/` (delete it afterwards) querying
 `portfolio.findMany` (the field is `status`, **not** `active`),
@@ -292,8 +301,40 @@ Older entries are compressed to one line each; their reasoning is in the commit 
 **(a) and (f) are both resolved** (§3). Research and every blind test read
 `.cache/bars/sp500-1d.json`, so the provider's window policy no longer decides what a stored
 `backtestSummary` means; and as of 2026-08-30 the live path is on Alpaca, drops placeholder bars,
-and the gate refuses a series it cannot believe. **(b) is now the top of the list**, and the panel
-has made it sharper rather than softer: the eligible pool is not just off-universe, it is empty.
+and the gate refuses a series it cannot believe. **(b) would be the top of the list — but as of
+2026-08-31 nothing on this list can move at all until the AI budget is restored, so start at §0.**
+When it is restored, (b) is where the queue resumes, and the panel has made it sharper rather than
+softer: the eligible pool is not just off-universe, it is empty.
+
+### 0. RESUME HERE — the one thing that unblocks everything else
+
+Owner's chosen direction on 2026-08-30 was **"unlock the research round first"**. Half of it is
+done (the Task Scheduler block, §6); the other half is not ours to do. In order:
+
+1. **Check the budget is actually back** before anything else:
+   ```
+   node --env-file=.env --import tsx scripts/research-round.mts
+   ```
+   If it prints `You've hit your monthly spend limit` again, **stop** — no AI path in this repo
+   can work, and every further step here is wasted. A healthy run instead logs
+   `research round [<theme>]` and takes **8–10 minutes**.
+2. **Do not wait for 2026-09-06.** The schedule is fixed, but a hand-run round settles in ten
+   minutes whether the panel gate works end to end, which has still never been observed.
+3. **Read the verdict with `npx tsx scripts/list-survivors.mts`**, not `list-approved` — approved
+   alone is not the survivor condition (§3). It also separates rows that *failed the bar* from
+   rows whose *gate never completed*; the second kind are re-runnable, and a mid-run
+   `NeonDbError` produces exactly that (run #110 ended in one).
+4. **Expect nothing to pass.** That is the gate working, not a fault. What the round proves is
+   that the loop can complete at all — the first `panel-v1` row in the project's history, even a
+   rejected one, is the result worth having.
+5. **Only then is the direction question live again**, and it is genuinely open: §b says the
+   eligible pool is empty, §g says the daily-OHLCV mechanism space is exhausted across two
+   disjoint universes. Writing another rule from that space is the low-value move; choose
+   deliberately.
+
+**Available meanwhile, costs no AI:** `git rm -r --quiet rl mt5-bridge/__pycache__` (§6), and
+settling why desk #11 runs `combo-vote` rather than `trend-pullback` (§6 — whichever is
+intended, the other is a silent mismatch). Also unpushed: three commits on `stocks-only-pivot`.
 
 ### a. ~~Fix the live bar feed~~ — **RESOLVED 2026-08-30**, see §3
 
@@ -435,6 +476,14 @@ be chosen deliberately rather than inherited.
   which reads **no price at all**, showed test1 avgR **+0.355 at 75.5% win** against a control
   p95 of +0.124. Quote the margin over the matched control (`src/lib/research/control.ts`) or
   do not quote the number.
+- **A failure classifier is only as good as the strings it was checked against.** `FATAL_BACKEND`
+  in `anthropic.ts` was written from what a dead login looks like and shipped without a test, so it
+  missed `You've hit your monthly spend limit` — the one failure most likely to actually happen.
+  The result was the worst shape available: no latch, no banner, every call retried and failed, and
+  War Room reporting AI online throughout. It was found by **running the thing**, not by reading the
+  regex. Before adding a pattern, get the literal string out of the tool; before removing one, ask
+  whether the failure it names is retryable. `limit` alone must stay unmatched — a rate limit is
+  retryable and latching it is the same bug pointing the other way.
 - **`scanner.ts:274`** — a portfolio with a `strategy` key set bypasses `decideSetup()`
   entirely, confluence block included. Filters are unreachable in that path, not merely inert.
 - **`--split=all`** in the sweep script has **no held-out half**. It exists only for `--byYear`
