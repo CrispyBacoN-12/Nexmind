@@ -51,6 +51,29 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
+- **A spent budget no longer fails silently. 2026-08-30.** `FATAL_BACKEND` in `anthropic.ts`
+  matched `authenticat|oauth|logged in|api key|credit balance|quota|subscription` — and **not**
+  "You've hit your monthly spend limit", the string the CLI actually returns when the account
+  budget runs out. So the latch never tripped: the desk went on calling a backend that could not
+  answer, every call failed on its own, and `aiOutageStatus()` stayed null, i.e. **War Room
+  reported AI online while nothing worked.** `spend limit|usage limit` added, and the predicate
+  extracted as `isFatalBackendReason` so it has tests (four, one per class). `limit` alone is
+  deliberately NOT matched — a plain rate limit is worth retrying, and latching it would take the
+  desk off AI for five minutes over a hiccup. Found by running a research round by hand, not by
+  reading the code.
+
+- **Webull market data moved to production (e1282ed).** UAT was serving a partially refreshed
+  fixture set — 15 of 50 large caps stale, price errors to 39.8% (RTX 127.50 vs a real 211.71),
+  and it never errored, so nothing downstream could tell. The old "the token is per-session, so a
+  cron can never hold one" verdict was **wrong**: create -> approve once in the app -> check ->
+  a NORMAL token lives exactly **15.00 days**, and `/token/refresh` returns +15 days with **no**
+  second approval. `lib/webull/token*.ts` rolls it forward; **`ensureWebullTokenFresh()` hangs off
+  the daily scan tick, not the data path** — Alpaca leads now, so `fetchWebullCandles` is
+  essentially never called and a use-triggered refresh would have died 15 days after seeding,
+  silently, leaving no fallback exactly when Alpaca finally needed cover. Verified against Alpaca
+  on the symbols UAT was stale on: CSX/RTX/PM/SPY/MRK/HON all **0.00% diff, 366 bars,
+  last 2026-08-28**. Still data-only; `/openapi/trade/*` untouched and untested.
+
 - **The live bar feed is fixed: Alpaca leads, placeholders are dropped, the gate can be wrong
   again. 2026-08-30.** Three changes, each with a test that failed first:
   **(1) provider order** — `providerOrder()` in `marketData.ts` puts Alpaca ahead of Webull, and
@@ -470,15 +493,22 @@ be reported as blockers while the runtime stays local:
   `(Get-ScheduledTask -TaskName "NEXMIND Research round").Triggers`: `DaysOfWeek 1` /
   `WeeksInterval 1`, no surviving `DaysInterval`. The loop now tests ~156 candidates/yr against
   the fixed p95 bar, which is the number the multiple-testing argument in §3 assumes.
-- **The weekly research round has not run once.** `NEXMIND Research round` is registered
-  correctly (weekly, Sunday 06:00) but its last firing — Sun **2026-08-30 21:04** — returned
-  **0x800710E0**, "the operator or administrator has refused the request", which is what Task
-  Scheduler reports when `DisallowStartIfOnBatteries` / `StopIfGoingOnBatteries` (both `True`
-  on this task) veto a run. The machine was on battery at 06:00 and asleep besides;
-  `StartWhenAvailable` is `False`, so there is no catch-up either. Next attempt **2026-09-06
-  06:00**. Until this is settled the panel gate has had nothing to gate: the DB's newest
-  `ResearchRun` is still #110 from 08-24, and 0 `panel-v1` rows exist. Owner's call — either
-  clear those two battery settings and set `StartWhenAvailable`, or run a round by hand.
+- **The AI budget is spent, and that is now the only thing stopping a research round.**
+  A hand-run round on **2026-08-30** died in seconds:
+  `claude CLI: You've hit your monthly spend limit`. Nothing in the repo can fix this —
+  raise it at `claude.ai/settings/usage` (**owner runs it; do not handle the account**), or
+  wait for the monthly reset. Until then `runScheduledResearchRound` cannot propose, and
+  HAWK/SAGE cannot decide: expect every scan to log `no-ai-backend`, which is the desk
+  refusing correctly, not a fault. The failure is at least **visible** now — see §3.
+  ~~**The weekly research round has not run once** (battery veto)~~ — **the scheduler half is
+  FIXED, 2026-08-30.** `NEXMIND Research round` had been returning **0x800710E0** on every
+  firing: `DisallowStartIfOnBatteries` and `StopIfGoingOnBatteries` were both `True` and
+  `StartWhenAvailable` `False` on **that task only** — `Stocks scan` and `Manage positions`
+  already had all three set correctly, which is exactly why the desk ran daily for a week
+  while research never ran at all. All three now match. Next automatic attempt **2026-09-06
+  06:00**, and `StartWhenAvailable` means a missed slot is caught up rather than lost. The DB's
+  newest `ResearchRun` is still **#110 from 08-24** and **0 `panel-v1` rows** exist; that will
+  not change until the budget above is restored.
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
 - Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`
   (`scripts/revert-stocks-desk-to-default.ts` sets `trend-pullback`; something set combo-vote

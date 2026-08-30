@@ -67,8 +67,25 @@ const CLI_RETRY_AFTER_MS = 5 * 60_000;
 let backendDown: { reason: string; at: number } | null = null;
 
 /** Messages that mean the backend is unusable until a human fixes it — as
- *  opposed to a timeout or a one-off upstream blip, which is worth retrying. */
-const FATAL_BACKEND = /authenticat|oauth|logged.?in|api key|credit balance|quota|subscription/i;
+ *  opposed to a timeout or a one-off upstream blip, which is worth retrying.
+ *
+ *  The two spend patterns were added on 2026-08-30, after the CLI answered a
+ *  research round with "You've hit your monthly spend limit". That matched none
+ *  of the others, so nothing latched: the desk went on calling a backend that
+ *  could not answer, every call failed, and War Room kept reporting AI online.
+ *  A budget that has run out is exactly the case this latch exists for — it
+ *  needs a human, and no amount of retrying will change it.
+ *
+ *  `limit` alone is deliberately not matched: a plain rate limit IS worth
+ *  retrying, and latching it would take the desk off AI for five minutes over
+ *  a hiccup — the opposite mistake, and just as wrong. */
+const FATAL_BACKEND =
+  /authenticat|oauth|logged.?in|api key|credit balance|quota|subscription|spend limit|usage limit/i;
+
+/** Does this failure need a human before the backend can work again? */
+export function isFatalBackendReason(reason: string): boolean {
+  return FATAL_BACKEND.test(reason);
+}
 
 function backendUsable(): boolean {
   if (!backendDown) return true;
@@ -118,7 +135,7 @@ function persistOutage(reason: string | null): void {
 function backendFailure(detail: string, source: "cli" | "api"): Error {
   const label = source === "cli" ? "claude CLI" : "anthropic api";
   const reason = detail.trim().slice(0, 200) || `unknown ${label} failure`;
-  if (FATAL_BACKEND.test(reason)) {
+  if (isFatalBackendReason(reason)) {
     backendDown = { reason: `${label} — ${reason}`, at: Date.now() };
     persistOutage(backendDown.reason);
     return new AiUnavailableError(reason);
