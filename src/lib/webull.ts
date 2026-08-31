@@ -53,10 +53,12 @@ export function intervalToWebullTimespan(interval: Interval): string {
 }
 
 /** Bar count to request for a Range at a given Interval — same day-count/
- *  bars-per-day model as mt5.ts's rangeToBarCount, capped at 1200 (the
- *  live API's enforced max for GET /openapi/market-data/stock/bars — a
- *  count above that returns a 417 ILLEGAL_PARAMETER, verified against the
- *  sandbox). */
+ *  bars-per-day model as mt5.ts's rangeToBarCount, capped at 1200.
+ *
+ *  Re-verified against PRODUCTION on 2026-08-31, since the original number came
+ *  from the sandbox host and sandbox serves fixture data: 1200 returns 200, and
+ *  1201 returns `417 ILLEGAL_PARAMETER "The count ranges is 1 to 1200."`. The
+ *  cap is real, but 417 alone does not identify it — see webullUpstreamError. */
 export function rangeToWebullCount(range: Range, interval: Interval): number {
   const days: Record<Range, number> = {
     "1d": 1, "5d": 5, "1mo": 31, "3mo": 93, "6mo": 186,
@@ -101,6 +103,40 @@ export function parseWebullBars(json: unknown, symbol: string, range: Range, int
 const CATEGORY = "US_STOCK";
 const DATA_HOST = () => process.env.WEBULL_BASE_URL || "https://api.webull.co.th";
 
+/**
+ * Turn a non-OK Webull response into an error a log line can be read from.
+ *
+ * The status alone is not enough, because 417 is overloaded. Verified against
+ * production on 2026-08-31:
+ *
+ *   417 INVALID_SYMBOL     "The symbol does not exist in the category."
+ *   417 ILLEGAL_PARAMETER  "The count ranges is 1 to 1200."
+ *
+ * Those are opposite situations — a delisted ticker we should stop asking for,
+ * versus a request we built wrong — and `webull upstream 417` was the whole of
+ * what the router logged for either. That cost a wrong diagnosis: EA and DFS
+ * (both delisted) 417'd during a weekly sweep and the provider chain was read as
+ * globally broken, while CSX, MO, KO and AZO were answering 200 throughout.
+ *
+ * Never throws. It runs on the failure path, where a second error thrown while
+ * describing the first is how the first one disappears.
+ */
+export function webullUpstreamError(status: number, body: string): string {
+  const base = `webull upstream ${status}`;
+  const text = body.trim();
+  if (!text) return base;
+  let detail = text;
+  try {
+    const j = JSON.parse(text) as { error_code?: unknown; message?: unknown };
+    const parts = [j.error_code, j.message].filter((x) => typeof x === "string" && x);
+    if (parts.length) detail = parts.join(": ");
+  } catch {
+    // Not JSON — an HTML error page or a gateway blob. Report it as-is; the
+    // truncation below is what keeps it to one line.
+  }
+  return `${base} ${detail.slice(0, 200)}`;
+}
+
 /** Fetch candles from Webull. Throws on missing credentials, an unavailable
  *  access token, non-OK status, or an empty RTH bar set — callers fall back to
  *  Yahoo (and reach this only after Alpaca has missed; see providerOrder in
@@ -124,6 +160,6 @@ export async function fetchWebullCandles(symbol: string, range: Range = "1mo", i
       count: String(rangeToWebullCount(range, interval)),
     },
   });
-  if (!res.ok) throw new Error(`webull upstream ${res.status}`);
+  if (!res.ok) throw new Error(webullUpstreamError(res.status, await res.text().catch(() => "")));
   return parseWebullBars(await res.json(), symbol, range, interval);
 }

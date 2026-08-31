@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { intervalToWebullTimespan, rangeToWebullCount, parseWebullBars, fetchWebullCandles } from "./webull";
+import { intervalToWebullTimespan, rangeToWebullCount, parseWebullBars, fetchWebullCandles, webullUpstreamError } from "./webull";
 
 test("intervalToWebullTimespan maps every supported interval to a Timespan enum name", () => {
   assert.equal(intervalToWebullTimespan("1m"), "M1");
@@ -70,4 +70,52 @@ test("fetchWebullCandles throws when no API key is configured", async () => {
     if (prevKey !== undefined) process.env.WEBULL_APP_KEY = prevKey;
     if (prevSecret !== undefined) process.env.WEBULL_APP_SECRET = prevSecret;
   }
+});
+
+// --- upstream errors --------------------------------------------------------
+//
+// Webull returns 417 for at least two unrelated conditions, and the status
+// alone cannot tell them apart:
+//
+//   {"error_code":"INVALID_SYMBOL","message":"The symbol does not exist in the category."}
+//   {"error_code":"ILLEGAL_PARAMETER","message":"The count ranges is 1 to 1200."}
+//
+// One means this symbol is not listed and never will be on this call; the other
+// means our own request was malformed. `webull upstream 417` was all the router
+// logged for either, and on 2026-08-31 that cost a wrong diagnosis: EA and DFS
+// (both delisted) 417'd, and the provider chain was read as globally broken.
+// CSX, MO, KO and AZO were answering 200 the whole time.
+
+test("the upstream error names the condition, not just the status", () => {
+  const msg = webullUpstreamError(417, '{"error_code":"INVALID_SYMBOL","message":"The symbol does not exist in the category.","status":417}');
+  assert.match(msg, /417/);
+  assert.match(msg, /INVALID_SYMBOL/);
+  assert.match(msg, /does not exist/);
+});
+
+test("the two 417s are distinguishable from each other", () => {
+  // The whole point: one is 'this ticker is dead', the other is 'we sent a bad
+  // request'. Reading them as the same thing is what happened.
+  const symbolErr = webullUpstreamError(417, '{"error_code":"INVALID_SYMBOL","message":"The symbol does not exist in the category.","status":417}');
+  const paramErr = webullUpstreamError(417, '{"error_code":"ILLEGAL_PARAMETER","message":"The count ranges is 1 to 1200.","status":417}');
+  assert.notEqual(symbolErr, paramErr);
+  assert.match(paramErr, /1 to 1200/);
+});
+
+test("a non-JSON body is still reported, truncated", () => {
+  // An HTML error page or a gateway blob must not throw here — this runs on the
+  // failure path, where throwing a second error hides the first.
+  const msg = webullUpstreamError(502, "<html><body>Bad Gateway</body></html>");
+  assert.match(msg, /502/);
+  assert.match(msg, /Bad Gateway/);
+});
+
+test("an empty body degrades to the bare status", () => {
+  assert.equal(webullUpstreamError(500, ""), "webull upstream 500");
+});
+
+test("a runaway body cannot flood the scan log", () => {
+  // One line per provider miss, and a scan sweeps ~500 symbols.
+  const msg = webullUpstreamError(500, "x".repeat(5000));
+  assert.ok(msg.length < 300, `too long: ${msg.length}`);
 });
