@@ -30,7 +30,39 @@ export function isPlaceholderBar(b: Candle): boolean {
 }
 
 /**
+ * How small a flat bar's volume has to be, against the symbol's typical
+ * session, before it is filler rather than a halt.
+ *
+ * MO's frozen weekly print traded 9,000 shares against a 29.6M average —
+ * 0.03%, clearing this line by 30x. A genuine limit-up or halted session would
+ * have to trade a hundredth of a normal week to be caught by it, which is why
+ * the line sits far below anything a real session produces rather than close to
+ * the case that prompted it.
+ */
+export const FROZEN_VOLUME_FRACTION = 0.01;
+
+/** Median of the volumes that actually traded, or null when none did.
+ *
+ *  The median rather than the mean, and over traded bars only: PARA carries 652
+ *  consecutive placeholder sessions, and an average taken across those collapses
+ *  toward zero — which would raise the bar for nothing and let the next filler
+ *  print straight through. */
+function typicalVolume(bars: Candle[]): number | null {
+  const vs = bars.map((b) => b.v).filter((v) => v > 0).sort((a, b) => a - b);
+  if (!vs.length) return null;
+  const mid = vs.length >> 1;
+  return vs.length % 2 ? vs[mid] : (vs[mid - 1] + vs[mid]) / 2;
+}
+
+/**
  * Drop placeholder bars from one symbol's history.
+ *
+ * Two rules, because the second needs context the first cannot have.
+ * isPlaceholderBar matches the unambiguous shape and is deliberately blind to
+ * flat bars that carry volume — from one bar there is no telling a limit-up halt
+ * from filler. Here the whole series is in hand, so "did this bar trade like the
+ * others?" is answerable, and a flat print on a token fraction of typical size
+ * is filler however non-zero its volume is.
  *
  * Dropping leaves a gap in the series, and the gap is the truth: the symbol was
  * not trading. Every consumer here is gap-tolerant already — indicators run on
@@ -40,10 +72,14 @@ export function isPlaceholderBar(b: Candle): boolean {
  * at, would put invented history inside the folds a verdict is measured on.
  */
 export function sanitizeSeries(bars: Candle[]): { candles: Candle[]; dropped: number } {
+  const typical = typicalVolume(bars);
+  const floor = typical == null ? 0 : typical * FROZEN_VOLUME_FRACTION;
+  const isFrozenPrint = (b: Candle) => b.o === b.h && b.h === b.l && b.l === b.c && b.v < floor;
+
   let dropped = 0;
   const candles: Candle[] = [];
   for (const b of bars) {
-    if (isPlaceholderBar(b)) dropped++;
+    if (isPlaceholderBar(b) || isFrozenPrint(b)) dropped++;
     else candles.push(b);
   }
   return { candles, dropped };
