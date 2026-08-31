@@ -87,6 +87,21 @@ export function minRiskRewardFor(scan: ScanResult, isResearch: boolean): number 
   return isResearch ? RESEARCH_MIN_RISK_REWARD : (DEFAULT_ACCOUNT.minRiskReward ?? 1.5);
 }
 
+/**
+ * The start of the bar the scan fired on — the key the re-entry guard dedupes
+ * against.
+ *
+ * scanner.ts:278 evaluates the strategy at `candles.length - 1` and ships that
+ * tail as `scan.candles`, so the last candle is the bar under decision. Stamps
+ * are seconds; a trade opened at or after this instant was taken on this bar.
+ * Null when the scan carries no candles: better to fall through to the
+ * open-position check than to invent a boundary and block a real entry.
+ */
+export function signalBarStart(scan: ScanResult): Date | null {
+  const t = scan.candles.at(-1)?.t;
+  return t == null ? null : new Date(t * 1000);
+}
+
 export async function runTradeTick(
   symbol: string,
   portfolioId: number,
@@ -102,14 +117,26 @@ export async function runTradeTick(
   symbol = scan.symbol; // carry the symbol forward from the scan result
   steps.push({ stage: "scanner", note: scan.note });
 
-  // One open position per symbol — re-scanning the same persisting setup must
+  // One trade per symbol per bar — re-scanning the same persisting setup must
   // not stack a duplicate trade (and must not burn AI calls finding that out).
+  //
+  // Asking only "is a position open?" is not enough on a slow timeframe. On
+  // 2026-08-24 portfolio #11 scanned the same unchanged weekly bar eight times;
+  // CSX stopped out inside each tick, so by the next scan nothing was open and
+  // the identical setup was taken again — eight -1.00R entries, and KMX five
+  // +0.83R entries, from two real setups. Both questions have to be asked: a
+  // position still running, or one already taken on THIS bar.
+  const barStart = signalBarStart(scan);
   const existing = await prisma.trade.findFirst({
-    where: { symbol, status: "open", portfolioId },
-    select: { id: true },
+    where: barStart
+      ? { symbol, portfolioId, OR: [{ status: "open" }, { openedAt: { gte: barStart } }] }
+      : { symbol, portfolioId, status: "open" },
+    orderBy: { id: "desc" },
+    select: { id: true, status: true },
   });
   if (existing) {
-    steps.push({ stage: "dedupe", note: `position #${existing.id} already open — skipped` });
+    const why = existing.status === "open" ? "already open" : "already taken on this bar";
+    steps.push({ stage: "dedupe", note: `position #${existing.id} ${why} — skipped` });
     return { symbol, outcome: "already-open", steps, costUsd };
   }
 
