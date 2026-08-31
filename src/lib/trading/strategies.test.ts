@@ -1,7 +1,7 @@
 import "dotenv/config"; // strategies.ts -> scanner.ts -> research/adapter.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getStrategy, combineStrategies, STRATEGIES } from "./strategies";
+import { getStrategy, combineStrategies, STRATEGIES, strategyFamily } from "./strategies";
 import type { Candle } from "@/lib/indicators";
 
 const DAY = 86_400;
@@ -366,5 +366,46 @@ test("registry exposes all 10 candlestick patterns + the combo by key", () => {
     "three-white-soldiers", "three-black-crows", "candlestick-any",
   ]) {
     assert.ok(keys.includes(k), `missing ${k}`);
+  }
+});
+
+// --- strategy family --------------------------------------------------------
+//
+// Which analysts HAWK fields depends on what the scanner just fired. A
+// mean-reversion analyst asked to rule on a trend-continuation setup answers a
+// question nobody asked ("should I fade this?") and the answer is structurally
+// always no: on 2026-08-23..08-30 it voted skip on 45 of 45 live setups under
+// combo-vote, alongside `structure` at 45 of 45, so nothing ever cleared the
+// 2-of-3 bar and the desk took no trade for seven days.
+
+test("combo-vote is a trend family — every member is a continuation setup", () => {
+  assert.equal(strategyFamily("combo-vote"), "trend");
+});
+
+test("mean-rev is a reversion family", () => {
+  assert.equal(strategyFamily("mean-rev"), "reversion");
+});
+
+test("a combo whose members straddle both families is mixed", () => {
+  // combo-all votes across trend-pullback + fvg + mean-rev + rip-sell, so the
+  // side it fires cannot be assumed to be a continuation.
+  assert.equal(strategyFamily("combo-all"), "mixed");
+});
+
+test("an unrecognised key is mixed, so an unclassified strategy keeps today's analyst mix", () => {
+  // Research strategies ("research-29") carry no family: the code was written by
+  // QUANT and nothing records what it does. Guessing wrong would silently drop
+  // the one analyst best placed to refuse it.
+  assert.equal(strategyFamily("research-29"), "mixed");
+  assert.equal(strategyFamily(undefined), "mixed");
+});
+
+test("every registered strategy declares a family explicitly", () => {
+  // Presence, not value: "mixed" is a legitimate declaration for a combo that
+  // votes across both families. What must never happen is a new strategy
+  // *forgetting* to declare, because that silently falls back to "mixed" and
+  // keeps the broken analyst mix instead of failing loudly here.
+  for (const s of STRATEGIES) {
+    assert.ok(s.family, `${s.key} must declare a family`);
   }
 });

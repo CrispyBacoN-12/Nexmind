@@ -16,7 +16,7 @@ import { sma, rsi, cumulativeDelta, detectLiquiditySweep, volumeProfile, type Ca
 import { findRecentUpLeg } from "@/lib/swings";
 import type { ScanResult } from "./scanner";
 
-export type Persona = "trend" | "structure" | "counter";
+export type Persona = "trend" | "structure" | "counter" | "exhaustion";
 
 /** The parts of the context a ScanResult cannot supply. Both are best-effort:
  *  a failed fetch costs the analysts a paragraph, not the trade. */
@@ -115,6 +115,18 @@ const LENSES: Record<Persona, string> = {
     "YOUR LENS — mean reversion. Weigh RSI and Stochastic extremes, Bollinger %B and bandwidth, and how far price is stretched " +
     "from VWAP and SMA20. Call it a fade only on real exhaustion; a trend that is merely strong is not overextended. " +
     "Say which extreme decided it.",
+  // The counter lens rules on whether to FADE the bar. On a continuation setup
+  // that question has one structural answer — live on 2026-08-30 it returned
+  // "this is a strong trend pullback setup, not exhaustion, so a fade isn't
+  // justified" and voted skip, which is reasoning FOR the scanner's long. This
+  // lens asks the same reader the answerable question instead: is the move
+  // already spent? Room left is a confirm, not an abstention.
+  exhaustion:
+    "YOUR LENS — how much move is left. Weigh RSI and Stochastic extremes, Bollinger %B and bandwidth, the stretch from VWAP " +
+    "and SMA20, and where the next structural target sits. You are not deciding whether to fade — the direction is given. " +
+    "Decide whether the move still has room: if it is not extended, that is a reason to CONFIRM the entry. " +
+    "Refuse only on real exhaustion — a blow-off, a spent extreme, or a target close enough that the reward no longer pays. " +
+    "Say which reading decided it.",
 };
 
 // ---- blocks ----

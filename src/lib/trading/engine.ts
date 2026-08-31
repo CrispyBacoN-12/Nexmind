@@ -214,7 +214,7 @@ export async function runTradeTick(
 
   let hawk: HawkVerdict;
   try {
-    hawk = await runHawk(scan, { context, ...exitOverride });
+    hawk = await runHawk(scan, { context, strategyKey, ...exitOverride });
   } catch (e) {
     // Was: fall back to mockHawk and keep going. Same refusal as the no-backend
     // guard above and for the same reason — a position opened on the rule-only

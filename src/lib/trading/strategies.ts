@@ -21,9 +21,22 @@ import type { CostModel } from "@/lib/backtest/engine";
 
 export interface StrategyResult { side: "long" | "short"; note: string }
 export type StrategyEvaluator = (i: number) => StrategyResult | null;
+/**
+ * What kind of move the strategy bets on — the input that decides which three
+ * analysts HAWK fields (see personasFor in hawk.ts).
+ *
+ * "mixed" is the honest answer for a combo that votes across both, and the safe
+ * default for anything unclassified: it keeps the original analyst trio rather
+ * than dropping a voter on a guess.
+ */
+export type StrategyFamily = "trend" | "reversion" | "mixed";
+
 export interface Strategy {
   key: string;
   label: string;
+  /** Omitted only where the answer is genuinely unknown; strategies.test.ts
+   *  requires every registered strategy to declare one. */
+  family?: StrategyFamily;
   build(bars: Candle[]): StrategyEvaluator;
   /** Backtest engine defaults (tp1Mult=2.5, singleTarget=false, slMult=1.5, no
    *  trail, no costs) suit the desk's original intraday strategies. A strategy
@@ -44,6 +57,7 @@ export interface Strategy {
 /** EMA Cross — fast EMA(9) crossing the slow EMA(21). */
 const emaCross: Strategy = {
   key: "ema-cross",
+  family: "trend",
   label: "EMA Cross (9/21)",
   build(bars) {
     const closes = bars.map((c) => c.c);
@@ -64,6 +78,7 @@ const emaCross: Strategy = {
  *  Intraday only: on daily candles each day has one bar, so it never fires. */
 const openingRangeBreakout: Strategy = {
   key: "orb",
+  family: "trend",
   label: "Opening Range Breakout",
   build(bars) {
     const OR_BARS = 4;
@@ -90,6 +105,7 @@ const openingRangeBreakout: Strategy = {
  *  signalling a momentum gap. Trade in the gap's direction. */
 const fairValueGap: Strategy = {
   key: "fvg",
+  family: "trend",
   label: "Fair Value Gap (ICT)",
   build(bars) {
     return (i) => {
@@ -106,6 +122,7 @@ const fairValueGap: Strategy = {
  *  wrapped as a registry strategy so it can be compared and combined. */
 const trendPullback: Strategy = {
   key: "trend-pullback",
+  family: "trend",
   label: "Trend-pullback",
   build(bars) {
     const closes = bars.map((c) => c.c);
@@ -133,6 +150,7 @@ const trendPullback: Strategy = {
  *  the trend filter + long-only is the fix. */
 const dipBuy: Strategy = {
   key: "mean-rev",
+  family: "reversion",
   label: "Dip Buy (RSI + SMA50 trend filter)",
   build(bars) {
     const closes = bars.map((c) => c.c);
@@ -154,6 +172,7 @@ const dipBuy: Strategy = {
  *  selling strength inside a downtrend instead of shorting the capitulation low. */
 const ripSell: Strategy = {
   key: "rip-sell",
+  family: "reversion",
   label: "Rip Sell (RSI + SMA50 downtrend filter)",
   build(bars) {
     const closes = bars.map((c) => c.c);
@@ -178,6 +197,7 @@ const ripSell: Strategy = {
  *  so backtest before trusting it. */
 const bullFlag: Strategy = {
   key: "bull-flag",
+  family: "trend",
   label: "Bull Flag (momentum continuation)",
   build(bars) {
     const POLE = 5, FLAG = 3;
@@ -223,6 +243,7 @@ const VOL_SPIKE_MULT = 3.0;
 const BODY_RATIO = 0.6;
 const volSpike: Strategy = {
   key: "vol-spike",
+  family: "trend",
   label: "Volume Spike (OHLCV-only, gold intraday)",
   build(bars) {
     const volSmaArr = sma(bars.map((b) => b.v), 20);
@@ -264,6 +285,7 @@ const SWEEP_LOOKBACK = 20;
 const SWEEP_VOL_MULT = 1.5;
 const liquiditySweep: Strategy = {
   key: "liquidity-sweep",
+  family: "reversion",
   label: "Liquidity Sweep + VWAP Reclaim",
   build(bars) {
     const vwap = anchoredVWAP(bars, dailyAnchor);
@@ -309,6 +331,7 @@ const liquiditySweep: Strategy = {
 const SWEEP_VP_LOOKBACK = 20;
 const liquiditySweepVolumeProfileGold: Strategy = {
   key: "liquidity-sweep-volume-profile-sma50",
+  family: "reversion",
   label: "Liquidity Sweep + Volume Profile + SMA50 (Long Only, ATR Trail)",
   preferredExit: {
     tp1Mult: 3.5,
@@ -362,6 +385,7 @@ const liquiditySweepVolumeProfileGold: Strategy = {
  *  isolation. */
 const swingTrendContinuation: Strategy = {
   key: "swing-trend-continuation",
+  family: "trend",
   label: "Swing Trend Continuation (Daily, Weekly VWAP)",
   preferredExit: { tp1Mult: 1.5, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -415,6 +439,7 @@ const swingTrendContinuation: Strategy = {
 const SMA50_SLOPE_LOOKBACK = 10;
 const macdTrendSma50Regime: Strategy = {
   key: "macd-trend-sma50-regime",
+  family: "trend",
   label: "MACD+Trend + SMA50-Slope Regime (Gold)",
   preferredExit: { tp1Mult: 2.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -450,6 +475,7 @@ const macdTrendSma50Regime: Strategy = {
  *  entry has weak edge on its own (see candlestick-any combo backtest notes). */
 const hammer: Strategy = {
   key: "hammer",
+  family: "reversion",
   label: "Hammer",
   preferredExit: { tp1Mult: 1.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -464,6 +490,7 @@ const hammer: Strategy = {
  *  directional not conclusive). */
 const shootingStar: Strategy = {
   key: "shooting-star",
+  family: "reversion",
   label: "Shooting Star",
   preferredExit: { tp1Mult: 3.0, singleTarget: false, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -478,6 +505,7 @@ const shootingStar: Strategy = {
  *  BTC-USD — weak entry edge, not an exit problem. */
 const bullishEngulfing: Strategy = {
   key: "bullish-engulfing",
+  family: "reversion",
   label: "Bullish Engulfing",
   preferredExit: { tp1Mult: 2.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -492,6 +520,7 @@ const bullishEngulfing: Strategy = {
  *  pattern in this batch. */
 const bearishEngulfing: Strategy = {
   key: "bearish-engulfing",
+  family: "reversion",
   label: "Bearish Engulfing",
   preferredExit: { tp1Mult: 3.0, singleTarget: false, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -505,6 +534,7 @@ const bearishEngulfing: Strategy = {
  *  -0.096 across 42 trades. Still net negative after tuning. */
 const piercingLine: Strategy = {
   key: "piercing-line",
+  family: "reversion",
   label: "Piercing Line",
   preferredExit: { tp1Mult: 1.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -517,6 +547,7 @@ const piercingLine: Strategy = {
  *  0.275 across 25 trades, positive on both symbols. */
 const darkCloudCover: Strategy = {
   key: "dark-cloud-cover",
+  family: "reversion",
   label: "Dark Cloud Cover",
   preferredExit: { tp1Mult: 3.0, singleTarget: false, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -532,6 +563,7 @@ const darkCloudCover: Strategy = {
  *  accumulates. */
 const morningStar: Strategy = {
   key: "morning-star",
+  family: "reversion",
   label: "Morning Star",
   preferredExit: { tp1Mult: 2.0, singleTarget: true, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -546,6 +578,7 @@ const morningStar: Strategy = {
  *  directional. */
 const eveningStar: Strategy = {
   key: "evening-star",
+  family: "reversion",
   label: "Evening Star",
   preferredExit: { tp1Mult: 1.0, singleTarget: false, costs: { slippageBps: 0.5, commissionBps: 1 } },
   build(bars) {
@@ -562,6 +595,7 @@ const eveningStar: Strategy = {
  *  more often in the dataset. */
 const threeWhiteSoldiers: Strategy = {
   key: "three-white-soldiers",
+  family: "trend",
   label: "Three White Soldiers",
   build(bars) {
     return (i) => (isThreeWhiteSoldiers(bars, i) ? { side: "long", note: "three white soldiers" } : null);
@@ -574,6 +608,7 @@ const threeWhiteSoldiers: Strategy = {
  *  on the engine default rather than tuning to noise. */
 const threeBlackCrows: Strategy = {
   key: "three-black-crows",
+  family: "trend",
   label: "Three Black Crows",
   build(bars) {
     return (i) => (isThreeBlackCrows(bars, i) ? { side: "short", note: "three black crows" } : null);
@@ -587,12 +622,15 @@ export type CombineMode = "any" | "vote";
  *  plus >= minVotes members agreeing on that side within the last `window` bars. */
 export function combineStrategies(
   key: string, label: string, memberKeys: string[], mode: CombineMode,
-  opts: { minVotes?: number; window?: number } = {},
+  opts: { minVotes?: number; window?: number; family?: StrategyFamily } = {},
 ): Strategy {
+  // The family is stated rather than derived from the members: combineStrategies
+  // runs while the STRATEGIES array literal is still being built, so getStrategy
+  // cannot be called here without a temporal-dead-zone crash on import.
   const minVotes = opts.minVotes ?? 2;
   const window = opts.window ?? 3;
   return {
-    key, label,
+    key, label, family: opts.family ?? "mixed",
     build(bars) {
       const evals = memberKeys
         .map((k) => getStrategy(k))
@@ -645,10 +683,10 @@ export const STRATEGIES: Strategy[] = [
   threeWhiteSoldiers,
   threeBlackCrows,
   // Combos of the positive-edge members (EMA Cross excluded — it backtests negative).
-  combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any"),
-  combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3 }),
+  combineStrategies("combo-or", "Combo OR (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "any", { family: "trend" }),
+  combineStrategies("combo-vote", "Combo Vote≥2 (Trend+ORB+FVG)", ["trend-pullback", "orb", "fvg"], "vote", { minVotes: 2, window: 3, family: "trend" }),
   // Long + short specialists for crypto (positive-edge members only, ORB dropped).
-  combineStrategies("combo-all", "Combo Vote≥2 (Trend+FVG+Dip+Rip)", ["trend-pullback", "fvg", "mean-rev", "rip-sell"], "vote", { minVotes: 2, window: 3 }),
+  combineStrategies("combo-all", "Combo Vote≥2 (Trend+FVG+Dip+Rip)", ["trend-pullback", "fvg", "mean-rev", "rip-sell"], "vote", { minVotes: 2, window: 3, family: "mixed" }),
   // Gold Desk multi-strategy: vote>=2 of the 3 members that backtest positive at
   // the desk's own cadence (1d/5y GC=F) — trend breakout, pullback continuation,
   // and oversold-bounce — so a setup needs two independent criteria to agree
@@ -661,7 +699,7 @@ export const STRATEGIES: Strategy[] = [
   // 72.2% win rate, 11.7% drawdown, +$50.09/5y vs +$21.55 solo).
   // Rip-sell, vol-spike, liquidity-sweep excluded from membership: all
   // backtest negative or near-silent (1 signal/5y) on daily gold bars.
-  { ...combineStrategies("combo-gold", "Gold Multi-Strategy Vote≥2 (Trend Cont.+Pullback+Dip Buy)", ["swing-trend-continuation", "trend-pullback", "mean-rev"], "vote", { minVotes: 2, window: 3 }),
+  { ...combineStrategies("combo-gold", "Gold Multi-Strategy Vote≥2 (Trend Cont.+Pullback+Dip Buy)", ["swing-trend-continuation", "trend-pullback", "mean-rev"], "vote", { minVotes: 2, window: 3, family: "mixed" }),
     preferredExit: swingTrendContinuation.preferredExit },
   // Candlestick reversal patterns (pure OHLCV + trend filter) — "any" fires
   // when exactly one member pattern triggers this bar.
@@ -691,9 +729,17 @@ export const STRATEGIES: Strategy[] = [
     "Candlestick Pattern (Any)",
     ["dark-cloud-cover", "bearish-engulfing", "morning-star"],
     "any",
+    { family: "reversion" },
   ),
 ];
 
 export function getStrategy(key: string): Strategy | null {
   return STRATEGIES.find((s) => s.key === key) ?? null;
+}
+
+/** The family of a strategy key, defaulting to "mixed" for anything the
+ *  registry does not know — research strategies above all, whose code was
+ *  written by QUANT and whose direction nothing records. */
+export function strategyFamily(key: string | null | undefined): StrategyFamily {
+  return (key ? STRATEGIES.find((s) => s.key === key)?.family : undefined) ?? "mixed";
 }

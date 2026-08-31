@@ -3,6 +3,7 @@
 
 import { callAgentJSON, type ModelTier } from "@/lib/anthropic";
 import type { ScanResult } from "./scanner";
+import { strategyFamily, type StrategyFamily } from "./strategies";
 import { buildAnalystContext, personaLens, renderContext, type AnalystContext, type Persona } from "./context";
 
 export interface HawkVote {
@@ -46,7 +47,45 @@ const PERSONAS: { persona: Persona; system: string }[] = [
     system:
       "You are a mean-reversion / counter-trend analyst. You look for exhaustion, overextension (RSI extremes), and fade opportunities. You are wary of chasing. Be concise.",
   },
+  {
+    persona: "exhaustion",
+    system:
+      "You are an exhaustion analyst. The trade's direction is already set; you judge only whether the move still has room to run or is already spent. An unextended move is a reason to confirm, not to abstain. Be concise.",
+  },
 ];
+
+const SYSTEM = Object.fromEntries(PERSONAS.map((p) => [p.persona, p.system])) as Record<Persona, string>;
+
+/**
+ * Which three analysts judge a setup, given what the firing strategy bets on.
+ *
+ * The count stays at three for every family. Simply dropping the voter that
+ * cannot confirm would turn the 2-of-3 bar into 2-of-2 unanimity between the
+ * survivors — a stricter gate than the one that already produced seven days of
+ * silence. What rotates is who plays the skeptic, so the disagreement stays real
+ * and answerable.
+ *
+ * Live evidence, portfolio #11 over 45 non-mock counterfactuals under
+ * combo-vote (all three members are continuation setups): trend voted long 39 /
+ * short 3 / skip 3, while structure and counter voted skip 45 of 45. Nothing
+ * cleared the bar.
+ */
+export function personasFor(family: StrategyFamily): Persona[] {
+  switch (family) {
+    // A continuation setup cannot be confirmed by a voter whose job is to fade
+    // it; `exhaustion` asks the same reader whether the move is spent instead.
+    case "trend":
+      return ["trend", "structure", "exhaustion"];
+    // Here the fade IS the setup, so `counter` can genuinely confirm or refuse,
+    // and the trend reader is the one supplying the opposing case.
+    case "reversion":
+      return ["counter", "structure", "trend"];
+    // A combo that votes across both families — and the default for anything
+    // unclassified, research strategies above all. Unchanged from before.
+    case "mixed":
+      return ["trend", "structure", "counter"];
+  }
+}
 
 const VOTE_SCHEMA = {
   type: "object",
@@ -82,20 +121,23 @@ export async function runHawk(
     atrTpMult?: number;
     singleTarget?: boolean;
     trail?: { activateMult: number; offsetMult: number };
+    /** The strategy that fired, used only to pick the analyst trio. Omitted ⇒
+     *  "mixed", i.e. the original three. */
+    strategyKey?: string | null;
   } = {},
 ): Promise<HawkVerdict> {
   if (!scan.side) return { agreed: false, side: null, votes: [], levels: null, totalCostUsd: 0 };
 
   const facts = renderContext(opts.context ?? buildAnalystContext(scan, { newsDigest: opts.newsDigest }));
   const results = await Promise.all(
-    PERSONAS.map((p) =>
+    personasFor(strategyFamily(opts.strategyKey)).map((persona) =>
       callAgentJSON<{ vote: HawkVote["vote"]; confidence: number; reason: string }>({
         tier: opts.tier ?? "sonnet",
-        system: p.system,
-        prompt: buildPrompt(facts, p.persona),
+        system: SYSTEM[persona],
+        prompt: buildPrompt(facts, persona),
         maxTokens: 300,
         jsonSchema: VOTE_SCHEMA,
-      }).then((r) => ({ ...r, persona: p.persona })),
+      }).then((r) => ({ ...r, persona })),
     ),
   );
 
