@@ -206,6 +206,35 @@ function confluenceVeto(s: ScanSnapshot, side: "long" | "short", t: SetupThresho
   return null;
 }
 
+/**
+ * The shallowest series a scan may run on.
+ *
+ * Set to SMA50's own requirement, not to a round number: the trend analyst's
+ * lens weighs MA alignment "above all else", and below 50 bars SMA50 is null,
+ * so that vote has nothing to be cast on.
+ */
+export const MIN_SCAN_BARS = 50;
+
+/**
+ * Pure: why this series is too shallow to scan, or null if it is deep enough.
+ *
+ * fetchCandles returns the LAST provider's answer even when short — deliberately,
+ * since a genuinely young listing has no deeper history at any provider — and
+ * until now nothing downstream asked how short. On 2026-08-30 EA came back from
+ * Yahoo with two weekly bars, and was scanned anyway: a Signal was written and
+ * three analysts were paid to read a facts sheet whose SMA20, SMA50, RSI, ADX,
+ * ATR and Bollinger fields were every one of them null.
+ *
+ * Refusing is the honest answer rather than a lost opportunity. A setup that
+ * cannot be measured cannot be judged, and the exit ladder is priced off an ATR
+ * that does not exist either.
+ */
+export function historyShortfall(candles: unknown[]): string | null {
+  return candles.length >= MIN_SCAN_BARS
+    ? null
+    : `only ${candles.length} bars available (needs ${MIN_SCAN_BARS}) — too little history to measure a setup`;
+}
+
 /** One-line indicator context for "no setup" diagnostics on the strategy path. */
 function snapshotDiag(s: ScanSnapshot): string {
   const parts: string[] = [];
@@ -271,10 +300,18 @@ export async function scanSymbol(
   // latest bar so live entries match what the Backtest Lab measured.
   let side: "long" | "short" | null;
   let note: string;
-  const strat = strategyKey && strategyKey !== "trend-pullback"
-    ? getStrategy(strategyKey) ?? await getResearchStrategy(strategyKey)
-    : null;
-  if (strat) {
+  // A series too shallow to measure is refused before the strategy is loaded:
+  // the research-strategy lookup is a DB round-trip, and there is nothing here
+  // for it to decide on. `side: null` routes to the engine's "no setup" exit,
+  // which discards the signal without paying three analysts to read nulls.
+  const shortfall = historyShortfall(candles);
+  const strat = shortfall || !strategyKey || strategyKey === "trend-pullback"
+    ? null
+    : getStrategy(strategyKey) ?? await getResearchStrategy(strategyKey);
+  if (shortfall) {
+    side = null;
+    note = `no setup · ${shortfall}`;
+  } else if (strat) {
     const sig = strat.build(candles)(candles.length - 1);
     side = sig?.side ?? null;
     note = sig ? `${strat.label}: ${sig.note}` : `no setup · ${strat.label} no signal · ${snapshotDiag(snapshot)}`;
