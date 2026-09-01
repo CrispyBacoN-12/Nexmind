@@ -18,7 +18,7 @@
 // nothing. An empty report means "no evidence yet", not "no edge".
 
 import { prisma } from "../src/lib/db";
-import { resolveCounterfactuals, compareArms } from "../src/lib/trading/counterfactual";
+import { resolveCounterfactuals, compareArms, dedupeBars } from "../src/lib/trading/counterfactual";
 import type { Range } from "../src/lib/yahoo";
 
 const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
@@ -47,9 +47,21 @@ async function main() {
 
   const rows = await prisma.counterfactual.findMany({
     where: { portfolioId, resolvedAt: { not: null } },
-    select: { aiOutcome: true, aiR: true, mockR: true },
+    orderBy: { id: "asc" },
+    select: {
+      aiOutcome: true, aiR: true, mockR: true,
+      symbol: true, timeframe: true, scanSide: true, mockEntry: true, mockSl: true,
+    },
   });
-  const c = compareArms(rows);
+  // Rows written before the one-bar-one-row guard repeat the same setup once per
+  // scan, and every number below is per opportunity — so collapse first or the
+  // edge is reported scaled by how often we happened to look.
+  const scored = dedupeBars(rows);
+  const c = compareArms(scored);
+  if (scored.length < rows.length) {
+    console.log(`${rows.length} resolved rows collapse to ${scored.length} distinct setups (pre-guard duplicates).
+`);
+  }
 
   if (c.ai.opportunities === 0) {
     console.log(`${total} rows recorded, none resolved yet — no verdict available.`);

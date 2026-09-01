@@ -43,6 +43,34 @@ export interface RecordInput {
   /** What the mock would have proposed for this same scan. */
   mockLevels: ProposedLevels;
   lot: number;
+  /** Start of the bar under decision, used to keep one bar to one row. Null
+   *  when the scan carried no candles: an unknown bar is always written rather
+   *  than silently folded into whatever came before it. */
+  barStart?: Date | null;
+}
+
+/** The row already standing for this bar, or null on the first sighting. */
+export type BarRow = { id: number; aiOutcome: string } | null;
+export type RecordAction = { kind: "create" } | { kind: "update"; id: number } | { kind: "skip"; id: number };
+
+/**
+ * One bar, one row.
+ *
+ * The engine's dedupe asks whether a Trade already exists on this bar, which
+ * catches nothing when the analysts refuse — no Trade is ever created, so a
+ * weekly setup that persists for five daily scans wrote five identical rows.
+ * Portfolio #11 carried EIX and FTV four times each off one bar, every copy
+ * stopping out at the same price on the same day, and `compareArms` counts rows:
+ * 8 real setups were reported as 19 opportunities.
+ *
+ * An execution still supersedes an earlier stand-aside on the same bar. Skipping
+ * unconditionally would keep Monday's refusal and drop Wednesday's actual entry,
+ * which loses the only row with a trade behind it.
+ */
+export function recordAction(existing: BarRow, outcome: RecordInput["aiOutcome"]): RecordAction {
+  if (!existing) return { kind: "create" };
+  if (outcome === "executed") return { kind: "update", id: existing.id };
+  return { kind: "skip", id: existing.id };
 }
 
 /**
@@ -51,28 +79,43 @@ export interface RecordInput {
  */
 export async function recordCounterfactual(input: RecordInput): Promise<void> {
   try {
-    await prisma.counterfactual.create({
-      data: {
-        portfolioId: input.portfolioId,
-        symbol: input.symbol,
-        timeframe: input.timeframe,
-        aiBackend: input.aiBackend,
-        scanSide: input.scanSide,
-        scanNote: input.scanNote.slice(0, 500),
-        aiOutcome: input.aiOutcome,
-        aiReason: input.aiReason?.slice(0, 500),
-        tradeId: input.tradeId,
-        aiEntry: input.aiLevels?.entry,
-        aiSl: input.aiLevels?.sl,
-        aiTp1: input.aiLevels?.tp1,
-        aiTp2: input.aiLevels?.tp2,
-        mockEntry: input.mockLevels.entry,
-        mockSl: input.mockLevels.sl,
-        mockTp1: input.mockLevels.tp1,
-        mockTp2: input.mockLevels.tp2,
-        lot: input.lot,
-      },
-    });
+    const existing = input.barStart
+      ? await prisma.counterfactual.findFirst({
+          where: {
+            portfolioId: input.portfolioId,
+            symbol: input.symbol,
+            timeframe: input.timeframe,
+            openedAt: { gte: input.barStart },
+          },
+          orderBy: { id: "desc" },
+          select: { id: true, aiOutcome: true },
+        })
+      : null;
+    const action = recordAction(existing, input.aiOutcome);
+    if (action.kind === "skip") return;
+
+    const data = {
+      portfolioId: input.portfolioId,
+      symbol: input.symbol,
+      timeframe: input.timeframe,
+      aiBackend: input.aiBackend,
+      scanSide: input.scanSide,
+      scanNote: input.scanNote.slice(0, 500),
+      aiOutcome: input.aiOutcome,
+      aiReason: input.aiReason?.slice(0, 500),
+      tradeId: input.tradeId,
+      aiEntry: input.aiLevels?.entry,
+      aiSl: input.aiLevels?.sl,
+      aiTp1: input.aiLevels?.tp1,
+      aiTp2: input.aiLevels?.tp2,
+      mockEntry: input.mockLevels.entry,
+      mockSl: input.mockLevels.sl,
+      mockTp1: input.mockLevels.tp1,
+      mockTp2: input.mockLevels.tp2,
+      lot: input.lot,
+    };
+    if (action.kind === "update") await prisma.counterfactual.update({ where: { id: action.id }, data });
+    else await prisma.counterfactual.create({ data });
   } catch (e) {
     console.error(`[counterfactual] failed to record ${input.symbol}:`, e instanceof Error ? e.message : e);
   }
@@ -222,6 +265,40 @@ export interface ArmComparison {
 
 type Scored = Pick<Counterfactual, "aiOutcome" | "aiR" | "mockR">;
 
+/** Enough of a row to say which bar it was recorded on. Entry and stop are
+ *  derived from that bar's close and ATR, so two rows sharing them are two
+ *  sightings of one setup rather than two setups. */
+type BarKeyed = { symbol: string; timeframe: string; scanSide: string; mockEntry: number; mockSl: number; aiOutcome: string };
+
+/**
+ * Collapse the rows written before `recordAction` existed.
+ *
+ * Those rows carry no bar stamp, so the bar is recovered from what the scan
+ * produced: symbol, timeframe, side, and the mock ladder's entry and stop. A
+ * re-scan of an unchanged bar reproduces all five exactly; the next bar moves
+ * the close, and with it the entry.
+ *
+ * Kept read-side on purpose. Deleting the duplicates would report the same
+ * numbers and cost the record of how often the desk was asked, which is the
+ * evidence that the re-scan loop existed at all.
+ */
+export function dedupeBars<T extends BarKeyed>(rows: T[]): T[] {
+  const at = new Map<string, number>();
+  const out: T[] = [];
+  for (const r of rows) {
+    const key = [r.symbol, r.timeframe, r.scanSide, r.mockEntry, r.mockSl].join("|");
+    const seen = at.get(key);
+    if (seen == null) {
+      at.set(key, out.length);
+      out.push(r);
+    } else if (r.aiOutcome === "executed" && out[seen].aiOutcome !== "executed") {
+      // Same precedence as recordAction: the copy with a trade behind it wins.
+      out[seen] = r;
+    }
+  }
+  return out;
+}
+
 /** Pure aggregation over resolved rows — no DB, so it can be tested directly. */
 export function compareArms(rows: Scored[]): ArmComparison {
   const usable = rows.filter((r) => r.aiR != null && r.mockR != null) as Array<Scored & { aiR: number; mockR: number }>;
@@ -263,7 +340,11 @@ export function compareArms(rows: Scored[]): ArmComparison {
 export async function armComparison(portfolioId: number): Promise<ArmComparison> {
   const rows = await prisma.counterfactual.findMany({
     where: { portfolioId, resolvedAt: { not: null } },
-    select: { aiOutcome: true, aiR: true, mockR: true },
+    orderBy: { id: "asc" },
+    select: {
+      aiOutcome: true, aiR: true, mockR: true,
+      symbol: true, timeframe: true, scanSide: true, mockEntry: true, mockSl: true,
+    },
   });
-  return compareArms(rows);
+  return compareArms(dedupeBars(rows));
 }

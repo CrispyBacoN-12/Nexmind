@@ -204,6 +204,11 @@ export async function runTradeTick(
       portfolioId, symbol, timeframe: scan.timeframe, aiBackend: backend,
       scanSide: scan.side!, scanNote: scan.note,
       aiOutcome, aiReason, tradeId, aiLevels, mockLevels, lot: cfLot,
+      // Same bar boundary the Trade dedupe above uses. That guard only fires
+      // once a Trade exists, so a refused setup was re-recorded on every scan
+      // of the same unchanged bar; the ledger then measured how often we scan
+      // rather than how often the desk decided.
+      barStart,
     });
   };
 

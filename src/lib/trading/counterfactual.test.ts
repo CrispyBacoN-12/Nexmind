@@ -1,7 +1,7 @@
 import "dotenv/config"; // counterfactual.ts -> db.ts constructs prisma at module scope
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compareArms, replay } from "./counterfactual";
+import { compareArms, dedupeBars, recordAction, replay } from "./counterfactual";
 import { DEFAULT_COST_MODEL, type SimPosition } from "@/lib/backtest/engine";
 import type { Candle } from "@/lib/indicators";
 
@@ -114,4 +114,61 @@ test("replay: a position that never resolves reports unsettled, not zero", () =>
 
 test("replay: no forward bars means no verdict", () => {
   assert.equal(replay(longPos(), []).settled, false);
+});
+
+// ---- one bar, one row ----
+
+test("recordAction: the first sighting of a bar is written", () => {
+  assert.deepEqual(recordAction(null, "no-consensus"), { kind: "create" });
+  assert.deepEqual(recordAction(null, "executed"), { kind: "create" });
+});
+
+test("recordAction: re-scanning an unchanged bar does not write a second row", () => {
+  // The bug this replaces: on a weekly timeframe the scanner re-fires the same
+  // unchanged bar every day, and a refusal creates no Trade — so the Trade-level
+  // dedupe in the engine never caught it. Portfolio #11 recorded EIX four times
+  // and FTV four times off one bar each, every copy stopping out at the same
+  // price on the same day, which inflated the arm comparison ~2.4x.
+  assert.deepEqual(recordAction({ id: 7, aiOutcome: "no-consensus" }, "no-consensus"), { kind: "skip", id: 7 });
+  assert.deepEqual(recordAction({ id: 7, aiOutcome: "vetoed" }, "no-consensus"), { kind: "skip", id: 7 });
+});
+
+test("recordAction: a later execution on the same bar replaces the stand-aside", () => {
+  // Skipping unconditionally would bias the ledger toward refusals: Monday's
+  // no-consensus would be kept and Wednesday's actual entry on the same bar
+  // dropped, so the one row that has a real trade behind it would go missing.
+  assert.deepEqual(recordAction({ id: 7, aiOutcome: "no-consensus" }, "executed"), { kind: "update", id: 7 });
+});
+
+// ---- collapsing the rows written before the guard existed ----
+
+const cfRow = (symbol: string, mockEntry: number, aiOutcome = "no-consensus", extra: Partial<{ mockSl: number; id: number }> = {}) => ({
+  id: extra.id ?? 0, symbol, timeframe: "1wk", scanSide: "long",
+  mockEntry, mockSl: extra.mockSl ?? mockEntry - 5, aiOutcome,
+});
+
+test("dedupeBars: one bar scanned four times counts once", () => {
+  // EIX, portfolio #11: four rows off one weekly bar, identical entry and stop,
+  // every copy stopping out at the same price on the same day.
+  const rows = [cfRow("EIX", 86.12), cfRow("EIX", 86.12), cfRow("EIX", 86.12), cfRow("EIX", 86.12)];
+  assert.equal(dedupeBars(rows).length, 1);
+});
+
+test("dedupeBars: a different bar on the same symbol is a different opportunity", () => {
+  // Same symbol, next week, new entry and stop — that is a second real setup and
+  // collapsing it would hide a decision rather than a duplicate.
+  assert.equal(dedupeBars([cfRow("EIX", 86.12), cfRow("EIX", 91.40)]).length, 2);
+  assert.equal(dedupeBars([cfRow("EIX", 86.12), cfRow("EIX", 86.12, "no-consensus", { mockSl: 80.1 })]).length, 2);
+});
+
+test("dedupeBars: the executed copy is the one kept", () => {
+  // Same rule as recordAction: the row with a real trade behind it wins.
+  const kept = dedupeBars([cfRow("FTV", 78.04, "no-consensus", { id: 1 }), cfRow("FTV", 78.04, "executed", { id: 2 })]);
+  assert.equal(kept.length, 1);
+  assert.equal(kept[0].id, 2);
+});
+
+test("dedupeBars: otherwise the first sighting is kept, matching the write path", () => {
+  const kept = dedupeBars([cfRow("FTV", 78.04, "no-consensus", { id: 1 }), cfRow("FTV", 78.04, "vetoed", { id: 2 })]);
+  assert.deepEqual(kept.map((r) => r.id), [1]);
 });
