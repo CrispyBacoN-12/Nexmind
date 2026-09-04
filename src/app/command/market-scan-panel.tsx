@@ -16,6 +16,7 @@ const PRESETS = [
   { id: "dow30", label: "Dow 30" },
   { id: "nasdaq100", label: "NASDAQ-100" },
   { id: "sp500", label: "S&P 500 (screened)" },
+  { id: "sp500+nasdaq100", label: "S&P 500 + NDX (screened)" },
 ];
 
 const tone: Record<string, "positive" | "warning" | "neutral"> = {

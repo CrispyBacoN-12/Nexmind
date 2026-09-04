@@ -1,0 +1,694 @@
+<title>NEXMIND Desk Session</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --paper:      #EDF0F3;
+    --surface:    #FFFFFF;
+    --surface-2:  #F5F7F9;
+    --ink:        #141A20;
+    --ink-2:      #3E4852;
+    --muted:      #6E7A85;
+    --line:       #D3DAE1;
+    --line-soft:  #E3E8ED;
+    --pass:       #2E6B57;
+    --pass-soft:  #E3EEE9;
+    --stop:       #96313F;
+    --stop-soft:  #F6E6E8;
+    --gate:       #3B4670;
+    --gate-soft:  #E6E9F2;
+    --shadow:     0 1px 2px rgba(20,26,32,.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #101519;
+      --surface:    #171E24;
+      --surface-2:  #1C242B;
+      --ink:        #E6ECF1;
+      --ink-2:      #B7C2CC;
+      --muted:      #808D98;
+      --line:       #2A343D;
+      --line-soft:  #222B33;
+      --pass:       #6FBFA1;
+      --pass-soft:  #15302A;
+      --stop:       #E28C97;
+      --stop-soft:  #341E22;
+      --gate:       #98A6D8;
+      --gate-soft:  #1D2436;
+      --shadow:     0 1px 2px rgba(0,0,0,.3);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #101519;
+    --surface:    #171E24;
+    --surface-2:  #1C242B;
+    --ink:        #E6ECF1;
+    --ink-2:      #B7C2CC;
+    --muted:      #808D98;
+    --line:       #2A343D;
+    --line-soft:  #222B33;
+    --pass:       #6FBFA1;
+    --pass-soft:  #15302A;
+    --stop:       #E28C97;
+    --stop-soft:  #341E22;
+    --gate:       #98A6D8;
+    --gate-soft:  #1D2436;
+    --shadow:     0 1px 2px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: clamp(32px, 6vw, 72px) clamp(18px, 5vw, 44px) 88px;
+  }
+
+  /* ---------- type ---------- */
+
+  h1, h2, h3 {
+    font-family: Anuphan, "IBM Plex Sans Thai", system-ui, sans-serif;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(30px, 5.2vw, 46px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.12;
+  }
+
+  h2 {
+    font-size: clamp(19px, 2.6vw, 23px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 1.4;
+  }
+
+  p { margin: 0; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .lede {
+    max-width: 62ch;
+    color: var(--ink-2);
+    font-size: 16px;
+  }
+
+  code, .mono {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code {
+    font-size: 0.88em;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--ink-2);
+  }
+
+  /* ---------- header ---------- */
+
+  header { display: flex; flex-direction: column; gap: 14px; }
+
+  .rule {
+    height: 1px;
+    background: var(--line);
+    border: 0;
+    margin: 0;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding-top: 4px;
+  }
+
+  .chip {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 3px 9px;
+    white-space: nowrap;
+  }
+
+  section { margin-top: clamp(40px, 6vw, 60px); }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .sec-head .eyebrow { flex: 0 0 auto; }
+  .sec-head .fill { flex: 1 1 auto; height: 1px; background: var(--line); }
+
+  /* ---------- triggers ---------- */
+
+  .triggers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+  }
+
+  .trig {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 2px solid var(--pass);
+    border-radius: 3px;
+    padding: 15px 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .trig[data-off="true"] {
+    border-top-color: var(--muted);
+    background: var(--surface-2);
+  }
+
+  .trig .cmd {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+
+  .trig[data-off="true"] .cmd { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+  .trig p { font-size: 13.5px; color: var(--ink-2); }
+
+  /* ---------- flow ---------- */
+
+  .flow { position: relative; display: flex; flex-direction: column; }
+
+  .flow::before {
+    content: "";
+    position: absolute;
+    left: 7px;
+    top: 22px;
+    bottom: 22px;
+    width: 2px;
+    background: var(--pass);
+    opacity: .3;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, .98fr);
+    column-gap: clamp(22px, 4vw, 52px);
+    align-items: center;
+    padding: 10px 0;
+  }
+
+  .node {
+    position: relative;
+    grid-column: 1;
+    margin-left: 40px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 13px 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .node::before {
+    content: "";
+    position: absolute;
+    left: -40px;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid var(--pass);
+  }
+
+  .node::after {
+    content: "";
+    position: absolute;
+    left: -24px;
+    top: 50%;
+    width: 24px;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .node .lbl {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .node .sub { font-size: 13.5px; color: var(--ink-2); }
+
+  .row[data-kind="gate"] .node {
+    background: var(--gate-soft);
+    border-color: color-mix(in srgb, var(--gate) 35%, var(--line));
+  }
+
+  .row[data-kind="gate"] .node::before {
+    border-radius: 2px;
+    border-color: var(--gate);
+    transform: rotate(45deg);
+  }
+
+  .row[data-kind="gate"] .node .lbl { color: var(--gate); }
+
+  .row[data-kind="cap"] .node {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+
+  .row[data-kind="cap"] .node h3,
+  .row[data-kind="cap"] .node .sub { color: var(--paper); }
+
+  .row[data-kind="cap"] .node .lbl { color: color-mix(in srgb, var(--paper) 62%, transparent); }
+  .row[data-kind="cap"] .node::before { background: var(--ink); border-color: var(--ink); }
+
+  .exit {
+    position: relative;
+    grid-column: 2;
+    background: var(--stop-soft);
+    border: 1px dashed color-mix(in srgb, var(--stop) 45%, var(--line));
+    border-radius: 3px;
+    padding: 11px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .exit::before {
+    content: "";
+    position: absolute;
+    left: calc(-1 * clamp(22px, 4vw, 52px));
+    top: 50%;
+    width: clamp(22px, 4vw, 52px);
+    border-top: 1px dashed var(--stop);
+  }
+
+  .exit .brk {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--stop);
+  }
+
+  .exit .name { font-size: 14.5px; font-weight: 500; color: var(--ink); }
+  .exit .count { font-size: 13px; color: var(--ink-2); font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  .loopmark {
+    grid-column: 1 / -1;
+    margin: 2px 0 2px 40px;
+    padding: 7px 14px;
+    border: 1px dashed var(--line);
+    border-radius: 3px;
+    background: var(--surface-2);
+    font-size: 12.5px;
+    color: var(--muted);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+  }
+
+  /* ---------- outcome ---------- */
+
+  .bar {
+    display: flex;
+    height: 34px;
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .bar span {
+    display: block;
+    height: 100%;
+  }
+
+  .bar .s-nc  { background: color-mix(in srgb, var(--stop) 62%, var(--surface)); }
+  .bar .s-vt  { background: var(--stop); }
+  .bar .s-ai  { background: var(--muted); }
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px 22px;
+    margin-top: 16px;
+  }
+
+  .leg {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    border-top: 1px solid var(--line);
+    padding-top: 9px;
+  }
+
+  .leg .sw { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; transform: translateY(-1px); }
+  .leg .k { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13px; flex: 1 1 auto; }
+  .leg .v { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  /* ---------- defects ---------- */
+
+  .defects { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+
+  .defect {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--stop);
+    border-radius: 3px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .defect .where {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .defect p { font-size: 14px; color: var(--ink-2); }
+
+  footer {
+    margin-top: 52px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 700px) {
+    .row { grid-template-columns: 1fr; row-gap: 10px; }
+    .exit { grid-column: 1; margin-left: 40px; border-style: solid; border-left-width: 3px; }
+    .exit::before { display: none; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">NEXMIND · runtime</p>
+    <h1>Desk Session Flow</h1>
+    <p class="lede">
+      เดสก์ไม่ได้รันตามตารางเวลาอีกแล้ว — มันเริ่มทำงานเฉพาะตอนที่เราสั่ง
+      หน้านี้คือลำดับการทำงานทั้งหมดของหนึ่ง session พร้อมตัวเลขจริงจากรอบล่าสุด
+    </p>
+    <div class="meta">
+      <span class="chip">branch · stocks-only-pivot</span>
+      <span class="chip">port · 3275</span>
+      <span class="chip">โหมด · paper</span>
+      <span class="chip">รอบล่าสุด · 1 ก.ย. 2026 20:32–20:44</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head"><p class="eyebrow">จุดเริ่ม</p><span class="fill"></span></div>
+    <div class="triggers">
+      <div class="trig">
+        <span class="cmd">npm run dev</span>
+        <p>เปิดเว็บ <code>:3275</code> และยิง session ไปพร้อมกัน มีตัวกันซ้ำ <code>--if-stale=30</code> ล็อกลง <code>scripts/session.log</code></p>
+      </div>
+      <div class="trig">
+        <span class="cmd">npm run desk</span>
+        <p>รัน session อย่างเดียว ไม่มีตัวกันซ้ำ ใช้ตอนอยากบังคับให้ทำงานเดี๋ยวนั้น</p>
+      </div>
+      <div class="trig" data-off="true">
+        <span class="cmd">Task Scheduler ×3</span>
+        <p>ปิดไปแล้ว (ยังไม่ได้ลบ) เปิดคืนด้วย <code>Enable-ScheduledTask</code> เมื่อไหร่ก็ได้</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><p class="eyebrow">ลำดับใน session</p><span class="fill"></span></div>
+
+    <div class="flow">
+
+      <div class="row" data-kind="cap">
+        <div class="node">
+          <span class="lbl">start</span>
+          <h3>npm run dev</h3>
+          <p class="sub">scripts/dev.mts แตกออกเป็นสองขา — เว็บ กับ session</p>
+        </div>
+      </div>
+
+      <div class="row" data-kind="gate">
+        <div class="node">
+          <span class="lbl">ตัดสิน</span>
+          <h3>เพิ่งรันไปไม่ถึง 30 นาที?</h3>
+          <p class="sub">restart dev server ไม่ควรเผาโควตา HAWK/SAGE ซ้ำบนแท่งเดิม</p>
+        </div>
+        <div class="exit">
+          <span class="brk">ใช่</span>
+          <span class="name">ข้าม session เปิดแค่เว็บ</span>
+          <span class="count">lastDeskSessionAt</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="node">
+          <span class="lbl">step 1</span>
+          <h3>Intel</h3>
+          <p class="sub">ดึงข่าว Finnhub + Fear &amp; Greed เข้ามาก่อน เพื่อให้ analyst เห็นของใหม่</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="node">
+          <span class="lbl">step 2</span>
+          <h3>Manage</h3>
+          <p class="sub">ปิดไม้ก่อนเปิดไม้ — ถ้าสลับลำดับ จำนวนสล็อตว่างจะนับผิด</p>
+        </div>
+      </div>
+
+      <div class="row" data-kind="gate">
+        <div class="node">
+          <span class="lbl">ตัดสิน</span>
+          <h3>ราคาชน SL / TP1 / TP2 ?</h3>
+          <p class="sub">เทียบไม้ที่เปิดอยู่กับราคาปัจจุบัน</p>
+        </div>
+        <div class="exit">
+          <span class="brk">ใช่</span>
+          <span class="name">ปิดไม้ + บันทึกผล R</span>
+        </div>
+      </div>
+
+      <div class="row" data-kind="gate">
+        <div class="node">
+          <span class="lbl">ประตูตลาด</span>
+          <h3>SPY &gt; SMA200 ?</h3>
+          <p class="sub">ฟีเจอร์ regime ตัวเดียวที่รอดทั้ง 5 fold ของ panel — มันตัดขาดทิ้ง ไม่ได้สร้างกำไร</p>
+        </div>
+        <div class="exit">
+          <span class="brk">ไม่</span>
+          <span class="name">risk-off · ไม่เปิดไม้ใหม่ทั้งรอบ</span>
+          <span class="count">รอบล่าสุด 761.78 &gt; 708.28 → risk-on, 2 สล็อต</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="node">
+          <span class="lbl">step 3</span>
+          <h3>Scan · โค้ดล้วน ไม่มี AI</h3>
+          <p class="sub">สแกน sp500 หา setup — AI มีหน้าที่ <em>กรอง</em> เท่านั้น ไม่ได้เป็นคนหาสัญญาณ</p>
+        </div>
+        <div class="exit" style="background:var(--pass-soft);border-color:color-mix(in srgb, var(--pass) 40%, var(--line));border-style:solid">
+          <span class="brk" style="color:var(--pass)">ผลรอบล่าสุด</span>
+          <span class="name">191 ตัว → 19 setups</span>
+          <span class="count">ใช้เวลา 751.9 วินาที</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <p class="loopmark">↻ สามด่านข้างล่างนี้รันซ้ำทีละ setup</p>
+      </div>
+
+      <div class="row" data-kind="gate">
+        <div class="node">
+          <span class="lbl">ด่าน 1</span>
+          <h3>HAWK 2 ใน 3 เห็นตรงกัน?</h3>
+          <p class="sub">trend · structure · exhaustion — ทีมนักวิเคราะห์ถูกเลือกตามตระกูลกลยุทธ์</p>
+        </div>
+        <div class="exit">
+          <span class="brk">ไม่</span>
+          <span class="name">no-consensus</span>
+          <span class="count">13 ครั้ง</span>
+        </div>
+      </div>
+
+      <div class="row" data-kind="gate">
+        <div class="node">
+          <span class="lbl">ด่าน 2</span>
+          <h3>SAGE ปล่อยผ่าน?</h3>
+          <p class="sub">ด่านความเสี่ยง อยู่ <em>หลัง</em> การโหวต ที่ engine.ts:265</p>
+        </div>
+        <div class="exit">
+          <span class="brk">ไม่</span>
+          <span class="name">vetoed</span>
+          <span class="count">5 ครั้ง — ตายที่นี่ทั้งหมด</span>
+        </div>
+      </div>
+
+      <div class="row" data-kind="gate">
+        <div class="node">
+          <span class="lbl">ด่าน 3</span>
+          <h3>ผ่าน Iron Rules?</h3>
+          <p class="sub">กฎแข็งเรื่องขนาดไม้และความเสี่ยงรวม</p>
+        </div>
+        <div class="exit">
+          <span class="brk">ไม่</span>
+          <span class="name">rules-blocked</span>
+          <span class="count">0 ครั้ง — ยังไม่เคยถูกเรียกใช้จริง</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="node">
+          <span class="lbl">execute</span>
+          <h3>เปิดไม้ · paper fill</h3>
+          <p class="sub">รอบล่าสุด 0 ครั้ง — ไม่มี setup ไหนเดินมาถึงตรงนี้</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="node">
+          <span class="lbl">step 4</span>
+          <h3>Ledger</h3>
+          <p class="sub">ปิดบัญชี counterfactual — เทียบว่า mock แบบไม่มี AI จะทำอะไร</p>
+        </div>
+        <div class="exit" style="background:var(--surface-2);border-color:var(--line);border-style:solid">
+          <span class="brk" style="color:var(--muted)">สถานะ</span>
+          <span class="name">0 / 65 ยังไม่ปิด</span>
+        </div>
+      </div>
+
+      <div class="row" data-kind="gate">
+        <div class="node">
+          <span class="lbl">ตัดสิน</span>
+          <h3>ครบรอบ research 7 วัน?</h3>
+          <p class="sub">ล็อกไว้ ไม่ให้กินเวลาทุกครั้งที่เปิดเว็บ</p>
+        </div>
+        <div class="exit">
+          <span class="brk">ไม่</span>
+          <span class="name">ข้าม research</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="node">
+          <span class="lbl">step 5</span>
+          <h3>Research</h3>
+          <p class="sub">panel gate · FIT 2016–18 → SELECT 2019 → TEST1/2/3</p>
+        </div>
+      </div>
+
+      <div class="row" data-kind="cap">
+        <div class="node">
+          <span class="lbl">end</span>
+          <h3>เขียนลง Postgres</h3>
+          <p class="sub">เว็บ :3275 อ่านจาก DB อย่างเดียว ไม่มี polling ไม่มี mark-to-market</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><p class="eyebrow">19 setups ตายที่ไหนบ้าง</p><span class="fill"></span></div>
+    <div class="bar" role="img" aria-label="จาก 19 setups: no-consensus 13, vetoed 5, no-ai-backend 1, เปิดไม้ 0">
+      <span class="s-nc" style="width:68.42%"></span>
+      <span class="s-vt" style="width:26.32%"></span>
+      <span class="s-ai" style="width:5.26%"></span>
+    </div>
+    <div class="legend">
+      <div class="leg"><span class="sw" style="background:color-mix(in srgb, var(--stop) 62%, var(--surface))"></span><span class="k">no-consensus</span><span class="v">13</span></div>
+      <div class="leg"><span class="sw" style="background:var(--stop)"></span><span class="k">vetoed · SAGE</span><span class="v">5</span></div>
+      <div class="leg"><span class="sw" style="background:var(--muted)"></span><span class="k">no-ai-backend</span><span class="v">1</span></div>
+      <div class="leg"><span class="sw" style="background:var(--pass)"></span><span class="k">เปิดไม้จริง</span><span class="v">0</span></div>
+    </div>
+    <p class="lede" style="margin-top:18px">
+      ตัวที่ได้ <code>no-ai-backend</code> คือ FCX — Claude CLI ล้มชั่วคราวกลางรอบ
+      เอนจินเลือกไม่เปิดไม้แทนที่จะเทรดโดยไม่มีนักวิเคราะห์ ซึ่งถูกแล้ว
+      แต่รอบที่ยาว 12 นาทีแบบนี้จะเจอเคสนี้บ่อยขึ้น ไม่ใช่น้อยลง
+    </p>
+  </section>
+
+  <section>
+    <div class="sec-head"><p class="eyebrow">สองจุดที่ยังไม่ได้แก้</p><span class="fill"></span></div>
+    <div class="defects">
+      <div class="defect">
+        <h3>คอขวดย้ายไปที่ SAGE แล้ว</h3>
+        <p class="where">src/lib/trading/engine.ts:265</p>
+        <p>
+          <code>vetoed</code> ถูกบันทึก <em>หลัง</em> การโหวต แปลว่า HAWK ผ่าน 2-of-3 ได้จริง 5 จาก 19 ครั้ง (26%)
+          แล้ว SAGE ฆ่าทิ้งทั้งหมด — ขัดกับข้อสรุปเดิมที่ว่า consensus แทบเป็นไปไม่ได้ ยังไม่ได้ไล่ดูเหตุผลการ veto ทั้งห้า
+        </p>
+      </div>
+      <div class="defect">
+        <h3>manage อ่านราคาแค่จุดเดียว</h3>
+        <p class="where">src/lib/trading/manage.ts:48</p>
+        <p>
+          ใช้ราคาปัจจุบันค่าเดียวตัดสินว่าไม้ควรปิดหรือยัง พอคอมปิดไปหลายวัน
+          มันมองไม่เห็นว่า SL โดนชนระหว่างนั้น ต้องเดินทีละแท่งด้วย high/low ของแต่ละแท่ง เหมือน <code>stepPosition</code> ใน backtest
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span class="mono">scripts/dev.mts</span>
+    <span class="mono">scripts/session.mts</span>
+    <span class="mono">scripts/desk.cmd</span>
+    <span class="mono">package.json</span>
+  </footer>
+
+</div>

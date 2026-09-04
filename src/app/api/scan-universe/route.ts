@@ -16,8 +16,9 @@ const MAX_SYMBOLS = 120; // covers the full NASDAQ-100 preset in one pass
 interface Row { symbol: string; outcome: string; tradeId?: number; costUsd: number; error?: string }
 
 // Scan a US universe (preset) or discovered actives through the desk pipeline.
-// POST { preset?: "us-mega"|"dow30"|"nasdaq100"|"sp500", discover?: boolean, max?: number }
-// sp500 is pre-filtered through screener.ts (liquidity/ATR/no-bank) before scanning.
+// POST { preset?: "us-mega"|"dow30"|"nasdaq100"|"sp500"|"sp500+nasdaq100", discover?: boolean, max?: number }
+// The two ~500-name presets are pre-filtered through screener.ts
+// (liquidity/ATR/no-bank) before scanning.
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const portfolioId = Number(body.portfolioId);
@@ -50,8 +51,8 @@ export async function POST(req: Request) {
     const presetKey = body.preset as string;
     const preset = UNIVERSES[presetKey] ?? UNIVERSES["us-mega"];
     source = preset.label;
-    if (presetKey === "sp500") {
-      // sp500 is large and heterogeneous — narrow to liquid, tradeable-range,
+    if (presetKey === "sp500" || presetKey === "sp500+nasdaq100") {
+      // Both are large and heterogeneous — narrow to liquid, tradeable-range,
       // non-bank names before spending AI calls on the pipeline (see screener.ts).
       const screened = await screenUniverse(preset.symbols);
       raw = screened.filter((r) => r.passed).map((r) => r.symbol);

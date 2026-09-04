@@ -61,6 +61,21 @@ const SP500 = [
   "WEC", "WFC", "WELL", "WST", "WDC", "WY", "WMB", "WTW", "GWW", "WYNN", "XEL", "XYL", "YUM", "ZBRA", "ZBH", "ZTS",
 ];
 
+// S&P 500 plus the handful of NASDAQ-100 members that are not in it — foreign
+// issuers and recent listings (ASML, CRWD, DDOG, MELI, MRVL, TEAM, TTD, WDAY,
+// ZS). Everything else in the NASDAQ-100 is already an S&P 500 name, so the
+// merge adds nine symbols, not eighty.
+//
+// Those nine lead the list on purpose. scanUniverse fetches only the first 200
+// symbols of a universe, so appending them behind 490 S&P names would make the
+// merge a no-op — they would never be looked at. Leading with them spends nine
+// of that fetch budget and cannot bias which setup is traded: candidates are
+// re-ranked by ADX before any slot is handed out, so list order decides who
+// gets looked at, never who gets served.
+const SP500_SET = new Set(SP500);
+const NDX_ONLY = NASDAQ100.filter((s) => !SP500_SET.has(s));
+const SP500_PLUS_NDX = [...NDX_ONLY, ...SP500];
+
 // Depository/commercial + major investment banks — earnings are rate-cycle and
 // credit-quality driven rather than the trend/momentum patterns the ATR-ladder
 // strategies key off, and the whole group tends to move together on Fed days
@@ -78,6 +93,7 @@ export const UNIVERSES: Record<string, Universe> = {
   "dow30": { label: "Dow 30", symbols: DOW30 },
   "nasdaq100": { label: "NASDAQ-100 (~80)", symbols: NASDAQ100 },
   "sp500": { label: "S&P 500 (~500)", symbols: SP500 },
+  "sp500+nasdaq100": { label: "S&P 500 + NASDAQ-100 (~499)", symbols: SP500_PLUS_NDX },
 };
 
 /**

@@ -18,6 +18,7 @@ const UNIVERSE_OPTIONS: { key: string; label: string }[] = [
   { key: "dow30", label: "Universe: Dow 30" },
   { key: "nasdaq100", label: "Universe: NASDAQ-100 (~80)" },
   { key: "sp500", label: "Universe: S&P 500 (~500)" },
+  { key: "sp500+nasdaq100", label: "Universe: S&P 500 + NASDAQ-100 (~499)" },
 ];
 
 // Entry strategies selectable for swing portfolios (keys mirror the registry).
