@@ -51,6 +51,20 @@ interface RotationEntry {
 // LADDER_OPTIONS (no AI involved); researching sizing means making the engine
 // size to risk first. Both are outside this file.
 //
+// **Read this before adding an angle that waits for anything.** Measured
+// 2026-09-03 (docs/quant/2026-09-03-entry-lateness.md): the baseline entry loses
+// to a matched random entry in 30 of 30 ladder x fold cells, and replaying the
+// SAME signals two or three bars earlier flips that margin positive in 5/5 folds
+// and both exit geometries. So the rule commits late, and every further test
+// placed in front of it commits later still — which is what the 13 rejected
+// confluence filters were, and what the previous "wait for a confirmation close"
+// angle here would have been. The eight gate relaxations run the same day are
+// the other half of the lesson: loosening a threshold does NOT recover the gain,
+// because it admits a wider population of trades rather than moving the same
+// trades earlier, and the matched control rises with it. An angle earns its place
+// here only if it fires on or before the baseline's trigger bar on setups the
+// baseline would also have taken.
+//
 // What IS expressible is *which bar you take the trade on*, and that is not a
 // cosmetic difference: entry price relative to a 1.5-ATR stop sets the R of
 // every trade that follows. Same trigger, entered three ways, is a genuine
@@ -76,25 +90,27 @@ const BASELINE = "the trend-pullback baseline (price above SMA50, pullback towar
 
 export const RESEARCH_ROTATION: RotationEntry[] = [
   {
-    label: "stocks-entry-timing",
-    brief: `Entry timing for US equities swing trading: same setup as ${BASELINE}, but vary WHICH bar the position is opened on. ${PANEL_TERMS}.`,
+    label: "stocks-entry-anticipation",
+    brief:
+      `Entry anticipation for US equities swing trading: open the SAME setup as ${BASELINE} EARLIER than the baseline does. ` +
+      `A candidate must fire on a bar at or before the baseline's trigger bar, never after it, and must not add a further test that has to pass first. ` +
+      `${PANEL_TERMS}.`,
     angles: [
-      "open immediately on the trigger bar's close, the baseline's own timing, as the control",
-      "require one confirmation close in the trade's direction before opening, accepting a worse entry price for a lower failure rate",
-      "wait for a pullback back toward the trigger bar's extreme and open there, accepting missed trades for a tighter entry relative to the stop",
+      "fire while the trend structure is already in place but the momentum reading has not yet reached the level the baseline stands aside for, so the position is open before the move is certified",
+      "fire on the bar that ends the pullback — the first close that reclaims the previous bar's range inside an established uptrend — rather than after a momentum indicator agrees",
+      "fire where the pullback's depth and duration already match what usually precedes a resumption, taking the position while price is still moving against the trend rather than after it turns",
     ],
   },
   {
     label: "stocks-trade-geometry",
     brief: `Trade geometry for US equities swing trading: take ${BASELINE} only where the distance from entry to a 1.5-ATR stop is favourable relative to the room the move plausibly has. ${PANEL_TERMS}.`,
     angles: [
-      "open only when the trigger bar's range is small relative to ATR, so the stop sits close to the entry",
+      "open only where a 1.5-ATR stop would sit beyond the pullback's low, so the stop is protected by the setup's own structure and not by distance alone",
       "open only when price is far from the recent swing high it would have to reach for the trade to work, i.e. there is room ahead",
-      "scale participation by where the entry sits inside the trigger bar's range rather than always taking the close",
+      "open only where the distance to the stop is small relative to the distance to the level the trade has to reach, since the ladder is swept separately and the entry bar is the only lever on that ratio",
     ],
   },
 ];
-
 const MS_PER_WEEK = 7 * 86_400_000;
 
 /**

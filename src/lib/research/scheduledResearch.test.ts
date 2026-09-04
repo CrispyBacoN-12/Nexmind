@@ -105,6 +105,18 @@ test("the rotation does not re-propose the confluence filters already rejected",
   assert.doesNotMatch(text, /bollinger|stochastic|vwap|lorentzian|volume.profile|liquidity sweep/i);
 });
 
+test("the rotation never asks for another entry confirmation", () => {
+  // 2026-09-03: the baseline entry loses to a matched random entry in 30/30
+  // cells and the loss is confirmation lag — shifting the SAME signals two or
+  // three bars earlier flips the margin positive in 5/5 folds. An angle telling
+  // QUANT to wait for one more signal spends a round on a mechanism already
+  // measured as counterproductive. This guard is why the old
+  // "require one confirmation close" angle is gone.
+  const text = RESEARCH_ROTATION.map((e) => `${e.brief} ${(e.angles ?? []).join(" ")}`).join(" ");
+  assert.doesNotMatch(text, /confirmation close|wait for (a |one )?(further |additional )?confirm/i);
+  assert.doesNotMatch(text, /one more signal|another confirmation/i);
+});
+
 test("pickRotationEntry cycles through the whole rotation and wraps", () => {
   const n = RESEARCH_ROTATION.length;
   for (let w = 0; w < n * 2; w++) {

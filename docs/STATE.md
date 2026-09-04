@@ -5,7 +5,7 @@ Auto-loaded every session via `CLAUDE.md`. Dated deep-dives live in `docs/quant/
 reasoning behind each change lives in its commit body. This file is the current bar, not
 the archive.
 
-_Last verified against the live DB + working tree: **2026-08-31**, branch `stocks-only-pivot`._
+_Last verified against the live DB + working tree: **2026-09-02**, branch `stocks-only-pivot`._
 
 > **The panel gate has now run end to end (2026-08-31, run #112, `status: done`).** The budget
 > that had paused everything came back the same day. The round proposed 3 strategies and rejected
@@ -37,8 +37,8 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Portfolios | **one**: #11 "US Stocks Desk", active, kill switch off, 5 slots, $10k paper |
-| Desk #11 strategy | **`combo-vote`** (built-in) — no longer `research-29` |
-| Open trades | 4 (KO, AZO, XOM, KMX), all `aiBackend = "mock"`, **all opened on or before 08-24** |
+| Desk #11 strategy | **`trend-pullback`** (built-in), 1wk/5y — switched off `combo-vote` 09-02 (§3) |
+| Open trades | 3 (KO, AZO, XOM), all `aiBackend = "mock"`, all opened 08-24 (KMX has since closed) |
 | Closed trades | 44, cumulative **-$386.82** |
 | AI backend on every trade ever | `mock` (46) or null (2) — **no trade has ever been opened by a real backend** |
 | Since the mock cutoff (08-25) | **0 trades opened.** The desk runs, decides with `cli`, and declines |
@@ -57,9 +57,127 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 08-30)
+## 3. Done recently (2026-08-23 → 09-02)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
+
+- **The lag is the RSI band, and relaxing it does not recover the lateness gain. 2026-09-03,
+  same day, follow-up to the entry below.** Two runs. `scripts/entry-gate-lag.mts` names what
+  the rule waits on: at the bar before a signal onset the RSI band is the *sole* refusing gate
+  in **53-58% of onsets in all five folds** (align ~19%, ADX ~13%, MACD ~11%), and in 4/5 the
+  binding end is **RSI > 70** — the rule standing aside from a trend that is running; TEST2
+  (2022-23) flips to the low end, as a bear market should. `scripts/entry-lag-variants.mts`
+  then tested 8 pre-registered relaxations, scored on margin over the matched control, with the
+  four-cell selection rule fixed in advance. **The margin stays negative in every cell of all
+  ten**, and the three RSI relaxations — the gate the diagnostic pointed straight at — are the
+  worst (`rsi high 80` negative in 10/10). The reason is the distinction the control exists to
+  draw: shifting an entry earlier keeps the same trades and moves their price, while relaxing a
+  gate admits a **new population** and lifts the control with it (fit/single control median
+  +0.018 → +0.036). **Three of eight raise raw avgR while losing to their own control.** One
+  candidate passed selection and then **replicated 6/6 out of sample — `adx 15`, 10/10 overall,
+  and it is the only variant whose control median FALLS (9/10 cells) while its own avgR rises**,
+  which is the signature entering-earlier should have. But it is worth **+0.009R** and leaves
+  every margin negative, so the ADX floor is measurably set too late and that is all it is.
+  **The §3 lateness gain is not reachable by loosening thresholds** — it came from moving the
+  *same* trades; every relaxation available changes *which* trades are taken. Study §6-8:
+  `docs/quant/2026-09-03-entry-lateness.md`.
+
+- **The baseline entry rule loses to random entry in 30 of 30 cells, and the loss is confirmation
+  lag. 2026-09-03.** Started as a check on whether `sweepLadder`'s FIT-chosen exit transfers out of
+  sample. It does — Spearman rho vs FIT is +1.00 on test1 and test3, +0.37 on test2, and −0.54 only
+  on SELECT, the fold where all six geometries are negative across a 0.028 spread. A trail wins in
+  4 of 5 folds and the trail pair holds ranks 1-2 in all four. But the same run's matched control
+  came back negative in **every one of the 30 ladder×fold cells**, and monotone in target width in
+  5/5 folds: `single 1.5` → `single 3.0` gets steadily worse (select −0.130 → −0.255), with
+  `single 3.0` the worst cell in three folds — worse than either trail. So the deficit scales with
+  how far price must travel *after* entry, which is a statement about entry timing, not about
+  exits. The obvious confound was checked and killed: ATR/price at entry, rule median ÷ control
+  median, is 1.014 / 1.002 / 1.003 / 1.015 / 1.011 — at most 1.5%, nowhere near a 0.034R gap.
+  Then `scripts/entry-lateness.mts` replayed the same signals *k* bars earlier with the control
+  recomputed at each *k*: the margin flips sign at t−2/t−3 and climbs, in 5/5 folds and both
+  geometries (`trail 1.5/1.5` at t−3: +0.185 / +0.021 / +0.164 / +0.109 / +0.174). **The rule picks
+  the right names and the wrong bars.** Caveat recorded in the study: the t−5/t−8 magnitudes are
+  inflated by the lookahead itself and are not a reachable target; the panel is daily while the
+  desk trades weekly. Study: `docs/quant/2026-09-03-entry-lateness.md`. Scripts and logs:
+  `scripts/ladder-transfer.mts`, `scripts/control-atr-bias.mts`, `scripts/entry-lateness.mts`.
+
+- **Three defects behind "0 fills", all found by running the desk rather than reading it.
+  2026-09-02.** The desk had produced 0 fills in 77 real AI decisions, and `structure` /
+  `exhaustion` were voting skip ~100% of the time, so the 2-of-3 bar was unreachable. It was not
+  one cause but three, and each was measured before and after in isolation:
+
+  **(1) Every analyst was told volume had collapsed, on every scan.** `isForming` in `context.ts`
+  tested `last.v === 0` only. That is the *Yahoo* shape — Yahoo appends the live quote as a
+  zero-volume bar — but the feed moved to Alpaca on 08-30, and Alpaca returns the real,
+  partially-filled bar. On a Tuesday the current weekly bar holds two sessions of volume, so
+  against a 20-week average it read **"0.29-0.40x — thin"** on perfectly ordinary weeks, and
+  `volumeBlock`'s correct `forming` branch (which reads the last *closed* bar) never ran.
+  `isForming` now tests **the clock, not the contents**: median bar spacing over the last 10 gaps,
+  the median so one halted or missing bar cannot stretch the deadline. Errs toward "still forming"
+  between a session close and the next period boundary, which costs a reading of the last closed
+  bar — always the defensible direction. Same six symbols, live, before -> after: WBD 0.40->0.81x,
+  VRTX 0.29->0.60x, ILMN 0.39->1.08x, NVDA 0.33->1.32x, ADP ->0.71x, DXCM ->0.68x, all now
+  "normal", and the in-progress bar is tagged `[bar not closed]`.
+
+  **(2) A truncated answer voided the whole panel and was reported as an outage.**
+  `maxTokens: 300` cut WBD's `structure` reason mid-string, `parseJsonLoose` threw, `Promise.all`
+  rejected, and the engine's catch filed **`no-ai-backend`** — while the backend was answering four
+  other symbols in the same run. That is the `FTNT -> no-ai-backend` line in the 09-02 log: a
+  misdiagnosed outage, and two paid-for votes binned. Fixed both ways — the cap is 600
+  (`MAX_VOTE_TOKENS`, a runaway guard, not a length budget) and `Promise.all` is now
+  `Promise.allSettled` folded by a new pure `countableVotes`. Dropping a failed vote **cannot make
+  entry easier**: the bar is "two votes on the same side", not "a majority of whoever answered", so
+  a smaller panel is strictly harder. A genuine `isFatalBackendReason` still throws, so the outage
+  latch keeps working, and an all-failed panel is an error. Dropped analysts are named in the
+  engine's step note — a 2-of-2 that only happened because the third analyst died must not read
+  like a clean 2-of-3.
+
+  **(3) `combo-vote` on weekly bars was silently a 2-of-2 AND.** `combo-vote` is
+  "vote >=2 of {trend-pullback, orb, fvg}" and desk #11 ran it on **weekly** bars, where `orb` — an
+  intraday opening-range break — fired **0 of 80 symbols**. The live rule was therefore
+  "trend-pullback AND fvg", and that intersection takes the most extended bar either member offers:
+  median **%B 0.89 / stochastic 92.8 / +29.1% over SMA50**, against 0.70 / 77.4 / +12.5% for
+  trend-pullback alone. Which is exactly what the analysts kept saying once (1) was fixed and the
+  volume noise was gone — not one skip cited volume any more, and `structure`/`exhaustion` skipped
+  4/4 unanimously **on extension**: ILMN "43.63% above SMA50 ... blown-off extension", ADP
+  "Stochastic %K 97.1/%D 95.0 pinned at the extreme", DXCM "93% of the visible range". The desk was
+  being handed the worst possible entries and the analysts were right to refuse them.
+  New exported `silentMembers` + a one-shot `console.warn` names any combo member that never fires
+  across a bar series, so a vote that has quietly become an AND says so. **Desk #11 is now on
+  `trend-pullback`** (1wk/5y unchanged), which also settles the §6 mismatch: combo-vote on weekly
+  was never intended. Switched with 3 legacy positions open — `revert-stocks-desk-to-default.ts`
+  refuses that, but its stated reason ("exits get managed by a rule that did not open them") does
+  not hold here: `manage.ts` reads no strategy at all, and exits are the sl/tp1/tp2 levels stored
+  per Trade row.
+
+  489/489 tests pass, typecheck clean. Note what none of the three was: a case for lowering the bar
+  to 1-of-3 or dropping the skeptical analysts. `structure` and `exhaustion` were reading the facts
+  they were given correctly on all three counts.
+
+  **Verification run, same day, `trend-pullback` live — 19 setups / 79 symbols, and the desk still
+  filled nothing (13 no-consensus, 6 vetoed). What changed is everything upstream of that:**
+  - **The false outage is gone.** 0 `no-ai-backend` in 19 decisions; FTNT, the symbol that produced
+    the misdiagnosis, decided `no-consensus` normally.
+  - **SAGE stopped vetoing the data and started vetoing the trade.** Was 5 of 6 vetoes about frozen
+    placeholder prints; now **0 of 6**. All six are setup arguments — COP "26.7% above SMA50,
+    Stochastic 93.5, 100% of range", MDLZ "TP1 requires a range high the name has never printed",
+    CSGP "weekly bearish but the daily has turned up". SAGE also now cites the new
+    `[bar not closed]` tag by name (INTU), so Fix (1) is reaching the risk reviewer too.
+  - **The analysts disagree now instead of uniformly refusing.** Under `combo-vote` it was
+    `trend:long, structure:skip, exhaustion:skip` on essentially every symbol. Now `exhaustion`
+    votes **long** on its own (PANW `trend:skip, exhaustion:long`; FAST `exhaustion:long` against
+    two skips) and PCAR draws three skips. A 2-of-3 bar is reachable in principle again; it was not
+    reachable before.
+  - **A real pattern the desk should not be handed:** 4 of the 6 vetoes are **shorts entered into an
+    active bounce** (CSGP, INTU, ISRG, TMUS) while the market gate reads risk-on (SPY 761.85 >
+    SMA200 708.75). The scanner is proposing downtrend-pullback shorts in a regime the gate has
+    already called long. Not yet investigated — next thing to look at, and cheaper than any AI work.
+  - **One defect in the fixes themselves, found by reading the DB rather than the log.** The engine
+    built the panel reading **twice** — once for the step note (with dropped analysts) and once at
+    `engine.ts:244` for the stored `Counterfactual.aiReason` (without). So CRWD recorded
+    `votes exhaustion:skip` and NVDA `votes trend:long, structure:skip` with no trace of the
+    analysts that never answered — in the one table the arm recorder keeps. Both call sites now
+    share `describePanel` (`hawk.ts`, two tests). 491/491.
 
 - **A spent budget no longer fails silently. 2026-08-30.** `FATAL_BACKEND` in `anthropic.ts`
   matched `authenticat|oauth|logged in|api key|credit balance|quota|subscription` — and **not**
@@ -369,6 +487,18 @@ too, or had no trades) but it will eventually.
 
 ### 0b. Direction, decided 2026-08-31: **stop researching entries; research exits and risk**
 
+> **Flagged 2026-09-03 — evidence now cuts against the first half of this heading.** The premise
+> was that the entry space is exhausted, so effort should move to exits. The lateness run says the
+> entry rule is not merely edgeless, it has *negative* selection value at the bar level (30 of 30
+> control cells), and that entering the same names earlier beats random by ~+0.18R at three bars.
+> That is an entry finding with a specific, untried direction — **reduce confirmation lag** — which
+> is the opposite of what the 13 confluence filters did. It also does not rescue the second half:
+> `runControl` shares its `exit` object with the rule, so the gate cannot credit an exit's
+> standalone value and "research exits" has no valid null until a second control exists. Both
+> halves of this direction need re-deciding. **That decision is the owner's, not the agent's — this
+> paragraph records the evidence, it does not overturn the choice.** See
+> `docs/quant/2026-09-03-entry-lateness.md`.
+
 The question was genuinely open — (b) says the eligible pool is empty, (g) says the daily-OHLCV
 mechanism space is exhausted across two disjoint universes — and the owner chose deliberately.
 Writing another entry rule is the low-value move: run #112 is a fair sample of what the proposer
@@ -422,8 +552,27 @@ inside the existing contract, and it is what the rotation now asks for.
   of sample. Proposing them through the AI loop would spend a round re-deriving a closed result.
   There is a test asserting the rotation text never names them.
 
-Next round fires Sun 2026-09-06 06:00 and will run `stocks-entry-timing`. Nothing about the gate
-changed — the bar to beat is still ~+0.04R at t=1.08.
+**Both rotation entries were replaced on 2026-09-03, and the sentence that used to stand here was
+wrong twice over.** It said the 09-06 round would run `stocks-entry-timing`; `pickRotationEntry`
+keys on `floor(Date.now()/MS_PER_WEEK) % 2`, which lands on **index 1** that week — the round was
+going to run `stocks-trade-geometry`. Do not restate a rotation pick from this file without
+evaluating the function. Both entries were compromised anyway:
+
+- `stocks-entry-timing` asked for "require one confirmation close" and "wait for a pullback back
+  toward the trigger bar's extreme". The 09-03 lateness result predicts both fail — the rule
+  already commits late — and its third angle was the baseline itself. **Replaced by
+  `stocks-entry-anticipation`**, which requires a candidate to fire *at or before* the baseline's
+  trigger bar and forbids adding a test that must pass first. That is the one bar-based direction
+  the evidence points at, and it is not the same as loosening a threshold (§6-8 of the study).
+- `stocks-trade-geometry` kept its brief but lost two angles: "small trigger-bar range relative to
+  ATR" is `nr7`, already screened and rejected on both universes, and "scale participation by where
+  the entry sits inside the trigger bar's range" asks for **position sizing, which the proposer
+  cannot express** — the same limit this section's own header warns about. Replaced with two
+  stop-versus-target geometry angles that a `{ side } | null` rule can actually implement.
+
+A new test asserts the rotation never asks for another entry confirmation, so the refuted angle
+cannot come back quietly. Nothing about the gate changed — the bar to beat is still ~+0.04R at
+t=1.08. 492/492 tests pass.
 
 **Costs no AI, still open:** `git rm -r --quiet rl mt5-bridge/__pycache__` (§6), and settling why
 desk #11 runs `combo-vote` rather than `trend-pullback` (§6 — whichever is intended, the other is a
@@ -589,6 +738,69 @@ be chosen deliberately rather than inherited.
   absolute cut points do not transfer.** The breadth quintile holding 17% of FIT's trades holds
   **79%** of TEST2's, and TEST2's top quintile is empty. A threshold fitted on 2016-2018 is
   measuring a different market by 2022. Evidence: `scripts/regime-conditional.log`.
+- **Do not re-tune "regime × trade side" as an edge. Measured 2026-09-03 on all five folds
+  with a 200-run matched control, and rejected.** The raw cross-tab looks like the strongest
+  regime result the panel has ever produced — `above × long` is positive in **5/5** folds
+  (+0.092 / +0.091 / +0.064 / +0.025 / +0.049) against a shipped gate that measures ~0. The
+  control erases it: random entries with the same symbols, the same trade count, the same
+  long/short mix and the same exits earn **more** (ctrl median +0.110 / +0.136 / +0.109 /
+  −0.017 / +0.074), so the rule beats p95 in **1/5** folds and loses in the other four. Across
+  all four cells × five folds, only **4 of 20** beat p95 and no cell does it twice in a row.
+  This is trap #1 in this section landing on the largest sample we have: **+0.09 in a bull
+  regime is beta, and the entry rule contributes nothing on top of it.** Evidence:
+  `scripts/regime-by-side.log`, produced by `scripts/regime-conditional.mts --control=200`.
+- **What survived that run is an exposure fact, not an edge, and must be labelled that way.**
+  Shorts opened while SPY > SMA200 lose in 4/5 folds (−0.113 / −0.209 / −0.136 / **+0.009** /
+  −0.104) — and the matched control loses the same amount (−0.114 / −0.087 / −0.104 / +0.024 /
+  −0.066). Both halves matter: the cell is a reliable bleed, **and** the rule is not picking bad
+  shorts, so there is nothing to improve by tuning the entry. Dropping the cell outright moves
+  panel avgR by +0.038 / +0.028 / +0.052 / **−0.035** / +0.028 on 22-32% of all trades. The
+  negative fold is TEST2 (2022-23) and it is not noise: in a bear market the stretches when SPY
+  sits above its SMA200 are exactly the bounces a short wants. So this is the same *kind* of
+  claim as the shipped market gate — a removable loss, not alpha — with one honest cost, and it
+  must never be written up as "the desk learned not to short into strength."
+- **Adding another entry confirmation makes the rule worse, and this is now measured, not
+  suspected.** The baseline entry loses to a matched random entry in 30 of 30 ladder×fold cells,
+  and replaying the same signals earlier flips that margin positive at t−2/t−3 in 5/5 folds and
+  both exit geometries. The rule's conditions — ADX > 20, a completed pullback, DI alignment, a
+  MACD histogram not rolling over — are each true only *after* the move starts. So the 13 rejected
+  confluence filters are one result, not thirteen: every one of them added a further condition to
+  a rule already committing late. **Any proposal whose mechanism is "wait for one more signal
+  before entering" is predicted to fail, and needs a reason why it is different before it gets
+  panel time.** Evidence: `docs/quant/2026-09-03-entry-lateness.md`.
+- **Relaxing the gate that causes the lag does not recover the lateness gain, and the
+  RSI band is the gate.** Measured 2026-09-03. At the bar before a signal onset the RSI
+  band is the *sole* refusing gate in **53-58% of onsets in all five folds** (vs ~19%
+  alignment, ~13% ADX, ~11% MACD), and in 4/5 the binding end is **RSI > 70** — the rule
+  standing aside from a trend that is running. But eight pre-registered relaxations, scored
+  on margin over the matched control, leave the margin **negative in every cell**, and the
+  three RSI relaxations are the **worst** of the eight (`rsi high 80`: −0.009 / −0.020 /
+  −0.035 / −0.051 vs baseline). Shifting an entry earlier keeps the same trades and moves
+  only their price; relaxing a gate admits a **new population**, and the control median rises
+  with it (+0.018 → +0.036 on fit/single), i.e. the relaxation buys exposure. **Three of the
+  eight raise raw avgR while losing to their own control** — trap #1 in this section, caught
+  in the act. The one variant that passed selection, **`adx 15`, replicated 6/6 on the
+  held-out folds (10/10 overall) with the correct signature** — its control median FALLS
+  while its own avgR rises, i.e. the extra bars are ones random entry does worse on — but
+  it is worth **+0.009R** and leaves the margin negative in all ten cells. A smaller loss,
+  not an edge; the gate asks for a margin over control **p95**. **The ADX floor is set too
+  late and that is now replicated; do not read it as an approval.** Evidence:
+  `scripts/entry-gate-lag.log`, `scripts/entry-lag-variants.log`,
+  `scripts/entry-lag-variants-holdout.log`, and §6-8 of
+  `docs/quant/2026-09-03-entry-lateness.md`.
+- **The lateness numbers past t−3 are lookahead and must never be quoted as an available edge.**
+  `scripts/entry-lateness.mts` shifts entries *k* bars earlier using the knowledge that the rule
+  will fire at bar *t* — knowledge you do not have at bar *t−k*. That is most of the +0.635 at
+  t−8. What the diagnostic legitimately establishes is direction and mechanism (the loss lives in
+  the waiting) and a rough size for three bars of lag on daily data. The desk trades **weekly**,
+  where three bars is three weeks; the lag was measured on the daily panel, not there.
+- **The panel gate cannot credit an exit's standalone value, by construction.** `runControl` in
+  `panelRun.ts` hands the control the *same* `exit` object as the rule, so a better exit lifts both
+  arms and the margin barely moves. That is the correct null for an *entry* claim and it should
+  stay — but it means the ATR trail, the one geometry here with a real OOS pedigree, could never
+  have been approved by this gate; it was validated on the sweep harness against the baseline
+  ladder, which is the right control for an exit change. **Before any AI-proposed exit can be
+  gated, a second null — same entries, baseline ladder — has to exist. It does not today.**
 - **The market gate's sample is ~a dozen episodes, not 91,236 trades.** Its variable changes only
   when SPY crosses its 200-day mean. Five folds of ONE benchmark series are not five independent
   observations. Never quote the trade counts as the evidence base.
@@ -652,9 +864,10 @@ be reported as blockers while the runtime stays local:
   newest `ResearchRun` is still **#110 from 08-24** and **0 `panel-v1` rows** exist; that will
   not change until the budget above is restored.
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
-- Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`
-  (`scripts/revert-stocks-desk-to-default.ts` sets `trend-pullback`; something set combo-vote
-  instead). Whichever is intended, the other is a silent mismatch.
+- ~~Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`~~ — **ANSWERED and
+  switched, 2026-09-02** (§3). `combo-vote` was never intended on weekly bars: `orb` cannot fire
+  there, so the rule was a 2-of-2 AND selecting the most extended bars on the board. Desk #11 is
+  on `trend-pullback`.
 
 ## 7. Housekeeping for whoever writes here next
 
