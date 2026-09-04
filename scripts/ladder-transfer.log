@@ -1,0 +1,48 @@
+panel: 491 symbols, 5 folds, 6 ladders
+entry rule: the desk's own baseline (computeEntrySignals defaults) — the ladder is the only thing varying
+
+  prepared fit in 12s
+  prepared select in 6s
+  prepared test1 in 14s
+  prepared test2 in 14s
+  prepared test3 in 21s
+
+avgR by ladder × fold  (rank in parentheses, 1 = best in that fold)
+  ladder                     fit        select         test1         test2         test3
+  single 1.5          +0.004 (6)    -0.044 (1)    +0.014 (6)    -0.031 (3)    -0.010 (6)
+  single 2.0          +0.010 (5)    -0.045 (2)    +0.025 (5)    -0.040 (4)    -0.009 (5)
+  single 2.5          +0.013 (4)    -0.065 (5)    +0.044 (4)    -0.054 (5)    -0.008 (4)
+  single 3.0          +0.023 (3)    -0.072 (6)    +0.056 (3)    -0.072 (6)    +0.001 (3)
+  trail 1/1.5         +0.049 (2)    -0.059 (3)    +0.061 (2)    +0.003 (1)    +0.036 (2)
+  trail 1.5/1.5       +0.050 (1)    -0.059 (4)    +0.062 (1)    -0.016 (2)    +0.041 (1)
+  trades                   20370          7065         15606         15330         20854
+
+FIT picks: trail 1.5/1.5  (this is what sweepLadder would select)
+  fold              rho vs FIT   FIT pick's rank        best in fold
+  select                 -0.54            4 of 6          single 1.5
+  test1                   1.00            1 of 6       trail 1.5/1.5
+  test2                   0.37            2 of 6         trail 1/1.5
+  test3                   1.00            1 of 6       trail 1.5/1.5
+
+margin over the matched random-entry control (200 runs)
+  ladder                   fit      select       test1       test2       test3
+  single 1.5            -0.014      -0.130      -0.030      -0.037      -0.031
+  single 2.0            -0.017      -0.164      -0.036      -0.049      -0.037
+  single 2.5            -0.024      -0.219      -0.034      -0.070      -0.045
+  single 3.0            -0.023      -0.255      -0.045      -0.093      -0.046
+  trail 1/1.5           -0.037      -0.213      -0.039      -0.045      -0.035
+  trail 1.5/1.5         -0.044      -0.236      -0.048      -0.063      -0.039
+  (rule avgR minus the control MEDIAN — negative means random entry did better)
+
+How to read this
+  - rho near +1 means the FIT ordering of ladders survived into that fold, and
+    picking a ladder on FIT is defensible. Near 0 or negative means the FIT
+    ranking carried no information about the fold, and sweepLadder is choosing
+    on noise — the same way breadth and vol cut points failed (STATE.md §5).
+  - "FIT pick's rank" is the direct cost: if the FIT winner lands mid-table or
+    worse out of sample, per-candidate ladder selection is buying nothing.
+  - The control block answers the separate question of whether ANY of these
+    geometries beats random entry under the same exit. Note it cannot credit an
+    exit on its own — the control gets the same ladder — so a uniform shift
+    across the column is expected and is not evidence about the ladder.
+

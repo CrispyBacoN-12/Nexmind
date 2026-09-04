@@ -22,7 +22,8 @@
 //
 import "dotenv/config";
 import { loadPanel, FOLDS, FIT_FOLD, type Fold } from "@/lib/research/panel";
-import { sliceFold, PANEL_LOT, type PanelExit } from "@/lib/research/panelRun";
+import { sliceFold, PANEL_LOT, PANEL_SEED, type PanelExit } from "@/lib/research/panelRun";
+import { matchedRandomSignals, mulberry32, summarizeControl, type ControlDistribution } from "@/lib/research/control";
 import {
   computeEntrySignals, simulateExits, DEFAULT_COST_MODEL, type SimTrade,
 } from "@/lib/backtest/engine";
@@ -145,11 +146,89 @@ function runFold(
   return out;
 }
 
+/** The four regime x side cells, in the order they are printed. */
+const CELLS = ["above × long", "above × short", "below × long", "below × short"] as const;
+type Cell = (typeof CELLS)[number];
+
+function cellOf(t: Tagged): Cell | null {
+  if (t.benchAbove == null) return null;
+  return `${t.benchAbove ? "above" : "below"} × ${t.trade.side}` as Cell;
+}
+
+function meanR(rows: Tagged[]): number | null {
+  const rs = rows.map((r) => r.trade.rMultiple).filter((r): r is number => r != null && Number.isFinite(r));
+  return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null;
+}
+
+/**
+ * The same cells, for entries placed at random.
+ *
+ * Without this the table above is unreadable, and STATE.md 5 says so in as many
+ * words: 69-87% of these names rose in every window, so ANY long-biased
+ * selection prints a healthy avgR for free. "above x long is +0.09 in 5/5 folds"
+ * and "longs in a bull market make money" are the same sentence until a control
+ * separates them.
+ *
+ * `matchedRandomSignals` keeps each symbol's entry COUNT and its long/short mix
+ * and moves only the timing, so the control lands in the regime buckets in
+ * roughly the same proportions the rule does — which is exactly what has to be
+ * held fixed for the comparison to be about the rule's timing rather than about
+ * its exposure. Signals are computed once and only `simulateExits` is repeated;
+ * the seed is `PANEL_SEED`, never a caller's choice (STATE.md 5).
+ */
+function controlCells(
+  panel: ReturnType<typeof loadPanel>,
+  fold: Fold,
+  regime: RegimeSeries,
+  exit: PanelExit,
+  runs: number,
+): Partial<Record<Cell, ControlDistribution>> {
+  const rng = mulberry32(PANEL_SEED);
+  const prepared = sliceFold(panel, fold).map((s) => ({ s, signals: computeEntrySignals(s.candles) }));
+  const per: Partial<Record<Cell, number[]>> = {};
+
+  for (let r = 0; r < runs; r++) {
+    const tagged: Tagged[] = [];
+    for (const { s, signals } of prepared) {
+      const sim = simulateExits(s.symbol, s.candles, matchedRandomSignals(signals, s.entryFrom, rng), {
+        lot: exit.lot ?? PANEL_LOT,
+        singleTarget: exit.singleTarget ?? true,
+        tp1Mult: exit.tp1Mult,
+        slMult: exit.slMult,
+        trail: exit.trail,
+        costs: exit.costs ?? DEFAULT_COST_MODEL,
+        entryFrom: s.entryFrom,
+      });
+      for (const t of sim.trades) {
+        const bar = regimeAt(regime, Math.floor(t.openedAt.getTime() / 1000));
+        tagged.push({ trade: t, breadth: bar?.breadth ?? null, benchAbove: bar?.benchAbove ?? null, vol: bar?.realizedVol ?? null });
+      }
+    }
+    for (const cell of CELLS) {
+      const m = meanR(tagged.filter((t) => cellOf(t) === cell));
+      if (m != null) (per[cell] ??= []).push(m);
+    }
+  }
+
+  const out: Partial<Record<Cell, ControlDistribution>> = {};
+  for (const cell of CELLS) {
+    const d = per[cell] && summarizeControl(per[cell]!);
+    if (d) out[cell] = d;
+  }
+  return out;
+}
+
 async function main() {
   const ladderKey = (process.argv.find((a) => a.startsWith("--ladder="))?.split("=")[1] ?? "flat").trim();
   const exit = LADDERS[ladderKey];
   if (!exit) {
     console.error(`unknown --ladder=${ladderKey}; expected one of: ${Object.keys(LADDERS).join(", ")}`);
+    process.exit(1);
+  }
+
+  const controlRuns = Number(process.argv.find((a) => a.startsWith("--control="))?.split("=")[1] ?? 0);
+  if (!Number.isFinite(controlRuns) || controlRuns < 0) {
+    console.error("--control= expects a non-negative integer");
     process.exit(1);
   }
 
@@ -219,6 +298,44 @@ async function main() {
       statsFor(known.filter((t) => t.benchAbove === false), "below", n),
       all,
     ]);
+
+    // The same leg crossed with the trade's own direction.
+    //
+    // The shipped gate is side-blind: it cuts the SLOT COUNT below trend and
+    // does nothing above it. So a short taken while SPY is above its SMA200 is
+    // waved through, and on 2026-09-02 four of SAGE's six live vetoes were
+    // exactly that trade — CSGP, INTU, ISRG, TMUS, all "shorting into an active
+    // bounce" while the gate read risk-on. Six vetoes is a hypothesis, not a
+    // finding, so it is asked of the folds here instead of being acted on.
+    //
+    // Nothing new is fitted: "above its own trailing mean" still has no free
+    // parameter, and a trade's side is not a parameter at all. That is the whole
+    // reason this cross is askable — the two features that died (breadth, vol)
+    // died because their FIT-derived cut points did not transfer, and there is
+    // no cut point here to transfer.
+    printTable(`by ${BENCHMARK} vs SMA200 × trade side`, [
+      ...CELLS.map((cell) => statsFor(known.filter((t) => cellOf(t) === cell), cell, n)),
+      all,
+    ]);
+
+    if (controlRuns > 0) {
+      const ctrl = controlCells(panel, fold, regime, exit, controlRuns);
+      console.log(`
+  the same cells against ${controlRuns} matched random-entry controls (seed ${PANEL_SEED})`);
+      console.log("    cell                     rule   ctrl med   ctrl p95    margin  beats p95");
+      for (const cell of CELLS) {
+        const ruleR = meanR(known.filter((t) => cellOf(t) === cell));
+        const d = ctrl[cell];
+        if (ruleR == null || !d) {
+          console.log(`    ${cell.padEnd(20)} ${fmt(ruleR)}         —          —         —          —`);
+          continue;
+        }
+        console.log(
+          `    ${cell.padEnd(20)} ${fmt(ruleR)}    ${fmt(d.median)}     ${fmt(d.p95)}   ` +
+            `${fmt(ruleR - d.median)}      ${ruleR > d.p95 ? "yes" : "no"}`,
+        );
+      }
+    }
 
     const withVol = known.filter((t) => t.vol != null);
     printTable("by realized-vol quintile (FIT cut points; Q5 = most volatile)", [

@@ -1,0 +1,78 @@
+panel: 491 symbols · control 200 runs per cell
+folds: TEST1/TEST2/TEST3 — held out. Read only after the candidate list is written down.
+
+test1 · single 1.5
+  variant           trades     avgR  ctrl med   margin  vs base
+  baseline           15606   +0.014    +0.044   -0.030   +0.000
+  adx 15             21346   +0.021    +0.041   -0.020   +0.010
+  adx rising         16449   +0.045    +0.070   -0.025   +0.004
+  macd off           17856   +0.034    +0.062   -0.028   +0.001
+  rsi low 30         16829   +0.014    +0.034   -0.020   +0.009
+  rsi high 80        17888   +0.017    +0.061   -0.045   -0.015
+  rsi 30-80          19108   +0.016    +0.052   -0.036   -0.006
+  rsi30-80+macd      21337   +0.030    +0.063   -0.033   -0.004
+
+test1 · trail 1.5/1.5
+  variant           trades     avgR  ctrl med   margin  vs base
+  baseline           12263   +0.062    +0.110   -0.048   +0.000
+  adx 15             16332   +0.069    +0.105   -0.036   +0.011
+  adx rising         12322   +0.100    +0.140   -0.040   +0.008
+  macd off           13814   +0.086    +0.133   -0.046   +0.002
+  rsi low 30         12909   +0.077    +0.097   -0.021   +0.027
+  rsi high 80        12996   +0.063    +0.133   -0.070   -0.022
+  rsi 30-80          13642   +0.077    +0.121   -0.044   +0.004
+  rsi30-80+macd      15125   +0.096    +0.136   -0.040   +0.008
+
+test2 · single 1.5
+  variant           trades     avgR  ctrl med   margin  vs base
+  baseline           15330   -0.031    +0.005   -0.037   +0.000
+  adx 15             21509   -0.028    +0.004   -0.032   +0.004
+  adx rising         15915   -0.014    +0.007   -0.021   +0.015
+  macd off           16735   -0.034    +0.009   -0.043   -0.007
+  rsi low 30         16831   -0.040    +0.004   -0.044   -0.007
+  rsi high 80        16767   -0.028    +0.010   -0.038   -0.001
+  rsi 30-80          18268   -0.036    +0.009   -0.045   -0.008
+  rsi30-80+macd      19672   -0.037    +0.012   -0.048   -0.012
+
+test2 · trail 1.5/1.5
+  variant           trades     avgR  ctrl med   margin  vs base
+  baseline           12440   -0.016    +0.046   -0.063   +0.000
+  adx 15             17060   -0.013    +0.043   -0.056   +0.006
+  adx rising         12264   -0.004    +0.040   -0.044   +0.019
+  macd off           13480   -0.021    +0.052   -0.072   -0.010
+  rsi low 30         13088   -0.024    +0.046   -0.070   -0.007
+  rsi high 80        12828   -0.018    +0.052   -0.069   -0.007
+  rsi 30-80          13476   -0.024    +0.053   -0.077   -0.015
+  rsi30-80+macd      14487   -0.026    +0.055   -0.081   -0.018
+
+test3 · single 1.5
+  variant           trades     avgR  ctrl med   margin  vs base
+  baseline           20854   -0.010    +0.020   -0.031   +0.000
+  adx 15             28144   -0.010    +0.017   -0.027   +0.003
+  adx rising         20409   -0.013    +0.035   -0.048   -0.017
+  macd off           23762   +0.004    +0.035   -0.031   -0.000
+  rsi low 30         22207   -0.020    +0.012   -0.033   -0.002
+  rsi high 80        23615   -0.008    +0.036   -0.043   -0.012
+  rsi 30-80          24969   -0.017    +0.028   -0.044   -0.013
+  rsi30-80+macd      27862   -0.005    +0.039   -0.045   -0.014
+
+test3 · trail 1.5/1.5
+  variant           trades     avgR  ctrl med   margin  vs base
+  baseline           16704   +0.041    +0.080   -0.039   +0.000
+  adx 15             21967   +0.045    +0.072   -0.028   +0.011
+  adx rising         15707   +0.031    +0.095   -0.064   -0.025
+  macd off           18704   +0.060    +0.101   -0.042   -0.003
+  rsi low 30         17335   +0.030    +0.067   -0.037   +0.002
+  rsi high 80        17622   +0.042    +0.102   -0.060   -0.021
+  rsi 30-80          18253   +0.032    +0.091   -0.059   -0.020
+  rsi30-80+macd      20178   +0.049    +0.108   -0.058   -0.019
+
+How to read this
+  - "margin" is avgR minus the matched control's median. It is the only column
+    that can support a claim; avgR alone rises whenever a variant simply trades
+    more on a panel that drifted up.
+  - "vs base" is the margin minus the baseline's margin in the same cell. A
+    variant earns candidate status only by being positive here on FIT AND SELECT
+    AND both geometries — four cells, pre-registered above.
+  - A variant whose trade count balloons while its margin barely moves has bought
+    exposure, not timing, and the control is what makes that visible.

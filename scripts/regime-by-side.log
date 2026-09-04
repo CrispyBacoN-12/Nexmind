@@ -1,0 +1,234 @@
+loading panel cache…
+panel 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+  dropped 1887 placeholder bar(s) (o==h==l==c, no volume) across 7 symbol(s): PARA 946, FI 421, SMCI 349, CTRA 167, BIIB 2, DXCM 1, EQT 1
+building regime series from SPY (trend 200d, vol 20d)…
+regime 2669 sessions, 2470 with a full trend window (median breadth denominator 478 names)
+
+quintile cut points, derived from fit sessions only (754 sessions):
+  breadth  0.640  0.710  0.767  0.818
+  vol      0.062  0.075  0.097  0.165
+
+baseline: trend-pullback (decideSetup), ladder "flat" tp1 1.2 / sl 1.5, costs 0.5bps slip + 1bps comm
+
+==============================================================================
+FIT  2016-01-01..2019-01-01  (post-2015 correction recovery through the 2018 Q4 selloff)  — 23445 trades, avgR -0.003, 33s
+  4481 trade(s) opened on a session with no regime reading — excluded from the buckets below
+
+  by breadth quintile (FIT cut points; low = few names above their SMA200)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 breadth              3972      471  -0.048  53.1%    17%
+    Q2 breadth              3543      471  -0.029  54.2%    15%
+    Q3 breadth              3708      471   0.042  58.2%    16%
+    Q4 breadth              3808      468   0.010  56.5%    16%
+    Q5 breadth              3933      468   0.070  59.8%    17%
+    ALL                    23445      471  -0.003  55.7%   100%
+
+  by SPY vs its own SMA200
+    bucket                 trades  symbols    avgR    win%   share
+    above                  17273      471   0.017  56.8%    74%
+    below                   1691      437  -0.071  51.8%     7%
+    ALL                    23445      471  -0.003  55.7%   100%
+
+  by SPY vs SMA200 × trade side
+    bucket                 trades  symbols    avgR    win%   share
+    above × long           10943      471   0.092  61.0%    47%
+    above × short           6330      471  -0.113  49.5%    27%
+    below × long             328      132  -0.127  48.8%     1%
+    below × short           1363      380  -0.058  52.5%     6%
+    ALL                    23445      471  -0.003  55.7%   100%
+
+  the same cells against 200 matched random-entry controls (seed 20260825)
+    cell                     rule   ctrl med   ctrl p95    margin  beats p95
+    above × long          0.092     0.110      0.118   -0.017      no
+    above × short        -0.113    -0.114     -0.104    0.000      no
+    below × long         -0.127    -0.041     -0.005   -0.086      no
+    below × short        -0.058     0.042      0.086   -0.100      no
+
+  by realized-vol quintile (FIT cut points; Q5 = most volatile)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 vol                  4053      471   0.064  59.5%    17%
+    Q2 vol                  4595      471   0.048  58.6%    20%
+    Q3 vol                  4252      469  -0.036  53.9%    18%
+    Q4 vol                  2177      464  -0.015  55.0%     9%
+    Q5 vol                  3887      471  -0.031  54.0%    17%
+    ALL                    23445      471  -0.003  55.7%   100%
+
+==============================================================================
+SELECT  2019-01-01..2020-01-01  (2019 melt-up on falling rates)  — 8252 trades, avgR -0.034, 21s
+
+  by breadth quintile (FIT cut points; low = few names above their SMA200)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 breadth              1718      461  -0.162  46.8%    21%
+    Q2 breadth              2327      468   0.016  56.7%    28%
+    Q3 breadth              1848      461   0.018  56.9%    22%
+    Q4 breadth              2073      467  -0.016  54.9%    25%
+    Q5 breadth               286      213  -0.137  48.3%     3%
+    ALL                     8252      475  -0.034  54.0%   100%
+
+  by SPY vs its own SMA200
+    bucket                 trades  symbols    avgR    win%   share
+    above                   7257      475   0.002  55.9%    88%
+    below                    995      420  -0.293  39.5%    12%
+    ALL                     8252      475  -0.034  54.0%   100%
+
+  by SPY vs SMA200 × trade side
+    bucket                 trades  symbols    avgR    win%   share
+    above × long            5103      470   0.091  60.9%    62%
+    above × short           2154      429  -0.209  44.2%    26%
+    below × long             365      240   0.460  81.4%     4%
+    below × short            630      357  -0.729  15.2%     8%
+    ALL                     8252      475  -0.034  54.0%   100%
+
+  the same cells against 200 matched random-entry controls (seed 20260825)
+    cell                     rule   ctrl med   ctrl p95    margin  beats p95
+    above × long          0.091     0.136      0.148   -0.045      no
+    above × short        -0.209    -0.087     -0.070   -0.122      no
+    below × long          0.460     0.576      0.602   -0.115      no
+    below × short        -0.729    -0.615     -0.562   -0.114      no
+
+  by realized-vol quintile (FIT cut points; Q5 = most volatile)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 vol                   607      345  -0.051  53.0%     7%
+    Q2 vol                   700      354  -0.085  51.1%     8%
+    Q3 vol                  1681      452  -0.020  54.7%    20%
+    Q4 vol                  3468      474   0.106  61.7%    42%
+    Q5 vol                  1796      460  -0.291  39.6%    22%
+    ALL                     8252      475  -0.034  54.0%   100%
+
+==============================================================================
+TEST1  2020-01-01..2022-01-01  (COVID crash and the liquidity-driven recovery)  — 17969 trades, avgR  0.010, 41s
+
+  by breadth quintile (FIT cut points; low = few names above their SMA200)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 breadth              4415      479   0.034  57.6%    25%
+    Q2 breadth              1898      460  -0.084  51.1%    11%
+    Q3 breadth              1575      457  -0.091  50.7%     9%
+    Q4 breadth              2064      474  -0.004  55.6%    11%
+    Q5 breadth              8017      483   0.042  58.2%    45%
+    ALL                    17969      483   0.010  56.3%   100%
+
+  by SPY vs its own SMA200
+    bucket                 trades  symbols    avgR    win%   share
+    above                  15481      483   0.012  56.5%    86%
+    below                   2488      477  -0.004  55.4%    14%
+    ALL                    17969      483   0.010  56.3%   100%
+
+  by SPY vs SMA200 × trade side
+    bucket                 trades  symbols    avgR    win%   share
+    above × long           11440      483   0.064  59.4%    64%
+    above × short           4041      476  -0.136  48.2%    22%
+    below × long             482      212   0.152  64.1%     3%
+    below × short           2006      466  -0.041  53.3%    11%
+    ALL                    17969      483   0.010  56.3%   100%
+
+  the same cells against 200 matched random-entry controls (seed 20260825)
+    cell                     rule   ctrl med   ctrl p95    margin  beats p95
+    above × long          0.064     0.109      0.118   -0.045      no
+    above × short        -0.136    -0.104     -0.092   -0.033      no
+    below × long          0.152     0.095      0.122    0.056      yes
+    below × short        -0.041    -0.107     -0.074    0.065      yes
+
+  by realized-vol quintile (FIT cut points; Q5 = most volatile)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 vol                     0        0       —      —     0%
+    Q2 vol                  1218      426  -0.008  55.4%     7%
+    Q3 vol                  1902      459  -0.014  55.0%    11%
+    Q4 vol                  7464      483   0.032  57.6%    42%
+    Q5 vol                  7385      482  -0.003  55.5%    41%
+    ALL                    17969      483   0.010  56.3%   100%
+
+==============================================================================
+TEST2  2022-01-01..2024-01-01  (rate-hike bear market and the 2023 recovery)  — 17572 trades, avgR -0.024, 13s
+
+  by breadth quintile (FIT cut points; low = few names above their SMA200)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 breadth             13828      487  -0.033  53.9%    79%
+    Q2 breadth              1825      467   0.046  58.4%    10%
+    Q3 breadth              1357      451   0.001  55.9%     8%
+    Q4 breadth               562      347  -0.092  50.7%     3%
+    Q5 breadth                 0        0       —      —     0%
+    ALL                    17572      487  -0.024  54.4%   100%
+
+  by SPY vs its own SMA200
+    bucket                 trades  symbols    avgR    win%   share
+    above                   9755      486   0.018  56.8%    56%
+    below                   7817      486  -0.077  51.5%    44%
+    ALL                    17572      487  -0.024  54.4%   100%
+
+  by SPY vs SMA200 × trade side
+    bucket                 trades  symbols    avgR    win%   share
+    above × long            5237      486   0.025  57.2%    30%
+    above × short           4518      484   0.009  56.3%    26%
+    below × long            2861      465  -0.029  54.2%    16%
+    below × short           4956      484  -0.105  49.9%    28%
+    ALL                    17572      487  -0.024  54.4%   100%
+
+  the same cells against 200 matched random-entry controls (seed 20260825)
+    cell                     rule   ctrl med   ctrl p95    margin  beats p95
+    above × long          0.025    -0.017     -0.002    0.042      yes
+    above × short         0.009     0.024      0.037   -0.015      no
+    below × long         -0.029     0.070      0.086   -0.098      no
+    below × short        -0.105    -0.066     -0.051   -0.039      no
+
+  by realized-vol quintile (FIT cut points; Q5 = most volatile)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 vol                     0        0       —      —     0%
+    Q2 vol                   171      146   0.174  65.5%     1%
+    Q3 vol                   932      403   0.077  60.1%     5%
+    Q4 vol                  6451      486   0.014  56.6%    37%
+    Q5 vol                 10018      485  -0.062  52.3%    57%
+    ALL                    17572      487  -0.024  54.4%   100%
+
+==============================================================================
+TEST3  2024-01-01..2027-01-01  (2024-2026 bull, AI-concentrated leadership)  — 23998 trades, avgR -0.014, 19s
+
+  by breadth quintile (FIT cut points; low = few names above their SMA200)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 breadth             10803      491  -0.042  53.4%    45%
+    Q2 breadth              5385      491   0.012  56.4%    22%
+    Q3 breadth              4471      490   0.053  58.8%    19%
+    Q4 breadth              2770      488  -0.017  54.9%    12%
+    Q5 breadth               569      342  -0.233  42.9%     2%
+    ALL                    23998      491  -0.014  55.0%   100%
+
+  by SPY vs its own SMA200
+    bucket                 trades  symbols    avgR    win%   share
+    above                  21758      491  -0.004  55.6%    91%
+    below                   2240      484  -0.109  49.7%     9%
+    ALL                    23998      491  -0.014  55.0%   100%
+
+  by SPY vs SMA200 × trade side
+    bucket                 trades  symbols    avgR    win%   share
+    above × long           14148      491   0.049  58.5%    59%
+    above × short           7610      491  -0.104  50.0%    32%
+    below × long             518      203  -0.156  47.1%     2%
+    below × short           1722      439  -0.094  50.5%     7%
+    ALL                    23998      491  -0.014  55.0%   100%
+
+  the same cells against 200 matched random-entry controls (seed 20260825)
+    cell                     rule   ctrl med   ctrl p95    margin  beats p95
+    above × long          0.049     0.074      0.081   -0.024      no
+    above × short        -0.104    -0.066     -0.057   -0.038      no
+    below × long         -0.156     0.161      0.187   -0.317      no
+    below × short        -0.094    -0.140     -0.106    0.045      yes
+
+  by realized-vol quintile (FIT cut points; Q5 = most volatile)
+    bucket                 trades  symbols    avgR    win%   share
+    Q1 vol                   317      235  -0.130  48.6%     1%
+    Q2 vol                   892      397  -0.008  55.4%     4%
+    Q3 vol                  3183      486   0.011  56.5%    13%
+    Q4 vol                 15496      491  -0.007  55.4%    65%
+    Q5 vol                  4110      491  -0.051  52.9%    17%
+    ALL                    23998      491  -0.014  55.0%   100%
+
+==============================================================================
+READ THIS BEFORE ACTING ON THE TABLE ABOVE
+  - Buckets differing by a few hundredths of R on a few hundred trades is not a
+    regime effect. The panel's own trade floor is 200 per fold, and its names are
+    correlated at rho 0.24-0.47, so a bucket's N is worth well under its face value.
+  - Breadth is computed on TODAY's index membership. It reads HIGH exactly where the
+    real index was shedding names, and there is no matched control to cancel that
+    here the way there is for a strategy's avgR.
+  - A gradient that appears in FIT and not in SELECT is the same result the 13
+    rejected confluence filters produced. Only a bucket ordering that holds in FIT,
+    SELECT and all three TEST folds is worth turning into a gate.
