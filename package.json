@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3275",
+    "dev": "node --import tsx scripts/dev.mts",
+    "dev:web": "next dev -p 3275",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -14,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "bot": "tsx scripts/bot.ts",
+    "desk": "node --env-file=.env --import tsx scripts/session.mts",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "backtest": "tsx scripts/backtest.ts",
     "backfill-lessons": "tsx scripts/backfill-lessons.ts",
