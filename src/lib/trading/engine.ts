@@ -5,7 +5,7 @@
 import { prisma } from "@/lib/db";
 import { aiBackend, aiOutageReason, type AiBackend } from "@/lib/anthropic";
 import { scanSymbol, type ScanResult } from "./scanner";
-import { runHawk, type HawkVerdict, type HawkVote, type ProposedLevels } from "./hawk";
+import { describePanel, runHawk, type HawkVerdict, type HawkVote, type ProposedLevels } from "./hawk";
 import { runSage, type SageVerdict } from "./sage";
 import { buildAnalystContext, type AnalystExtras } from "./context";
 import { fetchFundamentals, fundamentalsLine } from "@/lib/market/fundamentals";
@@ -230,13 +230,14 @@ export async function runTradeTick(
     return { symbol, outcome: "no-ai-backend", steps, costUsd };
   }
   costUsd += hawk.totalCostUsd;
-  steps.push({
-    stage: "hawk",
-    note: `votes ${hawk.votes.map((v) => `${v.persona}:${v.vote}`).join(", ")} → ${hawk.agreed ? hawk.side : "no consensus"}`,
-  });
+  const votesRead = describePanel(hawk);
+  steps.push({ stage: "hawk", note: `${votesRead} → ${hawk.agreed ? hawk.side : "no consensus"}` });
 
   if (!hawk.agreed || !hawk.side || !hawk.levels) {
-    await logCf("no-consensus", `votes ${hawk.votes.map((v) => `${v.persona}:${v.vote}`).join(", ")}`, null);
+    // The same reading goes to the log AND to the counterfactual row. They were
+    // built separately, and the row — the one the arm recorder keeps — was the
+    // half that lost the dropped analysts.
+    await logCf("no-consensus", votesRead, null);
     await prisma.signal.update({ where: { id: signal.id }, data: { status: "discarded" } });
     return { symbol, outcome: "no-consensus", steps, costUsd };
   }

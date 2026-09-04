@@ -1,7 +1,7 @@
 import "dotenv/config"; // hawk.ts -> context.ts -> scanner.ts -> research/adapter.ts imports prisma at module scope
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { personasFor } from "./hawk";
+import { countableVotes, describePanel, personasFor } from "./hawk";
 import { personaLens } from "./context";
 
 // Why HAWK fields a different trio per strategy family
@@ -61,4 +61,76 @@ test("the exhaustion lens treats an unextended reading as a reason to confirm", 
   const lens = personaLens("exhaustion");
   assert.match(lens, /confirm/i);
   assert.match(lens, /room|not extended|unextended/i);
+});
+
+// One analyst failing must not void the panel
+// -------------------------------------------
+// Live, 2026-09-02: WBD's `structure` answer was truncated mid-`reason` by the
+// 300-token cap, so `parseJsonLoose` threw, `Promise.all` rejected, and the
+// engine reported `no-ai-backend` — while the backend was answering four other
+// symbols in the same run. The two votes already paid for went in the bin.
+
+type Answer = { persona: "trend" | "structure" | "exhaustion"; data: { vote: "long" | "short" | "skip"; confidence: number; reason: string }; costUsd: number };
+
+const ok = (persona: Answer["persona"], vote: Answer["data"]["vote"]): PromiseSettledResult<Answer> => ({
+  status: "fulfilled",
+  value: { persona, data: { vote, confidence: 0.7, reason: `${persona} says ${vote}` }, costUsd: 0.01 },
+});
+const failed = (message: string): PromiseSettledResult<Answer> => ({ status: "rejected", reason: new Error(message) });
+
+const TRUNCATED = 'Agent did not return valid JSON: {"vote":"skip","confidence":0.62,"reason":"Price is 74% into a range';
+
+test("countableVotes: a truncated answer abstains instead of voiding the panel", () => {
+  const { votes, dropped, totalCostUsd } = countableVotes([ok("trend", "long"), failed(TRUNCATED), ok("exhaustion", "long")]);
+
+  assert.equal(votes.length, 2);
+  assert.deepEqual(votes.map((v) => v.persona), ["trend", "exhaustion"]);
+  assert.equal(dropped.length, 1);
+  assert.match(dropped[0], /did not return valid JSON/);
+  assert.equal(totalCostUsd, 0.02); // only the calls that answered are billed
+});
+
+test("countableVotes: a smaller panel is a harder bar, never an easier one", () => {
+  // The rule is "two votes on the same side", not "a majority of whoever
+  // answered" — so an abstention can only ever cost the setup a confirmation.
+  const { votes } = countableVotes([ok("trend", "long"), failed(TRUNCATED), ok("exhaustion", "skip")]);
+  assert.equal(votes.filter((v) => v.vote === "long").length, 1); // 1 < 2 → no consensus
+});
+
+test("countableVotes: a fatal backend failure still propagates", () => {
+  // The opposite case: no analyst can answer. Treating that as an abstention
+  // would take the outage latch off exactly when it is needed.
+  assert.throws(
+    () => countableVotes([ok("trend", "long"), failed("You've hit your monthly spend limit"), ok("exhaustion", "long")]),
+    /spend limit/,
+  );
+});
+
+test("countableVotes: a panel where every analyst failed is an error, not a skip", () => {
+  assert.throws(() => countableVotes([failed(TRUNCATED), failed(TRUNCATED), failed(TRUNCATED)]), /every HAWK analyst failed/);
+});
+
+// The stored reading and the logged reading must be the same reading
+// ------------------------------------------------------------------
+// They were built separately at two call sites, and the `Counterfactual` row —
+// the one the arm recorder keeps — was the half that dropped the dropped.
+
+test("describePanel: a clean panel reads as just its votes", () => {
+  assert.equal(
+    describePanel({ votes: [
+      { persona: "trend", vote: "long", confidence: 0.7, reason: "" },
+      { persona: "structure", vote: "skip", confidence: 0.5, reason: "" },
+    ], dropped: [] }),
+    "votes trend:long, structure:skip",
+  );
+});
+
+test("describePanel: a shrunken panel says so, and says why", () => {
+  const read = describePanel({
+    votes: [{ persona: "exhaustion", vote: "skip", confidence: 0.5, reason: "" }],
+    dropped: ["Agent did not return valid JSON", "socket hang up"],
+  });
+  assert.match(read, /votes exhaustion:skip/);
+  assert.match(read, /2 analyst\(s\) dropped/);
+  assert.match(read, /socket hang up/);
 });

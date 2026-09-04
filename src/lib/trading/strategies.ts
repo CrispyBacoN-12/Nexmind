@@ -620,6 +620,36 @@ export type CombineMode = "any" | "vote";
 /** Build a meta-strategy that combines members. "any" enters when exactly one
  *  direction triggers this bar (conflicts skip). "vote" needs a fresh trigger
  *  plus >= minVotes members agreeing on that side within the last `window` bars. */
+/** Which combo members never fire once across this bar series.
+ *
+ *  A vote combo silently becomes an AND when a member cannot fire on the
+ *  timeframe it is run on. `combo-vote` is "vote >=2 of {trend-pullback, orb,
+ *  fvg}" and portfolio #11 ran it on weekly bars, where `orb` — an intraday
+ *  opening-range break — fired 0 of 80 symbols on 2026-09-02. The live rule was
+ *  "trend-pullback AND fvg", and that intersection takes the most extended bar
+ *  either member offers: median %B 0.89 / stochastic 92.8 / +29.1% over SMA50,
+ *  against 0.70 / 77.4 / +12.5% for trend-pullback alone. HAWK's structure and
+ *  exhaustion analysts exist to refuse exactly those entries, so 2-of-3
+ *  consensus was unreachable by construction — and no log line said the vote
+ *  had a member that could never vote. */
+export function silentMembers(sigs: (StrategyResult | null)[][], memberKeys: string[]): string[] {
+  return memberKeys.filter((_, i) => sigs[i] != null && !sigs[i].some((x) => x != null));
+}
+
+/** Once per (combo, silent set) per process — the check runs on every scan of
+ *  every symbol, and a warning repeated 80 times a session is one nobody reads. */
+const warnedDegenerate = new Set<string>();
+function warnDegenerate(key: string, members: Strategy[], silent: string[], minVotes: number): void {
+  if (!silent.length) return;
+  const tag = `${key}:${silent.join(",")}`;
+  if (warnedDegenerate.has(tag)) return;
+  warnedDegenerate.add(tag);
+  console.warn(
+    `strategy ${key}: ${silent.join(", ")} never fire on this timeframe — ` +
+      `"vote >=${minVotes} of ${members.length}" is really ${minVotes}-of-${members.length - silent.length}`,
+  );
+}
+
 export function combineStrategies(
   key: string, label: string, memberKeys: string[], mode: CombineMode,
   opts: { minVotes?: number; window?: number; family?: StrategyFamily } = {},
@@ -632,12 +662,16 @@ export function combineStrategies(
   return {
     key, label, family: opts.family ?? "mixed",
     build(bars) {
-      const evals = memberKeys
-        .map((k) => getStrategy(k))
-        .filter((s): s is Strategy => s != null)
-        .map((s) => s.build(bars));
+      // Keep the resolved members alongside their signals: filtering the keys
+      // and the evaluators separately would shift the indices apart the moment
+      // one member failed to resolve.
+      const members = memberKeys.map((k) => getStrategy(k)).filter((s): s is Strategy => s != null);
       // Precompute each member's per-bar signal once.
-      const sigs = evals.map((ev) => bars.map((_, i) => ev(i)));
+      const sigs = members.map((s) => {
+        const ev = s.build(bars);
+        return bars.map((_, i) => ev(i));
+      });
+      if (mode === "vote") warnDegenerate(key, members, silentMembers(sigs, members.map((s) => s.key)), minVotes);
       const activeWithin = (side: "long" | "short", i: number) =>
         sigs.reduce((n, s) => {
           for (let j = Math.max(0, i - window + 1); j <= i; j++) if (s[j]?.side === side) return n + 1;

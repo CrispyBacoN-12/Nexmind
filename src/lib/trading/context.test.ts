@@ -107,7 +107,7 @@ test("buildAnalystContext: the live zero-volume bar is labelled, not compared", 
   const withQuote = [...candles, { t: live.t + HOUR, o: live.c, h: live.c, l: live.c, c: live.c, v: 0 }];
   const ctx = buildAnalystContext(scanResult({ candles: withQuote }));
 
-  assert.match(ctx.bars, /\[live quote, bar not closed\]/);
+  assert.match(ctx.bars, /\[bar not closed\]/);
   // The naive read of that bar is "volume collapsed to zero" — it must instead
   // report the last closed bar, whose volume is normal.
   assert.match(ctx.volume, /Last closed bar volume 1\.06M/);
@@ -131,4 +131,55 @@ test("renderContext: the facts sheet is identical across personas", () => {
   const ctx = buildAnalystContext(scanResult(), { newsDigest: "Fear & Greed: 61 (greed)" });
   assert.equal(renderContext(ctx), renderContext(ctx));
   assert.match(renderContext(ctx), /INTEL\nFear & Greed: 61 \(greed\)/);
+});
+
+const DAY = 24 * HOUR;
+const WEEK = 7 * DAY;
+
+/** `n` weekly bars of identical volume, the newest one starting `startedAgo`
+ *  seconds ago and carrying only `lastV`. Anchored to the real clock because
+ *  "is this bar still open" is a question about now, not about the series. */
+function weeklyBars(n: number, startedAgo: number, lastV: number): Candle[] {
+  const lastStart = Math.floor(Date.now() / 1000) - startedAgo;
+  return Array.from({ length: n }, (_, i) => {
+    const base = 100 + i * 0.5;
+    return {
+      t: lastStart - (n - 1 - i) * WEEK,
+      o: base - 0.2, h: base + 0.6, l: base - 0.6, c: base,
+      v: i === n - 1 ? lastV : 10_000_000,
+    };
+  });
+}
+
+test("buildAnalystContext: a partially-filled bar is treated as forming, not as collapsed volume", () => {
+  // Wednesday of an open week: 2 of 5 sessions are in, so the bar holds ~40% of
+  // a normal week's volume. Testing `v === 0` misses this shape entirely and
+  // reports "0.40× — thin" to every analyst on a perfectly ordinary week.
+  const ctx = buildAnalystContext(scanResult({ timeframe: "1wk", candles: weeklyBars(30, 2 * DAY, 4_000_000) }));
+
+  assert.match(ctx.bars, /\[bar not closed\]/);
+  assert.match(ctx.volume, /Last closed bar volume/);
+  assert.match(ctx.volume, /1\.00× — normal/);
+  assert.doesNotMatch(ctx.volume, / — thin/);
+});
+
+test("buildAnalystContext: a bar whose period has elapsed is closed, thin volume and all", () => {
+  // The mirror of the case above: 9 days since the bar opened, so it really did
+  // close on a fraction of its usual volume and the analysts must hear that.
+  const ctx = buildAnalystContext(scanResult({ timeframe: "1wk", candles: weeklyBars(30, 9 * DAY, 4_000_000) }));
+
+  assert.doesNotMatch(ctx.bars, /bar not closed/);
+  assert.match(ctx.volume, /Last bar volume 4\.00M/);
+  assert.match(ctx.volume, /0\.40× — thin/);
+});
+
+test("buildAnalystContext: one long gap does not make a closed bar look forming", () => {
+  // A halted or missing week stretches the final gap. Spacing is taken from the
+  // median so a single hole cannot push the last bar's deadline into the future.
+  const bars = weeklyBars(30, 9 * DAY, 10_000_000);
+  bars.splice(20, 3); // three-week hole mid-series
+  const ctx = buildAnalystContext(scanResult({ timeframe: "1wk", candles: bars }));
+
+  assert.doesNotMatch(ctx.bars, /bar not closed/);
+  assert.match(ctx.volume, /Last bar volume/);
 });

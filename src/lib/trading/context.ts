@@ -137,16 +137,53 @@ function barsBlock(candles: Candle[], d: number): string {
   const lines = tail.map(
     (c, i) =>
       `${stamp(c.t)}  O ${c.o.toFixed(d)}  H ${c.h.toFixed(d)}  L ${c.l.toFixed(d)}  C ${c.c.toFixed(d)}  V ${vol(c.v)}` +
-      (i === tail.length - 1 && isForming(candles) ? "  [live quote, bar not closed]" : ""),
+      (i === tail.length - 1 && isForming(candles) ? "  [bar not closed]" : ""),
   );
   return [`last ${tail.length} bars, oldest first:`, ...lines].join("\n");
 }
 
-/** Yahoo appends the current quote as a zero-volume bar. Read naively it looks
- *  like an open/high/low/close of the same price on no volume — i.e. a market
- *  that stopped trading — so it has to be called out wherever it is used. */
-function isForming(candles: Candle[]): boolean {
-  return candles.length > 1 && candles[candles.length - 1].v === 0;
+/** Milliseconds, whichever unit the provider used. */
+function toMs(t: number): number {
+  return t > 1e11 ? t : t * 1000;
+}
+
+/** Median gap between bars, in ms. The median and not the last gap: one halted
+ *  or missing bar would otherwise stretch the spacing and push a closed bar's
+ *  deadline into the future. */
+function barSpacing(candles: Candle[]): number | null {
+  const tail = candles.slice(-11);
+  const gaps: number[] = [];
+  for (let i = 1; i < tail.length; i++) {
+    const g = toMs(tail[i].t) - toMs(tail[i - 1].t);
+    if (g > 0) gaps.push(g);
+  }
+  if (!gaps.length) return null;
+  gaps.sort((a, b) => a - b);
+  return gaps[Math.floor(gaps.length / 2)];
+}
+
+/** Is the newest bar still open?
+ *
+ *  Two shapes reach us and only one of them is obvious. Yahoo appends the live
+ *  quote as a zero-volume bar — read naively, a market that stopped trading.
+ *  Alpaca instead returns the real, partially-filled bar: on a Wednesday the
+ *  current weekly bar holds two sessions of volume, which against a 20-week
+ *  average reads "0.40× — thin" on a perfectly ordinary week. Testing volume
+ *  catches only the first, and the second is the one that runs on every scan
+ *  that is not a Friday close.
+ *
+ *  So the test is the clock, not the contents: a bar whose period has not
+ *  elapsed yet is forming, whatever volume it happens to carry. Bar timestamps
+ *  are period starts, so the deadline is start + one period. That errs toward
+ *  "still forming" in the hours between a session's close and the next period
+ *  boundary, which costs a reading of the last closed bar instead — always the
+ *  defensible direction. */
+function isForming(candles: Candle[], now = Date.now()): boolean {
+  if (candles.length < 2) return false;
+  const last = candles[candles.length - 1];
+  if (last.v === 0) return true;
+  const spacing = barSpacing(candles);
+  return spacing != null && toMs(last.t) + spacing > now;
 }
 
 function structureBlock(scan: ScanResult, candles: Candle[], d: number): string {
@@ -277,8 +314,7 @@ function vol(v: number): string {
  *  — normalise rather than print a 1970 date into an analyst's prompt. */
 function stamp(t: number): string {
   if (!Number.isFinite(t) || t <= 0) return "?";
-  const ms = t > 1e11 ? t : t * 1000;
-  return new Date(ms).toISOString().slice(0, 16).replace("T", " ") + "Z";
+  return new Date(toMs(t)).toISOString().slice(0, 16).replace("T", " ") + "Z";
 }
 
 function maState(fast: number | null | undefined, slow: number | null | undefined): string {

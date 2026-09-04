@@ -1,7 +1,7 @@
 // HAWK ×3 — three analysts reason independently, then vote. 2-of-3 agreement
 // in the same direction is required, or the setup is folded.
 
-import { callAgentJSON, type ModelTier } from "@/lib/anthropic";
+import { callAgentJSON, isFatalBackendReason, type ModelTier } from "@/lib/anthropic";
 import type { ScanResult } from "./scanner";
 import { strategyFamily, type StrategyFamily } from "./strategies";
 import { buildAnalystContext, personaLens, renderContext, type AnalystContext, type Persona } from "./context";
@@ -29,6 +29,10 @@ export interface HawkVerdict {
   votes: HawkVote[];
   levels: ProposedLevels | null;
   totalCostUsd: number;
+  /** Analysts whose call failed and were not counted. Empty on a clean panel.
+   *  Surfaced rather than swallowed: a quietly smaller panel is exactly the
+   *  kind of degradation that reads as "the analysts declined". */
+  dropped?: string[];
 }
 
 const PERSONAS: { persona: Persona; system: string }[] = [
@@ -98,6 +102,11 @@ const VOTE_SCHEMA = {
   required: ["vote", "confidence", "reason"],
 };
 
+/** The prompt asks for a cited number and a sentence of reasoning, and the
+ *  analysts write 50-80 words. At 300 the answer was being cut off mid-`reason`
+ *  — see `countableVotes`. The cap is a runaway guard, not a length budget. */
+const MAX_VOTE_TOKENS = 600;
+
 const TASK =
   "Decide: long, short, or skip. The scanner has already fired — your job is to confirm or refuse it, " +
   "not to invent a different trade. Cite the specific number that decided your vote. " +
@@ -129,25 +138,19 @@ export async function runHawk(
   if (!scan.side) return { agreed: false, side: null, votes: [], levels: null, totalCostUsd: 0 };
 
   const facts = renderContext(opts.context ?? buildAnalystContext(scan, { newsDigest: opts.newsDigest }));
-  const results = await Promise.all(
+  const results = await Promise.allSettled(
     personasFor(strategyFamily(opts.strategyKey)).map((persona) =>
       callAgentJSON<{ vote: HawkVote["vote"]; confidence: number; reason: string }>({
         tier: opts.tier ?? "sonnet",
         system: SYSTEM[persona],
         prompt: buildPrompt(facts, persona),
-        maxTokens: 300,
+        maxTokens: MAX_VOTE_TOKENS,
         jsonSchema: VOTE_SCHEMA,
       }).then((r) => ({ ...r, persona })),
     ),
   );
 
-  const votes: HawkVote[] = results.map((r) => ({
-    persona: r.persona,
-    vote: r.data.vote,
-    confidence: clamp01(r.data.confidence),
-    reason: r.data.reason,
-  }));
-  const totalCostUsd = results.reduce((s, r) => s + r.costUsd, 0);
+  const { votes, dropped, totalCostUsd } = countableVotes(results);
 
   const longs = votes.filter((v) => v.vote === "long").length;
   const shorts = votes.filter((v) => v.vote === "short").length;
@@ -159,7 +162,65 @@ export async function runHawk(
     ? computeLevels(scan, side, opts.atrSlMult ?? 1.5, opts.atrTpMult ?? 2.5, opts.singleTarget ?? false, opts.trail)
     : null;
 
-  return { agreed: side != null, side, votes, levels, totalCostUsd };
+  return { agreed: side != null, side, votes, levels, totalCostUsd, dropped };
+}
+
+/** One analyst's answer, as `runHawk` receives it back. */
+type AnalystAnswer = {
+  persona: Persona;
+  data: { vote: HawkVote["vote"]; confidence: number; reason: string };
+  costUsd: number;
+};
+
+/** Fold three settled calls into the votes that can be counted.
+ *
+ *  A single analyst failing must not void the panel. It did: `maxTokens: 300`
+ *  truncated a long `reason` mid-string, `parseJsonLoose` threw, `Promise.all`
+ *  rejected, and the engine's catch reported **`no-ai-backend`** — an outage
+ *  that was not happening — discarding the two votes already paid for. FTNT on
+ *  2026-09-02 is one of these.
+ *
+ *  Dropping a failed vote cannot make entry easier: the bar is "two votes on
+ *  the same side", not "a majority of whoever answered", so a smaller panel is
+ *  a strictly harder bar. A fatal backend failure is the opposite case — no
+ *  analyst can answer — and still propagates, so the outage latch keeps working. */
+export function countableVotes(
+  results: PromiseSettledResult<AnalystAnswer>[],
+): { votes: HawkVote[]; dropped: string[]; totalCostUsd: number } {
+  const votes: HawkVote[] = [];
+  const dropped: string[] = [];
+  let totalCostUsd = 0;
+
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      votes.push({
+        persona: r.value.persona,
+        vote: r.value.data.vote,
+        confidence: clamp01(r.value.data.confidence),
+        reason: r.value.data.reason,
+      });
+      totalCostUsd += r.value.costUsd;
+      continue;
+    }
+    const why = r.reason instanceof Error ? r.reason.message : String(r.reason);
+    if (isFatalBackendReason(why)) throw r.reason;
+    dropped.push(why);
+  }
+
+  if (!votes.length) throw new Error(`every HAWK analyst failed: ${dropped.join(" | ")}`);
+  return { votes, dropped, totalCostUsd };
+}
+
+/** One reading of what the panel did, for the log line AND the stored
+ *  `Counterfactual.aiReason`. One function because they were two, and the
+ *  stored half — the one the arm recorder keeps and anyone reads months later
+ *  — was the half that silently omitted the analysts that never answered. A
+ *  panel that voted 2-of-2 because the third analyst died must never read like
+ *  a clean 2-of-3. */
+export function describePanel(v: Pick<HawkVerdict, "votes" | "dropped">): string {
+  const votes = `votes ${v.votes.map((x) => `${x.persona}:${x.vote}`).join(", ")}`;
+  if (!v.dropped?.length) return votes;
+  return `${votes} (${v.dropped.length} analyst(s) dropped: ${v.dropped.join(" | ")})`;
 }
 
 function computeLevels(

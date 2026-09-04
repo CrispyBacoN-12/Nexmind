@@ -1,7 +1,7 @@
 import "dotenv/config"; // strategies.ts -> scanner.ts -> research/adapter.ts imports prisma at module scope — needs DATABASE_URL to construct, same as other DB-touching scripts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getStrategy, combineStrategies, STRATEGIES, strategyFamily } from "./strategies";
+import { getStrategy, combineStrategies, silentMembers, STRATEGIES, strategyFamily } from "./strategies";
 import type { Candle } from "@/lib/indicators";
 
 const DAY = 86_400;
@@ -408,4 +408,44 @@ test("every registered strategy declares a family explicitly", () => {
   for (const s of STRATEGIES) {
     assert.ok(s.family, `${s.key} must declare a family`);
   }
+});
+
+// A vote combo that quietly became an AND
+// ---------------------------------------
+// `combo-vote` is "vote >=2 of {trend-pullback, orb, fvg}", and portfolio #11
+// ran it on WEEKLY bars. `orb` is an intraday opening-range break — on weekly
+// candles every day holds one bar, so it fired 0 of 80 symbols on 2026-09-02.
+// The live rule was therefore "trend-pullback AND fvg", a 2-of-2 unanimity gate,
+// and that intersection selects the most extended bar either member offers
+// (median %B 0.89 / stoch 92.8 / +29.1% over SMA50, against 0.70 / 77.4 /
+// +12.5% for trend-pullback alone). Nothing in the logs said so.
+
+test("silentMembers: names the members that cannot fire on this series", () => {
+  const fires = [null, { side: "long" as const, note: "x" }, null];
+  const never = [null, null, null];
+  assert.deepEqual(silentMembers([fires, never, fires], ["trend-pullback", "orb", "fvg"]), ["orb"]);
+  assert.deepEqual(silentMembers([fires, fires], ["trend-pullback", "fvg"]), []);
+});
+
+test("orb cannot fire on weekly bars, so combo-vote degenerates to an AND there", () => {
+  // 300 weekly bars of a genuine uptrend with real pullbacks — a series where
+  // the other two members fire freely, so a silent `orb` is a property of the
+  // timeframe and not of a series nothing could trade. ORB needs 5+ bars inside
+  // one UTC day; a weekly bar is one per week, so it cannot ever fire.
+  const WEEK = 7 * DAY;
+  let px = 100;
+  const weekly = Array.from({ length: 300 }, (_, i) => {
+    px += i % 20 >= 14 ? -6 : 4; // 14 up, 6 back — deep enough to keep RSI inside 35..70
+    return bar(i * WEEK, px - 0.3, px + 0.5, px - 0.5, px, 1_000_000);
+  });
+
+  const members = ["trend-pullback", "orb", "fvg"];
+  const sigs = members.map((k) => {
+    const ev = getStrategy(k)!.build(weekly);
+    return weekly.map((_, i) => ev(i));
+  });
+
+  assert.ok(sigs[0].some(Boolean), "trend-pullback must fire, or the contrast proves nothing");
+  assert.ok(sigs[2].some(Boolean), "fvg must fire, or the contrast proves nothing");
+  assert.deepEqual(silentMembers(sigs, members), ["orb"]);
 });
