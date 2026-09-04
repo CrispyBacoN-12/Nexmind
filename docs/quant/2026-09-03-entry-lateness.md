@@ -261,3 +261,102 @@ against the median. `adx 15` does not come close, and nothing here is an approva
   available here changes *which* trades are taken instead. Recovering the §3 gain
   would need a rule that anticipates the same setup rather than one that admits
   more setups — which is a different mechanism, not a threshold.
+
+---
+
+## 9. Anticipation: the closing test, 2026-09-05
+
+§8 ended by naming the one direction left — "a rule that anticipates the same
+setup rather than one that admits more setups". `scripts/entry-anticipation.mts`
+is that test, and it is designed so it cannot be answered by exposure.
+
+**Construction.** Two gates get a *pad*: a band around the real threshold where a
+bar fails the rule but is close to passing. Every padded variant comes in a pair:
+
+| | admits the pad | also requires the reading to be closing on the threshold |
+|---|---|---|
+| RSI ±5 | `rsi widen 5` | `rsi approach 5` |
+| RSI ±10 | `rsi widen 10` | `rsi approach 10` |
+| ADX −5 | `adx widen 5` | `adx approach 5` |
+| both | `both widen 5` | `both approach 5` |
+
+`approach` reads bars *i* and *i−1* only — RSI above the band must be falling
+toward it, below it rising; ADX below the floor must be rising. Nothing reads
+forward. The pre-registered bar was: beat the baseline **and** the paired widen
+variant, on FIT and SELECT and both geometries — four cells.
+
+A new column, `lead%`, measures anticipation directly: of the bars a variant
+signals on that the baseline does not, the share followed by a baseline signal of
+the same side within 3 bars. `simulateExits` holds one position per symbol, so an
+early signal takes the trade and the baseline's own signal is then skipped — this
+is the "same trade, earlier bar" mechanism, and `lead%` says how much of it is
+really happening rather than assumed.
+
+**The harness agrees with the previous one.** `adx widen 5` reproduces `adx 15`
+from §7 to three decimals in all four cells (+0.001 / +0.009 / +0.010 / +0.022),
+so the baseline row is bit-identical and the new columns sit on the old numbers.
+
+### Result: no candidate, and the two gates disagree about why
+
+`vs base`, all four selection cells:
+
+| variant | fit/single | fit/trail | select/single | select/trail | lead% |
+|---|---|---|---|---|---|
+| rsi approach 5 | −0.002 | −0.002 | −0.003 | −0.010 | 60.1% |
+| rsi widen 5 | −0.009 | −0.010 | −0.018 | −0.028 | 61.5% |
+| rsi approach 10 | −0.000 | −0.003 | −0.005 | −0.015 | 52.5% |
+| rsi widen 10 | −0.009 | −0.016 | −0.027 | −0.038 | 52.7% |
+| **adx approach 5** | −0.001 | +0.002 | +0.002 | +0.005 | 31.4% |
+| **adx widen 5** | +0.001 | +0.009 | +0.010 | +0.022 | 18.0% |
+| both approach 5 | −0.004 | +0.000 | −0.000 | −0.005 | 39.7% |
+| both widen 5 | −0.007 | −0.002 | −0.005 | +0.001 | 34.7% |
+
+Not one variant beats the baseline in 4/4. The best is `adx approach 5` at 3/4,
+failing fit/single — and it loses to plain widening in all four.
+
+**The two pads answer the direction question in opposite directions, and that is
+what settles the hypothesis rather than merely failing it.**
+
+- **RSI.** `approach` beats `widen` in 4/4, recovering roughly two thirds of the
+  harm widening does. But `lead%` is **60.1 against widening's 61.5**. The
+  direction test discarded 69% of the extra signals (23,345 → 7,225) and did not
+  improve onset prediction at all. Whatever it recovered, it did not recover by
+  anticipating the setup — it recovered by trading less.
+- **ADX.** `approach` lifts `lead%` from **18.0% to 31.4%** — a real +13pp gain at
+  predicting the baseline's own trigger — and **loses** to plain widening in 4/4.
+  Predicting the onset better made the returns worse.
+
+So the two things the hypothesis had treated as one — *firing earlier on the same
+setup* and *predicting when the setup fires* — are measurably distinct, and where
+they were separable they pointed opposite ways. That is what the 30/30 control
+result of §3 implies once it is read at the bar level: the baseline's trigger bar
+is negatively selected, so a rule that homes in on it more accurately inherits
+the selection rather than escaping it.
+
+**Caveat, stated so the table is not over-read:** `lead%` is confounded with which
+gate is padded — RSI pads score high on it, ADX pads low — so the cross-gate
+ordering is not evidence by itself. The within-gate pairs are the clean
+comparisons, and they are the two bullets above.
+
+**What this does and does not close.** It does not prove no anticipation rule can
+work; it tests the family reachable by padding the two gates that actually bind.
+It does refute the premise that firing earlier on the same setup is worth
+something causally — which was the premise §3's t−3 result appeared to support,
+and which was measured there by moving signals that were already known to occur.
+
+### Where the entry axis stands after three runs
+
+| question | answer |
+|---|---|
+| Is the entry rule late? | Yes — loses to random in 30/30 cells; t−3 replay is +0.18R in 5/5 folds |
+| What is it waiting on? | The RSI band, sole refusing gate in 53–58% of onsets; binding end is RSI>70 in 4/5 folds |
+| Can relaxing that gate recover it? | No — 8 relaxations, margin negative in 10/10 cells |
+| Is any gate genuinely set too late? | One: the ADX floor, +0.009R, replicated 10/10. Not a strategy |
+| Can a causal rule anticipate the setup? | No — 4 variants, none beats the baseline in 4/4; better onset prediction made returns *worse* |
+
+The remaining untried axis is not a threshold, a gate, or a bar. It is the **data
+class**: every mechanism screened across two universes has been a function of
+`ScanSnapshot`, which is price and volume only. Changing that is engine work — a
+point-in-time event source and a field to carry it — not a change to a research
+brief, and it belongs with the other capability gap this project has recorded (the
+proposer cannot express an exit or a size either).

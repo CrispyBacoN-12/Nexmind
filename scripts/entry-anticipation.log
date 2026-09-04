@@ -1,0 +1,61 @@
+panel: 491 symbols · control 200 runs per cell · lead window 3 bars
+folds: FIT + SELECT only (selection). Re-run with --holdout once the candidates are chosen.
+
+fit · single 1.5
+  variant            trades     avgR  ctrl med   margin  vs base  extra sig   lead%
+  baseline            20370   +0.004    +0.018   -0.014   +0.000          0       —
+  rsi approach 5      22221   +0.003    +0.019   -0.016   -0.002       7225   60.1%
+  rsi widen 5         23597   -0.001    +0.023   -0.023   -0.009      23345   61.5%
+  rsi approach 10     23023   +0.005    +0.019   -0.014   -0.000      10279   52.5%
+  rsi widen 10        25419   +0.001    +0.024   -0.023   -0.009      36016   52.7%
+  adx approach 5      24789   +0.005    +0.021   -0.016   -0.001      17703   31.4%
+  adx widen 5         27689   +0.005    +0.018   -0.013   +0.001      37183   18.0%
+  both approach 5     26726   +0.004    +0.022   -0.019   -0.004      25244   39.7%
+  both widen 5        31267   +0.000    +0.022   -0.022   -0.007      62930   34.7%
+
+fit · trail 1.5/1.5
+  variant            trades     avgR  ctrl med   margin  vs base  extra sig   lead%
+  baseline            16248   +0.050    +0.094   -0.044   +0.000          0       —
+  rsi approach 5      17120   +0.050    +0.096   -0.046   -0.002       7225   60.1%
+  rsi widen 5         17510   +0.048    +0.102   -0.054   -0.010      23345   61.5%
+  rsi approach 10     17445   +0.051    +0.098   -0.047   -0.003      10279   52.5%
+  rsi widen 10        18014   +0.045    +0.105   -0.060   -0.016      36016   52.7%
+  adx approach 5      19307   +0.056    +0.098   -0.042   +0.002      17703   31.4%
+  adx widen 5         21547   +0.056    +0.092   -0.035   +0.009      37183   18.0%
+  both approach 5     20121   +0.055    +0.099   -0.044   +0.000      25244   39.7%
+  both widen 5        22682   +0.053    +0.099   -0.046   -0.002      62930   34.7%
+
+select · single 1.5
+  variant            trades     avgR  ctrl med   margin  vs base  extra sig   lead%
+  baseline             7065   -0.044    +0.087   -0.130   +0.000          0       —
+  rsi approach 5       7637   -0.045    +0.088   -0.133   -0.003       4296   63.4%
+  rsi widen 5          7999   -0.052    +0.096   -0.149   -0.018      14249   63.7%
+  rsi approach 10      7819   -0.045    +0.090   -0.135   -0.005       5960   56.0%
+  rsi widen 10         8409   -0.059    +0.099   -0.158   -0.027      21284   55.3%
+  adx approach 5       8650   -0.036    +0.092   -0.128   +0.002      12370   30.0%
+  adx widen 5          9672   -0.039    +0.080   -0.120   +0.010      25743   17.0%
+  both approach 5      9220   -0.038    +0.093   -0.130   -0.000      16877   38.6%
+  both widen 5        10666   -0.047    +0.088   -0.135   -0.005      41548   33.6%
+
+select · trail 1.5/1.5
+  variant            trades     avgR  ctrl med   margin  vs base  extra sig   lead%
+  baseline             5533   -0.059    +0.177   -0.236   +0.000          0       —
+  rsi approach 5       5791   -0.065    +0.181   -0.246   -0.010       4296   63.4%
+  rsi widen 5          5907   -0.069    +0.194   -0.263   -0.028      14249   63.7%
+  rsi approach 10      5869   -0.066    +0.184   -0.250   -0.015       5960   56.0%
+  rsi widen 10         6016   -0.072    +0.201   -0.273   -0.038      21284   55.3%
+  adx approach 5       6627   -0.047    +0.184   -0.231   +0.005      12370   30.0%
+  adx widen 5          7412   -0.044    +0.169   -0.213   +0.022      25743   17.0%
+  both approach 5      6850   -0.052    +0.189   -0.241   -0.005      16877   38.6%
+  both widen 5         7746   -0.051    +0.183   -0.235   +0.001      41548   33.6%
+
+How to read this
+  - "margin" is avgR minus the matched control's median — the only column that
+    can support a claim. avgR alone rises whenever a variant simply trades more
+    on a panel that drifted up.
+  - "vs base" is the margin minus the baseline's margin in the same cell.
+  - "lead%" is the discriminator. Each approach variant must beat BOTH the
+    baseline AND its paired widen variant; if approach ~ widen on margin, the
+    direction-of-travel test bought nothing and this is the exposure result again.
+  - A variant whose extra-signal count balloons while its margin barely moves has
+    bought exposure, not timing.

@@ -61,6 +61,33 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
+- **Anticipating the setup fails too, and better onset prediction made returns WORSE.
+  2026-09-05 — the closing test of the entry axis.** §8 had named the one direction left: a
+  causal rule that fires earlier on the *same* setup rather than one that admits more setups.
+  `scripts/entry-anticipation.mts` tested it as four pre-registered pairs — a pad around the
+  RSI band or the ADX floor, each with and without a requirement that the reading be *closing
+  on* its threshold (bars i and i-1 only, nothing reads forward). Bar: beat the baseline AND
+  the paired widen-only variant on FIT and SELECT and both geometries. **No candidate.** Best
+  is `adx approach 5` at 3/4, failing fit/single, and it loses to plain widening in all four.
+  The harness checks out first — `adx widen 5` reproduces `adx 15` to three decimals in all
+  four cells (+0.001/+0.009/+0.010/+0.022). What settles it is that the two gates answer the
+  direction question **in opposite directions**, measured by a new column, `lead%` (of the
+  bars a variant signals on that the baseline does not, the share followed by a baseline
+  signal within 3 bars): on the RSI pad `approach` beats `widen` 4/4 while `lead%` **falls**
+  (60.1 vs 61.5) — it discarded 69% of the extra signals and did not predict onsets any
+  better, so it helped by trading less, not by anticipating; on the ADX pad `approach` lifts
+  `lead%` **18.0% -> 31.4%**, a real gain at predicting the rule's own trigger, and **loses**
+  4/4. *Firing earlier on the same setup* and *predicting when the setup fires* are therefore
+  measurably different things, and where they were separable they pointed opposite ways —
+  which is what the 30/30 control result means read at the bar level: the trigger bar is
+  negatively selected, so homing in on it inherits the selection. Caveat in the study:
+  `lead%` is confounded with which gate is padded, so only the within-gate pairs are clean.
+  **The entry axis is now closed on three fronts** — relax (8/8 fail), anticipate (4/4 fail),
+  and the one gate genuinely set late is worth +0.009R. The remaining untried axis is the
+  **data class**: every mechanism ever screened here is a function of `ScanSnapshot`, which
+  is price and volume only. Changing that is engine work, not a brief. Study §9:
+  `docs/quant/2026-09-03-entry-lateness.md`. Script + log: `scripts/entry-anticipation.mts`.
+
 - **The lag is the RSI band, and relaxing it does not recover the lateness gain. 2026-09-03,
   same day, follow-up to the entry below.** Two runs. `scripts/entry-gate-lag.mts` names what
   the rule waits on: at the bar before a signal onset the RSI band is the *sole* refusing gate
@@ -788,6 +815,21 @@ be chosen deliberately rather than inherited.
   `scripts/entry-gate-lag.log`, `scripts/entry-lag-variants.log`,
   `scripts/entry-lag-variants-holdout.log`, and §6-8 of
   `docs/quant/2026-09-03-entry-lateness.md`.
+- **Do not propose "fire earlier on the same setup" as if it were untested — and do not
+  treat predicting the rule's own trigger as progress.** Measured 2026-09-05, the closing
+  test of the entry axis. Four pre-registered anticipation pairs (a pad on the RSI band or
+  the ADX floor, each with and without a "closing on the threshold" requirement read from
+  bars i and i-1): **no candidate**, best 3/4. The instrument to keep is `lead%` — of the
+  bars a variant signals on that the baseline does not, the share followed by a baseline
+  signal within 3 bars. On the ADX pad the direction test raised `lead%` from **18.0% to
+  31.4%** and **lost** to plain widening in 4/4; on the RSI pad it beat widening 4/4 while
+  `lead%` did **not** move (60.1 vs 61.5), having thrown away 69% of the extra signals — so
+  it helped by trading less, not by anticipating. *Firing earlier* and *predicting the
+  trigger* are different things here, and they point opposite ways. Read together with the
+  30/30 control loss this says the baseline's trigger bar is **negatively selected**: a rule
+  that homes in on it more accurately inherits the selection. `lead%` is confounded with
+  which gate is padded — only the within-gate pairs are clean. Evidence:
+  `scripts/entry-anticipation.log` and §9 of `docs/quant/2026-09-03-entry-lateness.md`.
 - **The lateness numbers past t−3 are lookahead and must never be quoted as an available edge.**
   `scripts/entry-lateness.mts` shifts entries *k* bars earlier using the knowledge that the rule
   will fire at bar *t* — knowledge you do not have at bar *t−k*. That is most of the +0.635 at

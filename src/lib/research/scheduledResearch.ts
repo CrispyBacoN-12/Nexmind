@@ -65,6 +65,20 @@ interface RotationEntry {
 // here only if it fires on or before the baseline's trigger bar on setups the
 // baseline would also have taken.
 //
+// **Update 2026-09-05, and it cuts against the entry-anticipation entry below.**
+// The direction that survived the paragraph above was tested directly
+// (scripts/entry-anticipation.mts, study section 9): four pre-registered pairs
+// that fire while a binding gate is still failing but is closing on its
+// threshold. No candidate — best 3/4 cells, and it loses to simply widening the
+// same threshold. The finding to carry forward is sharper than the failure: on
+// the ADX pad the "closing on the threshold" test raised the share of early
+// signals that were followed by a real baseline signal from 18% to 31% — it
+// genuinely predicted the rule's own trigger better — and its margin got WORSE.
+// The baseline's trigger bar is negatively selected, so anticipating it more
+// accurately buys more of a bad thing. An angle that proposes to fire earlier on
+// the same setup is therefore not "untested" any more; it needs a reason why it
+// escapes that, not merely a different way of being early.
+//
 // What IS expressible is *which bar you take the trade on*, and that is not a
 // cosmetic difference: entry price relative to a 1.5-ATR stop sets the R of
 // every trade that follows. Same trigger, entered three ways, is a genuine
