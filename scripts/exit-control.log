@@ -1,0 +1,34 @@
+panel: 491 symbols · 1000 paired resamples per cell
+baseline (null): single 1.5/1.5 — REFINEMENT_LADDER, the geometry every refinement round already runs under
+folds: FIT + SELECT only (selection). Re-run with --holdout once the candidates are chosen.
+
+fit (2016-01-01..2019-01-01, post-2015 correction recovery through the 2018 Q4 selloff)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  single 2/1.5       17094    20370   +0.010   +0.004   +0.006   -0.008   +0.020  fail
+  single 2.5/1.5     14930    20370   +0.013   +0.004   +0.010   -0.013   +0.034  fail
+  single 3/1.5       13527    20370   +0.023   +0.004   +0.019   -0.015   +0.055  fail
+  trail 1/1.5        17913    20370   +0.049   +0.004   +0.045   +0.024   +0.067  PASS
+  trail 1.5/1.5      16248    20370   +0.050   +0.004   +0.046   +0.019   +0.076  PASS
+
+select (2019-01-01..2020-01-01, 2019 melt-up on falling rates)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  single 2/1.5        5921     7065   -0.045   -0.044   -0.002   -0.019   +0.019  fail
+  single 2.5/1.5      5180     7065   -0.065   -0.044   -0.022   -0.056   +0.020  fail
+  single 3/1.5        4620     7065   -0.072   -0.044   -0.028   -0.079   +0.035  fail
+  trail 1/1.5         6134     7065   -0.059   -0.044   -0.015   -0.049   +0.018  fail
+  trail 1.5/1.5       5533     7065   -0.059   -0.044   -0.015   -0.053   +0.026  fail
+
+How to read this
+  - "delta" is candidate avgR minus baseline avgR over the months BOTH arms
+    traded. The arms do not hold identical trades — one position per symbol means
+    a longer-held geometry skips signals a shorter one takes — so months only one
+    arm was in are excluded; including them would let arm composition drive the
+    number instead of the exit.
+  - "p5" is the bar. A positive delta with p5 below zero means the difference did
+    not survive resampling whole months, which is the failure mode this control
+    exists to catch: an exit that looks better because the market was.
+  - "base" is the SAME baseline ladder in every row of a fold, so the rows are
+    comparable to each other as well as to the null.
+  - PASS says only that this geometry beats the ladder we would have used anyway
+    on these entries. It says nothing about whether the entries are worth taking,
+    and the baseline entry loses to a matched random entry in every fold measured.

@@ -1,7 +1,8 @@
-// The two statistical instruments the panel gate rests on: a matched
-// random-entry control, and a monthly block bootstrap.
+// The statistical instruments the panel gate rests on: a matched random-entry
+// control, a monthly block bootstrap, and a paired month bootstrap for exit
+// changes.
 //
-// Both exist because of one measurement (docs/PROPOSAL-panel-validation.md §1b):
+// The first two exist because of one measurement (docs/PROPOSAL-panel-validation.md §1b):
 // across every window in the bar cache, between 69% and 87% of S&P 500 names
 // finished up, and their daily returns are correlated at rho 0.24-0.47. Those
 // two numbers between them break the naive reading of a panel backtest:
@@ -18,6 +19,12 @@
 //     Hence the BLOCK bootstrap over calendar months, resampling every symbol's
 //     trades in a sampled month together, which keeps the cross-sectional
 //     correlation intact instead of shuffling it away.
+//
+// The third exists because of what the FIRST one cannot do. The random-entry
+// control is the correct null for an ENTRY claim and holds the exit fixed on
+// purpose, which leaves an exit change with no null at all: swap the geometry
+// and both arms move together. pairedBlockBootstrap is that missing null —
+// same entries, baseline ladder, resampled by month in both arms at once.
 //
 // Pure and deterministic: seeded RNG, no I/O, no Date.now(). Same seed and same
 // inputs give the same verdict, which is what makes a pre-registered bar
@@ -139,6 +146,31 @@ export interface BootstrapResult {
 type BootstrapTrade = Pick<SimTrade, "openedAt" | "rMultiple">;
 
 /**
+ * Sum R by the calendar month a trade was OPENED in.
+ *
+ * Opened, not closed: that is when the bet was placed, and it is the market
+ * state the trade is a draw from. Trades with no R-multiple are dropped — null
+ * means the trade could not be measured in R (see MIN_RISK_FRACTION), and a
+ * zero would be a fabricated observation.
+ */
+function monthlySums(trades: BootstrapTrade[]): Map<string, { sum: number; count: number }> {
+  const sums = new Map<string, { sum: number; count: number }>();
+  for (const t of trades) {
+    if (t.rMultiple == null || !Number.isFinite(t.rMultiple)) continue;
+    const d = t.openedAt instanceof Date ? t.openedAt : new Date(t.openedAt);
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const cur = sums.get(key);
+    if (cur) {
+      cur.sum += t.rMultiple;
+      cur.count += 1;
+    } else {
+      sums.set(key, { sum: t.rMultiple, count: 1 });
+    }
+  }
+  return sums;
+}
+
+/**
  * Resample calendar months with replacement and report the spread of avgR.
  *
  * The month a trade was OPENED in is the block key — that is when the bet was
@@ -155,21 +187,7 @@ export function monthlyBlockBootstrap(
   runs: number,
   rng: () => number,
 ): BootstrapResult | null {
-  const sums = new Map<string, { sum: number; count: number }>();
-  for (const t of trades) {
-    if (t.rMultiple == null || !Number.isFinite(t.rMultiple)) continue;
-    const d = t.openedAt instanceof Date ? t.openedAt : new Date(t.openedAt);
-    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    const cur = sums.get(key);
-    if (cur) {
-      cur.sum += t.rMultiple;
-      cur.count += 1;
-    } else {
-      sums.set(key, { sum: t.rMultiple, count: 1 });
-    }
-  }
-
-  const blocks = [...sums.values()];
+  const blocks = [...monthlySums(trades).values()];
   if (blocks.length < 2) return null;
 
   const means: number[] = [];
@@ -192,5 +210,109 @@ export function monthlyBlockBootstrap(
     p5: percentile(means, 0.05),
     p50: percentile(means, 0.5),
     p95: percentile(means, 0.95),
+  };
+}
+
+export interface PairedBootstrapResult {
+  runs: number;
+  /** calendar months in which BOTH arms traded — the paired sample size */
+  blocks: number;
+  /** each arm's avgR over those shared months */
+  candidateAvgR: number;
+  baselineAvgR: number;
+  /** candidateAvgR - baselineAvgR: the point estimate the interval is around */
+  delta: number;
+  p5: number;
+  p50: number;
+  p95: number;
+}
+
+/**
+ * The third instrument: how much better one EXIT geometry is than another, on
+ * the same entries, with a resampling interval around the difference.
+ *
+ * It exists because the random-entry control cannot answer this. runControl
+ * hands the control the same `exit` object as the rule, deliberately — an entry
+ * claim has to be measured at a fixed exit geometry or it is a claim about two
+ * things. The consequence is that changing the exit moves both arms together
+ * and the margin barely responds, so the one geometry in this repo with a real
+ * out-of-sample pedigree (the ATR trail) could never have been approved by that
+ * gate. This is the null it needs instead: same entries, baseline ladder.
+ *
+ * PAIRED, and that is the whole point. Both arms trade the same entry signals
+ * in the same months, so their per-month errors are strongly correlated —
+ * March 2020 is a bad month for both ladders. Bootstrapping each arm separately
+ * and comparing the two intervals would charge that shared market variance to
+ * the difference twice over and could not detect an effect the size of the ones
+ * being looked for here (~0.02R). Resampling a MONTH means resampling that
+ * month's trades in BOTH arms together, so the shared component cancels inside
+ * every resample and what is left is the geometry.
+ *
+ * The blocks are the INTERSECTION of the two arms' months. One-position-per-
+ * symbol means a longer-held exit skips signals a shorter one takes, so the
+ * arms do not trade identical sets — that is a real property of the geometry
+ * and is left alone. But a month only one arm was in cannot contribute to a
+ * difference, and including it would let arm composition drive `delta` instead
+ * of the exit. Both point estimates are computed over the shared months for the
+ * same reason: `delta` must be the quantity the interval surrounds.
+ *
+ * Returns null when fewer than two months are shared. As everywhere else in
+ * this gate, a caller must read null as "unverified", never as "passed".
+ *
+ * What this does NOT say: nothing about whether the strategy is worth trading.
+ * A better exit on an entry that loses to random entry is still a losing
+ * strategy. This answers one question only — is this exit better than the exit
+ * we would have used anyway?
+ */
+export function pairedBlockBootstrap(
+  candidate: BootstrapTrade[],
+  baseline: BootstrapTrade[],
+  runs: number,
+  rng: () => number,
+): PairedBootstrapResult | null {
+  const cand = monthlySums(candidate);
+  const base = monthlySums(baseline);
+
+  const pairs = [...cand.entries()]
+    .filter(([key]) => base.has(key))
+    .map(([key, c]) => ({ c, b: base.get(key)! }));
+  if (pairs.length < 2) return null;
+
+  const deltaOf = (picks: typeof pairs): number | null => {
+    let cs = 0, cn = 0, bs = 0, bn = 0;
+    for (const p of picks) {
+      cs += p.c.sum; cn += p.c.count;
+      bs += p.b.sum; bn += p.b.count;
+    }
+    if (cn === 0 || bn === 0) return null;
+    return cs / cn - bs / bn;
+  };
+
+  const point = deltaOf(pairs);
+  if (point == null) return null;
+
+  const deltas: number[] = [];
+  for (let r = 0; r < runs; r++) {
+    const picks = Array.from({ length: pairs.length }, () => pairs[Math.floor(rng() * pairs.length)]);
+    const d = deltaOf(picks);
+    if (d != null && Number.isFinite(d)) deltas.push(d);
+  }
+  if (!deltas.length) return null;
+
+  const candSum = pairs.reduce((s, p) => s + p.c.sum, 0);
+  const candN = pairs.reduce((s, p) => s + p.c.count, 0);
+  const baseSum = pairs.reduce((s, p) => s + p.b.sum, 0);
+  const baseN = pairs.reduce((s, p) => s + p.b.count, 0);
+
+  deltas.sort((a, b) => a - b);
+  return {
+    runs: deltas.length,
+    blocks: pairs.length,
+    candidateAvgR: candSum / candN,
+    baselineAvgR: baseSum / baseN,
+    delta: point,
+    p5: percentile(deltas, 0.05),
+    p50: percentile(deltas, 0.5),
+    p95: percentile(deltas, 0.95),
   };
 }

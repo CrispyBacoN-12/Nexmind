@@ -4,10 +4,10 @@ import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
 import { backtestCandles, summarizeBacktest, DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
 import { panelSignalsForCode } from "./adapter";
-import { sweepLadder, isBankableRound, LADDER_TP_MULTS, LADDER_SL_MULT, LADDER_TRAILS, LADDER_OPTIONS, type ExitLadder } from "./runResearch";
+import { sweepLadder, isBankableRound, LADDER_TP_MULTS, LADDER_SL_MULT, LADDER_TRAILS, LADDER_OPTIONS, REFINEMENT_LADDER, type ExitLadder } from "./runResearch";
 import { MIN_TRADES } from "./autoReview";
 import { FOLDS } from "./panel";
-import type { PreparedSymbol } from "./panelRun";
+import { BASELINE_EXIT, sameGeometry, type PreparedSymbol } from "./panelRun";
 
 // sweepLadder now sweeps a prepared PANEL, not a (code, bars, snaps) triple, so
 // every fixture below is wrapped as a one-symbol panel. One symbol is enough:
@@ -229,4 +229,18 @@ test("a mock-proposed round is never bankable, and a manual round always is", ()
   // A non-manual round with no backend reported at all is refused rather than
   // waved through — same fail-closed default as applyBlindTestVerdict.
   assert.equal(isBankableRound(false, null), false);
+});
+
+test("BASELINE_EXIT is the same geometry as REFINEMENT_LADDER, so the exit gate's null is the exit we actually use", () => {
+  // panelRun.ts restates 1.5/1.5 as plain numbers instead of importing it,
+  // because runResearch.ts constructs a prisma client at module scope and
+  // panelRun must stay importable without a database. That copy is the price;
+  // this assertion is what keeps it from drifting. If REFINEMENT_LADDER is ever
+  // retuned, the exit control would otherwise go on measuring candidates
+  // against a ladder the desk stopped using — and silently, since every
+  // comparison would still run and still print a number.
+  assert.ok(
+    sameGeometry(BASELINE_EXIT, REFINEMENT_LADDER),
+    `BASELINE_EXIT ${JSON.stringify(BASELINE_EXIT)} has drifted from REFINEMENT_LADDER ${JSON.stringify(REFINEMENT_LADDER)}`,
+  );
 });

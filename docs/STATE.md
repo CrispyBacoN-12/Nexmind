@@ -61,6 +61,36 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
+- **The exit axis is measurable now, and the first thing it measured is the ATR trail.
+  2026-09-05 — the second null exists.** §5's standing trap said no AI-proposed exit could be
+  gated until a null of the form *same entries, baseline ladder* existed. It does:
+  `runExitControl` + `exitFoldVerdict` in `panelRun.ts`, resting on `pairedBlockBootstrap` in
+  `control.ts`. It is the mirror image of `runControl` — that one shuffles the entries and holds
+  the exit fixed, this one holds the entries fixed and swaps the geometry — so whichever half of
+  a strategy is under test, the other is the constant. The bootstrap is **paired**: both arms
+  trade the same signals in the same months, so resampling a month resamples it in *both* arms
+  and the shared market component cancels inside every resample; two independent bootstraps would
+  charge that variance to the difference twice and could not resolve a ~0.04R effect. Blocks are
+  the **intersection** of the two arms' months, because one-position-per-symbol means a
+  longer-held geometry skips signals a shorter one takes, and a month only one arm was in would
+  let arm composition drive the delta. Bar: p5 of the resampled delta > 0, one-sided at 5% — the
+  same level the entry gate asks of the control's p95, pre-registered before any geometry was
+  measured. Fail-closed as everywhere else: fewer than two shared months reads as *unverified*,
+  never as a pass. `BASELINE_EXIT` (1.5/1.5) is `REFINEMENT_LADDER` restated as plain numbers
+  because `runResearch.ts` constructs prisma at module scope; `runResearch.test.ts` asserts the
+  two agree so the copy cannot drift. **First reading (`scripts/exit-control.mts`, pre-registered
+  selection rule = p5 > 0 on FIT *and* SELECT): zero candidates.** Both ATR trails clear FIT
+  decisively (delta +0.045/+0.046, p5 +0.024/+0.019) and both fail SELECT, where every geometry
+  including the baseline is negative. The holdout, run afterwards with an empty candidate list to
+  finish the record: `trail 1/1.5` is positive in **5/5** folds and passes p5 in 4, failing only
+  SELECT; `trail 1.5/1.5` — the geometry the desk trades — is positive in 4 and passes 3, failing
+  SELECT and TEST2. The three wider single targets pass nothing, and their delta grows with
+  `tp1Mult` on FIT/TEST1 and shrinks with it on SELECT/TEST2 — a parameter whose sign depends on
+  the fold is a fit, not a mechanism. Read narrowly: an ATR trail is worth ~+0.04R per trade
+  *against the 1.5/1.5 ladder, on these entries*, and that is a smaller loss rather than an edge
+  — the baseline entry still loses to a matched random entry in 30/30 cells. Logs:
+  `scripts/exit-control.log`, `scripts/exit-control-holdout.log`. 509/509 tests.
+
 - **Anticipating the setup fails too, and better onset prediction made returns WORSE.
   2026-09-05 — the closing test of the entry axis.** §8 had named the one direction left: a
   causal rule that fires earlier on the *same* setup rather than one that admits more setups.
@@ -849,13 +879,14 @@ be chosen deliberately rather than inherited.
   t−8. What the diagnostic legitimately establishes is direction and mechanism (the loss lives in
   the waiting) and a rough size for three bars of lag on daily data. The desk trades **weekly**,
   where three bars is three weeks; the lag was measured on the daily panel, not there.
-- **The panel gate cannot credit an exit's standalone value, by construction.** `runControl` in
-  `panelRun.ts` hands the control the *same* `exit` object as the rule, so a better exit lifts both
-  arms and the margin barely moves. That is the correct null for an *entry* claim and it should
-  stay — but it means the ATR trail, the one geometry here with a real OOS pedigree, could never
-  have been approved by this gate; it was validated on the sweep harness against the baseline
-  ladder, which is the right control for an exit change. **Before any AI-proposed exit can be
-  gated, a second null — same entries, baseline ladder — has to exist. It does not today.**
+- **`runControl` still cannot credit an exit, and must not be changed so it can.** It hands the
+  control the *same* `exit` object as the rule, so a better exit lifts both arms and the margin
+  barely moves. That is the correct null for an *entry* claim — an entry has to be measured at a
+  fixed geometry or it is a claim about two things — and it stays as it is. The second null it
+  needed now exists: **`runExitControl` / `exitFoldVerdict` (2026-09-05)**, same entries, baseline
+  ladder, paired monthly block bootstrap on the difference. Use `runControl` for an entry change
+  and `runExitControl` for an exit change; a proposal that moves both is two claims and gets
+  neither gate.
 - **The market gate's sample is ~a dozen episodes, not 91,236 trades.** Its variable changes only
   when SPY crosses its 200-day mean. Five folds of ONE benchmark series are not five independent
   observations. Never quote the trade counts as the evidence base.

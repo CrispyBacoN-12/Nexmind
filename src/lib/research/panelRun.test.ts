@@ -9,10 +9,11 @@ import type { Fold, Panel } from "./panel";
 import { FOLDS } from "./panel";
 import {
   sliceFold, withSignals, simulateFold, runControl, panelFoldVerdict,
+  runExitControl, exitFoldVerdict, sameGeometry, BASELINE_EXIT,
   MIN_PANEL_TRADES, MIN_PANEL_SYMBOLS, PANEL_LOT,
-  type FoldRun, type PanelExit, type PreparedSymbol,
+  type ExitGeometry, type FoldRun, type PanelExit, type PreparedSymbol,
 } from "./panelRun";
-import type { BootstrapResult, ControlDistribution } from "./control";
+import type { BootstrapResult, ControlDistribution, PairedBootstrapResult } from "./control";
 
 const DAY = 86_400;
 const epoch = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 1000;
@@ -263,4 +264,129 @@ test("the engine's WARMUP is below PANEL_WARMUP's intent, so entryFrom is what a
   // 250-bar prefix, so entryFrom dominates — if WARMUP ever rose above it, folds
   // would silently lose their opening bars.
   assert.ok(WARMUP < 250);
+});
+
+// ---- sameGeometry / runExitControl / exitFoldVerdict ----
+
+test("sameGeometry compares the trail too, and reads a missing singleTarget as the default", () => {
+  // A shallow tp1/sl check would call the 1.5/1.5 ladder and the 1.5/1.5 trail
+  // the same exit — and those two are precisely what this control exists to tell
+  // apart, since a trail replaces targeting outright.
+  assert.equal(sameGeometry(BASELINE_EXIT, { tp1Mult: 1.5, slMult: 1.5, singleTarget: true }), true);
+  assert.equal(sameGeometry(BASELINE_EXIT, { tp1Mult: 1.5, slMult: 1.5 }), true, "simulateFold defaults singleTarget to true");
+  assert.equal(
+    sameGeometry(BASELINE_EXIT, { tp1Mult: 1.5, slMult: 1.5, singleTarget: true, trail: { activateMult: 1.5, offsetMult: 1.5 } }),
+    false,
+    "a trail is a different exit even at identical multiples",
+  );
+  assert.equal(sameGeometry(BASELINE_EXIT, { tp1Mult: 2.5, slMult: 1.5, singleTarget: true }), false);
+});
+
+test("runExitControl holds the ENTRIES fixed and changes only the geometry", () => {
+  // The mirror image of runControl: there the exit is the constant and the
+  // entries are shuffled; here the entries are the constant and the exit moves.
+  // The pair is why both halves of a strategy can now be measured — whichever
+  // one is under test, the other is held still.
+  const bars = uptrend("2020-01-01", 400);
+  const signals = longsAt(bars.length, [100, 180, 260, 340]);
+  const before = [...signals.sides];
+  const prepared: PreparedSymbol[] = [{ symbol: "A", candles: bars, entryFrom: 0, signals }];
+  const candidate: PanelExit = { ...EXIT, tp1Mult: 3.0 };
+
+  const cmp = runExitControl(prepared, FIXTURE_FOLD, candidate, BASELINE_EXIT, { bootstrapRuns: 50 });
+  assert.deepEqual(signals.sides, before, "neither arm may mutate the caller's signals");
+  assert.equal(cmp.candidate.signals, cmp.baseline.signals, "both arms are offered the same entries");
+  assert.deepEqual(
+    runExitControl(prepared, FIXTURE_FOLD, candidate, BASELINE_EXIT, { bootstrapRuns: 50 }),
+    cmp,
+    "reproducible from the fixed seed alone, like every other verdict in this gate",
+  );
+});
+
+test("runExitControl gives the baseline the candidate's lot, costs and fill — it may differ only in geometry", () => {
+  // Same construction as runControl sharing its `exit` object. A baseline
+  // sizing at a different lot or paying different costs would not be a control,
+  // it would be a second strategy, and the difference would be credited to the
+  // geometry regardless.
+  const bars = uptrend("2020-01-01", 400);
+  const prepared: PreparedSymbol[] = [
+    { symbol: "A", candles: bars, entryFrom: 0, signals: longsAt(bars.length, [100, 180, 260, 340]) },
+  ];
+  const costs = { slippageBps: 5, commissionBps: 10 };
+  const candidate: PanelExit = { tp1Mult: 3.0, slMult: 1.5, singleTarget: true, lot: 0.7, entryAt: "open", costs };
+  const cmp = runExitControl(prepared, FIXTURE_FOLD, candidate, BASELINE_EXIT, { bootstrapRuns: 20 });
+
+  // 0.7 is seven times PANEL_LOT: the arms' P/L are only comparable if the
+  // baseline inherited it rather than falling back to a default. The cost check
+  // is what makes the comparison non-vacuous — a baseline that quietly traded
+  // free would also "match" a run built the same wrong way.
+  const inherited = simulateFold(prepared, FIXTURE_FOLD, { ...BASELINE_EXIT, lot: 0.7, entryAt: "open", costs });
+  assert.ok(cmp.baseline.summary.trades > 0, "the baseline has to have traded for this to compare anything");
+  assert.deepEqual(cmp.baseline.summary, inherited.summary);
+  assert.ok(cmp.baseline.summary.totalCostsUsd > 0, "the baseline pays the candidate's costs, not zero");
+});
+
+const PAIRED: PairedBootstrapResult = {
+  runs: 1000, blocks: 24, candidateAvgR: 0.08, baselineAvgR: 0.05, delta: 0.03, p5: 0.01, p50: 0.03, p95: 0.05,
+};
+const TRAIL: ExitGeometry = { tp1Mult: 2.5, slMult: 1.5, singleTarget: true, trail: { activateMult: 1.5, offsetMult: 1.5 } };
+
+test("exitFoldVerdict passes an exit that clears every arm of the bar", () => {
+  const v = exitFoldVerdict(TRAIL, BASELINE_EXIT, foldRun(), foldRun(), PAIRED);
+  assert.equal(v.passed, true);
+  assert.deepEqual(v.reasons, []);
+});
+
+test("exitFoldVerdict judges the resampled DIFFERENCE, not the candidate's own avgR", () => {
+  // The failure this instrument exists to catch: an exit whose avgR looks good
+  // because the baseline's does too. A point estimate that survives on the full
+  // sample but not on resampled months is exactly that.
+  const v = exitFoldVerdict(TRAIL, BASELINE_EXIT, foldRun(), foldRun(), { ...PAIRED, p5: -0.004 });
+  assert.equal(v.passed, false);
+  assert.ok(v.reasons.some((r) => r.includes("-0.004") && r.includes("24 shared monthly blocks")), v.reasons.join(" | "));
+});
+
+test("exitFoldVerdict treats a p5 of exactly zero as a failure", () => {
+  const v = exitFoldVerdict(TRAIL, BASELINE_EXIT, foldRun(), foldRun(), { ...PAIRED, p5: 0 });
+  assert.equal(v.passed, false);
+});
+
+test("exitFoldVerdict fails closed when the paired bootstrap could not be computed", () => {
+  // Same rule as the entry gate: "we could not check" must never read as "it
+  // passed". null here means the arms shared fewer than two calendar months.
+  const v = exitFoldVerdict(TRAIL, BASELINE_EXIT, foldRun(), foldRun(), null);
+  assert.equal(v.passed, false);
+  assert.ok(v.reasons.some((r) => r.includes("unverified")));
+});
+
+test("exitFoldVerdict names a geometry compared against itself instead of reporting a zero delta", () => {
+  // Passing the baseline as the candidate does fail — but for the wrong reason,
+  // and the zero would be read as evidence about the exit rather than as the
+  // caller error it is.
+  const v = exitFoldVerdict(BASELINE_EXIT, BASELINE_EXIT, foldRun(), foldRun(), { ...PAIRED, delta: 0, p5: 0 });
+  assert.equal(v.passed, false);
+  assert.ok(v.reasons.some((r) => r.includes("compared against itself")));
+});
+
+test("exitFoldVerdict applies the readability floors to BOTH arms, naming which one is thin", () => {
+  // A comparison is only as readable as its thinner arm, and the arms do not
+  // hold the same trades: one-position-per-symbol means a longer-held geometry
+  // skips signals the shorter one takes.
+  const thin = foldRun({ summary: summary({ trades: 50 }), symbolsTraded: MIN_PANEL_SYMBOLS - 1 });
+  const cand = exitFoldVerdict(TRAIL, BASELINE_EXIT, thin, foldRun(), PAIRED);
+  assert.equal(cand.passed, false);
+  assert.ok(cand.reasons.some((r) => r.startsWith("candidate arm produced 50 trades")), cand.reasons.join(" | "));
+  assert.ok(cand.reasons.some((r) => r.startsWith("candidate arm traded")));
+
+  const base = exitFoldVerdict(TRAIL, BASELINE_EXIT, foldRun(), thin, PAIRED);
+  assert.equal(base.passed, false);
+  assert.ok(base.reasons.some((r) => r.startsWith("baseline arm produced 50 trades")), base.reasons.join(" | "));
+});
+
+test("BASELINE_EXIT is at least 1:1 against its stop, so the null is a geometry the desk would actually trade", () => {
+  // If this ever drifted sub-1:1 the exit gate would measure every candidate
+  // against the one ladder the project concluded it should never trade — the
+  // same defect REFINEMENT_LADDER was introduced to fix.
+  assert.ok(BASELINE_EXIT.tp1Mult / BASELINE_EXIT.slMult >= 1, "the baseline null must not be sub-1:1");
+  assert.equal(BASELINE_EXIT.trail, undefined, "the null is the ladder; the trail is the thing under test");
 });

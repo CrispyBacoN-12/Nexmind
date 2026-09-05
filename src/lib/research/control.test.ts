@@ -3,7 +3,7 @@ import "dotenv/config"; // @/lib/backtest/engine reaches prisma through scanner.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WARMUP, type EntrySignals, type SimTrade } from "@/lib/backtest/engine";
-import { mulberry32, percentile, matchedRandomSignals, summarizeControl, monthlyBlockBootstrap } from "./control";
+import { mulberry32, percentile, matchedRandomSignals, summarizeControl, monthlyBlockBootstrap, pairedBlockBootstrap } from "./control";
 
 /** Signals of length `n` with `sides` placed at the given indices. */
 function signals(n: number, placed: Record<number, "long" | "short">): EntrySignals {
@@ -190,5 +190,103 @@ test("monthlyBlockBootstrap reproduces exactly under the same seed", () => {
   assert.deepEqual(
     monthlyBlockBootstrap(trades, 100, mulberry32(42)),
     monthlyBlockBootstrap(trades, 100, mulberry32(42)),
+  );
+});
+
+// ---- pairedBlockBootstrap ----
+
+test("pairedBlockBootstrap resamples the SAME months in both arms, so the shared market cancels", () => {
+  // This is the property that makes the instrument usable at all. Both arms
+  // trade the same entries in the same months, so a bad month is bad for both.
+  // Here every month is dominated by a large common component (+5 then -5 then
+  // +5 ...) and the candidate is a flat +0.2 better in each. Bootstrapping the
+  // arms independently would draw different months for each and report an
+  // interval spanning the +-5 swing; pairing cancels it exactly, leaving the
+  // 0.2 with no spread at all.
+  const months = ["01", "02", "03", "04", "05", "06"];
+  const common = [5, -5, 5, -5, 5, -5];
+  const cand = months.map((m, i) => trade(`2020-${m}-05`, common[i] + 0.2));
+  const base = months.map((m, i) => trade(`2020-${m}-05`, common[i]));
+
+  const p = pairedBlockBootstrap(cand, base, 500, mulberry32(7));
+  assert.ok(p);
+  assert.equal(p.blocks, 6);
+  assert.ok(Math.abs(p.delta - 0.2) < 1e-9, `point estimate should be the paired difference, got ${p.delta}`);
+  assert.ok(Math.abs(p.p5 - 0.2) < 1e-9 && Math.abs(p.p95 - 0.2) < 1e-9, `paired interval should collapse, got [${p.p5}, ${p.p95}]`);
+});
+
+test("pairedBlockBootstrap only counts months BOTH arms traded", () => {
+  // One-position-per-symbol means a longer-held exit skips signals a shorter one
+  // takes, so the arms never trade identical sets. A month only one arm was in
+  // cannot contribute to a difference, and counting it would let arm composition
+  // move the delta instead of the exit geometry. Here the candidate's extra
+  // March is a huge +10 that must not reach the estimate at all.
+  const cand = [trade("2020-01-05", 1), trade("2020-02-05", 1), trade("2020-03-05", 10)];
+  const base = [trade("2020-01-05", 0), trade("2020-02-05", 0)];
+
+  const p = pairedBlockBootstrap(cand, base, 200, mulberry32(3));
+  assert.ok(p);
+  assert.equal(p.blocks, 2, "March is the candidate's alone and is not a paired observation");
+  assert.equal(p.candidateAvgR, 1, "the unshared +10 must not reach the point estimate");
+  assert.equal(p.delta, 1);
+});
+
+test("pairedBlockBootstrap fails closed when there is nothing paired to resample", () => {
+  // Same rule as everywhere else in this gate: null is "unverified", and the
+  // verdict layer must never read it as a pass.
+  assert.equal(pairedBlockBootstrap([], [], 100, mulberry32(1)), null);
+  // Two months each, but disjoint — no shared block at all.
+  assert.equal(
+    pairedBlockBootstrap(
+      [trade("2020-01-05", 1), trade("2020-02-05", 1)],
+      [trade("2020-05-05", 1), trade("2020-06-05", 1)],
+      100, mulberry32(1),
+    ),
+    null,
+  );
+  // One shared month resampled with replacement would return its own difference
+  // every time and print an interval of width zero — the most confident-looking
+  // thing this could produce, from a sample of one.
+  assert.equal(
+    pairedBlockBootstrap([trade("2020-01-05", 1)], [trade("2020-01-06", 0)], 100, mulberry32(1)),
+    null,
+  );
+  // Shared months exist but nothing carries an R-multiple.
+  assert.equal(
+    pairedBlockBootstrap(
+      [trade("2020-01-05", null), trade("2020-02-05", null)],
+      [trade("2020-01-05", 1), trade("2020-02-05", 1)],
+      100, mulberry32(1),
+    ),
+    null,
+  );
+});
+
+test("pairedBlockBootstrap weights months by trade count within each arm", () => {
+  // Each arm's avgR is total R over total trades, matching avgR everywhere else,
+  // and the arms are weighted independently because they do not hold the same
+  // number of trades in a month. Candidate: 10 trades at +1 in Jan, 1 at +1 in
+  // Feb -> +1.0. Baseline: 1 at +1 in Jan, 10 at -1 in Feb -> -0.818.
+  const cand = [
+    ...Array.from({ length: 10 }, () => trade("2020-01-05", 1)),
+    trade("2020-02-05", 1),
+  ];
+  const base = [
+    trade("2020-01-05", 1),
+    ...Array.from({ length: 10 }, () => trade("2020-02-05", -1)),
+  ];
+  const p = pairedBlockBootstrap(cand, base, 300, mulberry32(11));
+  assert.ok(p);
+  assert.equal(p.candidateAvgR, 1);
+  assert.ok(Math.abs(p.baselineAvgR - (-9 / 11)) < 1e-12, `got ${p.baselineAvgR}`);
+  assert.ok(Math.abs(p.delta - (1 - -9 / 11)) < 1e-12);
+});
+
+test("pairedBlockBootstrap reproduces exactly under the same seed", () => {
+  const cand = [trade("2020-01-05", 1), trade("2020-02-05", -0.5), trade("2020-03-05", 2)];
+  const base = [trade("2020-01-05", 0.5), trade("2020-02-05", -1), trade("2020-03-05", 1)];
+  assert.deepEqual(
+    pairedBlockBootstrap(cand, base, 100, mulberry32(42)),
+    pairedBlockBootstrap(cand, base, 100, mulberry32(42)),
   );
 });

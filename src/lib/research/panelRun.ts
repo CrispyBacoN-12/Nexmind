@@ -19,8 +19,8 @@ import {
 import type { Candle } from "@/lib/indicators";
 import { evaluateHoldout, type HoldoutVerdict } from "./holdout";
 import {
-  matchedRandomSignals, monthlyBlockBootstrap, mulberry32, summarizeControl,
-  type BootstrapResult, type ControlDistribution,
+  matchedRandomSignals, monthlyBlockBootstrap, pairedBlockBootstrap, mulberry32, summarizeControl,
+  type BootstrapResult, type ControlDistribution, type PairedBootstrapResult,
 } from "./control";
 import { foldSlice, type Fold, type Panel } from "./panel";
 
@@ -88,6 +88,36 @@ export interface PanelExit {
 }
 
 export const PANEL_LOT = 0.1;
+
+/** The geometry half of a PanelExit — what an exit CHANGE is, with the fill and sizing left out. */
+export type ExitGeometry = Pick<PanelExit, "tp1Mult" | "slMult" | "trail" | "singleTarget">;
+
+/**
+ * The exit the desk would have used anyway, and therefore the null every
+ * proposed exit change is measured against.
+ *
+ * 1.5/1.5 — an even 1:1 against the 1.5 ATR stop. Not chosen here: it is
+ * LADDER_OPTIONS[0], which runResearch already uses as REFINEMENT_LADDER, the
+ * fixed geometry every refinement round is compared under. Restated as plain
+ * numbers rather than imported because runResearch.ts pulls in prisma and this
+ * module must not; runResearch.test.ts asserts the two agree, so the copy
+ * cannot drift silently.
+ */
+export const BASELINE_EXIT: ExitGeometry = { tp1Mult: 1.5, slMult: 1.5, singleTarget: true };
+
+/** Paired resamples for the exit control. Cheap — no re-simulation, same reason as BOOTSTRAP_RUNS. */
+export const EXIT_BOOTSTRAP_RUNS = 1000;
+
+/**
+ * The bar an exit change must clear: the 5th percentile of the resampled
+ * candidate-minus-baseline difference must be above zero.
+ *
+ * One-sided at 5%, the same level the entry gate asks of the random-entry
+ * control's p95 — deliberately, so "beat the control" means the same strength
+ * of evidence whichever axis is being changed. Pre-registered here, before any
+ * exit geometry was measured against it.
+ */
+export const EXIT_DELTA_PERCENTILE = 0.05;
 
 /** How a symbol's bars become entry signals. Kept a callback so this module never imports the sandbox (or prisma behind it). */
 export type SignalSource = (symbol: string, candles: Candle[]) => EntrySignals;
@@ -225,6 +255,125 @@ export function runControl(
   }
 
   return summarizeControl(avgRs);
+}
+
+/** Do two geometries describe the same exit? Compared field by field so an added field cannot slip past a shallow check. */
+export function sameGeometry(a: ExitGeometry, b: ExitGeometry): boolean {
+  return (
+    a.tp1Mult === b.tp1Mult &&
+    a.slMult === b.slMult &&
+    (a.singleTarget ?? true) === (b.singleTarget ?? true) &&
+    a.trail?.activateMult === b.trail?.activateMult &&
+    a.trail?.offsetMult === b.trail?.offsetMult
+  );
+}
+
+export interface ExitComparison {
+  fold: Fold;
+  /** the proposed exit, on the rule's own entries */
+  candidate: FoldRun;
+  /** BASELINE_EXIT (or the caller's null), on the SAME entries */
+  baseline: FoldRun;
+  paired: PairedBootstrapResult | null;
+  verdict: HoldoutVerdict;
+}
+
+/**
+ * Score an EXIT change against the exit that would have been used anyway.
+ *
+ * The entries are held fixed and are the rule's own — no shuffling. That is the
+ * mirror image of runControl, which holds the exit fixed and shuffles the
+ * entries, and the pair of them is why the two axes can now both be measured:
+ * whichever half of a strategy is under test, the other half is the constant.
+ *
+ * The baseline inherits `lot`, `costs` and `entryAt` from the candidate rather
+ * than carrying its own. Same construction as runControl sharing its `exit`
+ * object: a baseline filling at a different price, sizing at a different lot or
+ * paying different costs would not be a control, it would be a second strategy,
+ * and making that unrepresentable beats detecting it.
+ */
+export function runExitControl(
+  prepared: PreparedSymbol[],
+  fold: Fold,
+  exit: PanelExit,
+  baseline: ExitGeometry = BASELINE_EXIT,
+  opts: { bootstrapRuns?: number; seed?: number } = {},
+): ExitComparison {
+  const seed = opts.seed ?? PANEL_SEED;
+  const baselineExit: PanelExit = { ...baseline, lot: exit.lot, costs: exit.costs, entryAt: exit.entryAt };
+
+  const candidateRun = simulateFold(prepared, fold, exit);
+  const baselineRun = simulateFold(prepared, fold, baselineExit);
+  const paired = pairedBlockBootstrap(
+    candidateRun.trades,
+    baselineRun.trades,
+    opts.bootstrapRuns ?? EXIT_BOOTSTRAP_RUNS,
+    mulberry32(seed + 2),
+  );
+
+  return {
+    fold,
+    candidate: candidateRun,
+    baseline: baselineRun,
+    paired,
+    verdict: exitFoldVerdict(exit, baseline, candidateRun, baselineRun, paired),
+  };
+}
+
+/**
+ * Judge one exit comparison.
+ *
+ * Read the pass narrowly. It says the candidate geometry beats the baseline
+ * ladder on these entries, and nothing else — in particular it says nothing
+ * about whether the entries are worth taking. The panel's own baseline entry
+ * loses to a matched random entry in every fold measured, and a better exit on
+ * a negative-value entry is still a negative-value strategy. An exit change and
+ * an entry change are separate claims needing separate gates, which is the
+ * whole reason this function exists rather than a branch inside
+ * panelFoldVerdict.
+ */
+export function exitFoldVerdict(
+  exit: ExitGeometry,
+  baseline: ExitGeometry,
+  candidate: FoldRun,
+  baselineRun: FoldRun,
+  paired: PairedBootstrapResult | null,
+): HoldoutVerdict {
+  const reasons: string[] = [];
+
+  if (sameGeometry(exit, baseline)) {
+    reasons.push(
+      `the candidate exit is the baseline exit (tp1 ${exit.tp1Mult}, sl ${exit.slMult}` +
+        `${exit.trail ? `, trail ${exit.trail.activateMult}/${exit.trail.offsetMult}` : ""}) — ` +
+        `a geometry compared against itself has no difference to measure, and a zero delta here is a caller error, not a verdict`,
+    );
+  }
+
+  for (const [arm, run] of [["candidate", candidate], ["baseline", baselineRun]] as const) {
+    if (run.summary.trades < MIN_PANEL_TRADES) {
+      reasons.push(`${arm} arm produced ${run.summary.trades} trades in ${run.fold.name} (floor ${MIN_PANEL_TRADES}) — a comparison is only as readable as its thinner arm`);
+    }
+    if (run.symbolsTraded < MIN_PANEL_SYMBOLS) {
+      reasons.push(`${arm} arm traded ${run.symbolsTraded} of ${run.symbolsInFold} symbols in ${run.fold.name} (floor ${MIN_PANEL_SYMBOLS})`);
+    }
+  }
+
+  if (!paired) {
+    reasons.push(
+      `the paired bootstrap could not run on ${candidate.fold.name} (needs at least two calendar months traded by BOTH arms) — ` +
+        `unverified, which is not a pass`,
+    );
+  } else if (paired.p5 <= 0) {
+    reasons.push(
+      `resampled candidate-minus-baseline avgR has p${Math.round(EXIT_DELTA_PERCENTILE * 100)} ` +
+        `${paired.p5.toFixed(3)} (<= 0) over ${paired.blocks} shared monthly blocks ` +
+        `(point estimate ${paired.delta >= 0 ? "+" : ""}${paired.delta.toFixed(3)}: ` +
+        `${paired.candidateAvgR.toFixed(3)} vs ${paired.baselineAvgR.toFixed(3)}) — ` +
+        `resampling whole months, the exit is not reliably better than the one we would have used anyway`,
+    );
+  }
+
+  return { passed: reasons.length === 0, reasons };
 }
 
 export interface PanelFoldResult {

@@ -1,0 +1,42 @@
+panel: 491 symbols · 1000 paired resamples per cell
+baseline (null): single 1.5/1.5 — REFINEMENT_LADDER, the geometry every refinement round already runs under
+folds: TEST1/TEST2/TEST3 — held out. Read only after the candidate list is written down.
+
+test1 (2020-01-01..2022-01-01, COVID crash and the liquidity-driven recovery)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  single 2/1.5       12951    15606   +0.025   +0.014   +0.011   -0.006   +0.028  fail
+  single 2.5/1.5     11363    15606   +0.044   +0.014   +0.030   -0.003   +0.063  fail
+  single 3/1.5       10199    15606   +0.056   +0.014   +0.041   -0.001   +0.090  fail
+  trail 1/1.5        13500    15606   +0.061   +0.014   +0.047   +0.006   +0.086  PASS
+  trail 1.5/1.5      12263    15606   +0.062   +0.014   +0.048   +0.007   +0.089  PASS
+
+test2 (2022-01-01..2024-01-01, rate-hike bear market and the 2023 recovery)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  single 2/1.5       12801    15330   -0.040   -0.031   -0.009   -0.031   +0.011  fail
+  single 2.5/1.5     11183    15330   -0.054   -0.031   -0.023   -0.064   +0.018  fail
+  single 3/1.5        9923    15330   -0.072   -0.031   -0.041   -0.101   +0.022  fail
+  trail 1/1.5        13752    15330   +0.003   -0.031   +0.034   +0.004   +0.065  PASS
+  trail 1.5/1.5      12440    15330   -0.016   -0.031   +0.015   -0.017   +0.050  fail
+
+test3 (2024-01-01..2027-01-01, 2024-2026 bull, AI-concentrated leadership)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  single 2/1.5       17386    20854   -0.009   -0.010   +0.002   -0.016   +0.017  fail
+  single 2.5/1.5     15277    20854   -0.008   -0.010   +0.002   -0.029   +0.030  fail
+  single 3/1.5       13755    20854   +0.001   -0.010   +0.012   -0.033   +0.052  fail
+  trail 1/1.5        18586    20854   +0.036   -0.010   +0.047   +0.027   +0.067  PASS
+  trail 1.5/1.5      16704    20854   +0.041   -0.010   +0.051   +0.027   +0.075  PASS
+
+How to read this
+  - "delta" is candidate avgR minus baseline avgR over the months BOTH arms
+    traded. The arms do not hold identical trades — one position per symbol means
+    a longer-held geometry skips signals a shorter one takes — so months only one
+    arm was in are excluded; including them would let arm composition drive the
+    number instead of the exit.
+  - "p5" is the bar. A positive delta with p5 below zero means the difference did
+    not survive resampling whole months, which is the failure mode this control
+    exists to catch: an exit that looks better because the market was.
+  - "base" is the SAME baseline ladder in every row of a fold, so the rows are
+    comparable to each other as well as to the null.
+  - PASS says only that this geometry beats the ladder we would have used anyway
+    on these entries. It says nothing about whether the entries are worth taking,
+    and the baseline entry loses to a matched random entry in every fold measured.
