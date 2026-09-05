@@ -65,8 +65,8 @@ interface RotationEntry {
 // here only if it fires on or before the baseline's trigger bar on setups the
 // baseline would also have taken.
 //
-// **Update 2026-09-05, and it cuts against the entry-anticipation entry below.**
-// The direction that survived the paragraph above was tested directly
+// **Update 2026-09-05 — this closed the entry axis, and emptied it out of the
+// rotation.** The direction that survived the paragraph above was tested directly
 // (scripts/entry-anticipation.mts, study section 9): four pre-registered pairs
 // that fire while a binding gate is still failing but is closing on its
 // threshold. No candidate — best 3/4 cells, and it loses to simply widening the
@@ -102,19 +102,18 @@ const PANEL_TERMS =
 // result here has to beat, not a rule presented as working.
 const BASELINE = "the trend-pullback baseline (price above SMA50, pullback toward SMA20, resumption on the trigger bar)";
 
+// **One entry, on purpose — the rotation is not a slot to be kept full.** An
+// entry-timing brief sat here until 2026-09-05, when the anticipation run closed
+// the last direction it could honestly ask for (see the update above). Nothing
+// replaced it because there is nothing to replace it with that the proposer can
+// express: a rule reaches the panel as `(i) => "long" | "short" | null` over a
+// ScanSnapshot, which carries price and volume only. The two directions the
+// evidence now points at — a different data class, and exits — are both engine
+// work, not briefs, and writing a brief that gestures at either would produce
+// candidates the adapter silently drops. A one-entry rotation repeats the same
+// axis weekly, which is the correct behaviour when only one axis is open: the
+// panel gate is what stops a repeat from banking a duplicate.
 export const RESEARCH_ROTATION: RotationEntry[] = [
-  {
-    label: "stocks-entry-anticipation",
-    brief:
-      `Entry anticipation for US equities swing trading: open the SAME setup as ${BASELINE} EARLIER than the baseline does. ` +
-      `A candidate must fire on a bar at or before the baseline's trigger bar, never after it, and must not add a further test that has to pass first. ` +
-      `${PANEL_TERMS}.`,
-    angles: [
-      "fire while the trend structure is already in place but the momentum reading has not yet reached the level the baseline stands aside for, so the position is open before the move is certified",
-      "fire on the bar that ends the pullback — the first close that reclaims the previous bar's range inside an established uptrend — rather than after a momentum indicator agrees",
-      "fire where the pullback's depth and duration already match what usually precedes a resumption, taking the position while price is still moving against the trend rather than after it turns",
-    ],
-  },
   {
     label: "stocks-trade-geometry",
     brief: `Trade geometry for US equities swing trading: take ${BASELINE} only where the distance from entry to a 1.5-ATR stop is favourable relative to the room the move plausibly has. ${PANEL_TERMS}.`,

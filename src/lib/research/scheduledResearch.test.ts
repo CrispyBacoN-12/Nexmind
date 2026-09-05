@@ -117,6 +117,16 @@ test("the rotation never asks for another entry confirmation", () => {
   assert.doesNotMatch(text, /one more signal|another confirmation/i);
 });
 
+test("the rotation is never empty", () => {
+  // Guarding a hazard that only appeared when the rotation shrank to one entry
+  // on 2026-09-05: at length 0 the modulo in pickRotationEntry is NaN, so it
+  // returns undefined and runScheduledResearchRound throws on `pick.brief` —
+  // a weekly cron failing in a way no caller distinguishes from a bad round.
+  // Removing the last entry is a legitimate decision; it just has to be made
+  // together with the picker, not by deleting a line.
+  assert.ok(RESEARCH_ROTATION.length > 0, "pickRotationEntry cannot index an empty rotation");
+});
+
 test("pickRotationEntry cycles through the whole rotation and wraps", () => {
   const n = RESEARCH_ROTATION.length;
   for (let w = 0; w < n * 2; w++) {

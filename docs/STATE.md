@@ -591,6 +591,19 @@ evaluating the function. Both entries were compromised anyway:
   `stocks-entry-anticipation`**, which requires a candidate to fire *at or before* the baseline's
   trigger bar and forbids adding a test that must pass first. That is the one bar-based direction
   the evidence points at, and it is not the same as loosening a threshold (§6-8 of the study).
+  **Then removed entirely on 2026-09-05**, after §9 tested that direction and closed it: four
+  pre-registered anticipation pairs, no candidate, and the pad that predicted the baseline's own
+  trigger *better* scored *worse*. Owner's call, taken 2026-09-05 — option (1) of three, the other
+  two being engine work. **The rotation is now a SINGLE entry, `stocks-trade-geometry`**, and it is
+  deliberately not being kept full: nothing replaced the entry slot because nothing that could
+  replace it is expressible as a brief. A rule reaches the panel as `(i) => "long" | "short" | null`
+  over a `ScanSnapshot`, which is price and volume only, so both remaining directions — a different
+  data class, and exits — are engine work. A one-entry rotation repeats the same axis weekly, which
+  is correct while one axis is open; the panel gate is what stops a repeat banking a duplicate.
+  A test now asserts the rotation is never empty: at length 0 `pickRotationEntry`'s modulo is NaN,
+  it returns `undefined`, and the weekly cron throws on `pick.brief` — indistinguishable from a bad
+  round. Verified by evaluating the function, not by reading this file: 2026-09-06 picks
+  `stocks-trade-geometry`.
 - `stocks-trade-geometry` kept its brief but lost two angles: "small trigger-bar range relative to
   ATR" is `nr7`, already screened and rejected on both universes, and "scale participation by where
   the entry sits inside the trigger bar's range" asks for **position sizing, which the proposer
@@ -603,7 +616,7 @@ t=1.08. 492/492 tests pass.
 
 **Costs no AI, still open:** `git rm -r --quiet rl mt5-bridge/__pycache__` (§6), and settling why
 desk #11 runs `combo-vote` rather than `trend-pullback` (§6 — whichever is intended, the other is a
-silent mismatch). Also unpushed: four commits on `stocks-only-pivot`.
+silent mismatch). Also unpushed: **23 commits** on `stocks-only-pivot` — pushing has not been requested.
 
 ### a. ~~Fix the live bar feed~~ — **RESOLVED 2026-08-30**, see §3
 
