@@ -1,0 +1,67 @@
+panel: 491 symbols · 1000 paired resamples per cell
+baseline (null): single 1.5/1.5 · all five folds, no selection is being made here
+
+fit (2016-01-01..2019-01-01)
+  baseline: 20370 trades, 8129 short (39.9%), mean hold 9.4d
+  geometry           hold  vs base      all     long  long p5    short  short p5
+  single 2/1.5      11.9d   +2.589   +0.006   +0.029   +0.006   -0.030    -0.053
+  single 2.5/1.5    14.5d   +5.179   +0.010   +0.050   +0.007   -0.050    -0.092
+  single 3/1.5      16.8d   +7.490   +0.019   +0.082   +0.015   -0.073    -0.129
+  trail 1/1.5       11.7d   +2.344   +0.045   +0.077   +0.038   +0.018    -0.007
+  trail 1.5/1.5     13.5d   +4.151   +0.046   +0.094   +0.044   -0.006    -0.038
+  rank correlation between "holds longer than baseline" and delta: -0.100
+
+select (2019-01-01..2020-01-01)
+  baseline: 7065 trades, 2440 short (34.5%), mean hold 9.3d
+  geometry           hold  vs base      all     long  long p5    short  short p5
+  single 2/1.5      11.7d   +2.468   -0.002   +0.051   +0.019   -0.081    -0.100
+  single 2.5/1.5    14.1d   +4.875   -0.022   +0.077   +0.010   -0.157    -0.195
+  single 3/1.5      16.4d   +7.137   -0.028   +0.120   +0.022   -0.203    -0.241
+  trail 1/1.5       11.5d   +2.243   -0.015   +0.020   -0.030   +0.002    -0.019
+  trail 1.5/1.5     13.2d   +3.973   -0.015   +0.061   +0.002   -0.066    -0.084
+  rank correlation between "holds longer than baseline" and delta: -0.900
+
+test1 (2020-01-01..2022-01-01)
+  baseline: 15606 trades, 5365 short (34.4%), mean hold 8.8d
+  geometry           hold  vs base      all     long  long p5    short  short p5
+  single 2/1.5      11.4d   +2.686   +0.011   +0.030   +0.004   -0.023    -0.069
+  single 2.5/1.5    14.0d   +5.208   +0.030   +0.067   +0.014   -0.035    -0.119
+  single 3/1.5      16.5d   +7.727   +0.041   +0.098   +0.019   -0.057    -0.174
+  trail 1/1.5       10.8d   +2.056   +0.047   +0.043   +0.010   +0.069    -0.025
+  trail 1.5/1.5     12.6d   +3.842   +0.048   +0.055   +0.009   +0.050    -0.071
+  rank correlation between "holds longer than baseline" and delta: -0.100
+
+test2 (2022-01-01..2024-01-01)
+  baseline: 15330 trades, 8239 short (53.7%), mean hold 8.8d
+  geometry           hold  vs base      all     long  long p5    short  short p5
+  single 2/1.5      11.3d   +2.510   -0.009   -0.001   -0.037   -0.016    -0.053
+  single 2.5/1.5    13.8d   +5.036   -0.023   -0.017   -0.084   -0.028    -0.104
+  single 3/1.5      16.4d   +7.656   -0.041   -0.026   -0.120   -0.054    -0.162
+  trail 1/1.5       10.8d   +2.071   +0.034   +0.046   -0.008   +0.029    -0.005
+  trail 1.5/1.5     12.4d   +3.662   +0.015   +0.030   -0.035   +0.006    -0.044
+  rank correlation between "holds longer than baseline" and delta: -0.900
+
+test3 (2024-01-01..2027-01-01)
+  baseline: 20854 trades, 8119 short (38.9%), mean hold 9.1d
+  geometry           hold  vs base      all     long  long p5    short  short p5
+  single 2/1.5      11.7d   +2.665   +0.002   +0.023   +0.005   -0.031    -0.064
+  single 2.5/1.5    14.2d   +5.156   +0.002   +0.048   +0.018   -0.067    -0.127
+  single 3/1.5      16.6d   +7.511   +0.012   +0.073   +0.021   -0.078    -0.154
+  trail 1/1.5       11.2d   +2.106   +0.047   +0.061   +0.033   +0.042    +0.015
+  trail 1.5/1.5     13.0d   +3.964   +0.051   +0.080   +0.045   +0.021    -0.010
+  rank correlation between "holds longer than baseline" and delta: -0.100
+
+verdict inputs (pre-registered rule: geometry needs shorts p5 > 0 in >= 4 of 5 folds)
+  single 2/1.5     shorts p5>0 in 0/5 folds · longs delta>0 in 4/5
+  single 2.5/1.5   shorts p5>0 in 0/5 folds · longs delta>0 in 4/5
+  single 3/1.5     shorts p5>0 in 0/5 folds · longs delta>0 in 4/5
+  trail 1/1.5      shorts p5>0 in 1/5 folds · longs delta>0 in 5/5
+  trail 1.5/1.5    shorts p5>0 in 0/5 folds · longs delta>0 in 5/5
+  mean rank correlation (hold gap vs delta) across folds: -0.420
+
+How to read this
+  - The SHORT column is the decisive one. Drift in a panel of US equities is up;
+    a geometry that only helps longs is collecting that drift, not managing a
+    trade. A geometry that helps shorts too is doing something to the trade.
+  - Short samples are much smaller than long ones — the entry rule is a
+    trend-follower on a panel that mostly rose �

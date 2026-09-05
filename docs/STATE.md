@@ -61,6 +61,26 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
+- **The wider single targets were exposure; the trails are not. 2026-09-05 — the side split.**
+  The new exit control said the trail is positive in 4-5/5 folds. This project has been fooled by
+  that shape before (regime x side was also 5/5 and turned out to be beta), so the same test
+  that exposed it was applied here before anything was tuned: `scripts/trail-is-geometry.mts`
+  computes the paired delta **separately on long and short trades**. Drift in a US equity panel is
+  up, so a geometry that only helps longs is collecting drift; one that helps both is managing a
+  trade. Result, against a pre-registered rule: **`single 2`, `single 2.5` and `single 3` are
+  exposure, confirmed** — positive on longs in 4/5 folds, negative on shorts in **5/5 each, 15 of
+  15 short cells the wrong way**, with both halves growing monotonically in `tp1Mult`. That also
+  explains the fit-shaped pattern from the day's earlier run: delta rising with `tp1Mult` on
+  FIT/TEST1 and falling on SELECT/TEST2 is the fold's long/short mix, nothing more. The trails
+  behave differently — `trail 1/1.5` has a **positive short delta in 5/5 folds**, `trail 1.5/1.5`
+  in 3/5 — but by the pre-registered rule (shorts p5 > 0 in ≥4/5) they are **MIXED, not proven**:
+  `trail 1/1.5` clears p5 on shorts in only 1/5, because the short leg is a third of the sample
+  over the same monthly blocks and the intervals are wide. Post-hoc and labelled as such: 5/5
+  positive is p = 1/32 under a fair coin. **Duration is refuted outright** — the rank correlation
+  between "holds longer than baseline" and delta is negative in all five folds (mean −0.42), and
+  the trails hold *less* than the single targets (10.8–13.5d vs 13.8–16.8d) while beating them
+  everywhere. Log: `scripts/trail-is-geometry.log`.
+
 - **The exit axis is measurable now, and the first thing it measured is the ATR trail.
   2026-09-05 — the second null exists.** §5's standing trap said no AI-proposed exit could be
   gated until a null of the form *same entries, baseline ladder* existed. It does:
@@ -879,6 +899,15 @@ be chosen deliberately rather than inherited.
   t−8. What the diagnostic legitimately establishes is direction and mechanism (the loss lives in
   the waiting) and a rough size for three bars of lag on daily data. The desk trades **weekly**,
   where three bars is three weeks; the lag was measured on the daily panel, not there.
+- **A wider fixed target is a way of buying drift, and its delta must not be read as an exit result.**
+  Measured 2026-09-05: `single 2/1.5`, `single 2.5/1.5` and `single 3/1.5` beat the 1.5/1.5 ladder
+  on LONG trades in 4/5 folds and lose on SHORT trades in 5/5 folds each, both halves growing with
+  `tp1Mult`. On a panel that drifted up, holding a long target further out collects more drift; the
+  aggregate delta is whatever the fold's long/short mix makes of that. `single 3/1.5`'s +0.041 on
+  TEST1 is the number to be suspicious of. Any exit claim gets the side split
+  (`scripts/trail-is-geometry.mts`) before it is believed; an aggregate delta alone cannot tell a
+  mechanism from a mix. Duration is NOT the confound to reach for first — the rank correlation
+  between holding longer and delta is negative in all five folds.
 - **`runControl` still cannot credit an exit, and must not be changed so it can.** It hands the
   control the *same* `exit` object as the rule, so a better exit lifts both arms and the margin
   barely moves. That is the correct null for an *entry* claim — an entry has to be measured at a
