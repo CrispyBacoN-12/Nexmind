@@ -1,0 +1,68 @@
+holding period and first-gap share, by mechanism — DIAGNOSTIC, not a verdict
+ladder=flat  seed=20260825  WARMUP=60  folds: fit, select (deep folds untouched)
+held = calendar days from fill to exit; <=1.5d means the trade was over the next session
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold    fill     trades     avgR    held p25    med    p75   mean   <=1 session
+    fit     close    17659    0.080       3.0    5.0    9.0    7.1      10.7%
+    fit     open     19178    0.026       1.0    4.0    7.0    5.7      28.5%
+      -> first gap is worth 0.0537R = 67% of the close-fill avgR   (median hold 5.0d)
+    select  close     5699    0.133       3.0    5.0    8.0    6.6      10.8%
+    select  open      5957    0.110       1.0    4.0    7.0    5.4      27.4%
+      -> first gap is worth 0.0227R = 17% of the close-fill avgR   (median hold 5.0d)
+
+nr7
+  volatility contraction: narrowest range of 7, direction from the symbol's own SMA50
+    fold    fill     trades     avgR    held p25    med    p75   mean   <=1 session
+    fit     close    27145    0.002       3.0    6.0   11.0    8.1       7.4%
+    fit     open     29273    0.015       2.0    5.0    9.0    6.6      22.8%
+      -> first gap is worth -0.0132R = -874% of the close-fill avgR   (median hold 6.0d)
+    select  close    10159    0.015       4.0    6.0   10.0    7.9       6.1%
+    select  open     11168   -0.004       2.0    5.0    9.0    6.5      20.8%
+      -> first gap is worth 0.0191R = 125% of the close-fill avgR   (median hold 6.0d)
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold    fill     trades     avgR    held p25    med    p75   mean   <=1 session
+    fit     close    42474   -0.013       3.0    6.0    9.0    7.3      11.7%
+    fit     open     46404   -0.019       1.0    4.0    8.0    5.9      29.0%
+      -> first gap is worth 0.0069R = -55% of the close-fill avgR   (median hold 6.0d)
+    select  close    16150   -0.031       3.0    6.0   10.0    7.6       9.0%
+    select  open     17688   -0.043       2.0    4.0    8.0    6.1      24.2%
+      -> first gap is worth 0.0121R = -39% of the close-fill avgR   (median hold 6.0d)
+
+turn-of-month
+  calendar: long on the last weekday of each month — zero parameters, zero price input
+    fold    fill     trades     avgR    held p25    med    p75   mean   <=1 session
+    fit     close    14735    0.093       3.0    6.0    9.0    7.4       9.9%
+    fit     open     14752    0.037       1.0    4.0    8.0    5.9      28.4%
+      -> first gap is worth 0.0554R = 60% of the close-fill avgR   (median hold 6.0d)
+    select  close     5163    0.051       3.0    5.0    7.0    6.4      11.0%
+    select  open      5631    0.025       1.0    3.0    7.0    4.9      34.0%
+      -> first gap is worth 0.0256R = 50% of the close-fill avgR   (median hold 5.0d)
+
+vol-dryup
+  volume dry-up: lowest volume of 20 while the close holds above its own SMA50
+    fold    fill     trades     avgR    held p25    med    p75   mean   <=1 session
+    fit     close     8792    0.108       4.0    7.0   11.0    8.3       5.6%
+    fit     open      9193    0.106       2.0    5.0    9.0    6.7      18.4%
+      -> first gap is worth 0.0024R = 2% of the close-fill avgR   (median hold 7.0d)
+    select  close     3718    0.083       4.0    6.0   10.0    7.9       5.2%
+    select  open      3860    0.086       2.0    5.0    9.0    6.5      17.8%
+      -> first gap is worth -0.0024R = -3% of the close-fill avgR   (median hold 6.0d)
+
+range-expand
+  range expansion: largest true range of 20, closing in the top/bottom quarter of its own bar
+    fold    fill     trades     avgR    held p25    med    p75   mean   <=1 session
+    fit     close    11445   -0.014       2.0    5.0    8.0    6.4      18.3%
+    fit     open     11618   -0.026       1.0    4.0    7.0    5.3      34.6%
+      -> first gap is worth 0.0128R = -94% of the close-fill avgR   (median hold 5.0d)
+    select  close     3413    0.002       2.0    5.0    8.0    6.2      18.9%
+    select  open      3431   -0.003       1.0    3.0    7.0    5.2      31.9%
+      -> first gap is worth 0.0053R = 221% of the close-fill avgR   (median hold 5.0d)
+
+Reading this: the last line of each fold is the filter the mechanism search needs.
+A candidate whose first gap is most of its avgR cannot be traded from Thailand,
+however good its close-fill number looks. avgR here carries NO control and is
+not evidence of edge — only the close-vs-open DIFFERENCE is being read.
