@@ -5,7 +5,7 @@ Auto-loaded every session via `CLAUDE.md`. Dated deep-dives live in `docs/quant/
 reasoning behind each change lives in its commit body. This file is the current bar, not
 the archive.
 
-_Last verified against the live DB + working tree: **2026-09-02**, branch `stocks-only-pivot`._
+_Last verified against the live DB + working tree: **2026-09-08**, branch `xauusd-mt5`._
 
 > **The panel gate has now run end to end (2026-08-31, run #112, `status: done`).** The budget
 > that had paused everything came back the same day. The round proposed 3 strategies and rejected
@@ -57,9 +57,40 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 09-02)
+## 3. Done recently (2026-08-23 → 09-08)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
+
+- **Weekly-bar screen: two of the six existing mechanisms clear the promotion bar at the only
+  fill the owner can trade. 2026-09-08.** Pre-registered hypothesis: at least one of the six
+  existing entry mechanisms, unmodified, resampled to weekly bars and filled the only way the
+  owner can actually place it — decided at the close of week *i*, filled at the open of week
+  *i+1* — beats its matched random-entry control at `DEFAULT_COST_MODEL` in both FIT and
+  SELECT. All three aborting checks passed before the verdict was read: HARNESS **match** (the
+  daily panel still reproduces `mechanism-screen-control.log` to 0.002R), RESAMPLER **pass**
+  (491 symbols, 265,167 weekly bars, every bar re-derived from and checked against its daily
+  source), VOIDING **99.73%** against a 99% bar. Stated as constraints, not caveats: FIT
+  carries **no** warm-up prefix and loses its first 60 weekly bars to the engine's own
+  warm-up (~14 months of a 3-year fold); SELECT is **52** weekly bars. Verdict, avgR /
+  control-median at `DEFAULT_COST_MODEL` (fit then select): **mr-down3** 0.104/0.073 then
+  0.397/0.241 — beats-median **and** clears the control p95 (0.097, 0.272) in both folds, raw
+  avgR positive and large both times. **gap-fade** 0.004/−0.071 then 0.026/−0.111 — also
+  beats-median in both folds, but its own avgR is ~0 while the control it beats is *negative*:
+  the same "clears the bar without making money" shape §5 already warns about, in reverse.
+  **mr-down3 and gap-fade are not the same finding — say which is which.** The other four
+  failed at least one fold and are not promoted: nr7 0.130/0.086 (fit beats-median) then
+  0.031/0.180 (select LOSES); turn-of-month 0.070/0.103 (fit LOSES) then 0.351/0.296 (select
+  beats-median); vol-dryup 0.277/0.124 (fit beats-median) then 0.180/0.325 (select LOSES);
+  range-expand 0.056/−0.009 (fit beats-median) then 0.005/0.128 (select LOSES). Realised
+  weekly 1R (median slMult × ATR / close over each mechanism's firing bars) came to
+  **5.58%–8.33%** of price across mechanisms and folds — the spec projected ~8.3% from
+  sqrt-of-time scaling off a measured daily 3.70%, so the realised number lands somewhat below
+  the projection: the halved cost-in-R the spec was testing for is real, but smaller than
+  projected. **ADVANCES: mr-down3, gap-fade** — read their TEST rows next, then write a
+  separate pre-registration before spending the deep hold-out (§4g). Spec
+  `docs/superpowers/specs/2026-09-08-weekly-bar-mechanism-screen-design.md`, plan
+  `docs/superpowers/plans/2026-09-08-weekly-bar-mechanism-screen.md`, log
+  `scripts/weekly-mechanism-screen.log`.
 
 - **The wider single targets were exposure; the trails are not. 2026-09-05 — the side split.**
   The new exit control said the trail is positive in 4-5/5 folds. This project has been fooled by
@@ -796,6 +827,15 @@ one corrected fill — nothing tradeable, and `decideSetup()` itself worse than 
 fold-cells. There is no candidate left to promote and no queued direction that the evidence
 supports. That is a real state of the project, not a gap in it, and the next direction should
 be chosen deliberately rather than inherited.
+
+**UPDATED 2026-09-08 — the weekly-bar screen adds a second live candidate, and both now have
+the same next step.** `scripts/weekly-mechanism-screen.mts` re-ran the same six mechanisms,
+unmodified, on weekly bars at the only fill the owner can trade (§3). `mr-down3` and
+`gap-fade` both cleared the promotion bar; the other four did not and are not to be re-tuned.
+**Next step, named by the script's own header: read the survivors' TEST rows, then write a
+separate pre-registration before spending the deep hold-out.** Neither is done yet — TEST is
+still unread for either mechanism on weekly bars, and the deep fold stays untouched until that
+pre-registration exists.
 
 ## 5. Traps — read before touching these areas
 
