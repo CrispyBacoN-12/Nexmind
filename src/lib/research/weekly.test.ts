@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
-import { weekIndex, toWeeklyBars } from "./weekly";
+import { weekIndex, toWeeklyBars, assertWeeklyMatchesDaily, weeklyPanel, WEEKLY_PANEL_WARMUP_BARS } from "./weekly";
+import type { Panel } from "./panel";
 
 const DAY = 86_400;
 
@@ -73,4 +74,70 @@ test("toWeeklyBars emits one bar per week across a weekend boundary", () => {
 
 test("toWeeklyBars returns nothing for an empty series", () => {
   assert.deepEqual(toWeeklyBars([]), []);
+});
+
+/** Five sessions a week for `weeks` weeks, prices walking up by 1 a session. */
+function dailySeries(weeks: number, t0 = MON_2016_01_04): Candle[] {
+  const out: Candle[] = [];
+  for (let w = 0; w < weeks; w++) {
+    for (let d = 0; d < 5; d++) {
+      const n = w * 5 + d;
+      const c = 100 + n;
+      out.push(bar(t0 + (w * 7 + d) * DAY, c - 1, c + 2, c - 3, c, 1_000 + n));
+    }
+  }
+  return out;
+}
+
+test("assertWeeklyMatchesDaily accepts the resampler's own output", () => {
+  const daily = dailySeries(6);
+  assert.doesNotThrow(() => assertWeeklyMatchesDaily("TEST", daily, toWeeklyBars(daily)));
+});
+
+test("assertWeeklyMatchesDaily rejects a wrong high", () => {
+  const daily = dailySeries(3);
+  const weekly = toWeeklyBars(daily);
+  weekly[1].h += 1;
+  assert.throws(() => assertWeeklyMatchesDaily("TEST", daily, weekly), /TEST.*\bh\b/);
+});
+
+test("assertWeeklyMatchesDaily rejects a wrong volume sum", () => {
+  const daily = dailySeries(3);
+  const weekly = toWeeklyBars(daily);
+  weekly[0].v -= 1;
+  assert.throws(() => assertWeeklyMatchesDaily("TEST", daily, weekly), /TEST.*\bv\b/);
+});
+
+test("assertWeeklyMatchesDaily rejects a dropped week", () => {
+  const daily = dailySeries(3);
+  const weekly = toWeeklyBars(daily).slice(0, 2);
+  assert.throws(() => assertWeeklyMatchesDaily("TEST", daily, weekly), /2 weekly bars from 3/);
+});
+
+test("weeklyPanel resamples every symbol and tags its cachePath", () => {
+  const panel: Panel = {
+    fetchedAt: "2026-08-14T00:00:00.000Z",
+    cachePath: ".cache/bars/test.json",
+    symbols: ["AAA", "BBB"],
+    bars: { AAA: dailySeries(4), BBB: dailySeries(4, MON_2016_01_04_YAHOO) },
+    droppedBars: { AAA: 3 },
+  };
+  const weekly = weeklyPanel(panel);
+  assert.deepEqual(weekly.symbols, ["AAA", "BBB"]);
+  assert.equal(weekly.bars.AAA.length, 4);
+  assert.equal(weekly.bars.BBB.length, 4);
+  assert.equal(weekly.cachePath, ".cache/bars/test.json#weekly");
+  assert.equal(weekly.fetchedAt, panel.fetchedAt);
+  assert.deepEqual(weekly.droppedBars, { AAA: 3 });
+});
+
+test("weeklyPanel throws rather than returning an empty panel", () => {
+  const panel: Panel = {
+    fetchedAt: "x", cachePath: ".cache/bars/empty.json", symbols: ["AAA"], bars: { AAA: [] }, droppedBars: {},
+  };
+  assert.throws(() => weeklyPanel(panel), /produced no weekly series/);
+});
+
+test("the weekly warm-up is two years and clears the engine's own 60-bar warm-up", () => {
+  assert.equal(WEEKLY_PANEL_WARMUP_BARS, 104);
 });
