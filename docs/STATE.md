@@ -51,7 +51,12 @@ Hard context the code does not state:
 | `Setting` rows | only `fearGreed` and `webull:accessToken` (expires **2026-09-14**). **No `ai:outage` row** — the spend limit predates the latch fix, so it was never recorded |
 | Market gate | **live and readable again** since 08-30: `SPY 769.35 > SMA200 707.41` (+8.8%) on Alpaca bars (§3) |
 | Scheduled tasks | all three (`Stocks scan` 05:00, `Manage positions` /15min, `Research round` Sun 06:00) now share the same power settings; next research fire **2026-09-06 06:00** |
-| Working tree | **clean**, 4 commits ahead of origin and **not pushed**: `4fc29ce` feed, `e1282ed` Webull production, `fb39e58` spend-limit latch, `7d993d5` state refresh |
+| Working tree | **dirty**, not clean: branch `xauusd-mt5`, 7 commits ahead of `dadb2f0` (the commit it was checked out from — no upstream configured, never pushed) — 16 tracked files touched plus 24 untracked, none of it yours to stash, clean, or check out over |
+
+The load-bearing part is the owner's uncommitted 2026-09-05 deep-hold-out work —
+`docs/quant/2026-09-05-deep-holdout.md`, `scripts/deep-holdout.mts`, `scripts/cache-deep-history.mts`,
+`scripts/deep-holdout.log`, `src/lib/research/mechanisms.ts` — plus 96 uncommitted lines already in
+this file. `git stash`, `git clean -fd`, or `git checkout --` on any of it destroys real work.
 
 Re-verify with a throwaway script under `scripts/` (delete it afterwards) querying
 `portfolio.findMany` (the field is `status`, **not** `active`),
@@ -75,8 +80,10 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   control-median at `DEFAULT_COST_MODEL` (fit then select): **mr-down3** 0.104/0.073 then
   0.397/0.241 — beats-median **and** clears the control p95 (0.097, 0.272) in both folds, raw
   avgR positive and large both times. **gap-fade** 0.004/−0.071 then 0.026/−0.111 — also
-  beats-median in both folds, but its own avgR is ~0 while the control it beats is *negative*:
-  the same "clears the bar without making money" shape §5 already warns about, in reverse.
+  beats-median in both folds, but its own avgR is ~0 while the control it beats is *negative* —
+  and at the pre-registered 5bps retail block its FIT avgR turns negative too (−0.009 against a
+  −0.086 control, `scripts/weekly-mechanism-screen.log`): the same "clears the bar without
+  making money" shape §5 already warns about, in reverse.
   **mr-down3 and gap-fade are not the same finding — say which is which.** The other four
   failed at least one fold and are not promoted: nr7 0.130/0.086 (fit beats-median) then
   0.031/0.180 (select LOSES); turn-of-month 0.070/0.103 (fit LOSES) then 0.351/0.296 (select
