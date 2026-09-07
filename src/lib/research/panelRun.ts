@@ -22,7 +22,7 @@ import {
   matchedRandomSignals, monthlyBlockBootstrap, pairedBlockBootstrap, mulberry32, summarizeControl,
   type BootstrapResult, type ControlDistribution, type PairedBootstrapResult,
 } from "./control";
-import { foldSlice, type Fold, type Panel } from "./panel";
+import { foldSlice, PANEL_WARMUP_BARS, type Fold, type Panel } from "./panel";
 
 // ---------------------------------------------------------------------------
 // The pass bar. Pre-registered in docs/PROPOSAL-panel-validation.md §4 before
@@ -162,13 +162,23 @@ export interface FoldSliceRow {
  * CODE-VERSION: a research round refines the same candidate two or three times
  * and runs three candidates in parallel, so the slices are cut once and shared
  * while only the signals are recomputed.
+ *
+ * `warmup` is a parameter rather than a constant because PANEL_WARMUP_BARS is
+ * 250 DAILY bars — one calendar year, and five calendar years of weekly ones.
+ * A weekly panel passes WEEKLY_PANEL_WARMUP_BARS instead. The default keeps
+ * every daily caller bit-identical.
  */
-export function sliceFold(panel: Panel, fold: Fold, symbols: string[] = panel.symbols): FoldSliceRow[] {
+export function sliceFold(
+  panel: Panel,
+  fold: Fold,
+  symbols: string[] = panel.symbols,
+  warmup: number = PANEL_WARMUP_BARS,
+): FoldSliceRow[] {
   const out: FoldSliceRow[] = [];
   for (const symbol of symbols) {
     const bars = panel.bars[symbol];
     if (!bars?.length) continue;
-    const slice = foldSlice(bars, fold);
+    const slice = foldSlice(bars, fold, warmup);
     if (!slice.tradableBars) continue;
     out.push({ symbol, candles: slice.candles, entryFrom: slice.entryFrom });
   }

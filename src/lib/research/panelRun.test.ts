@@ -390,3 +390,18 @@ test("BASELINE_EXIT is at least 1:1 against its stop, so the null is a geometry 
   assert.ok(BASELINE_EXIT.tp1Mult / BASELINE_EXIT.slMult >= 1, "the baseline null must not be sub-1:1");
   assert.equal(BASELINE_EXIT.trail, undefined, "the null is the ladder; the trail is the thing under test");
 });
+
+test("sliceFold's warmup parameter changes how much prefix a fold carries", () => {
+  // 400 daily bars ending inside FOLDS.fit, starting well before it, so the
+  // fold's first bar has more than 250 bars of history available.
+  const bars = uptrend("2015-01-01", 400);
+  const panel = panelOf({ AAA: bars });
+
+  const wide = sliceFold(panel, FOLDS.fit)[0];
+  const narrow = sliceFold(panel, FOLDS.fit, panel.symbols, 10)[0];
+
+  assert.equal(wide.entryFrom, 250, "the default is PANEL_WARMUP_BARS");
+  assert.equal(narrow.entryFrom, 10, "an explicit warmup wins");
+  // Same tradable window either way — only the prefix differs.
+  assert.equal(wide.candles.length - wide.entryFrom, narrow.candles.length - narrow.entryFrom);
+});
