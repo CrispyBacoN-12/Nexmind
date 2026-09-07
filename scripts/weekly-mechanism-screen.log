@@ -1,0 +1,103 @@
+weekly-bar mechanism screen — livable fill only, fit + select only
+PRE-REGISTERED: see this script's header. Nothing here may be approved.
+
+loading daily panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+HARNESS CHECK (daily panel reproduces mechanism-screen-control.log to 0.002R): match
+
+resampling to weekly bars (every bar asserted against its daily source)…
+RESAMPLER CHECK: pass — 491 symbols, 265167 weekly bars from .cache/bars/sp500-1d.json#weekly
+VOIDING CHECK (weekly bars with open != close): 99.73% — bar is 99%
+  fit: 474 symbols participate, 0 warm-up + 156 tradable weekly bars (first symbol)
+  select: 476 symbols participate, 104 warm-up + 52 tradable weekly bars (first symbol)
+
+fill: decided at the close of weekly bar i, filled at the open of bar i+1 (Friday 16:00 ET -> Monday 09:30 ET = Saturday 03:00 -> Monday 20:30 Thai)
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60 bars  fold warm-up=104 weekly bars
+
+================================================================================================================
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+================================================================================================================
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         2207      464    0.104   61.5%    0.073    0.097    0.032    7.28%  beats-median
+    select       965      431    0.397   77.7%    0.241    0.272    0.156    8.33%  beats-median
+
+nr7
+  volatility contraction: narrowest range of 7, direction from the symbol's own SMA50
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         4250      468    0.130   62.9%    0.086    0.108    0.045    6.28%  beats-median
+    select      2469      469    0.031   57.4%    0.180    0.206   -0.149    7.23%  LOSES-to-median
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3747      466    0.004   55.9%   -0.071   -0.048    0.075    6.33%  beats-median
+    select      2197      465    0.026   57.1%   -0.111   -0.082    0.137    7.39%  beats-median
+
+turn-of-month
+  calendar: long on the last weekday of each month — zero parameters, zero price input
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3757      468    0.070   59.6%    0.103    0.125   -0.033    6.02%  LOSES-to-median
+    select      1949      469    0.351   75.2%    0.296    0.321    0.055    6.95%  beats-median
+
+vol-dryup
+  volume dry-up: lowest volume of 20 while the close holds above its own SMA50
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         1519      454    0.277   71.1%    0.124    0.156    0.153    5.58%  beats-median
+    select       912      418    0.180   65.7%    0.325    0.368   -0.145    6.54%  LOSES-to-median
+
+range-expand
+  range expansion: largest true range of 20, closing in the top/bottom quarter of its own bar
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         1745      465    0.056   58.8%   -0.009    0.026    0.065    6.74%  beats-median
+    select       629      384    0.005   56.0%    0.128    0.177   -0.122    7.61%  LOSES-to-median
+
+================================================================================================================
+retail (5bps slip + 1bp comm) — pre-registered second statement
+================================================================================================================
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         2207      464    0.094   61.3%    0.058    0.082    0.035    7.28%  beats-median
+    select       963      431    0.389   77.6%    0.230    0.262    0.159    8.33%  beats-median
+
+nr7
+  volatility contraction: narrowest range of 7, direction from the symbol's own SMA50
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         4252      468    0.116   62.6%    0.071    0.093    0.045    6.28%  beats-median
+    select      2467      469    0.018   57.0%    0.169    0.193   -0.151    7.23%  LOSES-to-median
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3750      466   -0.009   55.6%   -0.086   -0.064    0.076    6.33%  beats-median
+    select      2197      465    0.017   56.9%   -0.124   -0.092    0.140    7.39%  beats-median
+
+turn-of-month
+  calendar: long on the last weekday of each month — zero parameters, zero price input
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3756      468    0.057   59.3%    0.088    0.111   -0.031    6.02%  LOSES-to-median
+    select      1945      469    0.339   74.9%    0.284    0.310    0.054    6.95%  beats-median
+
+vol-dryup
+  volume dry-up: lowest volume of 20 while the close holds above its own SMA50
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         1519      454    0.265   70.9%    0.110    0.144    0.155    5.58%  beats-median
+    select       910      418    0.162   65.1%    0.314    0.358   -0.152    6.54%  LOSES-to-median
+
+range-expand
+  range expansion: largest true range of 20, closing in the top/bottom quarter of its own bar
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         1745      465    0.044   58.5%   -0.023    0.012    0.067    6.74%  beats-median
+    select       629      384   -0.004   55.8%    0.118    0.165   -0.122    7.61%  LOSES-to-median
+
+================================================================================================================
+PROMOTION BAR: beats the control MEDIAN in BOTH fit and select, at DEFAULT_COST_MODEL.
+ADVANCES: mr-down3, gap-fade — read its TEST rows, then write a SEPARATE pre-registration before spending the deep hold-out.
+
+1R is the median of slMult x ATR / close over the bars each mechanism fires on. The spec projected ~8.3%
+of price for weekly bars by sqrt-of-time scaling off a measured daily 3.70%; the column above is what
+actually happened, and is the number that falsifies the cost arithmetic if it disagrees.
