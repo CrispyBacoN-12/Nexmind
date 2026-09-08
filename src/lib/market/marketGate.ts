@@ -93,6 +93,32 @@ export interface GateDecision {
   slots: number;
   /** the reading itself, reported even when `enabled` is false */
   benchAbove: boolean | null;
+  /**
+   * May this scan open a SHORT?
+   *
+   * False in exactly one case — the gate is on and the benchmark is above its
+   * own SMA200 — and true everywhere else, including both BLIND branches and
+   * the manual off switch. It lives here rather than in the caller so the
+   * fail-open and off cases cannot be got wrong by a second implementation of
+   * the same three conditions.
+   *
+   * Measured, and it is a COST cut, not an edge. On the panel side
+   * (STATE.md §5) above-regime shorts lose in 4 of 5 folds — and the matched
+   * random-entry control loses the same amount, so the rule is not selecting
+   * bad shorts, it is selling exposure. Dropping the cell moves panel avgR by
+   * +0.038 / +0.028 / +0.052 / -0.035 / +0.028; TEST2 is negative, so this is
+   * a removable loss, not alpha, and must never be written up as the desk
+   * having learned not to short into strength.
+   *
+   * The live side is what makes it worth shipping. Of the 100 stored
+   * counterfactual rows to 2026-09-02, every logged gate reading is risk-on
+   * and 10 setups were shorts. Post-fix the desk produced 6; HAWK reached
+   * consensus on 6 of 6 and SAGE vetoed 6 of 6 — 43% of every veto from 17% of
+   * the setups, and not one fill. That is four model calls per short spent to
+   * reach a refusal the panel had already measured. Suppressing them saves
+   * budget; it does not buy R, and nobody should expect it to.
+   */
+  shortsAllowed: boolean;
   /** one line for the scan log; the gate must never reduce slots silently */
   note: string;
 }
@@ -123,6 +149,7 @@ export function gateSlots(
     return {
       slots: freeSlots,
       benchAbove: null,
+      shortsAllowed: true,
       note:
         `market gate BLIND — ${BENCHMARK} returned ${benchmark.length} bar(s), needs ${TREND_PERIOD}; ` +
         `passing ${freeSlots} slot(s) through ungated`,
@@ -140,6 +167,7 @@ export function gateSlots(
     return {
       slots: freeSlots,
       benchAbove: null,
+      shortsAllowed: true,
       note:
         `market gate BLIND — ${BENCHMARK} ${close.toFixed(2)} sits ${(extension * 100).toFixed(0)}% from its own ` +
         `SMA${TREND_PERIOD} ${trend.toFixed(2)}, an implausible series (max ${(MAX_TREND_EXTENSION * 100).toFixed(0)}%); ` +
@@ -151,16 +179,30 @@ export function gateSlots(
   const reading = `${BENCHMARK} ${close.toFixed(2)} ${above ? ">" : "<"} SMA${TREND_PERIOD} ${trend.toFixed(2)}`;
 
   if (!cfg.enabled) {
-    return { slots: freeSlots, benchAbove: above, note: `market gate OFF (${reading}) — ${freeSlots} slot(s) unchanged` };
+    return {
+      slots: freeSlots,
+      benchAbove: above,
+      shortsAllowed: true,
+      note: `market gate OFF (${reading}) — ${freeSlots} slot(s) unchanged, shorts allowed`,
+    };
   }
   if (above) {
-    return { slots: freeSlots, benchAbove: true, note: `market gate risk-on (${reading}) — ${freeSlots} slot(s)` };
+    // Slots are untouched here; the only thing risk-on costs is the short side.
+    // Said out loud in the note for the same reason the slot cut is: a gate that
+    // removes trades silently is a gate nobody can audit from the log.
+    return {
+      slots: freeSlots,
+      benchAbove: true,
+      shortsAllowed: false,
+      note: `market gate risk-on (${reading}) — ${freeSlots} slot(s), long only`,
+    };
   }
 
   const slots = Math.max(0, Math.min(freeSlots, cfg.slotsBelowTrend));
   return {
     slots,
     benchAbove: false,
+    shortsAllowed: true,
     note: `market gate risk-off (${reading}) — ${freeSlots} free slot(s) cut to ${slots}`,
   };
 }
@@ -194,6 +236,7 @@ export async function readMarketGate(
     return {
       slots: freeSlots,
       benchAbove: null,
+      shortsAllowed: true,
       note: `market gate BLIND — ${BENCHMARK} fetch failed (${e instanceof Error ? e.message : String(e)}); passing ${freeSlots} slot(s) through ungated`,
     };
   }

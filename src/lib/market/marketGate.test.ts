@@ -140,3 +140,41 @@ test("the sanity check leaves real trends alone", () => {
   assert.equal(d.benchAbove, false, "-30% below trend is a crash, not a corrupt feed");
   assert.match(d.note, /risk-off/);
 });
+
+// Risk-on is long only
+// --------------------
+// The one side the gate removes, and the three cases where it must not.
+// Approved 2026-09-08 as a COST cut: live, every short the desk has proposed
+// reached HAWK consensus and was then vetoed by SAGE, 6 of 6 post-fix, for zero
+// fills at four model calls each. It buys budget, not R.
+
+test("risk-on allows the slots but not the short side", () => {
+  const d = gateSlots(uptrend(), 5);
+  assert.equal(d.slots, 5, "risk-on never costs a slot");
+  assert.equal(d.shortsAllowed, false);
+  assert.match(d.note, /long only/);
+});
+
+test("risk-off still allows shorts — it is the slot count that is cut, not the side", () => {
+  const d = gateSlots(downtrend(), 5);
+  assert.equal(d.shortsAllowed, true);
+});
+
+test("a blind gate allows shorts — the side filter fails open like the slot count", () => {
+  const tooFew = bars(TREND_PERIOD - 1, (i) => 100 + i);
+  assert.equal(gateSlots(tooFew, 4).benchAbove, null);
+  assert.equal(gateSlots(tooFew, 4).shortsAllowed, true, "no reading is not a long-only reading");
+
+  // The 2026-08-30 spliced series: above its mean by an impossible margin, and
+  // therefore not a risk-on reading that may suppress anything.
+  const spliced = bars(TREND_PERIOD + 5, (i) => (i < TREND_PERIOD ? 350 : 770));
+  assert.equal(gateSlots(spliced, 5).benchAbove, null);
+  assert.equal(gateSlots(spliced, 5).shortsAllowed, true);
+});
+
+test("the off switch turns off the side filter too", () => {
+  const off = { ...DEFAULT_MARKET_GATE, enabled: false };
+  const d = gateSlots(uptrend(), 5, off);
+  assert.equal(d.benchAbove, true, "the reading is still taken");
+  assert.equal(d.shortsAllowed, true, "but nothing is applied");
+});

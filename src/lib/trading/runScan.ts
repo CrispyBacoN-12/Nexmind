@@ -86,11 +86,19 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: 
 
   const candleMap = await fetchCandlesBatch(symbols, tf.range, tf.interval);
   const candidates: { symbol: string; adx: number }[] = [];
+  // Shorts dropped here rather than at the analysts. The gate decides whether
+  // the side is allowed (see `shortsAllowed`); this only counts what it cost,
+  // so the log can still say how many setups the RULE produced. Dropping them
+  // before HAWK is the whole point — every short the desk has ever proposed was
+  // proposed under a risk-on reading, reached consensus, and was vetoed by SAGE,
+  // at four model calls each for zero fills.
+  let shortsSuppressed = 0;
   for (const s of symbols) {
     const resp = candleMap.get(s);
     if (!resp || !strat || resp.candles.length < 60) continue;
     const sig = strat.build(resp.candles)(resp.candles.length - 1);
     if (sig?.side) {
+      if (sig.side === "short" && !gate.shortsAllowed) { shortsSuppressed++; continue; }
       const a = adx(resp.candles, 14).adx;
       candidates.push({ symbol: resp.symbol, adx: a[a.length - 1] ?? 0 });
     }
@@ -103,7 +111,10 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: 
   // NOT a filter: it cannot remove a trade, only reorder who is served first.
   // Untested as a ranking — worth its own sweep before anyone trusts it.
   candidates.sort((a, b) => b.adx - a.adx);
-  log(`#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${candleMap.size} fetched, ${slots} slot(s) free`);
+  log(
+    `#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${candleMap.size} fetched, ${slots} slot(s) free` +
+      (shortsSuppressed ? ` (${shortsSuppressed} short setup(s) suppressed — gate is long only)` : ""),
+  );
 
   for (const [n, c] of candidates.entries()) {
     if (slots <= 0) {
