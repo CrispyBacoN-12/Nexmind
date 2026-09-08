@@ -1,0 +1,60 @@
+weekly TEST rows — mr-down3 and gap-fade, livable fill, test1/test2/test3 only
+PRE-REGISTERED: see this script's header. This is a FILTER before the deep hold-out,
+not a verdict. The TEST folds have already been used to choose; nothing is approved here.
+
+loading daily panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+
+resampling to weekly bars (every bar asserted against its daily source)…
+RESAMPLER CHECK: pass — 491 symbols, 265167 weekly bars from .cache/bars/sp500-1d.json#weekly
+VOIDING CHECK (weekly bars with open != close): 99.73% — bar is 99%
+  test1: 483 symbols participate, 104 warm-up + 105 tradable weekly bars (first symbol)
+  test2: 488 symbols participate, 104 warm-up + 104 tradable weekly bars (first symbol)
+  test3: 491 symbols participate, 104 warm-up + 137 tradable weekly bars (first symbol)
+
+fill: decided at the close of weekly bar i, filled at the open of bar i+1 (Friday 16:00 ET -> Monday 09:30 ET = Saturday 03:00 -> Monday 20:30 Thai)
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60 bars  fold warm-up=104 weekly bars  trade floor=200
+
+========================================================================================================================
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+========================================================================================================================
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    test1       2669      477    0.290   71.7%    0.221    0.243    0.069    9.24%  beats-median
+    test2       3533      482    0.071   59.6%   -0.002    0.018    0.073    9.36%  beats-median
+    test3       3640      491    0.122   62.4%    0.102    0.120    0.020    8.81%  beats-median
+    -> beats-median 3/3, avgR>0 3/3  =>  HOLDS
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    test1       5693      480   -0.049   52.9%   -0.048   -0.030   -0.001    8.71%  LOSES-to-median
+    test2       4633      485    0.026   57.1%   -0.003    0.017    0.029    8.96%  beats-median
+    test3       6181      490    0.047   58.3%   -0.038   -0.023    0.084    8.35%  beats-median
+    -> beats-median 2/3, avgR>0 2/3  =>  HOLDS
+
+========================================================================================================================
+retail (5bps slip + 1bp comm) — pre-registered second statement
+========================================================================================================================
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    test1       2667      477    0.282   71.6%    0.211    0.232    0.071    9.24%  beats-median
+    test2       3536      482    0.065   59.5%   -0.012    0.008    0.077    9.36%  beats-median
+    test3       3642      491    0.113   62.2%    0.091    0.109    0.022    8.81%  beats-median
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    test1       5695      480   -0.058   52.7%   -0.059   -0.039    0.001    8.71%  beats-median
+    test2       4631      485    0.014   56.7%   -0.012    0.007    0.027    8.96%  beats-median
+    test3       6181      490    0.036   58.0%   -0.049   -0.035    0.085    8.35%  beats-median
+
+========================================================================================================================
+CRITERION: beats the control MEDIAN in >= 2 of 3 TEST folds AND raw avgR > 0 in >= 2 of 3, at DEFAULT_COST_MODEL.
+HOLDS: mr-down3, gap-fade — earns ONE thing: a SEPARATE pre-registration may now be written, and the deep hold-out spent once against it. Nothing is approved from this log.
+
+These folds were already read on daily bars while choosing what to look at next, so a pass here is weaker evidence than it looks. DEEP1-3 remain unread.
