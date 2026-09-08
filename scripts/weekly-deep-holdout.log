@@ -1,0 +1,114 @@
+weekly deep hold-out — mr-down3 and gap-fade on 2000-2016, weekly bars, livable fill
+PRE-REGISTERED: see this script's header. DEEP1-3 were already spent once on mr-down3 at
+DAILY bars (scripts/deep-holdout.log, 2026-09-05, passed 3/3), so this is not a virgin
+hold-out. What it can settle is whether the weekly version survives 2000-2002 and 2008.
+
+loading deep panel cache…
+panel .cache/bars/sp500-1d-deep.json — 453 symbols, fetchedAt 2026-09-05T14:42:19.951Z
+  dropped 1481 placeholder bar(s) across 41 symbol(s): AMCR 703, ODFL 310, DECK 104, NDAQ 92, MNST 66, CHTR 39, ACGL 35, TTWO 21, CSGP 15, IVZ 15, TSCO 9, BRO 7, …
+
+resampling to weekly bars (every bar asserted against its daily source)…
+RESAMPLER CHECK: pass — 453 symbols, 366739 weekly bars from .cache/bars/sp500-1d-deep.json#weekly
+VOIDING CHECK (weekly bars with open != close): 99.86% — bar is 99%
+
+deep folds all end before FIT begins (2016-01-01):
+  deep1  2000-01-01..2005-01-01  — dot-com bust and the 2002 bottom
+  deep2  2005-01-01..2010-01-01  — housing bubble, 2008 crisis, and the 2009 bottom
+  deep3  2010-01-01..2016-01-01  — QE recovery, flash crash, 2011 and 2015 corrections
+  deep1: 377 symbols participate, 7 warm-up + 261 tradable weekly bars (first symbol)
+  deep2: 410 symbols participate, 104 warm-up + 261 tradable weekly bars (first symbol)
+  deep3: 453 symbols participate, 104 warm-up + 313 tradable weekly bars (first symbol)
+
+fill: decided at the close of weekly bar i, filled at the open of bar i+1
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60 bars  fold warm-up=104 weekly bars  trade floor=200
+
+========================================================================================================================
+1. WEEKLY DEEP HOLD-OUT — two hypotheses, no audit rows
+========================================================================================================================
+
+------------------------------------------------------------------------------------------------------------------------
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+------------------------------------------------------------------------------------------------------------------------
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       5346      361    0.085   60.4%    0.124    0.137   -0.039   12.08%  LOSES-to-median
+    deep2       6386      403    0.107   61.6%    0.113    0.126   -0.006   10.33%  LOSES-to-median
+    deep3       6845      444    0.192   66.3%    0.169    0.183    0.023    8.01%  beats-median +p95
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       6595      363    0.009   56.1%   -0.038   -0.020    0.047   10.38%  beats-median +p95
+    deep2       7647      406   -0.036   53.7%   -0.021   -0.003   -0.015    8.98%  LOSES-to-median
+    deep3      12485      445   -0.054   52.7%   -0.046   -0.033   -0.008    7.42%  LOSES-to-median
+
+------------------------------------------------------------------------------------------------------------------------
+retail (5bps slip + 1bp comm) — pre-registered second statement
+------------------------------------------------------------------------------------------------------------------------
+
+mr-down3
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       5351      361    0.077   60.2%    0.116    0.129   -0.038   12.08%  LOSES-to-median
+    deep2       6391      403    0.099   61.4%    0.102    0.116   -0.003   10.33%  LOSES-to-median
+    deep3       6855      444    0.180   66.0%    0.157    0.171    0.023    8.01%  beats-median +p95
+
+gap-fade
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       6594      363   -0.001   55.9%   -0.047   -0.030    0.045   10.38%  beats-median +p95
+    deep2       7646      406   -0.044   53.5%   -0.031   -0.014   -0.013    8.98%  LOSES-to-median
+    deep3      12455      445   -0.067   52.3%   -0.059   -0.045   -0.008    7.42%  LOSES-to-median
+
+========================================================================================================================
+2. SURVIVORSHIP DIAGNOSTIC — mr-down3 by the symbol's own deep-window return
+========================================================================================================================
+449 symbols with >= 1y of deep history, 112/112/112/113 per quartile (every symbol in exactly one bucket, none dropped)
+
+mr-down3 · Q1 (worst compounders)
+  annualised return -27.8% .. 7.2%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1547       94   -0.039   53.5%    0.054    0.082   -0.093   12.47%  LOSES-to-median
+    deep2       1682      103    0.071   59.6%    0.074    0.104   -0.003   10.63%  LOSES-to-median
+    deep3       1851      110    0.141   63.5%    0.113    0.136    0.028    8.53%  beats-median +p95
+
+mr-down3 · Q2
+  annualised return 7.3% .. 10.7%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1698      107    0.076   59.8%    0.123    0.148   -0.048   11.31%  LOSES-to-median
+    deep2       1743      109    0.129   62.8%    0.109    0.130    0.020    8.83%  beats-median
+    deep3       1767      111    0.183   65.9%    0.177    0.205    0.007    7.34%  beats-median
+
+mr-down3 · Q3
+  annualised return 10.7% .. 15.8%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1354      100    0.175   65.4%    0.168    0.200    0.007   11.30%  beats-median
+    deep2       1753      111    0.114   62.0%    0.134    0.155   -0.020   10.08%  LOSES-to-median
+    deep3       1743      112    0.207   67.2%    0.175    0.199    0.033    7.80%  beats-median +p95
+
+mr-down3 · Q4 (best compounders)
+  annualised return 15.9% .. 99.3%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1        747       60    0.204   66.9%    0.184    0.227    0.020   14.79%  beats-median
+    deep2       1208       80    0.116   62.1%    0.151    0.186   -0.035   12.84%  LOSES-to-median
+    deep3       1484      111    0.246   69.3%    0.224    0.252    0.022    8.54%  beats-median
+
+========================================================================================================================
+3. VERDICT
+========================================================================================================================
+
+hold-out bar: beats control median >= 2/3 AND beats control p95 >= 1/3 AND raw avgR > 0 >= 2/3, at DEFAULT_COST_MODEL
+  mr-down3   beats median 1/3   beats p95 1/3   avgR>0 3/3   -> REJECT
+  gap-fade   beats median 1/3   beats p95 1/3   avgR>0 1/3   -> REJECT
+
+survivorship rule: mean margin over the control median, averaged across the three deep folds
+  Q1:  -0.023
+  Q2:  -0.007
+  Q3:   0.007
+  Q4:   0.002
+  -> REJECT — positive only where the names compounded; this is the index's drift, not an edge
+
+Both rules were written into the header of this file before it was first run. A REJECT here
+closes that mechanism on weekly bars; it is not a request for a different ladder or a fold to drop.
