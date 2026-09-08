@@ -1,0 +1,103 @@
+weekly indicator screen — ADX / MACD / EMA / RSI / Bollinger / Stochastic as STANDALONE entries
+PRE-REGISTERED: see this script's header. Library-default parameters, textbook thresholds,
+no sweep. fit + select only. Nothing here may be approved.
+
+loading daily panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+
+resampling to weekly bars (every bar asserted against its daily source)…
+RESAMPLER CHECK: pass — 491 symbols, 265167 weekly bars from .cache/bars/sp500-1d.json#weekly
+VOIDING CHECK (weekly bars with open != close): 99.73% — bar is 99%
+  fit: 474 symbols participate, 0 warm-up + 156 tradable weekly bars (first symbol)
+  select: 476 symbols participate, 104 warm-up + 52 tradable weekly bars (first symbol)
+
+fill: decided at the close of weekly bar i, filled at the open of bar i+1 (Friday 16:00 ET -> Monday 09:30 ET = Saturday 03:00 -> Monday 20:30 Thai)
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60 bars  fold warm-up=104 weekly bars  trade floor=200
+NOTE: FIT has NO warm-up prefix (the cache starts the day FIT does), so it loses its first 60 weekly bars to the engine's own warm-up — the same constraint the mechanism screen ran under.
+
+========================================================================================================================
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+========================================================================================================================
+
+adx-trend
+  trend strength: ADX(14) above 25, direction from which DI leads
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         9032      463    0.103   61.4%    0.088    0.098    0.015    6.09%  beats-median
+    select      2706      393   -0.041   53.4%    0.190    0.208   -0.231    7.14%  LOSES-to-median
+
+macd-cross
+  MACD(12,26,9) line crossing its signal line
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3327      467   -0.046   53.1%   -0.017    0.006   -0.029    6.26%  LOSES-to-median
+    select      1670      468    0.024   57.0%    0.034    0.068   -0.010    7.35%  LOSES-to-median
+
+ema-cross
+  EMA(20) crossing EMA(50) — the textbook trend-following entry
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit          601      304    0.031   57.4%   -0.007    0.049    0.038    7.25%  beats-median
+    select       365      233   -0.025   54.2%    0.131    0.207   -0.157    7.96%  LOSES-to-median
+
+rsi-band
+  RSI(14) oversold below 30 / overbought above 70
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3342      451   -0.156   47.0%   -0.176   -0.160    0.019    5.21%  beats-median
+    select       939      282   -0.094   50.5%   -0.423   -0.399    0.329    6.05%  beats-median
+
+bb-revert
+  close outside the Bollinger(20, 2 sigma) band, faded
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3548      468   -0.089   50.8%   -0.107   -0.089    0.018    6.16%  beats-median
+    select      1115      455   -0.037   53.6%   -0.254   -0.227    0.217    7.32%  beats-median
+
+stoch-revert
+  Stochastic %K(14,3,3) below 20 / above 80, faded
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         8221      468   -0.108   49.7%   -0.107   -0.094   -0.002    5.87%  LOSES-to-median
+    select      3690      469   -0.014   54.9%   -0.279   -0.260    0.264    6.84%  beats-median
+
+========================================================================================================================
+retail (5bps slip + 1bp comm) — pre-registered second statement
+========================================================================================================================
+
+adx-trend
+  trend strength: ADX(14) above 25, direction from which DI leads
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         9012      463    0.086   60.9%    0.073    0.084    0.013    6.09%  beats-median
+    select      2693      393   -0.056   52.9%    0.178    0.198   -0.235    7.14%  LOSES-to-median
+
+macd-cross
+  MACD(12,26,9) line crossing its signal line
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3330      467   -0.059   52.9%   -0.032   -0.010   -0.026    6.26%  LOSES-to-median
+    select      1671      468    0.015   56.9%    0.020    0.055   -0.005    7.35%  LOSES-to-median
+
+ema-cross
+  EMA(20) crossing EMA(50) — the textbook trend-following entry
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit          601      304    0.016   56.9%   -0.021    0.033    0.036    7.25%  beats-median
+    select       365      233   -0.031   54.2%    0.118    0.200   -0.149    7.96%  LOSES-to-median
+
+rsi-band
+  RSI(14) oversold below 30 / overbought above 70
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3364      451   -0.176   46.4%   -0.190   -0.174    0.014    5.21%  beats-median
+    select       939      282   -0.115   49.7%   -0.439   -0.413    0.324    6.05%  beats-median
+
+bb-revert
+  close outside the Bollinger(20, 2 sigma) band, faded
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         3554      468   -0.104   50.3%   -0.122   -0.103    0.018    6.16%  beats-median
+    select      1118      455   -0.051   53.2%   -0.268   -0.240    0.217    7.32%  beats-median
+
+stoch-revert
+  Stochastic %K(14,3,3) below 20 / above 80, faded
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         8237      468   -0.125   49.2%   -0.122   -0.108   -0.003    5.87%  LOSES-to-median
+    select      3690      469   -0.029   54.4%   -0.293   -0.275    0.264    6.84%  beats-median
+
+========================================================================================================================
+PROMOTION BAR: beats the control MEDIAN in BOTH fit and select, at DEFAULT_COST_MODEL, both folds above the trade floor.
+ADVANCES: rsi-band, bb-revert — read its TEST rows under the criterion pre-registered in scripts/weekly-test-rows.mts (beats median >=2/3 AND raw avgR > 0 >=2/3). Nothing is approved from this log.
+
+Every parameter above is a library default and every threshold is the textbook one. No number here
+was chosen by looking at a result, which is the only reason six rules on two folds is readable at all.
