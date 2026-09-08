@@ -1,0 +1,156 @@
+weekly indicator deep hold-out — rsi-band and bb-revert on 2000-2016, weekly bars, livable fill
+PRE-REGISTERED: see this script's header. This is the THIRD read of DEEP1-3 (daily mr-down3
+2026-09-05; weekly mr-down3 + gap-fade 2026-09-08), so it settles only whether these two
+indicator rules survive 2000-2002 and 2008. It cannot re-establish anything general.
+
+========================================================================================================================
+1. RULE FIDELITY CHECK — the copied rules must reproduce scripts/weekly-indicator-screen.log
+========================================================================================================================
+
+loading the fit/select panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+resampled to 491 symbols of weekly bars (asserted against daily)
+  rsi-band   fit     trades  3342 (logged 3342)   avgR  -0.156 (logged -0.156)   match
+  rsi-band   select  trades   939 (logged 939)   avgR  -0.094 (logged -0.094)   match
+  bb-revert  fit     trades  3548 (logged 3548)   avgR  -0.089 (logged -0.089)   match
+  bb-revert  select  trades  1115 (logged 1115)   avgR  -0.037 (logged -0.037)   match
+
+RULE FIDELITY CHECK: pass — both rules reproduce the screen exactly on fit and select.
+
+loading deep panel cache…
+panel .cache/bars/sp500-1d-deep.json — 453 symbols, fetchedAt 2026-09-05T14:42:19.951Z
+  dropped 1481 placeholder bar(s) across 41 symbol(s): AMCR 703, ODFL 310, DECK 104, NDAQ 92, MNST 66, CHTR 39, ACGL 35, TTWO 21, CSGP 15, IVZ 15, TSCO 9, BRO 7, …
+
+resampling to weekly bars (every bar asserted against its daily source)…
+RESAMPLER CHECK: pass — 453 symbols, 366739 weekly bars from .cache/bars/sp500-1d-deep.json#weekly
+VOIDING CHECK (weekly bars with open != close): 99.86% — bar is 99%
+
+deep folds all end before FIT begins (2016-01-01):
+  deep1  2000-01-01..2005-01-01  — dot-com bust and the 2002 bottom
+  deep2  2005-01-01..2010-01-01  — housing bubble, 2008 crisis, and the 2009 bottom
+  deep3  2010-01-01..2016-01-01  — QE recovery, flash crash, 2011 and 2015 corrections
+  deep1: 377 symbols participate, 7 warm-up + 261 tradable weekly bars (first symbol)
+  deep2: 410 symbols participate, 104 warm-up + 261 tradable weekly bars (first symbol)
+  deep3: 453 symbols participate, 104 warm-up + 313 tradable weekly bars (first symbol)
+
+fill: decided at the close of weekly bar i, filled at the open of bar i+1
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60 bars  fold warm-up=104 weekly bars  trade floor=200
+
+========================================================================================================================
+2. WEEKLY DEEP HOLD-OUT — two hypotheses, no audit rows
+========================================================================================================================
+
+------------------------------------------------------------------------------------------------------------------------
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+------------------------------------------------------------------------------------------------------------------------
+
+rsi-band
+  RSI(14) oversold below 30 / overbought above 70
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       4479      362   -0.091   50.6%   -0.157   -0.140    0.066    8.58%  beats-median +p95
+    deep2       5097      402   -0.055   52.6%   -0.108   -0.094    0.053    7.09%  beats-median +p95
+    deep3       7804      441   -0.128   48.6%   -0.203   -0.192    0.075    5.98%  beats-median +p95
+
+bb-revert
+  close outside the Bollinger(20, 2 sigma) band, faded
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       6555      363   -0.068   51.9%   -0.094   -0.079    0.026   10.02%  beats-median +p95
+    deep2       7430      406   -0.080   51.2%   -0.059   -0.044   -0.021    8.28%  LOSES-to-median
+    deep3       9544      443   -0.092   50.5%   -0.120   -0.106    0.028    6.99%  beats-median +p95
+
+------------------------------------------------------------------------------------------------------------------------
+retail (5bps slip + 1bp comm) — pre-registered second statement
+------------------------------------------------------------------------------------------------------------------------
+
+rsi-band
+  RSI(14) oversold below 30 / overbought above 70
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       4482      362   -0.105   50.2%   -0.167   -0.151    0.062    8.58%  beats-median +p95
+    deep2       5101      402   -0.068   52.2%   -0.119   -0.105    0.051    7.09%  beats-median +p95
+    deep3       7814      441   -0.145   48.1%   -0.217   -0.205    0.072    5.98%  beats-median +p95
+
+bb-revert
+  close outside the Bollinger(20, 2 sigma) band, faded
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       6572      363   -0.080   51.5%   -0.103   -0.090    0.023   10.02%  beats-median +p95
+    deep2       7438      406   -0.090   51.0%   -0.070   -0.054   -0.020    8.28%  LOSES-to-median
+    deep3       9545      443   -0.107   50.2%   -0.133   -0.120    0.027    6.99%  beats-median +p95
+
+========================================================================================================================
+3. SURVIVORSHIP DIAGNOSTIC — by the symbol's own deep-window annualised return
+========================================================================================================================
+449 symbols with >= 1y of deep history, 112/112/112/113 per quartile (every symbol in exactly one bucket, none dropped)
+
+rsi-band · Q1 (worst compounders)
+  annualised return -27.8% .. 7.2%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1        945       93   -0.004   55.4%   -0.061   -0.030    0.057    9.59%  beats-median +p95
+    deep2       1311      102   -0.050   52.9%   -0.089   -0.057    0.038    7.56%  beats-median +p95
+    deep3       1577      110   -0.054   52.7%   -0.125   -0.102    0.071    6.44%  beats-median +p95
+
+rsi-band · Q2
+  annualised return 7.3% .. 10.7%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1119      107   -0.027   54.2%   -0.123   -0.091    0.096    8.06%  beats-median +p95
+    deep2       1268      108   -0.021   54.5%   -0.089   -0.056    0.067    6.18%  beats-median +p95
+    deep3       1895      111   -0.104   49.9%   -0.196   -0.176    0.092    5.51%  beats-median +p95
+
+rsi-band · Q3
+  annualised return 10.7% .. 15.8%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1439      101   -0.139   47.9%   -0.200   -0.171    0.061    7.79%  beats-median +p95
+    deep2       1383      112   -0.055   52.6%   -0.113   -0.085    0.059    6.78%  beats-median +p95
+    deep3       1977      112   -0.130   48.5%   -0.201   -0.183    0.070    5.68%  beats-median +p95
+
+rsi-band · Q4 (best compounders)
+  annualised return 15.9% .. 99.3%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1        976       61   -0.179   45.7%   -0.238   -0.201    0.059    9.81%  beats-median +p95
+    deep2       1135       80   -0.098   50.2%   -0.157   -0.124    0.059    8.42%  beats-median +p95
+    deep3       2355      108   -0.195   44.8%   -0.264   -0.248    0.069    6.53%  beats-median +p95
+
+bb-revert · Q1 (worst compounders)
+  annualised return -27.8% .. 7.2%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1634       94   -0.057   52.4%   -0.040   -0.008   -0.017   10.65%  LOSES-to-median
+    deep2       1860      103   -0.081   51.2%   -0.047   -0.021   -0.034    8.40%  LOSES-to-median
+    deep3       2311      110   -0.081   51.2%   -0.070   -0.045   -0.011    7.44%  LOSES-to-median
+
+bb-revert · Q2
+  annualised return 7.3% .. 10.7%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1908      107   -0.035   53.7%   -0.074   -0.042    0.039    9.61%  beats-median +p95
+    deep2       2044      109   -0.047   53.0%   -0.046   -0.018   -0.002    7.20%  LOSES-to-median
+    deep3       2407      111   -0.089   50.7%   -0.114   -0.088    0.024    6.42%  beats-median
+
+bb-revert · Q3
+  annualised return 10.7% .. 15.8%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1874      101   -0.097   50.3%   -0.125   -0.092    0.028    9.21%  beats-median
+    deep2       2064      112   -0.088   50.8%   -0.064   -0.036   -0.024    8.06%  LOSES-to-median
+    deep3       2548      112   -0.068   51.9%   -0.118   -0.093    0.050    6.80%  beats-median +p95
+
+bb-revert · Q4 (best compounders)
+  annualised return 15.9% .. 99.3%
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    deep1       1139       61   -0.090   50.7%   -0.151   -0.119    0.062   11.70%  beats-median +p95
+    deep2       1462       82   -0.114   49.3%   -0.086   -0.052   -0.028    9.81%  LOSES-to-median
+    deep3       2278      110   -0.135   48.2%   -0.182   -0.154    0.047    7.43%  beats-median +p95
+
+========================================================================================================================
+4. VERDICT
+========================================================================================================================
+
+hold-out bar: beats control median >= 2/3 AND beats control p95 >= 1/3 AND raw avgR > 0 >= 2/3, at DEFAULT_COST_MODEL
+  rsi-band   beats median 3/3   beats p95 3/3   avgR>0 0/3   -> REJECT
+  bb-revert  beats median 2/3   beats p95 2/3   avgR>0 0/3   -> REJECT
+
+survivorship rule: mean margin over the control median, averaged across the three deep folds
+  rsi-band: Q1   0.056  Q2   0.085  Q3   0.063  Q4   0.062
+    -> WINNER-DRIFT OBJECTION FALLS — the rule works on the worst compounders too (MEMBERSHIP survivorship is NOT tested here and stays open)
+  bb-revert: Q1  -0.020  Q2   0.021  Q3   0.018  Q4   0.027
+    -> REJECT — positive only where the names compounded; this is the index's drift, not an edge
+
+Both rules were written into the header of this file before it was first run, together with a
+prediction that both would fail. A REJECT here closes that mechanism on weekly bars; it is not a
+request for a different ladder, a swept period, or a fold to drop.
