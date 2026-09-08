@@ -191,6 +191,14 @@ export async function runTradeTick(
     entry: applySlippage(scan.side === "long" ? "buy" : "sell", mockRaw.entry, DEFAULT_COST_MODEL.slippageBps ?? 0),
   };
   const cfLot = await counterfactualLot(portfolioId, mockLevels);
+  // The panel reading, captured once HAWK has voted so that EVERY row carries
+  // it — not only the no-consensus ones. A `vetoed` row used to store SAGE's
+  // reason alone, which threw away the votes that got the setup as far as SAGE;
+  // post-fix that is 14 of 36 rows, and the analyst evidence in them was gone.
+  // Held in the closure rather than passed as an argument so a new outcome
+  // branch cannot forget it — forgetting is the exact failure this file has
+  // already made once (see `describePanel`).
+  let panelRead: string | null = null;
   const logCf = async (
     aiOutcome: "executed" | "no-consensus" | "vetoed" | "rules-blocked",
     aiReason: string,
@@ -203,7 +211,9 @@ export async function runTradeTick(
     await recordCounterfactual({
       portfolioId, symbol, timeframe: scan.timeframe, aiBackend: backend,
       scanSide: scan.side!, scanNote: scan.note,
-      aiOutcome, aiReason, tradeId, aiLevels, mockLevels, lot: cfLot,
+      aiOutcome, aiReason: panelRead ? `${aiReason}
+${panelRead}` : aiReason,
+      tradeId, aiLevels, mockLevels, lot: cfLot,
       // Same bar boundary the Trade dedupe above uses. That guard only fires
       // once a Trade exists, so a refused setup was re-recorded on every scan
       // of the same unchanged bar; the ledger then measured how often we scan
@@ -231,13 +241,16 @@ export async function runTradeTick(
   }
   costUsd += hawk.totalCostUsd;
   const votesRead = describePanel(hawk);
+  panelRead = describePanel(hawk, { reasons: true });
   steps.push({ stage: "hawk", note: `${votesRead} → ${hawk.agreed ? hawk.side : "no consensus"}` });
 
   if (!hawk.agreed || !hawk.side || !hawk.levels) {
     // The same reading goes to the log AND to the counterfactual row. They were
     // built separately, and the row — the one the arm recorder keeps — was the
-    // half that lost the dropped analysts.
-    await logCf("no-consensus", votesRead, null);
+    // half that lost the dropped analysts. The row's copy now arrives through
+    // `panelRead` for every outcome, so passing `votesRead` here as well would
+    // store the votes twice.
+    await logCf("no-consensus", "no consensus", null);
     await prisma.signal.update({ where: { id: signal.id }, data: { status: "discarded" } });
     return { symbol, outcome: "no-consensus", steps, costUsd };
   }

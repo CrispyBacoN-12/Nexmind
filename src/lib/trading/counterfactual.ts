@@ -102,7 +102,13 @@ export async function recordCounterfactual(input: RecordInput): Promise<void> {
       scanSide: input.scanSide,
       scanNote: input.scanNote.slice(0, 500),
       aiOutcome: input.aiOutcome,
-      aiReason: input.aiReason?.slice(0, 500),
+      // 2000, not 500: the row now carries SAGE's own reason AND the HAWK
+      // panel's reading with each analyst's words (3 x 240 chars, budgeted in
+      // `describePanel`). At 500 the panel would have been truncated away
+      // silently — the column is Postgres `text`, so the cap is a guard against
+      // a runaway string, not a storage limit, and it has to leave room for the
+      // evidence the row is kept for.
+      aiReason: input.aiReason?.slice(0, 2000),
       tradeId: input.tradeId,
       aiEntry: input.aiLevels?.entry,
       aiSl: input.aiLevels?.sl,

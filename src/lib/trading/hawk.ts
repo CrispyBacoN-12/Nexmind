@@ -211,14 +211,41 @@ export function countableVotes(
   return { votes, dropped, totalCostUsd };
 }
 
+/** Per-analyst reason budget in the stored reading.
+ *
+ *  Fixed per analyst rather than shared, so the LAST analyst in the panel is
+ *  as readable as the first. A shared budget truncated from the end, which is
+ *  the same silent-omission failure `describePanel` exists to prevent — it
+ *  would just have moved from "the analyst that died" to "the analyst that
+ *  spoke third". Three of these plus SAGE's own 500 fit inside the row cap in
+ *  `recordCounterfactual` with room to spare. */
+const STORED_REASON_CHARS = 240;
+
+const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
+
 /** One reading of what the panel did, for the log line AND the stored
  *  `Counterfactual.aiReason`. One function because they were two, and the
  *  stored half — the one the arm recorder keeps and anyone reads months later
  *  — was the half that silently omitted the analysts that never answered. A
  *  panel that voted 2-of-2 because the third analyst died must never read like
- *  a clean 2-of-3. */
-export function describePanel(v: Pick<HawkVerdict, "votes" | "dropped">): string {
-  const votes = `votes ${v.votes.map((x) => `${x.persona}:${x.vote}`).join(", ")}`;
+ *  a clean 2-of-3.
+ *
+ *  `reasons: true` adds each analyst's confidence and its own words. The log
+ *  line stays terse; the stored row takes the verbose form, because the vote
+ *  alone cannot answer the question the row is kept to answer. Measured
+ *  2026-09-08: `structure` voted skip in 20 of 20 panels and has confirmed 0
+ *  times in 75 votes, and nothing in the database could say why — the reason
+ *  string existed on the vote object and was thrown away at exactly this
+ *  line. Still ONE function: same reading, two verbosities, one source. */
+export function describePanel(
+  v: Pick<HawkVerdict, "votes" | "dropped">,
+  opts: { reasons?: boolean } = {},
+): string {
+  const read = (x: HawkVote) =>
+    opts.reasons
+      ? `${x.persona}:${x.vote}@${x.confidence.toFixed(2)} ${JSON.stringify(oneLine(x.reason).slice(0, STORED_REASON_CHARS))}`
+      : `${x.persona}:${x.vote}`;
+  const votes = `votes ${v.votes.map(read).join(", ")}`;
   if (!v.dropped?.length) return votes;
   return `${votes} (${v.dropped.length} analyst(s) dropped: ${v.dropped.join(" | ")})`;
 }

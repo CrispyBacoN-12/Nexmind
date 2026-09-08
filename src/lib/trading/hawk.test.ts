@@ -134,3 +134,63 @@ test("describePanel: a shrunken panel says so, and says why", () => {
   assert.match(read, /2 analyst\(s\) dropped/);
   assert.match(read, /socket hang up/);
 });
+
+// The stored reading has to answer "why", not just "what"
+// -------------------------------------------------------
+// `structure` voted skip in 20 of 20 live panels and confirmed 0 times in 75
+// votes. The reason string was on the vote object every one of those times and
+// was dropped at stringification, so the question could not be answered from
+// the database at all.
+
+test("describePanel: the verbose form carries each analyst's confidence and words", () => {
+  const read = describePanel(
+    {
+      votes: [
+        { persona: "trend", vote: "long", confidence: 0.72, reason: "MA stack is aligned up" },
+        { persona: "structure", vote: "skip", confidence: 0.4, reason: "price is mid-range" },
+      ],
+      dropped: [],
+    },
+    { reasons: true },
+  );
+  assert.match(read, /trend:long@0\.72 "MA stack is aligned up"/);
+  assert.match(read, /structure:skip@0\.40 "price is mid-range"/);
+});
+
+test("describePanel: the terse form is unchanged when reasons are not asked for", () => {
+  const votes = [{ persona: "trend", vote: "long" as const, confidence: 0.72, reason: "MA stack is aligned up" }];
+  assert.equal(describePanel({ votes, dropped: [] }), "votes trend:long");
+});
+
+test("describePanel: the reason budget is per analyst, so the last one still speaks", () => {
+  const long = "x".repeat(4000);
+  const read = describePanel(
+    {
+      votes: [
+        { persona: "trend", vote: "long", confidence: 0.5, reason: long },
+        { persona: "structure", vote: "skip", confidence: 0.5, reason: long },
+        { persona: "exhaustion", vote: "skip", confidence: 0.5, reason: "spent already" },
+      ],
+      dropped: [],
+    },
+    { reasons: true },
+  );
+  assert.match(read, /exhaustion:skip@0\.50 "spent already"/);
+  assert.ok(read.length < 1200, `stored reading grew to ${read.length} chars`);
+});
+
+test("describePanel: a multi-line reason is stored as one line", () => {
+  const read = describePanel(
+    { votes: [{ persona: "counter", vote: "skip", confidence: 0.5, reason: "  line one\n\nline two  " }], dropped: [] },
+    { reasons: true },
+  );
+  assert.match(read, /counter:skip@0\.50 "line one line two"/);
+});
+
+test("describePanel: dropped analysts survive the verbose form too", () => {
+  const read = describePanel(
+    { votes: [{ persona: "trend", vote: "long", confidence: 0.6, reason: "ok" }], dropped: ["socket hang up"] },
+    { reasons: true },
+  );
+  assert.match(read, /1 analyst\(s\) dropped: socket hang up/);
+});
