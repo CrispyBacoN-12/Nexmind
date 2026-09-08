@@ -1,0 +1,66 @@
+earnings-event screen — SEC EDGAR 8-K item 2.02 announcement TIMESTAMPS as a standalone entry
+PRE-REGISTERED: see this script's header. Two rules, both declared before the run, zero fitted
+parameters. Daily bars, livable next-open fill, fit + select only. Nothing here may be approved.
+
+earnings cache .cache/earnings/sp500-8k-item202.json — 475 symbols, 22786 announcements, from 2015-01-01, fetchedAt 2026-09-08T12:36:11.742Z
+TIMESTAMP CHECK (ET clock of acceptanceDateTime): before 09:30 52.8%, during session 4.6%, after 16:00 42.6% — outside 95.4%, bar is 60%
+
+loading daily panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+VOIDING CHECK (daily bars with open != close): 99.32% — bar is 99%
+  fit: 474 symbols participate, 0 warm-up + 754 tradable bars (first symbol)
+    COVERAGE CHECK: 446/474 carry a tradable event (94.1%, bar 90%), median 4.00 events/symbol/year (band 3.5-4.5) over 3.00y
+  select: 476 symbols participate, 250 warm-up + 252 tradable bars (first symbol)
+    COVERAGE CHECK: 457/476 carry a tradable event (96.0%, bar 90%), median 4.00 events/symbol/year (band 3.5-4.5) over 1.00y
+
+NO-LOOKAHEAD CHECK (every entry bar dated strictly after its announcement's ET date):
+  pead-drift fit: 5063 signals, 0 violations
+  pead-drift select: 3260 signals, 0 violations
+  pead-fade fit: 5063 signals, 0 violations
+  pead-fade select: 3260 signals, 0 violations
+NO-LOOKAHEAD CHECK: pass
+
+fill: announcement -> reaction bar j (read at its close) -> entry at the OPEN of bar j+1
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60 bars  fold warm-up=250 bars  trade floor=200
+NOTE: FIT has NO warm-up prefix (the cache starts the day FIT does), so it loses its first 60 bars to the engine's own warm-up.
+
+========================================================================================================================
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+========================================================================================================================
+
+pead-drift
+  reaction bar closed UP -> long, DOWN -> short (post-earnings drift)
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         5029      446  -0.004     55.6  -0.006   0.014   0.001   3.16%  beats-median but avgR<=0
+    select      1871      456  -0.015     55.0   0.021   0.055  -0.035   3.55%  loses to median, avgR<=0
+  => FAILS (0/2 folds clear the frozen bar)
+
+pead-fade
+  the mirror: reaction bar closed UP -> short, DOWN -> long
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         5032      446  -0.018     54.8  -0.019   0.001   0.001   3.16%  beats-median but avgR<=0
+    select      1868      456  -0.025     54.4  -0.040  -0.011   0.015   3.55%  beats-median but avgR<=0
+  => FAILS (0/2 folds clear the frozen bar)
+
+========================================================================================================================
+retail (5bps slip + 1bp comm) — pre-registered second statement
+========================================================================================================================
+
+pead-drift
+  reaction bar closed UP -> long, DOWN -> short (post-earnings drift)
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         5028      446  -0.037     54.6  -0.039  -0.019   0.002   3.16%  beats-median but avgR<=0
+    select      1870      456  -0.036     54.5  -0.010   0.024  -0.027   3.55%  loses to median, avgR<=0
+
+pead-fade
+  the mirror: reaction bar closed UP -> short, DOWN -> long
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit         5030      446  -0.049     53.9  -0.051  -0.031   0.002   3.16%  beats-median but avgR<=0
+    select      1868      456  -0.044     54.1  -0.071  -0.036   0.027   3.55%  beats-median but avgR<=0
+
+========================================================================================================================
+VERDICT (frozen bar: beats the control MEDIAN and raw avgR > 0, in BOTH folds, at DEFAULT_COST_MODEL)
+  ADVANCES: none
+  Advancing earns a TEST-fold read under its own pre-registration, and nothing else.
+  It is not an approval, it is not sizeable, and it does not authorise spending DEEP1-3.
+  A margin is only readable against the control's own LEVEL — both are printed above.
