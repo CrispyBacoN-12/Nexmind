@@ -1,0 +1,67 @@
+weekly indicator TEST rows — rsi-band, bb-revert
+PRE-REGISTERED: see this script's header. HOLDS = beats the control median in >=2 of 3 TEST folds
+AND raw avgR > 0 in >=2 of 3, at DEFAULT_COST_MODEL. Nothing is approved from this log.
+
+loading daily panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+
+resampling to weekly bars (every bar asserted against its daily source)…
+RESAMPLER CHECK: pass — 491 symbols, 265167 weekly bars
+VOIDING CHECK (weekly bars with open != close): 99.73% — bar is 99%
+
+========================================================================================================================
+REPRODUCTION CHECK — do the copied rules reproduce scripts/weekly-indicator-screen.log?
+========================================================================================================================
+  rsi-band   fit     avgR  -0.156  screen says  -0.156  match
+  bb-revert  fit     avgR  -0.089  screen says  -0.089  match
+  rsi-band   select  avgR  -0.094  screen says  -0.094  match
+  bb-revert  select  avgR  -0.037  screen says  -0.037  match
+  test1: 483 symbols participate, 104 warm-up + 105 tradable weekly bars (first symbol)
+  test2: 488 symbols participate, 104 warm-up + 104 tradable weekly bars (first symbol)
+  test3: 491 symbols participate, 104 warm-up + 137 tradable weekly bars (first symbol)
+
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60  fold warm-up=104 weekly bars  trade floor=200
+
+========================================================================================================================
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+========================================================================================================================
+
+rsi-band
+  RSI(14) oversold below 30 / overbought above 70
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    test1       3451      464    0.025   57.1%   -0.228   -0.209    0.253    7.00%  beats-median
+    test2       1227      394    0.130   62.9%   -0.121   -0.089    0.251    7.12%  beats-median
+    test3       3806      477   -0.097   50.3%   -0.195   -0.179    0.098    7.04%  beats-median
+
+bb-revert
+  close outside the Bollinger(20, 2 sigma) band, faded
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    test1       4223      480    0.013   56.4%   -0.127   -0.107    0.140    8.41%  beats-median
+    test2       3099      485    0.140   63.4%   -0.054   -0.036    0.194    8.19%  beats-median
+    test3       4880      491   -0.020   54.5%   -0.112   -0.095    0.091    7.96%  beats-median
+
+========================================================================================================================
+retail (5bps slip + 1bp comm) — pre-registered second statement
+========================================================================================================================
+
+rsi-band
+  RSI(14) oversold below 30 / overbought above 70
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    test1       3458      464    0.015   56.8%   -0.238   -0.219    0.253    7.00%  beats-median
+    test2       1231      394    0.118   62.6%   -0.131   -0.099    0.249    7.12%  beats-median
+    test3       3816      477   -0.115   49.7%   -0.207   -0.192    0.092    7.04%  beats-median
+
+bb-revert
+  close outside the Bollinger(20, 2 sigma) band, faded
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    test1       4223      480    0.004   56.2%   -0.138   -0.117    0.142    8.41%  beats-median
+    test2       3100      485    0.130   63.2%   -0.064   -0.046    0.194    8.19%  beats-median
+    test3       4883      491   -0.035   54.0%   -0.124   -0.107    0.089    7.96%  beats-median
+
+========================================================================================================================
+CRITERION: beats the control median in >=2 of 3 TEST folds AND raw avgR > 0 in >=2 of 3.
+  rsi-band   beats-median 3/3, avgR>0 2/3 => HOLDS
+  bb-revert  beats-median 3/3, avgR>0 2/3 => HOLDS
+
+A FAIL closes the classic indicator library on this data, per this script's header —
+no period sweep, no threshold move, no added filter, no third fill.
