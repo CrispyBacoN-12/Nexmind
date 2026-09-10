@@ -238,10 +238,76 @@ anything in `src/` that serves the live desk; the gold/MT5 half of the split.
 
 - Design decision #5 (pre-placed orders at the next open) is dead and is
   replaced by Decision 1 above.
-- The ranking-vs-random-selection experiment remains owed by
-  `portfolio-capacity.mts`'s own header. Its ordering spreads were wide
-  (test1 19.5%–49.9%), so selection may be the whole game — but it is only
-  worth measuring once a mechanism exists to select from.
-- `portfolio-capacity.log` contains one unexplained audit row: $2,500/5 slots
-  beats $5,000/5 slots in percentage terms in several folds, contradicting the
-  whole-share rounding logic. Labelled unexplained, not used for any decision.
+- **RESOLVED 2026-09-09 — the ranking-vs-random-selection experiment owed by
+  `portfolio-capacity.mts`'s own header has been run.** Three rankings were
+  measured against the random band at $2,500/5 on all eight folds, in dollars
+  and again in R (mean rMultiple over the trades the walk actually took —
+  risk-normalised, so leverage cancels). The verdict rule was fixed before the
+  run: an advantage that survives in R is selection, an advantage that vanishes
+  in R is position sizing.
+
+  | ranking | beats median ($) | beats median (R) | above R-p95 | leverage vs random |
+  |---|---|---|---|---|
+  | `cheap` | 4/5 + 3/3 | 4/5 + 3/3 | 2/8 | 1.27x |
+  | `hi-vol` | 4/5 + 3/3 | 3/5 + 3/3 | 0/8 | 1.81x |
+  | `hi-adx` | 2/5 + 3/3 | 3/5 + 3/3 | 3/8 | 1.05x |
+
+  `walkPortfolio` sizes in DOLLARS (`shares = floor(budget / entry)`), so risk
+  per position is `budget × ATR% × 1.5` and any ranking correlated with ATR%
+  buys leverage rather than selection. `hi-vol` is leverage outright — 1.81x,
+  above R-p95 in 0 of 8 folds, and it goes backwards in R on select and test1.
+  `cheap` is mostly leverage: its beats-median result survives into R but the
+  strong form collapses 5/8 → 2/8. `hi-adx` is the only one leverage does not
+  explain (1.05x).
+
+  **`hi-adx` is not a proposal — it is what already ships.** `runScan.ts`
+  already carries `candidates.sort((a, b) => b.adx - a.adx)`, with its own
+  comment saying it is untested. So this experiment paid a debt on live code,
+  and the answer is that the shipped tie-break is at worst harmless. It is
+  still NOT evidence that it helps: all eight folds are spent, so the
+  experiment can only disconfirm — a positive is a hypothesis with no unspent
+  data left to confirm it — and `hi-adx`'s dollar verdict flips with the
+  random-band construction (4/5 post-2016 against 10-stream medians, 2/5
+  against per-ordering medians). **Keep the ADX tie-break, never write it up as
+  proven, and never add a ranking correlated with ATR%** — that is risk per
+  position, not selection.
+
+- **RESOLVED 2026-09-09 — the "unexplained audit row" was a units error in how
+  the log is read, not a defect in the mechanism.** In
+  `portfolio-capacity.mts` the headline row is the median of 50 orderings drawn
+  from ONE advancing `mulberry32(PANEL_SEED)` stream, while each audit row is a
+  SINGLE ordering from a freshly re-seeded `mulberry32(PANEL_SEED)` — and
+  `$2,500/5` is not in `AUDIT_CONFIGS` at all, so the log contains no
+  like-for-like row anywhere. Measured paired (same ordering key sequence for
+  both configs, 50 orderings per fold), doubling capital is worth **+0.1 to
+  +1.1 pp/yr, positive in 7 of 8 folds** (test2 −0.3%), never close to the
+  ordering spread. The whole-share constraint does bite on affordability —
+  test3 drops 46 unaffordable signals at $2,500 against 12 at $5,000 — but
+  costs almost nothing in return, because a dropped signal usually just frees
+  the slot for another one.
+
+- **NEW 2026-09-09, and it weakens this log's own PASS.** The median-of-50 is
+  itself seed-unstable: re-run across 10 independent RNG streams at $2,500/5,
+  the median moves **0.9 pp (deep3) to 5.1 pp (select)**. That puts
+  `portfolio-capacity.log`'s fit **+2.3%** and select **+2.9%** margins inside
+  their own estimator's noise. It does NOT overturn deep1 +19.4, test1 +9.9,
+  test2 +7.5 or test3 +4.0. Cite that log as "clear in 4 folds, fragile in 2",
+  never as "5/5".
+
+- **STILL OPEN — membership survivorship, and it cannot be closed with this
+  data.** `src/lib/trading/universe.ts` hard-codes TODAY's S&P 500 (490 names);
+  the shallow cache holds 491 keys (plus SPY) and the deep cache 453. Names
+  that left the index between 2000 and 2016 are not in a low quartile — they
+  are not in the data at all. The quartile diagnostic run three times measures
+  winner DRIFT among survivors and cannot reach that, exactly as
+  `deep-holdout.mts:228` and `weekly-indicator-deep-holdout.mts:112` already
+  say. Even among survivors the deep panel does not start together: only **345
+  of 453** names have bars from 2000 (325 start in 1998, the rest arrive
+  through 2015), so DEEP1 runs on a smaller, older, more-selected subset than
+  the later folds. What still protects the work is the matched control: it
+  re-places entries within the SAME symbols, so both sides inherit the same
+  bias — **margins over the control remain readable, levels do not**. Closing
+  this needs two datasets the project does not have and which are not free: a
+  point-in-time constituent list with add/drop dates back to 2000, and price
+  history for delisted names. Report the status as "open, unmeasurable with
+  this data" — never as tested or passed.
