@@ -21,7 +21,7 @@ export interface SizingResult {
   reasoning: string;
 }
 
-function corrMultiplierFor(avgCorrelation: number | null): number {
+export function corrMultiplierFor(avgCorrelation: number | null): number {
   if (avgCorrelation == null) return 1;
   if (avgCorrelation >= 0.8) return 0.7;
   if (avgCorrelation >= 0.6) return 0.85;
