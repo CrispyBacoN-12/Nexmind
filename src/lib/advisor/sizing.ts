@@ -89,7 +89,7 @@ export function sizeShares(input: ShareSizingInput): ShareSizingResult {
     reason =
       `${shares} share(s). Both caps bind at the same number: the risk budget allows ${riskShares} ` +
       `and the slot budget affords ${affordableShares}. Real risk is $${actualRiskUsd.toFixed(2)} ` +
-      `(${actualRiskPct.toFixed(2)}% of capital), not the ${riskPct}% requested.`;
+      `(${actualRiskPct.toFixed(2)}% of capital), not the ${riskPct.toFixed(2)}% requested.`;
   } else if (boundBy[0] === "risk") {
     reason =
       `${shares} share(s), capped by RISK: the risk budget of $${riskUsdTarget.toFixed(2)} allows ` +
@@ -99,7 +99,7 @@ export function sizeShares(input: ShareSizingInput): ShareSizingResult {
     reason =
       `${shares} share(s), capped by AFFORDABILITY: one slot is $${slotBudget.toFixed(2)}, which buys ` +
       `${affordableShares} at $${entry.toFixed(2)}, while the risk budget would have allowed ${riskShares}. ` +
-      `Real risk is $${actualRiskUsd.toFixed(2)} (${actualRiskPct.toFixed(2)}% of capital), not the ${riskPct}% requested.`;
+      `Real risk is $${actualRiskUsd.toFixed(2)} (${actualRiskPct.toFixed(2)}% of capital), not the ${riskPct.toFixed(2)}% requested.`;
   }
 
   return {

@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { Candle } from "@/lib/indicators";
+import { atr, type Candle } from "@/lib/indicators";
 import { advise } from "./advise";
-import { ADVISOR_NO_EDGE_CLAIM } from "./types";
+import { sizeShares } from "./sizing";
+import { ADVISOR_ATR_PERIOD, ADVISOR_ATR_SL_MULT, ADVISOR_NO_EDGE_CLAIM } from "./types";
 
 const DAY = 86_400;
 const T0 = Date.parse("2020-01-01T00:00:00Z") / 1000;
@@ -20,6 +21,21 @@ function bars(n: number, close: number, range = 6): Candle[] {
       c: close,
       v: 1_000_000,
     });
+  }
+  return out;
+}
+
+/**
+ * n daily bars whose close zigzags on a 5-day cycle, so daily returns have
+ * variance. bars() cannot be used for a correlation test — a constant close
+ * means zero variance and pearsonCorrelation returns null. Two zigzag series
+ * built from different bases follow the same pattern, so they correlate ~1.
+ */
+function zigzag(n: number, base: number, range = 6): Candle[] {
+  const out: Candle[] = [];
+  for (let i = 0; i < n; i++) {
+    const c = base + ((i % 5) - 2);
+    out.push({ t: T0 + i * DAY, o: c, h: c + range / 2, l: c - range / 2, c, v: 1_000_000 });
   }
   return out;
 }
@@ -144,12 +160,76 @@ test("holding the asked-about ticker is flagged", () => {
 });
 
 test("the correlation multiplier is reported, never folded into shares", () => {
-  const res = advise({ ...BASE, candles: bars(60, 180, 6), entryOverride: 180 });
+  // The multiplier must actually be < 1 or this test asserts nothing: with no
+  // holdings corrMultiplier is 1 and folding it in would change no number.
+  const candles = zigzag(60, 180);
+  const res = advise({
+    ...BASE,
+    candles,
+    entryOverride: 180,
+    holdings: [
+      { ticker: "MSFT", candles: zigzag(60, 300) },
+      { ticker: "NVDA", candles: zigzag(60, 420) },
+    ],
+  });
   assert.equal(res.ok, true);
   if (!res.ok) return;
-  // No holdings -> no correlation -> multiplier 1, and shares is untouched either way.
-  assert.equal(res.card.avgCorrelation, null);
-  assert.equal(res.card.corrMultiplier, 1);
-  assert.equal(res.card.sizing.shares, 2);
-  assert.equal(res.card.corrAdjustedShares, 2);
+  const card = res.card;
+
+  assert.ok(card.corrMultiplier < 1, `expected a damping multiplier, got ${card.corrMultiplier}`);
+  assert.ok(card.sizing.shares > 0);
+
+  // Shares must equal what sizeShares returns for the same inputs — unadjusted.
+  const atrValue = atr(candles, ADVISOR_ATR_PERIOD).at(-1) as number;
+  const expected = sizeShares({
+    entry: 180,
+    slDistance: ADVISOR_ATR_SL_MULT * atrValue,
+    capital: BASE.capital,
+    maxSlots: BASE.maxSlots,
+    riskPct: BASE.riskPct,
+  });
+  assert.equal(card.sizing.shares, expected.shares);
+
+  // And the adjusted number is a SEPARATE, strictly smaller field.
+  assert.ok(
+    card.corrAdjustedShares < card.sizing.shares,
+    `corrAdjustedShares ${card.corrAdjustedShares} should be below shares ${card.sizing.shares}`,
+  );
+
+  // Both series end on the same date, so neither reading is hedged.
+  assert.deepEqual(
+    card.correlations.map((c) => c.note),
+    ["", ""],
+  );
+});
+
+test("a holding whose series ends earlier is reported as approximate, not clean", () => {
+  const res = advise({
+    ...BASE,
+    candles: zigzag(60, 180),
+    entryOverride: 180,
+    holdings: [{ ticker: "MSFT", candles: zigzag(59, 300) }],
+  });
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+
+  assert.equal(res.card.asOf, "2020-02-29");
+  const line = res.card.correlations[0];
+  assert.ok(line.correlation != null, "the correlation is still computed and shown");
+  assert.notEqual(line.note, "");
+  assert.match(line.note, /2020-02-28/);
+  assert.match(line.note, /2020-02-29/);
+  assert.ok(res.card.warnings.some((w) => /MSFT/.test(w) && /approximate/i.test(w)));
+});
+
+test("inputNotes are prepended to the card's warnings, ahead of any core warning", () => {
+  const note = "Counted MSFT once — 1 duplicate entry was collapsed.";
+  const res = advise({ ...BASE, candles: bars(60, 180, 6), inputNotes: [note] });
+  assert.equal(res.ok, true);
+  if (!res.ok) return;
+
+  assert.equal(res.card.warnings[0], note);
+  // BASE has no benchmark, so the core pushes its own warning afterwards.
+  const coreIndex = res.card.warnings.findIndex((w) => /benchmark/i.test(w));
+  assert.ok(coreIndex > 0, "the core-generated warning must follow the caller's notes");
 });

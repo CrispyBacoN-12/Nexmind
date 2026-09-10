@@ -3,7 +3,13 @@
 import { useState } from "react";
 
 import { Badge, Button, Card, CardTitle, Stat } from "@/components/ui";
-import type { AdvisorCard, AdvisorResult } from "@/lib/advisor/types";
+import {
+  ADVISOR_ATR_PERIOD,
+  ADVISOR_ATR_SL_MULT,
+  ADVISOR_COST_BPS,
+  type AdvisorCard,
+  type AdvisorResult,
+} from "@/lib/advisor/types";
 import { fmtMoney, fmtNumber, fmtPct } from "@/lib/utils";
 
 const CAP_LABEL: Record<string, string> = {
@@ -41,9 +47,13 @@ export function AdvisorForm() {
           holdings: holdings.split(/[\s,]+/).filter(Boolean),
         }),
       });
-      const json = (await res.json()) as AdvisorResult;
-      if (json.ok) setCard(json.card);
-      else setError(json.error);
+      // res.ok is not enough on its own and neither is res.json(): an error
+      // body that is not this route's JSON (a proxy 502 page, say) would
+      // otherwise surface to the owner as a JSON parse error.
+      const json = (await res.json().catch(() => null)) as AdvisorResult | null;
+      if (json && json.ok) setCard(json.card);
+      else if (json && !json.ok) setError(json.error);
+      else setError(`The server answered HTTP ${res.status} with a response this page could not read.`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -135,9 +145,17 @@ function ResultCard({ card }: { card: AdvisorCard }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-4">
           <Stat label="Entry" value={fmtMoney(card.entry)} sub={card.entrySource} />
-          <Stat label="Stop (1.5 x ATR)" value={fmtMoney(card.stop)} sub={`${fmtMoney(card.slDistance)} away`} />
-          <Stat label="ATR(14)" value={fmtMoney(card.atr)} />
-          <Stat label="Cost of the round trip" value={`${fmtNumber(card.costR, 3)} R`} sub="5bps assumption" />
+          <Stat
+            label={`Stop (${ADVISOR_ATR_SL_MULT} x ATR)`}
+            value={fmtMoney(card.stop)}
+            sub={`${fmtMoney(card.slDistance)} away`}
+          />
+          <Stat label={`ATR(${ADVISOR_ATR_PERIOD})`} value={fmtMoney(card.atr)} />
+          <Stat
+            label="Cost of the round trip"
+            value={`${fmtNumber(card.costR, 3)} R`}
+            sub={`${ADVISOR_COST_BPS}bps assumption`}
+          />
         </div>
       </section>
 
@@ -199,7 +217,15 @@ function ResultCard({ card }: { card: AdvisorCard }) {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">Slots and market state</h2>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Stat label="Free slots" value={fmtNumber(card.freeSlots, 0)} sub={`${card.ticker} would be one of them`} />
+          <Stat
+            label="Free slots"
+            value={fmtNumber(card.freeSlots, 0)}
+            sub={
+              card.alreadyHeld
+                ? `${card.ticker} already holds one of your slots`
+                : `${card.ticker} would be one of them`
+            }
+          />
           <Stat
             label="Gate"
             value={card.gate.benchAbove == null ? "BLIND" : card.gate.benchAbove ? "ABOVE TREND" : "BELOW TREND"}

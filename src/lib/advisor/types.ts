@@ -80,7 +80,9 @@ export interface CorrelationLine {
   ticker: string;
   /** null when the holding's candles could not be fetched or had no variance. */
   correlation: number | null;
-  /** Why it is null, when it is null. Empty string otherwise. */
+  /** Why it is null, when it is null; or why a non-null reading is only
+   *  approximate (the two series do not end on the same date). Empty string
+   *  ONLY when the reading is clean. */
   note: string;
 }
 
@@ -101,6 +103,9 @@ export interface AdvisorInput {
   /** Percent units: 1 = 1%. */
   riskPct: number;
   costBps?: number;
+  /** Notes from the caller's own input handling (deduped holdings, dropped tokens).
+   *  Prepended to the card's warnings — the core never invents these. */
+  inputNotes?: string[];
   holdings: HoldingInput[];
   /** SPY daily candles, at least TREND_PERIOD of them. null = gate reads BLIND. */
   benchmark: Candle[] | null;

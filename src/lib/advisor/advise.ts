@@ -46,6 +46,7 @@ export function advise(input: AdvisorInput): AdvisorResult {
 
   const lastBar = candles[candles.length - 1];
   const lastClose = lastBar.c;
+  const asOf = barDate(lastBar.t);
 
   const atrSeries = atr(candles, ADVISOR_ATR_PERIOD);
   const atrValue = atrSeries.at(-1) ?? null;
@@ -58,7 +59,10 @@ export function advise(input: AdvisorInput): AdvisorResult {
     };
   }
 
-  const warnings: string[] = [];
+  // Seeded from the caller's own input handling (deduped holdings, dropped
+  // tokens). The core never invents these, and they lead the list because they
+  // describe what the owner typed rather than what the data did.
+  const warnings: string[] = [...(input.inputNotes ?? [])];
 
   const override = input.entryOverride;
   const useOverride = override != null && Number.isFinite(override) && override > 0;
@@ -81,6 +85,13 @@ export function advise(input: AdvisorInput): AdvisorResult {
   const costR = costInR(entry, slDistance, costBps);
 
   // Correlation against what is already held. Reported, never applied.
+  //
+  // pearsonCorrelation zips the two return series by TRAILING INDEX, not by
+  // date — its own comment says so — and the fetch layer will happily return a
+  // holding whose last bar is several sessions older than this ticker's. That
+  // pairs Tuesday's return with Thursday's and still yields a number, so a
+  // series that does not end on the same date is labelled approximate rather
+  // than rendered as a clean reading.
   const tickerReturns = dailyReturns(candles);
   const correlations: CorrelationLine[] = input.holdings.map((h) => {
     const name = h.ticker.trim().toUpperCase();
@@ -91,6 +102,18 @@ export function advise(input: AdvisorInput): AdvisorResult {
     const c = pearsonCorrelation(tickerReturns, dailyReturns(h.candles));
     if (c == null) {
       return { ticker: name, correlation: null, note: "too few overlapping bars, or no variance" };
+    }
+    const holdingAsOf = barDate(h.candles[h.candles.length - 1].t);
+    if (holdingAsOf !== asOf) {
+      warnings.push(
+        `${name}: its last bar is ${holdingAsOf} while ${ticker}'s is ${asOf}. The correlation pairs the two ` +
+          `series by position rather than by date, so that reading is approximate.`,
+      );
+      return {
+        ticker: name,
+        correlation: c,
+        note: `approximate: this series ends ${holdingAsOf}, ${ticker} ends ${asOf}`,
+      };
     }
     return { ticker: name, correlation: c, note: "" };
   });
@@ -120,7 +143,7 @@ export function advise(input: AdvisorInput): AdvisorResult {
 
   const card: AdvisorCard = {
     ticker,
-    asOf: barDate(lastBar.t),
+    asOf,
     lastClose,
     entry,
     entrySource,
