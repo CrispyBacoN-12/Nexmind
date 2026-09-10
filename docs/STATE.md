@@ -5,7 +5,8 @@ Auto-loaded every session via `CLAUDE.md`. Dated deep-dives live in `docs/quant/
 reasoning behind each change lives in its commit body. This file is the current bar, not
 the archive.
 
-_Last verified against the live DB + working tree: **2026-09-08**, branch `xauusd-mt5`._
+_Last verified against the live DB: **2026-08-31**. Working tree, branch and test suite
+re-checked **2026-09-11**, branch `stocks-only-pivot`._
 
 > **The panel gate has now run end to end (2026-08-31, run #112, `status: done`).** The budget
 > that had paused everything came back the same day. The round proposed 3 strategies and rejected
@@ -51,7 +52,7 @@ Hard context the code does not state:
 | `Setting` rows | only `fearGreed` and `webull:accessToken` (expires **2026-09-14**). **No `ai:outage` row** — the spend limit predates the latch fix, so it was never recorded |
 | Market gate | **live and readable again** since 08-30: `SPY 769.35 > SMA200 707.41` (+8.8%) on Alpaca bars (§3) |
 | Scheduled tasks | all three (`Stocks scan` 05:00, `Manage positions` /15min, `Research round` Sun 06:00) now share the same power settings; next research fire **2026-09-06 06:00** |
-| Working tree | **dirty**, not clean: branch `xauusd-mt5`, 7 commits ahead of `dadb2f0` (the commit it was checked out from — no upstream configured, never pushed) — 16 tracked files touched plus 24 untracked, none of it yours to stash, clean, or check out over |
+| Working tree | **dirty**, not clean: branch `stocks-only-pivot` at `859331a`, **52 commits ahead of `origin/stocks-only-pivot`, never pushed** — 16 tracked files touched (10 modified, 6 intent-to-add) plus 28 untracked, none of it yours to stash, clean, or check out over. `xauusd-mt5` was fast-forwarded into this branch on 09-11 and deleted |
 
 The load-bearing part is the owner's uncommitted 2026-09-05 deep-hold-out work —
 `docs/quant/2026-09-05-deep-holdout.md`, `scripts/deep-holdout.mts`, `scripts/cache-deep-history.mts`,
@@ -62,9 +63,47 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 09-08)
+## 3. Done recently (2026-08-23 → 09-11)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
+
+- **The stocks half now has a surface the owner can actually use, and it claims no edge.
+  2026-09-11.** `/advisor` — the first thing this project has shipped that is meant to be
+  *used* rather than measured. It is not a screener and not an automated trader: the owner
+  types a ticker they already chose, and the tool reports that ticker's structure. Entry
+  (last close, or an override), stop at **1.5 × ATR(14)**, the R ladder `[1, 1.5, 2, 2.5, 3]`
+  in real prices, the round-trip cost expressed **in R**, how many **whole** shares the
+  capital buys under two caps (risk budget and one-slot affordability) with the binding cap
+  named and the **actual** risk % printed, free slots, the market gate's own reading, and
+  correlation to what is already held. It picks no target, ranks nothing, and every card
+  carries `ADVISOR_NO_EDGE_CLAIM` verbatim — because §4 (g), the weekly deep hold-out and the
+  classic-indicator screen all landed the same way, and a tool built on top of that record has
+  no business implying a reason to buy. Correlation is **reported, never applied**: the card
+  prints `corrMultiplier` and `corrAdjustedShares` beside a size that ignores both.
+  Architecture is one boundary, enforced: `src/lib/advisor/` is pure (no prisma, no
+  marketData, no yahoo, no clock) and `src/app/api/advisor/route.ts` is the only I/O. SPY is
+  fetched separately at `2y/1d` with a 300-day floor, because `fetchCandlesBatch` takes no
+  `minDays` and a `6mo` benchmark would have made the gate read BLIND on every request with
+  nobody the wiser. Six commits, `9bcae76..859331a`, fast-forwarded into `stocks-only-pivot`.
+  **648 tests pass.** Spec `docs/superpowers/specs/2026-09-10-stock-advisory-tool-design.md`.
+
+  The load-bearing part is what the final whole-branch review caught, because it is the
+  failure mode this file keeps warning about in a new place: the route coerced every numeric
+  field through a silent fallback, so typing `0.5%` into "Risk per trade (%)" produced `NaN`,
+  fell back to `1`, and the card then printed *"Real risk is $18.00 (0.72% of capital), not
+  the **1%** requested"* — a **fabricated risk percentage at double the intended risk**, with
+  the tool's own honesty machinery repeating the wrong number back with confidence. `3,000`
+  in the capital field was worse: it became 2500 and nothing on the card echoes capital, so
+  every dollar figure was silently wrong. Fixed in `859331a`: absent or blank still means
+  "use the default", but anything present that does not parse to a positive number is a
+  **400 naming the field and the value**. Same round: holdings are deduped (a repeated name
+  was silently eating a slot), tokens dropped for any reason now reach the card's warnings,
+  and a holding whose last bar lands on a different date than the ticker's is flagged
+  approximate instead of being rendered as a clean correlation — `pearsonCorrelation` zips by
+  trailing index, not by date, and `fetchCandlesBatch` will hand back a series up to 6 days
+  stale. Also replaced a test that asserted nothing: the "correlation is reported, never
+  applied" case had been running with **no holdings**, so the multiplier was 1 and the
+  assertion was arithmetic; folding the multiplier into the share count would have passed it.
 
 - **Weekly-bar screen: two of the six existing mechanisms clear the promotion bar at the only
   fill the owner can trade. 2026-09-08.** Pre-registered hypothesis: at least one of the six
@@ -98,6 +137,49 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   `docs/superpowers/specs/2026-09-08-weekly-bar-mechanism-screen-design.md`, plan
   `docs/superpowers/plans/2026-09-08-weekly-bar-mechanism-screen.md`, log
   `scripts/weekly-mechanism-screen.log`.
+
+- **`mr-down3` PASSED a pre-registered hold-out on 2000–2016 data. 2026-09-05 — the first
+  thing in this project ever to pass one.** `docs/quant/2026-09-05-deep-holdout.md`,
+  raw log `scripts/deep-holdout.log`.
+
+  The 2016-01-04 floor on every symbol in `sp500-1d.json` was never the end of history — it is
+  **Alpaca's equity inception**. `providerOrder()` falls through to Yahoo only when a provider
+  *errors*, and Alpaca does not error, so Yahoo, which serves the same names back to the 1990s,
+  had never been asked. `scripts/cache-deep-history.mts` asked it: **453 of 491 S&P names,
+  1998-01-02..2016-01-04**, into a SEPARATE cache (`.cache/bars/sp500-1d-deep.json`) so no
+  existing number moves. Three new `DEEP_FOLDS`, all ending before `FOLDS.fit` begins.
+
+  Rules fixed in the script header **before the first run**: pass = beats the control median in
+  ≥2/3 deep folds AND the control p95 in ≥1/3; anything less closes mean reversion as a family.
+
+  | fold | trades | avgR | ctrl med | ctrl p95 | margin vs p95 |
+  |---|---|---|---|---|---|
+  | deep1 2000-05 (dot-com bust) | 27,521 | +0.070 | 0.045 | 0.051 | **+0.019** |
+  | deep2 2005-10 (GFC) | 30,268 | +0.074 | 0.039 | 0.044 | **+0.030** |
+  | deep3 2010-16 (QE) | 38,195 | +0.132 | 0.076 | 0.081 | **+0.051** |
+
+  **Median 3/3, p95 3/3 — PASS on the stricter condition in every fold.** The pre-registered
+  survivorship diagnostic (quartile symbols by their OWN deep-window return; reject if the
+  margin lives only in the top quartile) came back **flat**: Q1 +0.037, Q2 +0.040, Q3 +0.036,
+  Q4 +0.042, 12/12 cells beating the control median, with Q1 holding names compounding at
+  −27.8%/yr. **The winner-drift objection falls — that one only.** Bucketing survivors by
+  their own return cannot reach the names that left the index, so membership survivorship is
+  untested here, not answered (restated in "What it is NOT" below, and now carried in the
+  script's own verdict line rather than only in prose). 13 of 14 fold-cells positive across two ticker-disjoint
+  universes and two non-overlapping 16-year eras, from a rule with zero fitted parameters on an
+  exit ladder never tuned to it.
+
+  **What it is NOT.** Not a strategy: 27k–38k trades per fold is a diffuse edge firing ~40×/day,
+  and at $2–3k in whole shares the desk holds ~5 slots — *which* signals to take is unsolved and
+  unvalidated. Not free of **membership** survivorship: the list is today's S&P 500, and names
+  that delisted 2000–2016 are absent entirely (the quartile test kills "winners bounce", not
+  "losers are missing"). Not to be combined with the ATR trail (both chosen on the same panel).
+  Not to be swept — "3 days" comes from the literature, and that is the whole reason it is
+  credible. **Next question is sizing and selection, not another entry mechanism.**
+
+  Harness verification: `LADDERS`/`MECHANISMS` moved to `src/lib/research/mechanisms.ts` so both
+  screens run the same objects; proven number-identical by diffing a full 9×5 run against
+  `git show HEAD:scripts/mechanism-screen.mts`. `npm test` 519/519.
 
 - **The wider single targets were exposure; the trails are not. 2026-09-05 — the side split.**
   The new exit control said the trail is positive in 4-5/5 folds. This project has been fooled by
@@ -399,12 +481,33 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   before: **negative-value entry timing, in every fold, including the two it was built on.**
   Everything tuned around it — the exit ladder, the 13 vetoes, the market gate — was tuned
   around that. Read this before spending another round on the same rule.
-- **Six new entry mechanisms screened, five rejected. 2026-08-26**, same run.
-  `mr-down3`, `nr7`, `turn-of-month`, `vol-dryup`, `range-expand` — **do not re-tune**, all
-  failed on the screening folds (fit/select). `gap-fade` is the only row beating the control
+- **Six new entry mechanisms screened. 2026-08-26**, same run.
+  `nr7`, `turn-of-month`, `vol-dryup`, `range-expand` — **do not re-tune**, all failed on the
+  screening folds (fit/select). `gap-fade` is the only row beating the control
   p95 in 5/5 folds, but its raw avgR is negative in 4/5 because its control is negative too:
   an information result, not a tradeable one, and its entry fills at the CLOSE of the gap bar,
   which is the wrong price for the mechanism. Open, undecided — §4g.
+- **CORRECTION 2026-09-05 — `mr-down3` was not one of the five.** This line read "all failed
+  on the screening folds" for ten days and hid the only interesting row in the log.
+  `mr-down3` (long after 3 consecutive lower closes, **zero fitted parameters**) fails
+  **SELECT only** — the single 2019 melt-up year whose control median is +0.146 against FIT's
+  +0.078, the same fold that killed the ATR trail. Its margin over the control median, from
+  `scripts/mechanism-screen-control.log` and `mechanism-screen-broad-control.log`:
+
+  | fold | S&P 500 (491 names) | broad (1,172 names, zero ticker overlap) |
+  |---|---|---|
+  | FIT | +0.002 | +0.012 |
+  | SELECT | −0.013 | −0.014 |
+  | TEST1 | +0.056 | +0.033 |
+  | TEST2 | +0.010 | +0.011 |
+  | TEST3 | +0.047 | +0.034 |
+
+  Beats the control median in **9 of 10 cells across two ticker-disjoint universes**, with raw
+  avgR positive 5/5 on both — against a baseline that loses to the median 10/10 and a
+  `gap-fade` that beats the control while losing money. **Three of those four winning cells
+  are TEST folds whose numbers have now been read**, so it could not be selected from them
+  without spending the hold-out. That is what `scripts/deep-holdout.mts` exists to settle, on
+  pre-2016 data no fold has ever touched — §4g.
 - **Stocks-only pivot finished.** Gold/forex/crypto/options desks and watchlist seeds gone.
 - **All 13 confluence filters rejected** IS/OOS — loop closed (§5),
   `docs/quant/2026-08-23-confluence-filter-sweep-results.md`.
@@ -835,6 +938,16 @@ fold-cells. There is no candidate left to promote and no queued direction that t
 supports. That is a real state of the project, not a gap in it, and the next direction should
 be chosen deliberately rather than inherited.
 
+**SUPERSEDED IN PART, 2026-09-05.** The sentence above — "no candidate left to promote" — was
+written from a summary that had `mr-down3` in the failed list, and it was wrong. `mr-down3`
+failed SELECT only, and on 2026-09-05 it **passed a pre-registered hold-out on 1998–2016 Yahoo
+data no fold had ever touched**, median 3/3 and p95 3/3, with the survivorship objection
+measured and dismissed — §3, `docs/quant/2026-09-05-deep-holdout.md`. Everything else in this
+section stands: the baseline is still dead, the other mechanisms still failed, and swapping the
+universe is still closed. What changed is that there is now exactly one live candidate, and the
+open question about it is **position sizing and same-day signal selection at ~5 whole-share
+slots**, not another entry rule.
+
 **UPDATED 2026-09-08 — the weekly-bar screen adds a second live candidate, and both now have
 the same next step.** `scripts/weekly-mechanism-screen.mts` re-ran the same six mechanisms,
 unmodified, on weekly bars at the only fill the owner can trade (§3). `mr-down3` and
@@ -855,6 +968,25 @@ pre-registration exists.
   which reads **no price at all**, showed test1 avgR **+0.355 at 75.5% win** against a control
   p95 of +0.124. Quote the margin over the matched control (`src/lib/research/control.ts`) or
   do not quote the number.
+- **Yahoo treats `interval` as a request and `range` as the contract.** `/v8/finance/chart`
+  answers `range=max&interval=1d` with **weekly, monthly or quarterly bars** and no error, no
+  warning, and no field saying so: AAPL comes back with 169 bars for 42 years, NVDA with 333.
+  Every one of those bars is a real, well-formed, correctly adjusted session aggregate, so
+  `sanitizeSeries` passes all of them — there is nothing wrong with any bar individually, and
+  the only evidence is the SPACING between them. A panel built on such a cache runs every
+  indicator, every fold and every control without complaint and reports numbers for a strategy
+  nobody could trade. Use explicit `period1`/`period2` epoch seconds (AAPL: 4,048 daily bars
+  1999→2016) and check `isDailySeries` from `src/lib/bars.ts` before writing a cache;
+  `scripts/cache-deep-history.mts` aborts the whole run on one failure rather than writing a
+  file that is 99% right. `fetchYahooCandles` in `src/lib/yahoo.ts` still sends `range=` and is
+  correct for the 2-year live pulls it serves — do not reuse it for history.
+- **Yahoo has no chart history at all for a handful of live tickers.** Deterministic, verified
+  on both `query1` and `query2` and at every window including `range=1mo`: MMC, K, BK and HES
+  return `Not Found`, EA and AVB return `Bad Request`. Nothing to retry and nothing to fix —
+  the deep cache is 453 of the 491 S&P names for this reason plus ~20 genuinely post-2016
+  entities (CARR, OTIS, CTVA, KVUE, GEHC, VLTO, SOLV, GEV, VST, CEG, DOW, UBER, MRNA …). The
+  two Yahoo failure codes mean *different* things and both mean "no data, do not retry":
+  `Not Found` = no such ticker, `Bad Request` = real ticker, listed after this window.
 - **A failure classifier is only as good as the strings it was checked against.** `FATAL_BACKEND`
   in `anthropic.ts` was written from what a dead login looks like and shipped without a test, so it
   missed `You've hit your monthly spend limit` — the one failure most likely to actually happen.
@@ -986,6 +1118,22 @@ pre-registration exists.
   placeholder accumulates into the majority of the dataset while nobody reads labels.
 - Next.js 16 here has breaking changes vs. training data; read `node_modules/next/dist/docs/`
   before writing app code (`AGENTS.md`).
+- **Four things about the web layer that reviewers get wrong every single time.**
+  (1) `fmtPct` (`src/lib/utils.ts:31`) **divides by 100**, and every `*Pct` field in this repo
+  is already in percent units (`1` = 1%), so passing one straight to `fmtPct` is correct —
+  "fixing" the apparent double conversion is what breaks it. (2) `Stat`
+  (`src/components/ui.tsx:19`) renders its **own** `<Card>`; a grid of `Stat` must sit in a
+  plain `<section>`, never inside a second `Card`. (3) **Nothing under `src/app/` is tested**
+  in this repo, by design — a route or page is verified against a running dev server, so
+  "these files have no tests" is not a finding. (4) Repo-wide `npm run lint` carries a
+  **263-problem pre-existing baseline** (102 errors, 161 warnings) in files nobody is touching;
+  judge lint scoped to the files a change actually edits, or every diff looks broken.
+- **Start dev servers through the harness's preview tooling, never `npm run dev` in Bash.**
+  A Bash-launched server outlives the turn that started it and holds port 3275 against the
+  next one. Related, and it costs a wasted verification round every time: the pane renames
+  `launch.json` configurations, so `"dev:web"` must be started as `nexmind-dev-web`, and the
+  first `navigate` after a cold start fails while Next is still compiling — check
+  `preview_logs` for "Ready in" before treating that failure as a permission problem.
 
 ## 6. Blocked on the user (still open)
 
