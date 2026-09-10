@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Radar, FileBarChart, Activity, LineChart, FlaskConical, ScrollText, Microscope } from "lucide-react";
+import { Radar, FileBarChart, Activity, LineChart, FlaskConical, ScrollText, Microscope, Compass } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/", label: "War Room", icon: Radar },
   { href: "/analyze", label: "AI Analysis", icon: LineChart },
+  { href: "/advisor", label: "Trade Advisor", icon: Compass },
   { href: "/backtest", label: "Backtest Lab", icon: FlaskConical },
   { href: "/research", label: "Quant Research", icon: Microscope },
   { href: "/activity", label: "Scan Activity", icon: ScrollText },
