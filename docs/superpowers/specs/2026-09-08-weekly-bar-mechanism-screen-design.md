@@ -270,7 +270,8 @@ anything in `src/` that serves the live desk; the gold/MT5 half of the split.
   random-band construction (4/5 post-2016 against 10-stream medians, 2/5
   against per-ordering medians). **Keep the ADX tie-break, never write it up as
   proven, and never add a ranking correlated with ATR%** — that is risk per
-  position, not selection.
+  position, not selection. Full write-up:
+  `docs/quant/2026-09-09-portfolio-capacity.md` §3.
 
 - **RESOLVED 2026-09-09 — the "unexplained audit row" was a units error in how
   the log is read, not a defect in the mechanism.** In
@@ -289,10 +290,12 @@ anything in `src/` that serves the live desk; the gold/MT5 half of the split.
 - **NEW 2026-09-09, and it weakens this log's own PASS.** The median-of-50 is
   itself seed-unstable: re-run across 10 independent RNG streams at $2,500/5,
   the median moves **0.9 pp (deep3) to 5.1 pp (select)**. That puts
-  `portfolio-capacity.log`'s fit **+2.3%** and select **+2.9%** margins inside
-  their own estimator's noise. It does NOT overturn deep1 +19.4, test1 +9.9,
-  test2 +7.5 or test3 +4.0. Cite that log as "clear in 4 folds, fragile in 2",
-  never as "5/5".
+  three of the eight margins at or below their own estimator's noise: fit
+  **+2.3**, select **+2.9** and deep3 **+2.0** (select's 5.1 pp spread exceeds
+  its margin outright). It does NOT overturn the five larger ones — deep1
+  +19.4, test1 +9.9, deep2 +8.4, test2 +7.5, test3 +4.0. Cite that log as
+  "clear in five folds, fragile in fit, select and deep3", never as "5/5".
+  Full write-up: `docs/quant/2026-09-09-portfolio-capacity.md`.
 
 - **STILL OPEN — membership survivorship, and it cannot be closed with this
   data.** `src/lib/trading/universe.ts` hard-codes TODAY's S&P 500 (490 names);
@@ -310,4 +313,5 @@ anything in `src/` that serves the live desk; the gold/MT5 half of the split.
   this needs two datasets the project does not have and which are not free: a
   point-in-time constituent list with add/drop dates back to 2000, and price
   history for delisted names. Report the status as "open, unmeasurable with
-  this data" — never as tested or passed.
+  this data" — never as tested or passed. Full write-up:
+  `docs/quant/2026-09-09-portfolio-capacity.md` §4.
