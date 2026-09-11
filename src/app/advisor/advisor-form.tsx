@@ -14,6 +14,7 @@ import {
 import { fmtMoney, fmtNumber, fmtPct } from "@/lib/utils";
 
 import { AdvisorChart } from "./advisor-chart";
+import { AdvisorCritique } from "./advisor-critique";
 
 const CAP_LABEL: Record<string, string> = {
   risk: "RISK BUDGET",
@@ -43,6 +44,10 @@ export function AdvisorForm() {
   const [chart, setChart] = useState<ChartBar[] | null>(null);
   /** Set when the entry field was filled by clicking a candle, cleared on submit. */
   const [pickedFrom, setPickedFrom] = useState<string | null>(null);
+  // Bumped by any keystroke in the form. Used as AdvisorCritique's key, so an
+  // edit unmounts a critique that was argued against numbers that no longer
+  // match the card. React's onChange bubbles, so one handler covers every field.
+  const [formEpoch, setFormEpoch] = useState(0);
 
   /**
    * A clicked candle fills the Entry field and stops there.
@@ -96,7 +101,11 @@ export function AdvisorForm() {
   return (
     <div className="space-y-6">
       <Card className="p-5">
-        <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-3">
+        <form
+          onSubmit={onSubmit}
+          onChange={() => setFormEpoch((n) => n + 1)}
+          className="grid gap-4 sm:grid-cols-3"
+        >
           {/* Changing the ticker clears the entry.
               An entry typed — or clicked off a candle — for one name is a
               price in that name's range, and carrying it into another turns
@@ -158,7 +167,9 @@ export function AdvisorForm() {
         </Card>
       ) : null}
 
-      {card ? <ResultCard card={card} chart={chart} onPickEntry={pickEntry} /> : null}
+      {card ? (
+        <ResultCard card={card} chart={chart} onPickEntry={pickEntry} critiqueKey={formEpoch} />
+      ) : null}
     </div>
   );
 }
@@ -194,10 +205,13 @@ function ResultCard({
   card,
   chart,
   onPickEntry,
+  critiqueKey,
 }: {
   card: AdvisorCard;
   chart: ChartBar[] | null;
   onPickEntry: (price: number, date: string) => void;
+  /** Changes on any form edit; remounting AdvisorCritique is how it clears. */
+  critiqueKey: number;
 }) {
   return (
     <div className="space-y-4">
@@ -355,6 +369,8 @@ function ResultCard({
           </ul>
         </Card>
       ) : null}
+
+      <AdvisorCritique key={critiqueKey} card={card} chart={chart} />
 
       <p className="text-xs text-(--color-muted) border-l-2 border-(--color-border) pl-4">{card.noEdgeClaim}</p>
     </div>
