@@ -60,6 +60,11 @@ export function AdvisorForm() {
   function pickEntry(price: number, date: string) {
     setEntry(price.toFixed(2));
     setPickedFrom(date);
+    // setEntry above is a programmatic controlled-input change: React does not
+    // fire the form's bubbled onChange for it, so formEpoch (AdvisorCritique's
+    // remount key) would not otherwise bump and a stale critique — argued
+    // against the OLD entry — would keep rendering under the new card.
+    setFormEpoch((n) => n + 1);
   }
 
   async function onSubmit(e: React.FormEvent) {

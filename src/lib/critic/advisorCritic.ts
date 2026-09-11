@@ -13,6 +13,7 @@
 
 import {
   guardObjections,
+  isDirectional,
   type CritiqueResult,
   type Objection,
   type Severity,
@@ -87,6 +88,21 @@ export async function critiqueCard(facts: string): Promise<CritiqueResult> {
     // time, and here is why.
     const reason =
       err instanceof Error ? err.message : String(err);
+    // The guard (guardObjections / isDirectional) is the one thing this module
+    // must never let slip past — and parseJsonLoose's own error message is a
+    // slice of the model's raw, un-guarded prose ("Agent did not return valid
+    // JSON: <first 200 chars>"). That is exactly the failure mode where the
+    // model broke its contract and said something directional in plain text,
+    // and forwarding it verbatim to the card would bypass the guard entirely.
+    // So this one failure reason is replaced with a fixed note; every other
+    // backend failure (spend limit, timeout, ...) is still forwarded because
+    // the owner genuinely benefits from seeing it.
+    if (reason.startsWith("Agent did not return valid JSON") || isDirectional(reason)) {
+      console.error("RAVEN: withholding raw model text from the card:", reason);
+      return degraded(
+        "อ่านคำตอบของโมเดลไม่ได้ — ข้อความดิบถูกตัดออกเพื่อไม่ให้คำชี้นำหลุดขึ้นการ์ด",
+      );
+    }
     return degraded(reason);
   }
 }
@@ -103,13 +119,25 @@ export function normalizeCritique(
   raw: RawCritique,
   meta: { model: string; costUsd: number },
 ): CritiqueResult {
-  const { kept, stripped } = guardObjections(readObjections(raw.objections));
+  const { kept, stripped: strippedObjections } = guardObjections(readObjections(raw.objections));
+  // blindSpots is free model text too, and readStrings only type-filters — it
+  // never runs the guard. Left unguarded, a directional blind spot ("worth
+  // waiting for the earnings reaction") would reach the card exactly as
+  // untouched as an unguarded objection would. Same guard, same visibility:
+  // a dropped blind spot joins the SAME stripped list the objections use,
+  // objections' entries first, so the removal is never silent.
+  const blindSpots: string[] = [];
+  const strippedBlindSpots: string[] = [];
+  for (const b of readStrings(raw.blindSpots)) {
+    if (isDirectional(b)) strippedBlindSpots.push(b);
+    else blindSpots.push(b);
+  }
   return {
     objections: kept.slice(0, MAX_OBJECTIONS),
-    blindSpots: readStrings(raw.blindSpots),
+    blindSpots,
     degraded: false,
     note: "",
-    stripped,
+    stripped: [...strippedObjections, ...strippedBlindSpots],
     model: meta.model,
     costUsd: meta.costUsd,
   };

@@ -42,8 +42,13 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ card, chart }),
       });
-      const json = (await res.json()) as CritiqueResult | { ok: false; error: string };
-      if ("ok" in json && json.ok === false) {
+      // res.ok is not enough on its own and neither is res.json(): an error
+      // body that is not this route's JSON (a proxy 502 page, say) would
+      // otherwise surface to the owner as a JSON parse error.
+      const json = (await res.json().catch(() => null)) as CritiqueResult | { ok: false; error: string } | null;
+      if (json === null) {
+        setError(`The server answered HTTP ${res.status} with a response this page could not read.`);
+      } else if ("ok" in json && json.ok === false) {
         setError(json.error);
       } else {
         setResult(json as CritiqueResult);
@@ -88,7 +93,13 @@ function CritiqueBody({ result }: { result: CritiqueResult }) {
   return (
     <div className="space-y-4">
       {result.objections.length === 0 ? (
-        <p className="text-sm">RAVEN ไม่พบข้อโต้แย้งจากตัวเลขชุดนี้ — ไม่ได้แปลว่าน่าเข้า</p>
+        result.stripped.length === 0 ? (
+          <p className="text-sm">RAVEN ไม่พบข้อโต้แย้งจากตัวเลขชุดนี้ — ไม่ได้แปลว่าน่าเข้า</p>
+        ) : (
+          <p className="text-sm">
+            RAVEN ไม่เหลือข้อโต้แย้งที่ใช้ได้ — ที่ตอบมาเป็นคำชี้นำซื้อ/ขายทั้งหมด และถูกตัดออก
+          </p>
+        )
       ) : (
         <ul className="space-y-3">
           {result.objections.map((o, i) => (

@@ -86,6 +86,18 @@ test("normalizeCritique survives junk: wrong types, missing fields, bad severity
   assert.equal(r.degraded, false);
 });
 
+test("a directional blind spot is removed from blindSpots and appears in stripped", () => {
+  const r = normalizeCritique(
+    {
+      objections: [],
+      blindSpots: ["earnings in 3 days — you should wait for the reaction", "sector-wide moves are not on the card"],
+    },
+    { model: "m", costUsd: 0 },
+  );
+  assert.deepEqual(r.blindSpots, ["sector-wide moves are not on the card"]);
+  assert.deepEqual(r.stripped, ["earnings in 3 days — you should wait for the reaction"]);
+});
+
 test("normalizeCritique treats a missing objections array as zero objections, not an error", () => {
   const r = normalizeCritique({}, { model: "m", costUsd: 0 });
   assert.deepEqual(r.objections, []);
