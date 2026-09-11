@@ -43,7 +43,7 @@ Everything RAVEN sees was produced by this server one request earlier:
 
 - the `AdvisorCard` (entry, stop, ATR, R ladder, sizing and its `boundBy`,
   correlations, `corrMultiplier`, `freeSlots`, `gate`, `warnings`)
-- the `ChartRow[]` already returned alongside it — two years of daily bars with
+- the `ChartBar[]` already returned alongside it — six months of daily bars with
   SMA50 and SMA200
 
 No new market-data pull, no recomputation. The numbers RAVEN argues about are
@@ -88,7 +88,7 @@ gates nothing, so the field would only invite a reader to treat it as a verdict.
 
 | File | Responsibility | Pure |
 |---|---|---|
-| `src/lib/advisor/critiqueContext.ts` | `AdvisorCard` + `ChartRow[]` to facts sheet string; `guardObjections()` | **yes** |
+| `src/lib/advisor/critiqueContext.ts` | `AdvisorCard` + `ChartBar[]` to facts sheet string; `guardObjections()` | **yes** |
 | `src/lib/advisor/critiqueContext.test.ts` | facts-sheet content, guard behaviour, degenerate cards | — |
 | `src/lib/critic/advisorCritic.ts` | system prompt, JSON schema, `callAgentJSON`, fallback | no (I/O) |
 | `src/lib/critic/advisorCritic.test.ts` | mock-backend path returns `degraded`, never throws | — |
