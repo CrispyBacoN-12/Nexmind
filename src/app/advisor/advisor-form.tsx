@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Badge, Button, Card, CardTitle, Stat } from "@/components/ui";
+import { CHART_SMA_SLOW, type ChartBar } from "@/lib/advisor/chartSeries";
 import {
   ADVISOR_ATR_PERIOD,
   ADVISOR_ATR_SL_MULT,
@@ -12,10 +13,21 @@ import {
 } from "@/lib/advisor/types";
 import { fmtMoney, fmtNumber, fmtPct } from "@/lib/utils";
 
+import { AdvisorChart } from "./advisor-chart";
+
 const CAP_LABEL: Record<string, string> = {
   risk: "RISK BUDGET",
   affordability: "AFFORDABILITY",
 };
+
+/**
+ * The route's 200 body: the AdviceResult with the chart bars beside it.
+ *
+ * `chart` sits OUTSIDE the card because `advise` is pure and knows nothing
+ * about drawing. It is optional and nullable on purpose — the history pull for
+ * the chart fails soft, and a card with no picture is still a whole card.
+ */
+type AdvisorResponse = AdvisorResult & { chart?: ChartBar[] | null };
 
 export function AdvisorForm() {
   const [ticker, setTicker] = useState("");
@@ -28,12 +40,30 @@ export function AdvisorForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<AdvisorCard | null>(null);
+  const [chart, setChart] = useState<ChartBar[] | null>(null);
+  /** Set when the entry field was filled by clicking a candle, cleared on submit. */
+  const [pickedFrom, setPickedFrom] = useState<string | null>(null);
+
+  /**
+   * A clicked candle fills the Entry field and stops there.
+   *
+   * It deliberately does NOT re-submit: recharts fires onClick for any click
+   * inside the plot area, and a request per stray click would be both a fetch
+   * storm and a card that changes under the owner without them asking. The
+   * note below the field is what makes the click visible instead.
+   */
+  function pickEntry(price: number, date: string) {
+    setEntry(price.toFixed(2));
+    setPickedFrom(date);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setCard(null);
+    setChart(null);
+    setPickedFrom(null);
     try {
       const res = await fetch("/api/advisor", {
         method: "POST",
@@ -50,9 +80,11 @@ export function AdvisorForm() {
       // res.ok is not enough on its own and neither is res.json(): an error
       // body that is not this route's JSON (a proxy 502 page, say) would
       // otherwise surface to the owner as a JSON parse error.
-      const json = (await res.json().catch(() => null)) as AdvisorResult | null;
-      if (json && json.ok) setCard(json.card);
-      else if (json && !json.ok) setError(json.error);
+      const json = (await res.json().catch(() => null)) as AdvisorResponse | null;
+      if (json && json.ok) {
+        setCard(json.card);
+        setChart(json.chart ?? null);
+      } else if (json && !json.ok) setError(json.error);
       else setError(`The server answered HTTP ${res.status} with a response this page could not read.`);
     } catch (err) {
       setError((err as Error).message);
@@ -65,8 +97,43 @@ export function AdvisorForm() {
     <div className="space-y-6">
       <Card className="p-5">
         <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-3">
-          <Field label="Ticker" value={ticker} onChange={setTicker} placeholder="AAPL" required />
-          <Field label="Entry (blank = last close)" value={entry} onChange={setEntry} placeholder="180.00" />
+          {/* Changing the ticker clears the entry.
+              An entry typed — or clicked off a candle — for one name is a
+              price in that name's range, and carrying it into another turns
+              the card into an override nobody asked for: the entry level and
+              the whole R ladder float away from the price action, and the
+              chart stops showing the latest price as the entry. Blank means
+              "use this ticker's last close", which is the right default for a
+              ticker whose price has not been read yet. */}
+          <Field
+            label="Ticker"
+            value={ticker}
+            onChange={(v) => {
+              if (v !== ticker) {
+                setEntry("");
+                setPickedFrom(null);
+              }
+              setTicker(v);
+            }}
+            placeholder="AAPL"
+            required
+          />
+          <div>
+            <Field
+              label="Entry (blank = last close)"
+              value={entry}
+              onChange={(v) => {
+                setEntry(v);
+                setPickedFrom(null);
+              }}
+              placeholder="180.00"
+            />
+            {pickedFrom ? (
+              <p className="mt-1 text-xs text-(--color-accent)">
+                Taken from the {pickedFrom} candle. Read the structure again to size it.
+              </p>
+            ) : null}
+          </div>
           <Field label="Capital ($)" value={capital} onChange={setCapital} />
           <Field label="Max slots" value={maxSlots} onChange={setMaxSlots} />
           <Field label="Risk per trade (%)" value={riskPct} onChange={setRiskPct} />
@@ -85,13 +152,13 @@ export function AdvisorForm() {
       </Card>
 
       {error ? (
-        <Card className="p-5 border-(--color-negative)/40">
-          <CardTitle className="text-(--color-negative)">Nothing to show</CardTitle>
+        <Card className="p-5 border-rose-500/40">
+          <CardTitle className="text-rose-400">Nothing to show</CardTitle>
           <p className="text-sm mt-2">{error}</p>
         </Card>
       ) : null}
 
-      {card ? <ResultCard card={card} /> : null}
+      {card ? <ResultCard card={card} chart={chart} onPickEntry={pickEntry} /> : null}
     </div>
   );
 }
@@ -123,15 +190,40 @@ function Field({
   );
 }
 
-function ResultCard({ card }: { card: AdvisorCard }) {
+function ResultCard({
+  card,
+  chart,
+  onPickEntry,
+}: {
+  card: AdvisorCard;
+  chart: ChartBar[] | null;
+  onPickEntry: (price: number, date: string) => void;
+}) {
   return (
     <div className="space-y-4">
+      {/* The already-held banner stays above the chart: it changes how every
+          number AND every line below it should be read, so it cannot sit
+          420px further down where it can be scrolled past. */}
       {card.alreadyHeld ? (
-        <Card className="p-4 border-(--color-warning)/40">
+        <Card className="p-4 border-amber-500/40">
           <p className="text-sm">
             <Badge tone="warning">ALREADY HELD</Badge>{" "}
             You listed {card.ticker} among your current holdings. Everything below sizes a NEW position on top of it.
           </p>
+        </Card>
+      ) : null}
+
+      {chart && chart.length > 0 ? (
+        <Card className="p-5 space-y-3">
+          <div className="flex items-baseline justify-between">
+            <CardTitle>
+              {card.ticker} · six months, with the levels on it
+            </CardTitle>
+            <span className="text-xs text-(--color-muted) font-mono">
+              SMA{CHART_SMA_SLOW} computed over two years
+            </span>
+          </div>
+          <AdvisorChart bars={chart} card={card} onPickEntry={onPickEntry} />
         </Card>
       ) : null}
 
@@ -254,7 +346,7 @@ function ResultCard({ card }: { card: AdvisorCard }) {
       </section>
 
       {card.warnings.length > 0 ? (
-        <Card className="p-5 space-y-2 border-(--color-warning)/40">
+        <Card className="p-5 space-y-2 border-amber-500/40">
           <CardTitle>What went wrong but did not stop the card</CardTitle>
           <ul className="text-sm space-y-1 list-disc pl-5">
             {card.warnings.map((w) => (

@@ -7,6 +7,7 @@
 // the wiser.
 
 import { advise } from "@/lib/advisor/advise";
+import { chartSeries, CHART_MIN_SESSIONS } from "@/lib/advisor/chartSeries";
 import type { HoldingInput } from "@/lib/advisor/types";
 import { BENCHMARK } from "@/lib/market/regime";
 import { fetchCandles, fetchCandlesBatch } from "@/lib/marketData";
@@ -23,6 +24,23 @@ const TICKER_RE = /^[A-Z][A-Z.\-]{0,9}$/;
 /** A percentage of capital above 100 is not a risk percentage. Capital and
  *  slot count have no natural ceiling here, so neither gets one. */
 const MAX_RISK_PCT = 100;
+
+/** US sessions in a calendar year. The conversion below needs it. */
+const SESSIONS_PER_YEAR = 252;
+
+/**
+ * Calendar-day floor for the chart's own history pull.
+ *
+ * `fetchCandles`'s minDays is CALENDAR days — it is `coversDays`, the span from
+ * first bar to last — while CHART_MIN_SESSIONS counts SESSIONS. Converting is
+ * not optional: 326 sessions asked for as 326 calendar days would accept a
+ * series a third too short, and the SMA200 line would then start two thirds of
+ * the way across the chart, which reads as missing data rather than as a
+ * window. A "2y" daily pull spans ~730 calendar days, so it clears this
+ * comfortably; anything that does not is treated as a miss and the chart is
+ * dropped rather than drawn half-lined.
+ */
+const CHART_MIN_CALENDAR_DAYS = Math.floor((CHART_MIN_SESSIONS * 365) / SESSIONS_PER_YEAR);
 
 interface ParsedField {
   /** null when the field was absent or blank — the caller's default applies. */
@@ -162,10 +180,29 @@ export async function POST(req: Request) {
     candles: batch.get(h)?.candles ?? null,
   }));
 
-  // 2y at 1d with a 300-day floor, so SMA200 has the 200 sessions it needs.
-  const benchmark = await fetchCandles(BENCHMARK, "2y", "1d", 300)
-    .then((r) => (r.candles.length > 0 ? r.candles : null))
-    .catch(() => null);
+  // Two independent 2y pulls, run together because neither needs the other.
+  //
+  // The benchmark is the gate's input; the chart history is the ticker's own,
+  // fetched AGAIN at 2y rather than reusing the 6mo batch above. That is
+  // deliberate and it is not waste: the card's numbers — ATR, correlation, the
+  // last close — are all computed from the 6mo series, and re-deriving them
+  // from a longer one would move published figures silently. The 2y pull feeds
+  // the drawing only.
+  //
+  // Both fail soft. A missing benchmark makes the gate read BLIND, which it is
+  // already built to do; a missing chart drops the picture and leaves every
+  // number on the card intact. Neither is allowed to fail the request.
+  const [benchmark, chartCandles] = await Promise.all([
+    // 2y at 1d with a 300-day floor, so SMA200 has the 200 sessions it needs.
+    fetchCandles(BENCHMARK, "2y", "1d", 300)
+      .then((r) => (r.candles.length > 0 ? r.candles : null))
+      .catch(() => null),
+    fetchCandles(ticker, "2y", "1d", CHART_MIN_CALENDAR_DAYS)
+      .then((r) => (r.candles.length > 0 ? r.candles : null))
+      .catch(() => null),
+  ]);
+
+  const chart = chartCandles ? chartSeries(chartCandles) : null;
 
   const result = advise({
     ticker,
@@ -179,5 +216,10 @@ export async function POST(req: Request) {
     benchmark,
   });
 
-  return Response.json(result, { status: result.ok ? 200 : 400 });
+  // `chart` rides alongside the card rather than inside it: `advise` is pure and
+  // knows nothing about drawing, and an AdviceResult must keep meaning exactly
+  // what it meant before the chart existed.
+  return result.ok
+    ? Response.json({ ...result, chart }, { status: 200 })
+    : Response.json(result, { status: 400 });
 }
