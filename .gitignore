@@ -91,3 +91,6 @@ backup-*.json
 
 # scheduled research-round log (same category as scripts/scan.log above)
 scripts/research-round.log
+
+# SDD scratch workspace (ledger, task briefs, reports, review packages)
+.superpowers/
