@@ -12,7 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import type { ChartBar } from "@/lib/advisor/chartSeries";
-import { renderCritiqueContext } from "@/lib/advisor/critiqueContext";
+import { guardObjections, renderCritiqueContext, type Objection } from "@/lib/advisor/critiqueContext";
 import { ADVISOR_NO_EDGE_CLAIM, type AdvisorCard } from "@/lib/advisor/types";
 
 function makeCard(over: Partial<AdvisorCard> = {}): AdvisorCard {
@@ -122,4 +122,55 @@ test("warnings render verbatim, and an empty list says so", () => {
   assert.match(dirty, /correlation data missing for MSFT/);
   const clean = renderCritiqueContext(makeCard(), null);
   assert.match(clean, /\[warnings\]\nnone/);
+});
+
+function obj(claim: string, evidence = "some number"): Objection {
+  return { claim, evidence, severity: "concern" };
+}
+
+test("the guard strips English directional vocabulary and records it verbatim", () => {
+  const { kept, stripped } = guardObjections([obj("You should buy this here")]);
+  assert.equal(kept.length, 0);
+  assert.equal(stripped.length, 1);
+  assert.match(stripped[0]!, /You should buy this here — some number/);
+});
+
+test("the guard strips the negated form too — a negated verdict is still a verdict", () => {
+  const { kept, stripped } = guardObjections([obj("You should not buy this")]);
+  assert.equal(kept.length, 0);
+  assert.equal(stripped.length, 1);
+});
+
+test("the guard strips Thai recommendation language by substring", () => {
+  const { kept, stripped } = guardObjections([obj("ราคานี้ไม่ควรเข้า", "เกิน SMA50 อยู่ 26%")]);
+  assert.equal(kept.length, 0);
+  assert.equal(stripped.length, 1);
+});
+
+test("the guard matches directional words in the evidence field, not only the claim", () => {
+  const { kept, stripped } = guardObjections([obj("The structure is stretched", "so avoid it")]);
+  assert.equal(kept.length, 0);
+  assert.equal(stripped.length, 1);
+});
+
+test("the guard leaves a clean structural objection untouched", () => {
+  const clean = obj("The last close sits 26.7% above its SMA50", "SMA50 178.90, close 226.40");
+  const { kept, stripped } = guardObjections([clean]);
+  assert.deepEqual(kept, [clean]);
+  assert.deepEqual(stripped, []);
+});
+
+test("the guard is word-boundary anchored in English — 'entered' and 'shortfall' survive", () => {
+  const a = obj("Price entered this range only four bars ago", "bars 36-40");
+  const b = obj("There is a shortfall between the budget and one share", "budget $100, share $226.40");
+  const { kept, stripped } = guardObjections([a, b]);
+  assert.equal(kept.length, 2);
+  assert.deepEqual(stripped, []);
+});
+
+test("the guard preserves order and mixes kept with stripped correctly", () => {
+  const clean = obj("ATR is 1.8% of entry", "4.12 on 226.40");
+  const { kept, stripped } = guardObjections([obj("recommend waiting"), clean, obj("sell into strength")]);
+  assert.deepEqual(kept, [clean]);
+  assert.equal(stripped.length, 2);
 });

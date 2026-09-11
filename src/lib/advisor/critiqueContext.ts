@@ -193,3 +193,83 @@ function rangeBlock(card: AdvisorCard, chart: ChartBar[] | null): string[] {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// The guard, and the reason ADVISOR_NO_EDGE_CLAIM survives having an AI on the
+// same screen.
+//
+// The system prompt also forbids this language. The guard exists because a
+// prompt is not an enforcement mechanism. Presence of the vocabulary is the
+// whole test — no sentiment analysis, so "you should not buy this" is stripped
+// exactly like "you should buy this", because a negated verdict is a verdict.
+// A false strip costs one objection, which is cheap; a leaked recommendation
+// costs the claim printed four lines below it.
+// ---------------------------------------------------------------------------
+
+/** Word-boundary matched, case-insensitive. */
+const GUARD_WORDS_EN: readonly string[] = [
+  "buy",
+  "buying",
+  "sell",
+  "selling",
+  "long",
+  "short",
+  "enter",
+  "entering",
+  "avoid",
+  "recommend",
+  "recommendation",
+  "suggest",
+  "should",
+  "worth it",
+  "take this trade",
+];
+
+/**
+ * Plain substring matched. Thai is written without spaces, so a \b anchor
+ * never fires against it and would silently disable this entire half of the
+ * list while still looking like it worked.
+ */
+const GUARD_WORDS_TH: readonly string[] = [
+  "ควรซื้อ",
+  "น่าซื้อ",
+  "ควรเข้า",
+  "น่าเข้า",
+  "ควรขาย",
+  "ไม่ควร",
+  "แนะนำ",
+  "น่าลงทุน",
+];
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** No /g flag: a global regex carries lastIndex between .test() calls. */
+const GUARD_RE_EN = new RegExp(`\\b(?:${GUARD_WORDS_EN.map(escapeRe).join("|")})\\b`, "i");
+
+/** Exported for the tests and for anything that wants to explain a strip. */
+export function isDirectional(text: string): boolean {
+  if (GUARD_RE_EN.test(text)) return true;
+  return GUARD_WORDS_TH.some((w) => text.includes(w));
+}
+
+/**
+ * Remove every objection that recommends rather than objects.
+ *
+ * Stripping is visible, never silent: the removed text is returned verbatim so
+ * the UI can say how many times the model had to be muzzled. A model that has
+ * to be muzzled is information about the model.
+ */
+export function guardObjections(objections: Objection[]): { kept: Objection[]; stripped: string[] } {
+  const kept: Objection[] = [];
+  const stripped: string[] = [];
+  for (const o of objections) {
+    if (isDirectional(`${o.claim} ${o.evidence}`)) {
+      stripped.push(`${o.claim} — ${o.evidence}`);
+    } else {
+      kept.push(o);
+    }
+  }
+  return { kept, stripped };
+}
