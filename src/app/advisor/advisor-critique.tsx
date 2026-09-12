@@ -96,8 +96,11 @@ function CritiqueBody({ result }: { result: CritiqueResult }) {
         result.stripped.length === 0 ? (
           <p className="text-sm">RAVEN ไม่พบข้อโต้แย้งจากตัวเลขชุดนี้ — ไม่ได้แปลว่าน่าเข้า</p>
         ) : (
+          // stripped is one list for both objections and blind spots, so this
+          // branch cannot tell which kind was muzzled. It says only what is
+          // true either way; the <details> below carries the actual text.
           <p className="text-sm">
-            RAVEN ไม่เหลือข้อโต้แย้งที่ใช้ได้ — ที่ตอบมาเป็นคำชี้นำซื้อ/ขายทั้งหมด และถูกตัดออก
+            RAVEN ไม่เหลือข้อโต้แย้งที่ใช้ได้ — มีข้อความที่เป็นคำชี้นำซื้อ/ขายถูกตัดออก ดูด้านล่าง
           </p>
         )
       ) : (
