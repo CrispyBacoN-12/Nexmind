@@ -16,6 +16,7 @@
 // Pure — no prisma, no market data, no clock.
 
 import type { ChartBar } from "@/lib/advisor/chartSeries";
+import { earningsPhrase } from "@/lib/advisor/earningsPhrase";
 import {
   ADVISOR_ATR_PERIOD,
   ADVISOR_ATR_SL_MULT,
@@ -36,7 +37,9 @@ export interface Objection {
 export interface CritiqueResult {
   /** 0-4. Zero is a legitimate answer and is rendered as such. */
   objections: Objection[];
-  /** What the card cannot see at all: earnings dates, news, sector-wide moves. */
+  /** What the card cannot see at all: news, sector-wide moves, options
+   *  positioning, the macro calendar. Earnings came off this list on
+   *  2026-09-14 — the [head] block now carries the date. */
   blindSpots: string[];
   /** True when the AI backend was unavailable or the call failed. */
   degraded: boolean;
@@ -80,6 +83,11 @@ export function renderCritiqueContext(card: AdvisorCard, chart: ChartBar[] | nul
     `last close: ${usd(card.lastClose)}`,
     `entry: ${usd(card.entry)} (${card.entrySource})`,
     `already held: ${card.alreadyHeld ? "yes" : "no"}`,
+    // The only non-price fact on the sheet, and the only one whose absence is
+    // itself informative — which is why it is printed even when it is unknown
+    // rather than omitted. A missing line reads as "nothing to say here"; an
+    // "unknown" line reads as "go and check", which is the truth.
+    `next earnings: ${earningsPhrase(card.earnings, card.asOf)}`,
     "",
     "[risk]",
     `ATR(${ADVISOR_ATR_PERIOD}): ${num(card.atr)} (${pct(atrPctOfEntry)} of entry)`,

@@ -48,6 +48,9 @@ function makeCard(over: Partial<AdvisorCard> = {}): AdvisorCard {
     corrAdjustedShares: 2,
     freeSlots: 3,
     gate: { slots: 3, benchAbove: true, shortsAllowed: false, note: "market gate ON" },
+    // A known date by default, so that a test which cares about the unknown
+    // wording has to ask for it and cannot pass by accident.
+    earnings: { date: "2026-10-28", hour: "amc" },
     alreadyHeld: false,
     warnings: [],
     noEdgeClaim: ADVISOR_NO_EDGE_CLAIM,
@@ -173,4 +176,16 @@ test("the guard preserves order and mixes kept with stripped correctly", () => {
   const { kept, stripped } = guardObjections([obj("recommend waiting"), clean, obj("sell into strength")]);
   assert.deepEqual(kept, [clean]);
   assert.equal(stripped.length, 2);
+});
+
+test("renderCritiqueContext: the head block carries the earnings date the owner can see", () => {
+  const s = renderCritiqueContext(makeCard({ earnings: { date: "2026-09-13", hour: "bmo" } }), null);
+  assert.match(s, /next earnings: 2026-09-13 before the open — 3 calendar day\(s\) after the as-of date/);
+});
+
+test("renderCritiqueContext: an unknown earnings date is printed, not omitted", () => {
+  // Omitting the line would let the model read "no earnings risk here". The
+  // whole reason the line exists is that its absence is a claim.
+  const s = renderCritiqueContext(makeCard({ earnings: null }), null);
+  assert.match(s, /next earnings: unknown/);
 });

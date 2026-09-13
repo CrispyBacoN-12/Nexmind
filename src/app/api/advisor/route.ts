@@ -9,6 +9,7 @@
 import { advise } from "@/lib/advisor/advise";
 import { chartSeries, CHART_MIN_SESSIONS } from "@/lib/advisor/chartSeries";
 import type { HoldingInput } from "@/lib/advisor/types";
+import { fetchNextEarnings } from "@/lib/market/earnings";
 import { BENCHMARK } from "@/lib/market/regime";
 import { fetchCandles, fetchCandlesBatch } from "@/lib/marketData";
 import type { CandleResponse } from "@/lib/yahoo";
@@ -192,7 +193,11 @@ export async function POST(req: Request) {
   // Both fail soft. A missing benchmark makes the gate read BLIND, which it is
   // already built to do; a missing chart drops the picture and leaves every
   // number on the card intact. Neither is allowed to fail the request.
-  const [benchmark, chartCandles] = await Promise.all([
+  // The earnings lookup joins them for the same reason and on the same terms:
+  // it never rejects and never throws — a failure comes back as a null date
+  // carrying the reason, which the card prints as "unknown — <reason>" rather
+  // than silently omitting the line.
+  const [benchmark, chartCandles, earnings] = await Promise.all([
     // 2y at 1d with a 300-day floor, so SMA200 has the 200 sessions it needs.
     fetchCandles(BENCHMARK, "2y", "1d", 300)
       .then((r) => (r.candles.length > 0 ? r.candles : null))
@@ -200,6 +205,7 @@ export async function POST(req: Request) {
     fetchCandles(ticker, "2y", "1d", CHART_MIN_CALENDAR_DAYS)
       .then((r) => (r.candles.length > 0 ? r.candles : null))
       .catch(() => null),
+    fetchNextEarnings(ticker),
   ]);
 
   const chart = chartCandles ? chartSeries(chartCandles) : null;
@@ -214,6 +220,7 @@ export async function POST(req: Request) {
     inputNotes,
     holdings,
     benchmark,
+    earnings,
   });
 
   // `chart` rides alongside the card rather than inside it: `advise` is pure and

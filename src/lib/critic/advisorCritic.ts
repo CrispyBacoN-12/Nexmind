@@ -58,8 +58,13 @@ const SYSTEM =
   "desk cannot support. Argue only against the numbers in front of you, and quote " +
   "the specific number that supports each objection. Return at most " +
   `${MAX_OBJECTIONS} objections. Returning ZERO objections is a valid and useful ` +
-  "answer; do not invent one to fill space. Also list what the card is blind to " +
-  "(earnings dates, news, sector-wide moves) as short phrases. " +
+  "answer; do not invent one to fill space. The next earnings date IS on the " +
+  "card, under [head]: it is no longer a blind spot and must not be listed as " +
+  "one. If that date is close to the entry, that is an objection and you must " +
+  "quote the date — name the risk, never the action. If the card says the date " +
+  "is unknown, THAT is a blind spot and worth saying. Also list what the card " +
+  "is blind to (news, sector-wide and peer moves, options positioning, the " +
+  "macro calendar) as short phrases. " +
   'Return JSON {"objections":[{"claim","evidence","severity":"note"|"concern"|"serious"}],"blindSpots":[string]}.';
 
 /** The unvalidated shape the model may or may not have returned. */
@@ -76,6 +81,7 @@ export async function critiqueCard(facts: string): Promise<CritiqueResult> {
     const r = await callAgentJSON<RawCritique>({
       tier: "sonnet", // judgment work; a cheaper tier produces the generic
       // objections that made HAWK's votes worthless.
+      label: "raven",
       system: SYSTEM,
       prompt: facts,
       maxTokens: 1200,

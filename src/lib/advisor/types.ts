@@ -76,6 +76,29 @@ export interface LadderRow {
   plUsd: number;
 }
 
+/**
+ * The next scheduled earnings report for the ticker on the card.
+ *
+ * The shape lives HERE, in the pure tree, rather than beside the fetch that
+ * fills it: the card owns what it renders, and `src/lib/market/earnings.ts`
+ * produces this shape rather than the other way round. That keeps every import
+ * across the boundary pointing from the I/O module into the pure one.
+ *
+ * There is no "days away" field. Days from WHAT is the whole question — the
+ * card's numbers are all as of its last closed bar, not as of the moment the
+ * owner is reading it — so the subtraction is done at render time against
+ * `asOf`, once, by `earningsPhrase`.
+ */
+export interface EarningsInfo {
+  /** YYYY-MM-DD of the next scheduled report, or null when none is known. */
+  date: string | null;
+  /** Finnhub's session tag: bmo (before open), amc (after close), dmh (during). */
+  hour: string | null;
+  /** Why there is no date. ALWAYS set when `date` is null — "unknown" and
+   *  "none scheduled" are different facts and the card must not merge them. */
+  note?: string;
+}
+
 export interface CorrelationLine {
   ticker: string;
   /** null when the holding's candles could not be fetched or had no variance. */
@@ -109,6 +132,9 @@ export interface AdvisorInput {
   holdings: HoldingInput[];
   /** SPY daily candles, at least TREND_PERIOD of them. null = gate reads BLIND. */
   benchmark: Candle[] | null;
+  /** Fetched by the caller, like everything else here. Omitted or null means the
+   *  card says the date is unknown — never that there is no report coming. */
+  earnings?: EarningsInfo | null;
 }
 
 export interface AdvisorCard {
@@ -136,6 +162,12 @@ export interface AdvisorCard {
   /** max(0, maxSlots - holdings.length) */
   freeSlots: number;
   gate: GateDecision;
+  /** The one non-price fact on this card. It is reported, never acted on: the
+   *  2026-09-08 earnings-event screen found timing worthless as a standalone
+   *  entry in BOTH directions (drift and fade both landed on their own control),
+   *  so a date near the entry is a risk disclosure and nothing more. Nothing on
+   *  this card sizes, stops or ladders differently because of it. */
+  earnings: EarningsInfo | null;
   /** True when the asked-about ticker is already in holdings. Shown at the top. */
   alreadyHeld: boolean;
   /** Everything that went wrong but did not stop the card rendering. */

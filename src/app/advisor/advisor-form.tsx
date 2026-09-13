@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Badge, Button, Card, CardTitle, Stat } from "@/components/ui";
 import { CHART_SMA_SLOW, type ChartBar } from "@/lib/advisor/chartSeries";
+import { earningsPhrase } from "@/lib/advisor/earningsPhrase";
 import {
   ADVISOR_ATR_PERIOD,
   ADVISOR_ATR_SL_MULT,
@@ -254,6 +255,14 @@ function ResultCard({
           </h2>
           <span className="text-xs text-(--color-muted) font-mono">as of {card.asOf}</span>
         </div>
+        {/* Reported, never acted on — the 2026-09-08 screen found earnings timing
+            worthless as an entry in both directions, so nothing below this line
+            sizes or stops differently because of it. It is here because RAVEN
+            argues about this exact string, and the owner has to be able to see
+            what RAVEN is arguing about. */}
+        <p className="text-xs text-(--color-muted)">
+          Next earnings: <span className="font-mono">{earningsPhrase(card.earnings, card.asOf)}</span>
+        </p>
         <div className="grid gap-4 sm:grid-cols-4">
           <Stat label="Entry" value={fmtMoney(card.entry)} sub={card.entrySource} />
           <Stat

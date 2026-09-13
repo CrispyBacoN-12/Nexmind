@@ -160,6 +160,10 @@ export function advise(input: AdvisorInput): AdvisorResult {
     corrAdjustedShares,
     freeSlots,
     gate,
+    // Copied, never derived. advise() has no clock and no network, so it cannot
+    // check this date against anything; it carries it to the card so that the
+    // card and the facts sheet are looking at the same object.
+    earnings: input.earnings ?? null,
     alreadyHeld,
     warnings,
     noEdgeClaim: ADVISOR_NO_EDGE_CLAIM,
