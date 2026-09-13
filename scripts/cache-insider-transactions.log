@@ -1,0 +1,55 @@
+SEC bulk Insider Transactions Data Sets — TRANS_CODE P/S for 490 S&P 500 names
+quarters: 2015q1..2026q3 (47 total)
+
+  2015q1: 5845 P/S events across 373 symbols
+  2015q2: 4386 P/S events across 363 symbols
+  2015q3: 4743 P/S events across 359 symbols
+  2015q4: 4575 P/S events across 343 symbols
+  2016q1: 5313 P/S events across 367 symbols
+  2016q2: 4221 P/S events across 364 symbols
+  2016q3: 4183 P/S events across 365 symbols
+  2016q4: 4039 P/S events across 356 symbols
+  2017q1: 5218 P/S events across 390 symbols
+  2017q2: 3708 P/S events across 363 symbols
+  2017q3: 3562 P/S events across 369 symbols
+  2017q4: 4053 P/S events across 374 symbols
+  2018q1: 6024 P/S events across 378 symbols
+  2018q2: 3672 P/S events across 358 symbols
+  2018q3: 4168 P/S events across 374 symbols
+  2018q4: 3953 P/S events across 340 symbols
+  2019q1: 5866 P/S events across 383 symbols
+  2019q2: 4439 P/S events across 389 symbols
+  2019q3: 4192 P/S events across 387 symbols
+  2019q4: 3896 P/S events across 365 symbols
+  2020q1: 6106 P/S events across 398 symbols
+  2020q2: 5149 P/S events across 353 symbols
+  2020q3: 5855 P/S events across 354 symbols
+  2020q4: 5519 P/S events across 379 symbols
+  2021q1: 6342 P/S events across 396 symbols
+  2021q2: 5849 P/S events across 399 symbols
+  2021q3: 5869 P/S events across 371 symbols
+  2021q4: 7135 P/S events across 387 symbols
+  2022q1: 6650 P/S events across 372 symbols
+  2022q2: 4572 P/S events across 370 symbols
+  2022q3: 3586 P/S events across 317 symbols
+  2022q4: 4229 P/S events across 351 symbols
+  2023q1: 4562 P/S events across 384 symbols
+  2023q2: 3164 P/S events across 354 symbols
+  2023q3: 3234 P/S events across 369 symbols
+  2023q4: 4427 P/S events across 378 symbols
+  2024q1: 7258 P/S events across 398 symbols
+  2024q2: 4841 P/S events across 371 symbols
+  2024q3: 5449 P/S events across 364 symbols
+  2024q4: 4835 P/S events across 371 symbols
+  2025q1: 5229 P/S events across 385 symbols
+  2025q2: 3544 P/S events across 355 symbols
+  2025q3: 4554 P/S events across 369 symbols
+  2025q4: 4581 P/S events across 360 symbols
+  2026q1: 5125 P/S events across 382 symbols
+  2026q2: not yet published, skipping
+  2026q3: not yet published, skipping
+
+COVERAGE: 486/490 symbols carry at least one P/S event (99.2%)
+EVENTS: 217720 P/S transactions (148 filed late, 0.1%)
+
+wrote .cache/insider/sp500-form4-ps.json

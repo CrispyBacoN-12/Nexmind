@@ -196,6 +196,29 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   The earnings date is **reported, never acted on** — the 2026-09-08 mirror-pair screen killed
   earnings timing as an entry in both directions, so nothing sizes, stops or ladders from it.
 
+- **New data class evaluated and built: SEC Form 4 insider transactions. 2026-09-14.**
+  Investigated SEC EDGAR's bulk **Insider Transactions Data Sets** (quarterly ZIPs,
+  `SUBMISSION`/`NONDERIV_TRANS`/`REPORTINGOWNER` tables joined by `ACCESSION_NUMBER`) as a
+  candidate research data class, holding it to the same bar the news-sentiment investigation
+  above failed: free, point-in-time-by-construction, reaches before FIT's 2016-01-01, and
+  survives at panel scale. It passes all four. **Point-in-time**: `SUBMISSION.FILING_DATE`
+  (day precision) plus row-level `TRANS_TIMELINESS` — of 217,720 cached events only 148
+  (0.1%) were filed late. **Free and flat**: quarterly ZIPs run ~13.6-13.9MB compressed
+  regardless of year. **Panel join**: 486/490 SP500 symbols carry at least one event
+  (99.2%); the 4 misses (`BIO`, `FOXA`, `LEN`, `NWSA`) are dual-class structures where
+  insiders trade the *other* class (`FOX` not `FOXA`, the excluded `LEN.B` not `LEN`), not
+  a join defect. **Signal density**: filtered to `TRANS_CODE` P/S only (open-market
+  buy/sell — excludes grants, option exercises, tax withholding, gifts, conversions),
+  leaving a real subset rather than a thin one.
+  **Recommendation: build it.** Built `scripts/cache-insider-transactions.mts` (mirrors
+  `cache-earnings-dates.mts`'s pattern; new `adm-zip` dependency, zero transitive deps, to
+  read TSVs out of the ZIPs), producing `.cache/insider/sp500-form4-ps.json`: 217,720 P/S
+  events, 486/490 symbols, `2015q1..2026q3` (`2026q2`/`2026q3` not yet published by SEC —
+  a trailing publication lag distinguished from a real historical gap by only tolerating
+  404s at the tail, not mid-run). **This is the caching half only.** The proposer still
+  only consumes a price/volume `ScanSnapshot`; wiring insider data into the proposer or
+  backtest engine is separate, larger work and has not been started or decided.
+
 - **The stocks half now has a surface the owner can actually use, and it claims no edge.
   2026-09-11.** `/advisor` — the first thing this project has shipped that is meant to be
   *used* rather than measured. It is not a screener and not an automated trader: the owner
