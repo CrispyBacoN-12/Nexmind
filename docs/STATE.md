@@ -67,6 +67,27 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
+- **The advisory card now carries a real earnings date, and SCOUT's news is per-position.
+  2026-09-14. NOT a regime break — nothing HAWK or SAGE reads changed.** RAVEN had been
+  reciting "earnings dates, news, sector-wide moves" as blind spots because its own system
+  prompt listed them, not because it had looked. Two of the five are now real:
+  (a) **earnings** — `lib/market/earnings.ts` calls Finnhub's `calendar/earnings` (free tier,
+  verified live), `AdvisorCard.earnings` carries it, `lib/advisor/earningsPhrase.ts` formats
+  the ONE string that both the owner's card and RAVEN's `[head]` block print, and the SYSTEM
+  prompt now forbids listing earnings as a blind spot and requires quoting the date instead.
+  (b) **news** — `refreshFinnhubNews` moved from `news?category=general` to
+  `company-news?symbol=` over the symbols with an **open trade**, filling the `NewsItem.symbol`
+  column that had always existed and been left null. A flat desk now stores nothing rather
+  than storing the market's front page.
+  **Deliberately not done:** the earnings field was kept OFF `Fundamentals`. `fundamentalsLine`
+  feeds `buildAnalystContext`, which is in every HAWK and SAGE prompt on every scan — a line
+  there WOULD have been a regime break splitting the `Counterfactual` population at this date.
+  The advisory tool decides nothing and trades nothing, so it got its own module instead.
+  **Also deliberately not done:** news is NOT wired into RAVEN. Sector/peer moves, options
+  positioning and the macro calendar remain blind spots; no free source for them exists here.
+  The earnings date is **reported, never acted on** — the 2026-09-08 mirror-pair screen killed
+  earnings timing as an entry in both directions, so nothing sizes, stops or ladders from it.
+
 - **The stocks half now has a surface the owner can actually use, and it claims no edge.
   2026-09-11.** `/advisor` — the first thing this project has shipped that is meant to be
   *used* rather than measured. It is not a screener and not an automated trader: the owner

@@ -101,12 +101,17 @@ export default async function WarRoom() {
 
           <CardTitle>🛰️ SCOUT Intel</CardTitle>
           {news.length === 0 ? (
-            <Empty title="No intel yet" hint="SCOUT pulls free news, funding, and sentiment daily." />
+            <Empty title="No intel yet" hint="SCOUT pulls news for the symbols the desk is holding. A flat desk has none." />
           ) : (
             news.map((n) => (
               <Card key={n.id} className="p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <Badge tone="neutral">{n.source}</Badge>
+                  {/* The symbol leads now that every row has one: the panel's job
+                      is to say which holding a headline is about. */}
+                  <div className="flex items-center gap-2">
+                    {n.symbol && <Badge tone="neutral">{n.symbol}</Badge>}
+                    <span className="text-xs text-(--color-muted)">{n.source}</span>
+                  </div>
                   {n.sentiment && (
                     <Badge tone={n.sentiment === "bullish" ? "positive" : n.sentiment === "bearish" ? "negative" : "neutral"}>{n.sentiment}</Badge>
                   )}
