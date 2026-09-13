@@ -4,7 +4,9 @@
 //
 // Backend resolution order:
 //   1. ANTHROPIC_API_KEY set  → Anthropic SDK (pay per token)
-//   2. Claude Code CLI found  → `claude -p` headless (subscription auth)
+//   2. Claude Code CLI found  → `claude -p` headless (subscription auth), run
+//                               under CLI_ISOLATION so it is a one-shot
+//                               completion and not a full agent session
 //   3. neither                → aiEnabled() false, callers use their mock paths
 //
 // A backend that is present but cannot authenticate is treated as (3), not as a
@@ -198,6 +200,44 @@ interface CliResult {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
+/**
+ * The flags that make `claude -p` a one-shot text completion instead of a full
+ * Claude Code session. Measured, not guessed — see the numbers below.
+ *
+ * A bare `claude -p` boots the whole interactive agent in whatever directory
+ * the Next server happens to be running from, which here is the repo root. Every
+ * call therefore paid for the entire IDE context before it read a single number
+ * off the card. Measured from the CLI's own session transcripts (four RAVEN runs
+ * on 2026-09-12/13), the fixed prefix was **~105,000 tokens of cache-creation per
+ * call**, and the largest single item in it was `CLAUDE.md` pulling in
+ * `@docs/STATE.md` — 95 KB of handoff notes, injected in front of a prompt whose
+ * real payload is ~900 tokens. Total input ran **163k-413k tokens per critique**
+ * over 2-5 turns, because nothing stopped the agent from calling ToolSearch, Bash
+ * and WebSearch first and re-sending the prefix on each turn.
+ *
+ * On subscription auth that is billed against the 5-hour usage window, so one
+ * card could take a double-digit percentage of it. Same probe with these flags:
+ * **6,579 input tokens, 1 turn, 13s** — a 25-63x reduction with the answer
+ * unchanged (it still quotes the card's numbers, still returns the JSON).
+ *
+ *   --safe-mode   disables CLAUDE.md (and so STATE.md), skills, plugins, hooks,
+ *                 MCP servers, custom agents and commands. Auth, model selection
+ *                 and permissions are untouched, which is why this is the right
+ *                 flag here and `--bare` is not: --bare forces ANTHROPIC_API_KEY
+ *                 and would break the subscription path this function exists for.
+ *   --tools ""    drops every built-in tool schema from the system prompt AND
+ *                 makes a tool-calling loop impossible, so a turn is a turn. None
+ *                 of these agents wants a tool; they all want one JSON object.
+ *   --no-session-persistence
+ *                 stops writing a ~400 KB transcript per call. 921 of them had
+ *                 accumulated under ~/.claude/projects for this repo alone.
+ *
+ * Deliberately NOT added: --strict-mcp-config and --disable-slash-commands are
+ * both already implied by --safe-mode, and the probe above confirms it (3.3k of
+ * cache-creation total leaves no room for MCP schemas).
+ */
+const CLI_ISOLATION = '--safe-mode --tools "" --no-session-persistence';
+
 /** One agent turn through `claude -p` headless mode. Prompt goes via stdin. */
 async function callAgentCli(opts: CallOptions): Promise<AgentResult> {
   const tier = opts.tier ?? "sonnet";
@@ -212,7 +252,7 @@ async function callAgentCli(opts: CallOptions): Promise<AgentResult> {
   await cliAcquire();
   try {
     const raw = await new Promise<string>((resolve, reject) => {
-      const child = spawn(`claude -p --output-format json --model ${tier}`, {
+      const child = spawn(`claude -p --output-format json --model ${tier} ${CLI_ISOLATION}`, {
         shell: true,
         windowsHide: true,
         env: process.env.CLAUDE_CODE_OAUTH_TOKEN
