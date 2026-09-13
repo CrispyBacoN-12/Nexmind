@@ -1,0 +1,30 @@
+panel: 491 symbols · 1000 paired resamples per cell
+baseline (null): single 1.5/1.5 — same baseline as exit-control.mts
+candidates: earlier trail activation only — offset fixed at 1.5, activateMult in {0.25, 0.5, 0.75}
+folds: FIT + SELECT only (selection). Re-run with --holdout once the candidates are chosen.
+
+fit (2016-01-01..2019-01-01, post-2015 correction recovery through the 2018 Q4 selloff)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  trail 0.25/1.5     20343    20370   +0.041   +0.004   +0.037   +0.017   +0.057  PASS
+  trail 0.5/1.5      19712    20370   +0.045   +0.004   +0.041   +0.021   +0.062  PASS
+  trail 0.75/1.5     18863    20370   +0.046   +0.004   +0.043   +0.022   +0.063  PASS
+
+select (2019-01-01..2020-01-01, 2019 melt-up on falling rates)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  trail 0.25/1.5      6959     7065   -0.048   -0.044   -0.004   -0.041   +0.030  fail
+  trail 0.5/1.5       6764     7065   -0.051   -0.044   -0.008   -0.042   +0.025  fail
+  trail 0.75/1.5      6475     7065   -0.053   -0.044   -0.010   -0.043   +0.022  fail
+
+How to read this
+  - Same instrument as exit-control.mts: "delta" is candidate avgR minus
+    baseline avgR over the months BOTH arms traded, "p5" is the bar (must
+    clear zero), "base" is BASELINE_EXIT in every row.
+  - This table answers one question only: does activating the trail before
+    1.0 ATR beat the 1.5/1.5 single-target ladder. It does NOT compare these
+    candidates against trail 1/1.5 or trail 1.5/1.5 directly — read
+    scripts/exit-control.log and scripts/exit-control-holdout.log
+    side by side against this file's log for that.
+  - PASS says only that this geometry beats the ladder we would have used
+    anyway on these entries. It says nothing about whether the entries are
+    worth taking, and the baseline entry loses to a matched random entry in
+    every fold measured.

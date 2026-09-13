@@ -63,9 +63,117 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 09-11)
+## 3. Done recently (2026-08-23 → 09-14)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
+
+- **REGIME BREAK — the automated research pipeline now decides at 5bps slippage, not 0.5bps.
+  2026-09-14.** `RESEARCH_COST_MODEL` (`runResearch.ts`) fed `sweepLadder` at all three of its
+  call sites — the FIT ladder sweep, the SELECT approve/reject read, and the held-out blind
+  test — from `DEFAULT_COST_MODEL`, whose own comment says it was calibrated to an **MT5
+  Raw/ECN GOLD account** and never re-derived after the stocks-only pivot to US equities. The
+  size of that gap was already measured and sitting uncommitted:
+  `scripts/probe-fill-and-costs.mts` replayed the real SP500 panel at 0.5bps vs 5bps slippage
+  (commissionBps held at 1 in both) and found fold avgR shifts of **roughly -0.022 to -0.033R**
+  (`scripts/probe-fill-and-costs.log`) — the same size as most effects this panel hunts for, so
+  which of the two numbers research uses can flip a verdict on its own.
+  New constant `EQUITY_COST_MODEL = { slippageBps: 5, commissionBps: 1 }` — exactly the
+  already-measured pessimistic cell, not a new guess — and `RESEARCH_COST_MODEL` now points at
+  it instead of `DEFAULT_COST_MODEL`. 5bps matches Vibe-Trading's `global_equity.py` assumption
+  for US equities and sits in the same neighborhood as `ADVISOR_COST_BPS` (already 5, already
+  stock-specific, already used by the advisory card — never previously propagated to research).
+  Same pattern this project already established for the wrong reason not to guess: `XAU_COSTS`
+  / `xauCostPoints()` (`xauFolds.ts`) throws rather than silently substitute
+  `DEFAULT_COST_MODEL` for an uncalibrated instrument; this is the equities mirror of that
+  refusal, expressed as picking the worse of two measured numbers instead of an assumption with
+  no data behind it at all — there is no equities fill log to calibrate a true value from yet
+  (Webull here is data-only).
+  **Deliberately NOT touched:** `DEFAULT_COST_MODEL` itself (still the live paper desk's P&L
+  assumption), `mechanisms.ts`'s already-logged, already-concluded screens (`deep-holdout.mts`,
+  `mechanism-screen.mts`), and `panelRun.ts`'s exit-control fallback (`costs: exit.costs ??
+  DEFAULT_COST_MODEL`) — re-deciding those is a separate, larger task, not this fix.
+  **What this invalidates:** every number in run #112 (§0) and everything in §3-§5 measured via
+  `sweepLadder`/`runResearch` was decided at 0.5bps. A future `ResearchRun` decides at 5bps.
+  **Do not pool a pre-2026-09-14 SELECT/blind-test verdict with a post-2026-09-14 one** — they
+  were judged against different friction. 704/704 tests pass (`runResearch.test.ts`'s
+  `recomputeSweep` helper now mirrors `sweepLadder` off the same `RESEARCH_COST_MODEL` constant
+  so the two cannot silently drift), typecheck clean. Owner-authorized (`ทำเลย`) after a
+  three-point technical review that also reopened the exit axis (below) and flagged the news-
+  sentiment data class as unresolved pending a depth check.
+
+- **Earlier ATR-trail activation was the follow-up hypothesis `exit-control.mts` flagged on
+  2026-09-05, and it is now tested and rejected. 2026-09-14. NOT a regime break — no candidate
+  survived selection, so nothing downstream changes.** The original exit-control run (§3, below)
+  found `trail 1/1.5` beating `trail 1.5/1.5` — the desk's live geometry — specifically on TEST2,
+  the one fold where the live geometry fails, and flagged activating even earlier as "a hypothesis
+  for a pre-registered run, not a conclusion from this one." `scripts/exit-control-trail-
+  activation.mts` is that run: `activateMult` in `{0.25, 0.5, 0.75}` against a fixed `offsetMult`
+  of 1.5, so only activation timing varies, same `BASELINE_EXIT` null, same `runExitControl`
+  machinery, same pre-registered rule (p5 > 0 on FIT *and* SELECT), written down before either
+  fold ran. Uses `DEFAULT_COST_MODEL`, not the new `RESEARCH_COST_MODEL` above — deliberately, to
+  stay numerically comparable to `exit-control.log`/`exit-control-holdout.log`, and because this
+  script exercises `panelRun.ts`'s exit-control path, which the cost-model fix explicitly left
+  untouched. **Selection: zero candidates, all three ways.** All three clear FIT decisively (delta
+  +0.037 to +0.043, p5 +0.017 to +0.022) and all three fail SELECT — not merely short of zero but
+  *negative relative to baseline* (delta -0.004 to -0.010, p5 -0.041 to -0.043), worse than doing
+  nothing. Holdout, run after per the same convention as the original (an empty candidate list
+  does not skip the record): TEST1 fails (baseline itself positive here, +0.014; trail deltas
+  positive but p5 crosses zero, -0.006 to -0.001); **TEST2 — the fold this whole follow-up exists
+  to explain — passes on all three** (baseline -0.031, trails +0.007 to +0.010, p5 clears zero);
+  TEST3 also passes (baseline -0.010, trails +0.031, p5 +0.020 to +0.024). Read this narrowly: the
+  hypothesis is directionally right exactly where predicted, and the gate rejects it anyway,
+  because SELECT said no before TEST2 was ever looked at — a holdout win cannot un-fail a
+  selection fold, and reading it as vindication is the exact trap `runControl`'s p95-on-a-null-hits
+  check exists to catch on the entry side. The exit axis, having now had both its already-built
+  candidates (1.0/1.5, 1.5/1.5) and the earlier-activation region below them tested, is closed
+  along this dimension the same way the entry axis closed in §5 — the remaining untried lever is
+  `offsetMult`, not `activateMult`. No production code changed; 704/704 tests unaffected, typecheck
+  clean. Logs: `scripts/exit-control-trail-activation.log`,
+  `scripts/exit-control-trail-activation-holdout.log`. Second of the three items authorized by
+  `ทำเลย` alongside the cost-model fix above; third (news-sentiment data depth) below.
+
+- **News-sentiment data depth investigated and the pipeline was NOT built. 2026-09-14. No code
+  written — this is the third `ทำเลย` item, and the point of checking first was to spend nothing
+  if the data can't clear the bar.** Same question the 2026-09-08 earnings screen asked of an
+  EPS-surprise feed, asked of sentiment: is there a source that is free, reaches back to FIT
+  (2016-01-01), and is point-in-time BY CONSTRUCTION rather than a vendor's restated-today
+  read of the past. None does, at panel scale:
+  (a) **Finnhub `/news-sentiment`** — already the desk's news vendor (`lib/intel/news.ts`) —
+  returns only a rolling aggregate over "articles in the last week": buzz, weekly average,
+  sector bullish %. No date-range parameter, no per-article score. Finnhub's own tracker
+  (`finnhubio/Finnhub-API` issue #19, opened by a user asking for exactly this, still open with
+  no response) confirms historical per-article sentiment isn't offered, not merely underdocumented.
+  Dead end before any fold is touched.
+  (b) **Finnhub `/company-news`** — the endpoint `refreshFinnhubNews` already calls for the SCOUT
+  panel — takes a real date range but returns headline/summary/datetime only. Checking
+  `lib/intel/news.ts` against `prisma/schema.prisma`'s `NewsItem.sentiment` column found that
+  field is set by **nothing in the live code path** — `refreshFinnhubNews`'s `create` call never
+  touches it. The only rows that ever carry it are `prisma/seed.ts`'s three fixture rows, so the
+  sentiment badge `page.tsx` renders (`{n.sentiment && (...)}`, line 115) is fixture-data leftover,
+  not a working feature, on every real Finnhub-sourced row today. Unrelated to this investigation
+  but worth a line since it surfaced for free: harmless (SCOUT feeds no analyst), not worth a
+  separate task.
+  (c) **Alpha Vantage `NEWS_SENTIMENT`** — the one API shaped right (`time_from`/`time_to` range,
+  genuine per-article scores) — free tier is **25 requests/day**. The panel is 491 symbols across
+  6 folds; even one query per symbol-fold is ~3,000 calls, a 120-day fetch on the free key alone,
+  before the multi-month windows a real 2016-2018 backfill needs. Not viable without a paid tier,
+  and depth before ~2021-2022 is itself unconfirmed in Alpha Vantage's own docs.
+  (d) **GDELT GKG** — the only free source with real point-in-time-by-construction coverage
+  reaching before FIT's 2016-01-01 open (from February 2015): its tone score is computed
+  automatically when an article is crawled and is never revised, the same property this project
+  already trusts in EDGAR's `acceptanceDateTime` (`cache-earnings-dates.mts`). But GKG has no
+  built-in ticker mapping — matching a global news-tone stream to specific S&P 500 symbols is an
+  open-ended entity-resolution project, a different order of engineering from the earnings
+  screen's clean ticker→CIK join, and the raw archive runs into terabytes a year.
+  **Why this closes the question rather than deferring it:** the earnings screen already
+  established the fallback this project uses when a point-in-time surprise feed doesn't exist —
+  substitute the reaction bar's own price move and call that the surprise. The same substitution
+  is the only thing left once (a)-(d) are ruled out: score a headline with today's LLM after the
+  fact, which is not a text-sentiment signal distinct from price, it is the 2026-09-08 PEAD/
+  reaction-bar experiment again, already run in both directions (`pead-drift`, `pead-fade`) and
+  already rejected. Building a sentiment pipeline here would either cost more than this project's
+  other data-class work for a source that cannot reach FIT, or quietly re-run a screen already on
+  the books. **Recommendation: do not build it.** All three `ทำเลย` items are now closed.
 
 - **The advisory card now carries a real earnings date, and SCOUT's news is per-position.
   2026-09-14. NOT a regime break — nothing HAWK or SAGE reads changed.** RAVEN had been

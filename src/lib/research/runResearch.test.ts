@@ -2,9 +2,9 @@ import "dotenv/config"; // runResearch.ts imports prisma at module scope
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
-import { backtestCandles, summarizeBacktest, DEFAULT_COST_MODEL } from "@/lib/backtest/engine";
+import { backtestCandles, summarizeBacktest } from "@/lib/backtest/engine";
 import { panelSignalsForCode } from "./adapter";
-import { sweepLadder, isBankableRound, LADDER_TP_MULTS, LADDER_SL_MULT, LADDER_TRAILS, LADDER_OPTIONS, REFINEMENT_LADDER, type ExitLadder } from "./runResearch";
+import { sweepLadder, isBankableRound, LADDER_TP_MULTS, LADDER_SL_MULT, LADDER_TRAILS, LADDER_OPTIONS, REFINEMENT_LADDER, RESEARCH_COST_MODEL, type ExitLadder } from "./runResearch";
 import { MIN_TRADES } from "./autoReview";
 import { FOLDS } from "./panel";
 import { BASELINE_EXIT, sameGeometry, type PreparedSymbol } from "./panelRun";
@@ -29,7 +29,7 @@ function recomputeSweep(bars: Candle[], entry: (i: number) => "long" | "short" |
   const scored = LADDER_OPTIONS.map((ladder) => {
     const bt = backtestCandles(
       "EXPECT", bars, 0.1, undefined, entry, true, ladder.tp1Mult,
-      DEFAULT_COST_MODEL, ladder.slMult, ladder.trail,
+      RESEARCH_COST_MODEL, ladder.slMult, ladder.trail,
     );
     return { ladder, summary: summarizeBacktest(bt.trades) };
   });

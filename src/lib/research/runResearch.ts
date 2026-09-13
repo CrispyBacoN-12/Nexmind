@@ -28,7 +28,7 @@
 // provider happened to return that morning.
 
 import { prisma } from "@/lib/db";
-import { summarizeBacktest, DEFAULT_COST_MODEL, type BacktestSummary, type CostModel } from "@/lib/backtest/engine";
+import { summarizeBacktest, type BacktestSummary, type CostModel } from "@/lib/backtest/engine";
 import { compileStrategy, SandboxSafetyError } from "./sandbox";
 import { panelSignalsForCode } from "./adapter";
 import { proposeCandidates, refineCandidate, fixUnsafeCode, type Candidate } from "./propose";
@@ -47,11 +47,34 @@ export const MAX_REFINEMENT_ROUNDS = 2;
 export const MAX_RETRIES_PER_SAFETY_FAIL = 1;
 export const COST_CIRCUIT_BREAKER_USD = 2;
 
-// Same disclosed cost assumption used by the live paper desk (DEFAULT_COST_MODEL)
-// so a candidate's research-time numbers and its post-approval live numbers are
-// judged against identical friction — see that constant's comment for the
-// rationale.
-export const RESEARCH_COST_MODEL: CostModel = DEFAULT_COST_MODEL;
+// `DEFAULT_COST_MODEL` (src/lib/backtest/engine.ts) is NOT used here on purpose.
+// Its own comment says it was calibrated to an MT5 Raw/ECN GOLD account; nobody
+// re-derived it for the desk's actual instrument (US equities on Webull) after
+// the stocks-only pivot. scripts/probe-fill-and-costs.mts measured what that
+// gap costs on the real SP500 panel: moving slippageBps 0.5 -> 5 (commissionBps
+// held at 1) shifts fold avgR by roughly -0.022 to -0.033R
+// (scripts/probe-fill-and-costs.log) — the same size as most effects this
+// panel hunts for, so the FIT/SELECT/blind-test verdict a candidate gets can
+// flip depending on which of these two numbers research happens to use.
+//
+// Rather than guess a truer number with no real fill data to calibrate against
+// (there isn't any yet — Webull is data-only here), this pins the DECISION
+// cost to the pessimistic, already-measured cell: 5bps slippage, the same
+// figure Vibe-Trading's global_equity.py assumes for US equities and in the
+// same neighborhood as ADVISOR_COST_BPS (src/lib/advisor/types.ts), the
+// separate stock-specific assumption already used by the advisory card.
+// commissionBps stays 1 — unchanged from DEFAULT_COST_MODEL and not
+// independently measured. Same pattern as XAU_COSTS/xauCostPoints()
+// (xauFolds.ts): refuse to silently trade under a cost model calibrated for
+// the wrong instrument rather than pretend a guess is a measurement.
+//
+// This does NOT touch DEFAULT_COST_MODEL, which stays as the live paper desk's
+// P&L assumption, mechanisms.ts's already-logged screens, and panelRun.ts's
+// exit-control fallback — changing those re-decides concluded, already-logged
+// history and is out of scope here.
+export const EQUITY_COST_MODEL: CostModel = { slippageBps: 5, commissionBps: 1 };
+
+export const RESEARCH_COST_MODEL: CostModel = EQUITY_COST_MODEL;
 
 // What a panel round records on its ResearchRun row. The columns predate the
 // panel and still describe one symbol over one range; filling them with the

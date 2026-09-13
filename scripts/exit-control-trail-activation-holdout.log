@@ -1,0 +1,36 @@
+panel: 491 symbols · 1000 paired resamples per cell
+baseline (null): single 1.5/1.5 — same baseline as exit-control.mts
+candidates: earlier trail activation only — offset fixed at 1.5, activateMult in {0.25, 0.5, 0.75}
+folds: TEST1/TEST2/TEST3 — held out. Read only after the candidate list is written down.
+
+test1 (2020-01-01..2022-01-01, COVID crash and the liquidity-driven recovery)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  trail 0.25/1.5     15114    15606   +0.050   +0.014   +0.036   -0.006   +0.078  fail
+  trail 0.5/1.5      14724    15606   +0.056   +0.014   +0.041   -0.002   +0.084  fail
+  trail 0.75/1.5     14170    15606   +0.056   +0.014   +0.042   -0.001   +0.084  fail
+
+test2 (2022-01-01..2024-01-01, rate-hike bear market and the 2023 recovery)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  trail 0.25/1.5     15399    15330   +0.009   -0.031   +0.041   +0.010   +0.069  PASS
+  trail 0.5/1.5      15002    15330   +0.009   -0.031   +0.040   +0.008   +0.070  PASS
+  trail 0.75/1.5     14402    15330   +0.007   -0.031   +0.038   +0.007   +0.068  PASS
+
+test3 (2024-01-01..2027-01-01, 2024-2026 bull, AI-concentrated leadership)
+  geometry          trades  base tr     avgR     base    delta       p5      p95  verdict
+  trail 0.25/1.5     20957    20854   +0.031   -0.010   +0.042   +0.020   +0.063  PASS
+  trail 0.5/1.5      20377    20854   +0.031   -0.010   +0.041   +0.021   +0.061  PASS
+  trail 0.75/1.5     19517    20854   +0.033   -0.010   +0.044   +0.024   +0.064  PASS
+
+How to read this
+  - Same instrument as exit-control.mts: "delta" is candidate avgR minus
+    baseline avgR over the months BOTH arms traded, "p5" is the bar (must
+    clear zero), "base" is BASELINE_EXIT in every row.
+  - This table answers one question only: does activating the trail before
+    1.0 ATR beat the 1.5/1.5 single-target ladder. It does NOT compare these
+    candidates against trail 1/1.5 or trail 1.5/1.5 directly — read
+    scripts/exit-control.log and scripts/exit-control-holdout.log
+    side by side against this file's log for that.
+  - PASS says only that this geometry beats the ladder we would have used
+    anyway on these entries. It says nothing about whether the entries are
+    worth taking, and the baseline entry loses to a matched random entry in
+    every fold measured.
