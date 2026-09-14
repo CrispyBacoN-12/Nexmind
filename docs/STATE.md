@@ -238,6 +238,31 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   WHEN a company's own officers traded their own stock, alone, is not tradable here. No TEST-fold
   read is authorised — the frozen bar says stop.
 
+- **Insider role-weighting: REJECTED, both directions — closes the untried axis named above.
+  2026-09-14.** `scripts/insider-role-weight-screen.mts` — same net-dollar-value screen as above,
+  but each event's contribution is multiplied by a fixed ordinal role rank (Officer=3 >
+  Director=2 > TenPercentOwner/Other=1, highest rank wins on multi-role filings) before
+  aggregation, testing whether the raw screen's null was a large uninformative 10%-owner trade
+  drowning out a smaller, more informed officer trade on the same bar. It was not:
+  `insider-role-follow` -0.074 fit / -0.096 select (vs control -0.095/-0.166) and
+  `insider-role-fade` +0.056/+0.099 (vs control +0.070/+0.148, 59.0%/61.3% win rate) are, to three
+  decimal places, the **same numbers as the unweighted screen** — the weighting changed almost
+  nothing. Same four checks, same frozen bar, same verdict: both FAIL.
+  **A genuine data-quality bug was found and fixed first, before any performance number was read.**
+  A pre-registered ROLE-MIX diagnostic (informational, no gate) exposed a handful of SEC Form 4
+  events with corrupted per-share prices dominating one role bucket's dollar total. A same-date
+  price-vs-panel-close check was tried first and rejected: the panel's bars are retroactively
+  split-adjusted (confirmed via GOOG's 2022 20:1 split), so it flagged ~20,700 legitimate pre-split
+  GOOG/NVDA/CMG filings as corrupt. The check actually shipped compares each event's price/close
+  ratio against the **local median ratio of that same symbol's nearby filings** — a split moves a
+  whole neighbourhood together so it does not register, isolated corruption still does. 43 of
+  217,720 events dropped (0.02%), not sign-flipped; ROLE-MIX post-cleaning: Officer 75.6% of
+  events/37.2% of dollar value, Director 20.6%/15.4%, TenPercentOwner+Other 3.8%/47.4%. **Not
+  fixed by this check:** a share-COUNT-side corruption (BAC, 2016-10-19: 4,201,596,806 shares at a
+  plausible $15.61) — a different shape, stated as an open limitation, not addressed here.
+  **What is now closed:** role-based weighting of Form 4 filing timing, on this fold/regime.
+  No TEST-fold read is authorised.
+
 - **The stocks half now has a surface the owner can actually use, and it claims no edge.
   2026-09-11.** `/advisor` — the first thing this project has shipped that is meant to be
   *used* rather than measured. It is not a screener and not an automated trader: the owner

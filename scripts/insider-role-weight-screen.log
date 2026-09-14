@@ -1,0 +1,85 @@
+insider-role-weight screen — same-bar Form 4 net value, weighted by reporting-owner role
+PRE-REGISTERED: see this script's header. Two rules, both declared before the run. Role weight is a fixed
+ordinal rank (Officer=3 > Director=2 > TenPercentOwner/Other=1), not a fitted magnitude. Daily bars, no
+shift1, fit + select only. Nothing here may be approved.
+
+insider cache .cache/insider/sp500-form4-ps.json — 486 symbols, 217720 P/S events, 2015q1..2026q3 (not yet published: 2026q2, 2026q3), fetchedAt 2026-09-13T21:14:17.101Z
+
+FILING-LAG CHECK (d >= td): 217699/217720 (99.99%) — bar 99%. lag days: p50=2.0 p95=4.0 max=730487.0
+
+loading daily panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+VOIDING CHECK (daily bars with open != close): 99.32% — bar is 99%
+
+PRICE-SANITY CHECK (price/close ratio within 10x of that symbol's own local median ratio, informational — drops applied, not gated):
+  sane: 197690/217720 (90.80%)  dropped (insane): 43 (0.020%, $21424460.64B of $21425477.34B raw total)  kept-no-local-baseline (no panel bar near td, or <3 comparable neighbours): 19987 (9.18%)
+  example drops (ratio = price/close, baseline = symbol's local median ratio):
+    K 2017-12-13 S 50,000sh @ $3,303,340 vs close $46.55 — ratio 70963.27 vs local baseline 1.42 [TenPercentOwner]
+    LLY 2023-08-28 S 37,160sh @ $554,101 vs close $542.62 — ratio 1021.16 vs local baseline 1.03 [TenPercentOwner]
+    LLY 2025-02-24 S 1,818sh @ $878,401 vs close $872.17 — ratio 1007.14 vs local baseline 1.02 [TenPercentOwner]
+    LLY 2025-11-14 S 55,908sh @ $1,031,414 vs close $1020.35 — ratio 1010.84 vs local baseline 1.01 [TenPercentOwner]
+    LLY 2025-11-14 S 17,567sh @ $1,032,319 vs close $1020.35 — ratio 1011.73 vs local baseline 1.01 [TenPercentOwner]
+    AZO 2024-10-02 S 173sh @ $31,115.01 vs close $3083.43 — ratio 10.09 vs local baseline 1.00 [Director,Officer]
+    GOOG 2016-09-29 S 1,832sh @ $2.91 vs close $38.41 — ratio 0.08 vs local baseline 20.59 [Director,Officer,TenPercentOwner]
+    GOOG 2022-02-08 S 200sh @ $200 vs close $138 — ratio 1.45 vs local baseline 20.08 [Director,TenPercentOwner]
+
+ROLE-MIX CHECK (informational, no gate; post price-sanity):
+  weight 3 (Officer): 164601 events (75.6%), $377.73B (37.2% of total dollar value)
+  weight 2 (Director): 44895 events (20.6%), $157.02B (15.4% of total dollar value)
+  weight 1 (TenPercentOwner/Other): 8181 events (3.8%), $481.95B (47.4% of total dollar value)
+  fit: 474 symbols participate, 0 warm-up + 754 tradable bars (first symbol)
+    COVERAGE CHECK: 452/474 carry a tradable event (95.4%, bar 90%), median 11.00 events/symbol/year (informational, no fixed cadence for Form 4) over 3.00y
+  select: 476 symbols participate, 250 warm-up + 252 tradable bars (first symbol)
+    COVERAGE CHECK: 454/476 carry a tradable event (95.4%, bar 90%), median 11.01 events/symbol/year (informational, no fixed cadence for Form 4) over 1.00y
+
+NO-LOOKAHEAD CHECK (every entry bar dated strictly after its filing's own date):
+  insider-role-follow fit: 17587 signals, 0 violations
+  insider-role-follow select: 10939 signals, 0 violations
+  insider-role-fade fit: 17587 signals, 0 violations
+  insider-role-fade select: 10939 signals, 0 violations
+NO-LOOKAHEAD CHECK: pass
+
+fill: filing d -> first tradable bar j dated strictly after d -> entry at bar j's own OPEN (no shift1)
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60 bars  fold warm-up=250 bars  trade floor=200
+NOTE: FIT has NO warm-up prefix (the cache starts the day FIT does), so it loses its first 60 bars to the engine's own warm-up.
+
+========================================================================================================================
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+========================================================================================================================
+
+insider-role-follow
+  net role-weighted buying -> long, net selling -> short
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit        11946      450  -0.074     51.7  -0.095  -0.085   0.021   2.85%  beats-median but avgR<=0
+    select      4432      452  -0.096     50.5  -0.166  -0.150   0.070   3.16%  beats-median but avgR<=0
+  => FAILS (0/2 folds clear the frozen bar)
+
+insider-role-fade
+  the mirror: net role-weighted buying -> short, net selling -> long
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit        12073      450   0.056     59.0   0.070   0.080  -0.014   2.85%  loses to median
+    select      4491      453   0.099     61.3   0.148   0.164  -0.049   3.16%  loses to median
+  => FAILS (0/2 folds clear the frozen bar)
+
+========================================================================================================================
+retail (5bps slip + 1bp comm) — pre-registered second statement
+========================================================================================================================
+
+insider-role-follow
+  net role-weighted buying -> long, net selling -> short
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit        11954      450  -0.102     51.1  -0.128  -0.118   0.026   2.85%  beats-median but avgR<=0
+    select      4421      452  -0.128     49.5  -0.196  -0.180   0.068   3.16%  beats-median but avgR<=0
+
+insider-role-fade
+  the mirror: net role-weighted buying -> short, net selling -> long
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit        12044      450   0.024     58.1   0.038   0.048  -0.014   2.85%  loses to median
+    select      4474      453   0.063     60.1   0.118   0.135  -0.056   3.16%  loses to median
+
+========================================================================================================================
+VERDICT (frozen bar: beats the control MEDIAN and raw avgR > 0, in BOTH folds, at DEFAULT_COST_MODEL)
+  ADVANCES: none
+  Advancing earns a TEST-fold read under its own pre-registration, and nothing else.
+  It is not an approval, it is not sizeable, and it does not authorise spending DEEP1-3.
+  A margin is only readable against the control's own LEVEL — both are printed above.
