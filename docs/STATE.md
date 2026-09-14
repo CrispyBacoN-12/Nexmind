@@ -219,6 +219,25 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   only consumes a price/volume `ScanSnapshot`; wiring insider data into the proposer or
   backtest engine is separate, larger work and has not been started or decided.
 
+- **Insider-transaction screen: REJECTED, both directions. 2026-09-14.**
+  `scripts/insider-transaction-screen.mts` — pre-registered mirror-pair screen (`insider-follow`:
+  net dollar-value buying -> long, net selling -> short; `insider-fade`: the exact mirror), daily
+  bars, filing date `d` as the sole anchor, same-bar fill (`entryAt: "open"`, no `shift1` needed
+  because the signal depends on nothing about any bar's own price), FIT+SELECT only. All four
+  checks passed: FILING-LAG 99.99% `d >= td`; COVERAGE 95.6%/95.4%; NO-LOOKAHEAD zero violations
+  across 17,594+10,941 signals per rule; VOIDING 99.32%. **Neither rule clears the frozen bar.**
+  `insider-follow` beats its control's median in both folds but **loses money outright**
+  (avgR -0.074 fit / -0.096 select vs control median -0.095 / -0.166) — the exact "margin over a
+  losing control" shape the `avgR > 0` clause exists to reject. `insider-fade` is the mirror image
+  of the interesting case: it is **profitable in both folds** (avgR +0.056 fit / +0.100 select,
+  59.0%/61.4% win rate) but **loses to its own control's median** (+0.070 / +0.146) — insiders
+  selling ahead of an up move and buying ahead of a down move is real money, but a random entry on
+  this panel in this regime makes even more of it, so the edge is the panel's own directional
+  drift, not something specific to insider filings. Retail costs change neither verdict. **This is
+  the second non-price data class in a row to fail** (earnings-timing above was the first): knowing
+  WHEN a company's own officers traded their own stock, alone, is not tradable here. No TEST-fold
+  read is authorised — the frozen bar says stop.
+
 - **The stocks half now has a surface the owner can actually use, and it claims no edge.
   2026-09-11.** `/advisor` — the first thing this project has shipped that is meant to be
   *used* rather than measured. It is not a screener and not an automated trader: the owner

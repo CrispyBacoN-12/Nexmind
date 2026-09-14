@@ -1,0 +1,66 @@
+insider-transaction screen — SEC Form 4 open-market P/S filings as a standalone entry
+PRE-REGISTERED: see this script's header. Two rules, both declared before the run, zero fitted
+parameters. Daily bars, same-bar fill (no shift1 needed), fit + select only. Nothing here may be approved.
+
+insider cache .cache/insider/sp500-form4-ps.json — 486 symbols, 217720 P/S events, 2015q1..2026q3 (not yet published: 2026q2, 2026q3), fetchedAt 2026-09-13T21:14:17.101Z
+FILING-LAG CHECK (d >= td): 217699/217720 (99.99%) — bar 99%. lag days: p50=2.0 p95=4.0 max=730487.0
+
+loading daily panel cache…
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+VOIDING CHECK (daily bars with open != close): 99.32% — bar is 99%
+  fit: 474 symbols participate, 0 warm-up + 754 tradable bars (first symbol)
+    COVERAGE CHECK: 453/474 carry a tradable event (95.6%, bar 90%), median 11.00 events/symbol/year (informational, no fixed cadence for Form 4) over 3.00y
+  select: 476 symbols participate, 250 warm-up + 252 tradable bars (first symbol)
+    COVERAGE CHECK: 454/476 carry a tradable event (95.4%, bar 90%), median 11.01 events/symbol/year (informational, no fixed cadence for Form 4) over 1.00y
+
+NO-LOOKAHEAD CHECK (every entry bar dated strictly after its filing's own date):
+  insider-follow fit: 17594 signals, 0 violations
+  insider-follow select: 10941 signals, 0 violations
+  insider-fade fit: 17594 signals, 0 violations
+  insider-fade select: 10941 signals, 0 violations
+NO-LOOKAHEAD CHECK: pass
+
+fill: filing d -> first tradable bar j dated strictly after d -> entry at bar j's own OPEN (no shift1)
+ladder=flat tp1=1.2 sl=1.5  control=200 runs  seed=20260825  engine WARMUP=60 bars  fold warm-up=250 bars  trade floor=200
+NOTE: FIT has NO warm-up prefix (the cache starts the day FIT does), so it loses its first 60 bars to the engine's own warm-up.
+
+========================================================================================================================
+DEFAULT_COST_MODEL (0.5bps slip + 1bp comm) — THIS BLOCK DECIDES
+========================================================================================================================
+
+insider-follow
+  net buying -> long, net selling -> short (literature's textbook direction)
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit        11952      451  -0.074     51.7  -0.095  -0.086   0.021   2.85%  beats-median but avgR<=0
+    select      4435      452  -0.096     50.5  -0.166  -0.148   0.070   3.16%  beats-median but avgR<=0
+  => FAILS (0/2 folds clear the frozen bar)
+
+insider-fade
+  the mirror: net buying -> short, net selling -> long
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit        12074      451   0.056     59.0   0.070   0.081  -0.014   2.85%  loses to median
+    select      4494      453   0.100     61.4   0.146   0.163  -0.046   3.16%  loses to median
+  => FAILS (0/2 folds clear the frozen bar)
+
+========================================================================================================================
+retail (5bps slip + 1bp comm) — pre-registered second statement
+========================================================================================================================
+
+insider-follow
+  net buying -> long, net selling -> short (literature's textbook direction)
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit        11959      451  -0.102     51.1  -0.128  -0.117   0.027   2.85%  beats-median but avgR<=0
+    select      4424      452  -0.128     49.5  -0.196  -0.177   0.068   3.16%  beats-median but avgR<=0
+
+insider-fade
+  the mirror: net buying -> short, net selling -> long
+    fold      trades  symbols     avgR     win%   ctrl med  ctrl p95   margin      1R  verdict
+    fit        12045      451   0.024     58.1   0.038   0.049  -0.014   2.85%  loses to median
+    select      4477      453   0.063     60.2   0.117   0.134  -0.054   3.16%  loses to median
+
+========================================================================================================================
+VERDICT (frozen bar: beats the control MEDIAN and raw avgR > 0, in BOTH folds, at DEFAULT_COST_MODEL)
+  ADVANCES: none
+  Advancing earns a TEST-fold read under its own pre-registration, and nothing else.
+  It is not an approval, it is not sizeable, and it does not authorise spending DEEP1-3.
+  A margin is only readable against the control's own LEVEL — both are printed above.
