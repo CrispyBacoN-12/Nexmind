@@ -6,13 +6,13 @@ import { Radar, FileBarChart, Activity, LineChart, FlaskConical, ScrollText, Mic
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { href: "/", label: "War Room", icon: Radar },
-  { href: "/analyze", label: "AI Analysis", icon: LineChart },
   { href: "/advisor", label: "Trade Advisor", icon: Compass },
-  { href: "/backtest", label: "Backtest Lab", icon: FlaskConical },
-  { href: "/research", label: "Quant Research", icon: Microscope },
-  { href: "/activity", label: "Scan Activity", icon: ScrollText },
-  { href: "/reports", label: "Reports", icon: FileBarChart },
+  { href: "/", label: "War Room (archive)", icon: Radar },
+  { href: "/analyze", label: "AI Analysis (archive)", icon: LineChart },
+  { href: "/backtest", label: "Backtest Lab (archive)", icon: FlaskConical },
+  { href: "/research", label: "Quant Research (archive)", icon: Microscope },
+  { href: "/activity", label: "Scan Activity (archive)", icon: ScrollText },
+  { href: "/reports", label: "Reports (archive)", icon: FileBarChart },
 ];
 
 export function Sidebar({ online = 0 }: { online?: number }) {
@@ -24,7 +24,7 @@ export function Sidebar({ online = 0 }: { online?: number }) {
           <Activity className="h-5 w-5 text-(--color-accent)" />
           <span>NEXMIND</span>
         </Link>
-        <p className="text-[11px] text-(--color-muted) mt-1 font-mono">AI TRADING GUILD</p>
+        <p className="text-[11px] text-(--color-muted) mt-1 font-mono">EXECUTION &amp; RISK COPILOT</p>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
         {nav.map((item) => {
@@ -46,9 +46,9 @@ export function Sidebar({ online = 0 }: { online?: number }) {
         })}
       </nav>
       <div className="px-5 py-4 border-t border-(--color-border) text-xs text-(--color-muted) font-mono">
-        <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 live-dot mr-2 align-middle" />
-        {online} agents online
-        <div className="mt-1 text-[10px]">PAPER MODE · no broker</div>
+        <span className="inline-block h-2 w-2 rounded-full bg-(--color-muted) mr-2 align-middle" />
+        autonomous desk: paused ({online} agents online)
+        <div className="mt-1 text-[10px]">no rule survived its hold-out — advisor is the tool now</div>
       </div>
     </aside>
   );

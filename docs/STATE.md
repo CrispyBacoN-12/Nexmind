@@ -8,30 +8,50 @@ the archive.
 _Last verified against the live DB: **2026-08-31**. Working tree, branch and test suite
 re-checked **2026-09-11**, branch `stocks-only-pivot`._
 
-> **The panel gate has now run end to end (2026-08-31, run #112, `status: done`).** The budget
-> that had paused everything came back the same day. The round proposed 3 strategies and rejected
-> all 3 at the FIT fold — **the first `panel-v1` rows the project has ever produced**, and the
-> answer to the question that had been open since the gate was built: it works, and it says no.
-> The eligible pool is still empty, but that is now a verdict rather than an untested claim.
-> **Resume at §4.0.**
+> **2026-09-15 pivot: the project's role changed. Read §1 before anything else.** The owner
+> decided to stop searching for fully-automated alpha and made `/advisor` the whole point of
+> this repo. The autonomous desk (SCANNER → HAWK → SAGE → Iron Rules, all three Task
+> Scheduler jobs) is **paused, not deleted** — it is now historical/reference code, not a
+> thing to keep tuning. **Resume at §1, not §4.**
 
 ---
 
 ## 1. What this project is
 
-Multi-agent AI trading guild (Next.js 16 · Prisma 7 · Neon Postgres). **US stocks only**,
-**paper mode**, no broker API. Pipeline: SCANNER (no AI) → HAWK×3 vote → SAGE veto →
-Iron Rules (pure code) → simulated fill. See `README.md` for the architecture; do not
-duplicate it here.
+**As of 2026-09-15: an Execution & Risk Copilot, not an alpha-seeking desk.** The owner typed
+this decision explicitly: finding fully-automated alpha on the S&P 500 with $2-3k capital
+(whole shares, 5 slots) on free data conflicts with market-structure reality — every
+price-based entry rule, every exit geometry, and now three non-price data classes have all
+been screened and rejected (`docs/STATE.md` §3 has the full list; `/nexmind-13f-*` and
+`/nexmind-exit-alone-*` memories close the last two axes). Rather than keep hunting, **all of
+the repo's value now lives at `/advisor`**: the owner types a ticker, the tool reports ATR
+stop distance, whole-share position sizing at real $2-3k capital, round-trip cost expressed
+in R, and correlation against typed-in holdings — structure and risk, never a name, a rank, or
+a target (`ADVISOR_NO_EDGE_CLAIM`, `src/lib/advisor/types.ts`). See
+`docs/superpowers/specs/2026-09-10-stock-advisory-tool-design.md` for the full design; it
+already existed and already matched this philosophy before the pivot was made official.
+
+**The autonomous desk is paused, not removed.** Multi-agent trading guild (Next.js 16 ·
+Prisma 7 · Neon Postgres), pipeline SCANNER (no AI) → HAWK×3 vote → SAGE veto → Iron Rules
+(pure code) → simulated fill — see `README.md` for the architecture. All three Windows Task
+Scheduler jobs (`NEXMIND Stocks scan`, `NEXMIND Manage positions`, `NEXMIND Research round`)
+are **Disabled** (confirmed via `Get-ScheduledTask` 2026-09-15 — they were already off,
+apparently disabled sometime between the 09-11 verification and now; this pivot makes that
+state intentional and permanent rather than an unexplained gap). Do not re-enable them and do
+not resume `panel-v1` research rounds — that whole line is closed pending a genuinely new
+idea, not paused for a budget reason. The code stays in the repo as reference/history; do not
+delete it, and do not spend effort tuning it further.
 
 Hard context the code does not state:
 
 - **Webull is data-only.** Its trading API can't be reached unattended; the shadow-execution
-  path was removed 2026-08-22. Real orders are manual.
+  path was removed 2026-08-22. Real orders are manual — which is now the point, not a
+  limitation: `/advisor` is built for exactly this manual workflow.
 - **Real capital is $2–3k on Webull, whole shares only.** No fractional sizing → ~5 usable
-  slots. Validate unconstrained first, then restate results at $2–3k.
-- Go-Live is deferred and unscheduled. Nothing goes live until an arm comparison shows the
-  analysts beat the rule-only baseline.
+  slots. `/advisor`'s sizing defaults already reflect this ($2,500 / 5 slots / 1% risk).
+- **Go-Live is dead, not deferred.** There is no arm comparison left to run — nothing in this
+  project ever beat its own random-entry control on a deep hold-out, across every entry rule,
+  every exit geometry, and every non-price data class tried.
 
 ## 2. Live state (verified by query, 2026-08-31)
 
@@ -66,6 +86,134 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 ## 3. Done recently (2026-08-23 → 09-14)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
+
+- **Project pivot: NEXMIND is now an Execution & Risk Copilot, not an alpha-seeking desk.
+  2026-09-15.** After three non-price data classes (earnings timing, insider transactions,
+  13F ownership network) and the entire exit-geometry axis all closed with no surviving
+  mechanism, the owner made the call directly rather than continuing the search: stop hunting
+  for fully-automated alpha on $2-3k/whole-shares/free-data, and make `/advisor` — already
+  built 2026-09-10→09-14, see `docs/superpowers/specs/2026-09-10-stock-advisory-tool-design.md`
+  — the entire point of the repo. Confirmed all three Task Scheduler jobs were already
+  `Disabled` (`Get-ScheduledTask`), so the autonomous loop is not currently running; this pivot
+  makes that state official and permanent rather than treating it as a gap to fix. Changed:
+  `docs/STATE.md` §1 rewritten to state the new role; `src/app/layout.tsx` metadata and
+  `src/components/sidebar.tsx` nav reordered (Trade Advisor first, everything else labeled
+  "(archive)") and its footer changed from a live "N agents online" pulse to "autonomous desk:
+  paused". Not changed: no code under `src/lib/advisor/` — it already had ATR stop, dynamic
+  whole-share sizing, cost-in-R, and correlation-against-holdings before this pivot; the owner
+  confirmed the existing pearson-correlation-against-typed-holdings already satisfies what they
+  meant by "sector correlation" (no GICS/SIC classification data was added). Desk code
+  (SCANNER/HAWK/SAGE/Iron Rules, `panel-v1` research) stays in the repo as reference — do not
+  delete it, do not resume tuning it, do not re-enable the Task Scheduler jobs without a new
+  owner decision to do so.
+
+- **Third non-price data class evaluated: SEC Form 13F common-ownership network — too narrow
+  to build. 2026-09-15.** Investigated whether a graph of "stocks commonly held by the same
+  institutional filers" (SEC's bulk quarterly Form 13F structured data sets,
+  `sec.gov/data-research/sec-markets-data/form-13f-data-sets`, back to 2013 Q2, filing-date
+  point-in-time, no per-filer API calls needed) could serve as a relational entry-signal data
+  class, per [[nexmind-entry-is-late]]'s closing note that only the data class behind the
+  entry remains untried. CUSIP↔ticker resolution used normalized-name matching against
+  `company_tickers.json` (no ticker→CUSIP path exists publicly; OpenFIGI only goes
+  CUSIP→ticker) — 91% (2016 Q1) / 95% (2019 Q4) panel coverage after a bug fix (below).
+  **Finding #1 (raw graph): fails.** A co-occurrence graph over ALL institutional filers
+  holding any tracked stock is near-complete (median node degree 327/406) and dominated by
+  size/liquidity — `JCI|PG` jaccard=0.80, the single highest pair, despite no business
+  relationship — because nearly every broad/index-style filer holds nearly the whole S&P 500
+  panel, so any two large-caps trivially co-occur. Same beta-exposure contamination as
+  [[nexmind-regime-side-is-beta]], not new relational information.
+  **Finding #2 (restricted to "concentrated filers", breadth ≤20 of 406 tracked stocks,
+  excluding closet-indexers): partially real, but narrow.** Rebuilt on two independent
+  quarters (2016 Q1, 2019 Q4). Real structure did emerge and replicated in both: a large,
+  stable REIT-specialist cluster (jaccard 0.35-0.63:
+  `ESS|PLD`,`PLD|PSA`,`ARE|DOC`,`HST|VTR`...) and a handful of literal corporate-structural
+  pairs — `MO|PM` (2008 Altria/Philip Morris Int'l split), `HPE|HPQ` (2015 HP split),
+  `DD|DOW` (DowDuPont breakup), `EBAY|PYPL` (2015 spinoff). The 2016Q1 mega-cap noise
+  (`JCI|PG` etc.) vanished in 2019Q4, confirming it was quarter-specific, not structural.
+  **But generic same-sector competitor pairs stayed weak in both quarters** — `HD|LOW`,
+  `KO|PEP`, `MCD|SBUX`, `FDX|UPS`, `COST|WMT` all sit at jaccard 0.02-0.13 on only 2-12
+  shared concentrated filers, identically in both snapshots. **Verdict: the network is real
+  for REITs and explicit spinoff pairs, not a general cross-sector fabric** — built at panel
+  scale the qualifying universe would be a few dozen names, the same participation-floor
+  failure that sank the SEC Form 8-K Item 4.02 investigation. **Not built further; the user
+  chose to stop this line and take a full summary rather than a narrow REIT-only test.**
+  **Bug found and fixed along the way, worth keeping:** the original matcher
+  (`match_13f_names_v2.mjs`) kept only the first-seen `NAMEOFISSUER` spelling per CUSIP; a
+  CUSIP filed under several spelling variants across filers (e.g. "UNITED PARCEL SERVICE INC"
+  vs "United Parcel Service of America Cl B") could have its dominant, correctly-spelled
+  variant shadowed by an earlier-in-file obscure one, silently binding the ticker to a
+  near-unheld CUSIP instead of its real common stock — this is what had UPS, WMT and LOW
+  resolving to 1-11-holder CUSIPs instead of their real ~2,000-holder common stock, and is
+  presumably why `BAC` had the same symptom in an earlier pass. Fix: track *all* name variants
+  per CUSIP and match on any of them. Coverage rose 87%→91% (2016 Q1) after the fix; exact
+  (pass-1) matches rose 325→385 — this was suppressing legitimate matches broadly, not just
+  in the isolated cases first noticed.
+  **This closes the third data-class candidate this project has tried and found wanting; see
+  [[nexmind-earnings-timing-not-an-entry]] and [[nexmind-insider-transactions-not-an-entry]]
+  for the first two.** The only data-source candidate confirmed feasible but not yet tested
+  is Wikipedia pageviews (free API, 92% panel-title coverage, back to July 2015) — feasibility
+  confirmed in an earlier session, the deeper "does a pageview spike carry direction" question
+  never empirically tested.
+
+- **Broad-universe weekly replication — not one verdict flipped. 2026-09-14.**
+  `scripts/weekly-mechanism-screen.mts --panel=.cache/bars/broad-1d.json` (new `--panel=` flag,
+  mirroring the existing precedent on `mechanism-screen.mts`) re-ran the same six weekly-bar
+  mechanisms, same folds, same ladder, same seed, on a disjoint 1,173-symbol universe (2.4x the
+  S&P panel, built 2026-08-26, zero new fetch). `mr-down3` (fit margin +0.002, select +0.110) and
+  `gap-fade` (fit margin +0.089, select +0.138) are again the only two beating their control
+  median in both folds; the other four (`nr7`, `turn-of-month`, `vol-dryup`, `range-expand`) fail
+  again, identically. Log: `scripts/weekly-mechanism-screen-broad.log`.
+  **What this closes:** the "small S&P sample" objection to the original weekly screen (§4g) —
+  the signal replicates on a completely disjoint, larger set, so it is not narrow-universe noise.
+  **What this does NOT close:** the weekly deep hold-out rejection of both mechanisms on
+  2000-2016 (§4g, below) — `broad-1d.json` is Alpaca-sourced and floors at 2016-01-04, so there
+  is no pre-2016 broad panel to re-run that rejection against either way. Both mechanisms stay
+  closed for deployment. **The bigger pattern:** this is the SECOND identical universe-swap
+  experiment (after the 2026-08-26 daily-bar rerun, §4g) to produce zero flipped verdicts, on two
+  independent bar classes — evidence against "too few symbols" as the operative constraint behind
+  this codebase's mechanism failures in general. Do not propose further universe-swapping to
+  rescue any of these six mechanisms; see §5.
+
+- **Exit geometry alone cannot rescue a zero-information entry — NO CANDIDATE. 2026-09-14.**
+  `scripts/exit-on-random-entry.mts` fixed the entry axis at exactly zero information
+  (matched-random entries, same count/side-mix as `decideSetup()`) and swept all 6
+  `LADDER_OPTIONS` geometries (`single 1.5/1.5` through `single 3/1.5`, `trail 1/1.5`,
+  `trail 1.5/1.5`) against them, daily bars, close fill, fit+select only. **Primary bar: all 6
+  geometries "pass"** (control p5 > 0 in both folds). **Mandatory long/short diagnostic: all 6
+  fail it** — every geometry's control is strongly positive long-only (fit +0.10 to +0.22,
+  select +0.20 to +0.39) and strongly negative short-only (fit -0.08 to -0.19, select -0.21 to
+  -0.36) in every fold measured, the textbook signature of long-side drift wearing an
+  exit-geometry costume ([[nexmind-regime-side-is-beta]]), not a management discovery.
+  Sub-finding: the two `trail` geometries show a more asymmetric long/short split than the four
+  `single` geometries (e.g. `trail 1.5/1.5` fit short is only ~45% of long's magnitude, vs a
+  symmetric split for `single 2.5/1.5`) — a trailing stop lets a long winner run further into the
+  same drift a fixed target caps early, so it captures MORE of the drift, not a distinct
+  mechanical effect. Log: `scripts/exit-on-random-entry.log`. **Closes:** whether ANY
+  `LADDER_OPTIONS` geometry rescues a zero-information entry on this population — not exit
+  research outright, since a bar-count/calendar time stop is a different geometry class not yet
+  expressible by `PanelExit` (engine change, [[nexmind-proposer-is-entry-only]]). Do not sweep
+  `LADDER_OPTIONS` further; see §5.
+
+- **The remaining gap above — a bar-count time stop — closed the same way. NO CANDIDATE,
+  full stop on the entire exit-geometry axis. 2026-09-15.** `PanelExit.maxBars` was built
+  (engine change: `SimPosition.barsHeld`/`ExitOptions.maxBars` in `backtest/engine.ts`; fires
+  only when the bar's action is still "hold" after SL/TP/trail found no trigger — a backstop
+  layered atop `BASELINE_EXIT`, never a bare geometry). `scripts/exit-time-stop-on-random-entry.mts`
+  then ran the identical protocol as the script above on the identical matched-random-entry
+  population: swept `maxBars` in `{1, 2, 3, 5, 8, 13, 21, 34}` atop `BASELINE_EXIT`, fit+select
+  only, same primary bar (control p5 > 0 both folds), same mandatory long/short diagnostic.
+  **Primary bar: 5 of 8 values "pass"** (maxBars = 5, 8, 13, 21, 34). **Diagnostic: all 5 fail
+  it, same signature as the ladder geometries** (long strongly positive, short strongly
+  negative, both folds), and this time the magnitude is monotone in `maxBars` itself — the
+  longer the time stop lets a long ride, the more up-drift it collects, exactly the mechanism
+  already named for the `trail` geometries above. `maxBars=34` (where the time stop rarely
+  binds) reproduces the bare-ladder numbers from the script above as a built-in continuity
+  check, confirming the harness. Log: `scripts/exit-time-stop-on-random-entry.log`. **Closes:**
+  the one geometry class the script above left open — between the two scripts, every exit
+  geometry this project's engine can express (fixed target, trailing stop, bar-count time stop)
+  has now been swept and diagnosed against a zero-information entry, and every one fails the
+  same way. Do not propose a new exit-geometry variant of any kind to rescue a rejected or
+  zero-information entry; see §5. Memory: [[nexmind-exit-alone-is-long-drift]] (updated).
 
 - **Pre-registered Probe #1: Webull cost realism measured for `mr-down3`. 2026-09-14 — a
   DIAGNOSTIC, not a promotion gate.** `scripts/mr-down3-webull-cost-realism.mts` replaced the
@@ -219,6 +367,37 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   positioning and the macro calendar remain blind spots; no free source for them exists here.
   The earnings date is **reported, never acted on** — the 2026-09-08 mirror-pair screen killed
   earnings timing as an entry in both directions, so nothing sizes, stops or ladders from it.
+
+- **REGIME BREAK — the universe scan now caps how many candidates reach the analysts.
+  2026-09-14.** New setting `scanAttemptsPerSlot`, **default 4**, read in `scanUniverse`:
+  the loop stops after `slots × 4` candidates instead of walking the whole list. It walked
+  the whole list because `slots--` only fires on an **executed** trade, and the desk has
+  executed **zero** — so a typical round ("18 setups / 79 fetched, 2 slot(s) free") paid
+  18 × 3–4 model calls to fill at most 2. Measured: 115 `Counterfactual` rows ≈ **375 model
+  calls** over 10 active days, 85 no-consensus + 30 vetoed, **0 executed**.
+  **What this does to the record:** `Counterfactual` rows produced on or after 2026-09-14
+  are the **top-N by ADX**, not every setup the rule accepted. The ADX sort was previously
+  a pure tie-break that could only reorder who was served first; it is now the cut line, and
+  it has never been validated as a ranking. **Do not pool rows either side of this date
+  without checking `scanAttemptsPerSlot`.** Set it to `0` to restore the old behaviour
+  exactly. Nothing about entries, votes, vetoes or the Iron Rules changed — only how far
+  down the candidate list the desk is willing to pay.
+
+- **Every model call is now on the ledger, and the CLI path was undercounting by ~99.9%.
+  2026-09-14.** New `AiCall` table, one row per call, written fire-and-forget from
+  `lib/anthropic.ts` on both backends. The bug it closes: `CliResult.usage` was typed with
+  only `input_tokens`/`output_tokens`, so `cache_creation_input_tokens` and
+  `cache_read_input_tokens` — which carry essentially all of the real input — were dropped,
+  and `total_cost_usd` was parsed and then thrown away. A probe measuring **8,029** real
+  input tokens was recorded as `inputTokens: 2`. Verified live after the fix: a one-word
+  haiku call recorded `in 10 / out 44 / cacheCreate 4,690 / reported $0.0096`.
+  Two cost columns on purpose — `costUsd` stays *money actually billed* (0 on subscription
+  auth) and `reportedCostUsd` is the backend's own list-price figure, the only quota-burn
+  signal the CLI gives. Cache tokens are stored **separately**, not folded into
+  `inputTokens`, because they price differently and they are the number that moves.
+  `CallOptions.label` now tags each call (`hawk:<persona>`, `sage`, `raven`, `memo`,
+  `analyze:*`, `research:*`, `codegen`, `secretary:*`) so spend attributes to an agent.
+  Cost questions are now a query, not a fresh probe.
 
 - **New data class evaluated and built: SEC Form 4 insider transactions. 2026-09-14.**
   Investigated SEC EDGAR's bulk **Insider Transactions Data Sets** (quarterly ZIPs,
@@ -1177,6 +1356,25 @@ separate pre-registration before spending the deep hold-out.** Neither is done y
 still unread for either mechanism on weekly bars, and the deep fold stays untouched until that
 pre-registration exists.
 
+**UPDATED 2026-09-14 — corrects the paragraph above: TEST was already read and the deep fold
+was already spent, both mechanisms REJECTED.** The "neither is done yet" sentence above is
+stale. `mr-down3` and `gap-fade` cleared all 3 TEST folds on weekly bars
+([[nexmind-weekly-bars-reopen-the-entry-axis]]), then both were REJECTED at the weekly deep
+hold-out on 2000-2016: the deep-fold random-entry control itself pays +0.11 to +0.17R in that
+regime, so a rule can win every deep fold and still lose
+([[nexmind-weekly-deep-holdout-rejects-mean-reversion]]). Both mechanisms are closed for
+deployment.
+
+Separately, and NOT a reopening of that rejection: the antecedent FIT/SELECT pass was re-run
+2026-09-14 on a disjoint 1,173-symbol universe (`.cache/bars/broad-1d.json`,
+`scripts/weekly-mechanism-screen.mts --panel=`) to test whether it was small-sample noise from
+screening only 491 S&P tickers — §3 above has the full write-up. **Not one verdict flipped**:
+`mr-down3` and `gap-fade` are again the only two beating their control median in both folds; log
+`scripts/weekly-mechanism-screen-broad.log`. `broad-1d.json` floors at 2016-01-04 (Alpaca), so
+there is no pre-2016 broad panel to re-test the deep hold-out against — this result cannot and
+does not touch the rejection above. It does extend the "changing the universe is closed" finding
+earlier in this section: two bar classes, two independent universe swaps, zero flipped verdicts.
+
 ## 5. Traps — read before touching these areas
 
 - **A raw avgR from the panel carries no information on its own.** Demonstrated three times
@@ -1221,6 +1419,19 @@ pre-registration exists.
   regime checks on an already-chosen variant. Never select anything with it.
 - **Do not re-tune the 13 confluence filters, cross-sectional mean reversion, or
   cross-sectional momentum.** All three loops are closed and documented as rejected.
+- **Do not sweep `LADDER_OPTIONS`, or a `maxBars` time stop, to rescue a zero-information or
+  already-rejected entry.** Measured 2026-09-14 with entries fixed at exactly zero information
+  (matched-random, `scripts/exit-on-random-entry.mts`): all 6 geometries "pass" the primary bar
+  but all 6 fail the mandatory long/short diagnostic — the apparent edge is long-side drift
+  wearing an exit-geometry costume, not a management discovery (§3, [[nexmind-regime-side-is-beta]]).
+  **Updated 2026-09-15:** the one geometry class that script left untried — a bar-count time
+  stop — was then built (`PanelExit.maxBars`) and swept the same way
+  (`scripts/exit-time-stop-on-random-entry.mts`): 5 of 8 `maxBars` values clear the primary bar
+  and all 5 fail the same diagnostic, with the long/short gap growing monotonically in `maxBars`.
+  **The entire exit-geometry axis — fixed target, trailing stop, and bar-count time stop — is now
+  closed against zero-information entries on this population.** Nothing about exit geometry
+  remains untried here; do not propose another variant. The only open axis project-wide is the
+  data class behind the entry ([[nexmind-exit-alone-is-long-drift]]).
 - **Do not re-tune breadth or realized vol as regime features.** Measured on all five folds and
   rejected: breadth is monotone in FIT then inverts in SELECT and TEST3; vol's top bucket is
   consistently bad but its Q1–Q4 ordering holds nowhere. Both died the same way — **FIT-derived
@@ -1354,6 +1565,19 @@ pre-registration exists.
   `launch.json` configurations, so `"dev:web"` must be started as `nexmind-dev-web`, and the
   first `navigate` after a cold start fails while Next is still compiling — check
   `preview_logs` for "Ready in" before treating that failure as a permission problem.
+- **For UI-only verification, start `nexmind-dev-web`, never `nexmind`.** The `"nexmind"`
+  config runs plain `npm run dev` → `scripts/dev.mts`, which unconditionally spawns
+  `scripts/session.mts --if-stale=30` as a real background process on `.env` (real Claude
+  subscription budget, real HAWK/SAGE calls) unless started with `--no-scan`/`DESK_SCAN=0` —
+  neither of which the launch config passes. Hit this for real on 2026-09-15: starting
+  `nexmind-dev` to screenshot the post-pivot sidebar silently ran a full desk session (8
+  analyst calls across ILMN/PANW/CRWD/PAYX/ADP/BIIB/CTAS/AMGN, all vetoed/no-consensus — no
+  trade opened, 0 closed, 0 resolved, so no state changed, but real budget was spent) minutes
+  after the owner had just confirmed pausing the desk entirely (§1, §3). `"dev:web"` →
+  `nexmind-dev-web` runs `next dev -p 3275` directly with no `dev.mts` wrapper and cannot
+  trigger this. Now that the desk is paused project-wide, there is no longer a legitimate
+  reason to start `"nexmind"` from the preview tooling at all — use `nexmind-dev-web` for
+  every future UI check.
 
 ## 6. Blocked on the user (still open)
 

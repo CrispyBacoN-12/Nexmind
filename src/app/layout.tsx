@@ -9,8 +9,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "NEXMIND — AI Trading Guild",
-  description: "Multi-agent trading war room: Scanner → HAWK×3 → SAGE → Iron Rules.",
+  title: "NEXMIND — Execution & Risk Copilot",
+  description: "Structure and risk for a ticker you chose: ATR stop, whole-share sizing, cost in R, correlation. The autonomous research desk is paused; it predicts nothing and never did survive its own hold-out.",
 };
 
 async function getOnlineCount(): Promise<number> {
