@@ -1,0 +1,55 @@
+Pre-registered Probe #1: Webull Cost Realism on mr-down3 — DIAGNOSTIC, not a promotion gate
+Slot size: $500, whole shares only. SEC fee 0.0000278/$ (min $0.01), FINRA TAF 0.000166/share (min $0.01, max $8.3).
+
+MEASURED signal frequency (all 5 folds, whole panel): 124612 signal-bars over 1275602 symbol-days
+  -> 48.0 signals/day averaged across the panel (caller's figure: ~40/day)
+
+Zero-friction reference (SEC/FINRA fees only): avg gross $2.2479/trade, n=70066
+
+====================================================================================================
+SWEEP 1: Execution friction as bps-per-side (Webull PFOF spread proxy)
+====================================================================================================
+  grid            n   excl   avgR(net)   avg fee$  tot cost$   avg gross$   sharpe   ann.drag%
+  0.5         70101   1924      0.0951      0.023      0.066         2.20     1.72         0.7
+  1           70115   1925      0.0922      0.023      0.113         2.16     1.68         1.2
+  2           70165   1926      0.0861      0.023      0.207         2.06     1.60         2.2
+  3           70191   1924      0.0807      0.023      0.292         1.98     1.54         3.1
+  5           70275   1923      0.0693      0.023      0.468         1.80     1.40         4.9
+  7.5         70370   1927      0.0553      0.023      0.686         1.58     1.23         7.2
+  10          70482   1933      0.0408      0.023      0.911         1.36     1.05         9.5
+
+====================================================================================================
+SWEEP 2: Execution friction as flat cents-per-share (odd-lot/whole-share reality)
+====================================================================================================
+  grid            n   excl   avgR(net)   avg fee$  tot cost$   avg gross$   sharpe   ann.drag%
+  0.00        70066   1924      0.0979      0.023      0.023         2.25     1.75         0.2
+  0.01        70066   1924      0.0870      0.023      0.214         2.06     1.60         2.2
+  0.02        70066   1924      0.0761      0.023      0.405         1.87     1.45         4.3
+  0.03        70066   1924      0.0652      0.023      0.596         1.67     1.30         6.3
+  0.05        70066   1924      0.0434      0.023      0.978         1.29     1.00        10.3
+
+====================================================================================================
+HURDLE RATE (break-even friction, net of SEC fee + FINRA TAF)
+====================================================================================================
+  bps-per-side model:   17.18 bps/side  (NOT reached within tested range (max grid 10 still avgR 0.0408) — extrapolated from the fitted slope)
+    equivalent at the panel's avg entry price ($143.87): $0.2471/share (24.71 cents/share)
+  cents-per-share model: $0.0898/share (8.98 cents/share)  (NOT reached within tested range (max grid 0.05 still avgR 0.0434) — extrapolated from the fitted slope)
+    equivalent at the panel's avg entry price ($143.87): 6.24 bps/side
+
+  CROSS-CHECK: the two independently-extrapolated hurdles convert to $0.2471/share (from bps) vs $0.0898/share (native) — a 2.8x gap.
+  INCONSISTENT — a flat cents-per-share cost and a proportional-bps cost only convert 1:1 through a single price if mr-down3's traded population is price-homogeneous in ATR%-of-price terms. It is not (S&P 500 spans single-digit-% to $1000+ names). Read each grid's OWN hurdle as the authoritative number for its own friction model; the cross-conversion is a sanity gut-check, not a reconciliation, and both figures involve extrapolating past the tested range (max tested 10 bps / 0.05 $/share).
+
+====================================================================================================
+SENSITIVITY CURVE (OLS slope, avgR vs grid value)
+====================================================================================================
+  bps model:   avgR = 0.0978 + (-0.00569) * bps_per_side
+  cents model: avgR = 0.0979 + (-1.0897) * cents_per_share
+
+====================================================================================================
+TURNOVER CONTEXT
+====================================================================================================
+  mean holding period: 6.95 days -> 52.5 round trips/year for one continuously-redeployed $500 slot
+  "ann.drag%" columns above are PROJECTED: (round trips/year) * (avg total cost $/trade at that grid point) / $500.
+  This assumes zero idle cash between signals, which is optimistic — a real slot waits for the next mr-down3 fire on ITS OWN symbol pool, not the next one anywhere in the panel.
+
+Done. This is a diagnostic: it establishes a hurdle rate, it does not approve or reject mr-down3.

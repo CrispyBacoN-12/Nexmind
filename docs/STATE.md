@@ -67,6 +67,30 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
+- **Pre-registered Probe #1: Webull cost realism measured for `mr-down3`. 2026-09-14 — a
+  DIAGNOSTIC, not a promotion gate.** `scripts/mr-down3-webull-cost-realism.mts` replaced the
+  two inherited slippage guesses with Webull's actual disclosed US-equities fee schedule (no
+  commission; SEC Section 31 fee $0.0000278/$ of sell-side dollar volume, min $0.01; FINRA TAF
+  $0.000166/sell-side share, min $0.01, max $8.30) at whole-share, $500/slot sizing, and swept
+  the one number that schedule does not cover — PFOF execution friction — on two independent
+  grids: bps-per-side [0.5..10] via the engine's own `slippageBps`, and flat cents-per-share
+  [0..0.05] applied by hand (not expressible via `CostModel`). Measured signal frequency: 48.0
+  signals/day across the modern panel, close to the ~40/day figure the probe was scoped against.
+  **avgR stayed positive across the entire tested range on both grids** — mr-down3 survives the
+  full disclosed Webull fee schedule plus friction up to 10bps/side or 5¢/share. The Hurdle Rate
+  (break-even friction) therefore had to be extrapolated from the fitted slope, not observed:
+  **17.18 bps/side** (bps model) vs **$0.0898/share = 8.98¢/share** (cents model) — the two
+  independently-extrapolated hurdles convert to a **2.8x disagreement** at the panel's avg entry
+  price ($143.87), because a flat per-share cost and a proportional-bps cost only convert 1:1
+  through one price if the traded population is homogeneous in ATR%-of-price terms, and the S&P
+  500 (single-digit-% to $1000+ names) is not. **Read each grid's own native hurdle, not the
+  cross-conversion.** Turnover drag (52.5 round trips/year for one continuously-redeployed $500
+  slot, mean hold 6.95 days) is small at low friction (~0.2-0.7%/year) but climbs to **~9.5-10.3%
+  of the slot per year** at the highest tested friction — not negligible, and not previously
+  measured at all. Sensitivity: avgR falls ~0.0057 per bp of friction, ~1.09R per $1/share
+  (~0.0109 per ¢/share). The `EQUITY_COST_MODEL` stopgap below (5bps) sits well inside the
+  surviving range on the bps grid. Log: `scripts/mr-down3-webull-cost-realism.log`.
+
 - **REGIME BREAK — the automated research pipeline now decides at 5bps slippage, not 0.5bps.
   2026-09-14.** `RESEARCH_COST_MODEL` (`runResearch.ts`) fed `sweepLadder` at all three of its
   call sites — the FIT ladder sweep, the SELECT approve/reject read, and the held-out blind
