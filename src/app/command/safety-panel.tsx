@@ -42,12 +42,13 @@ const TIMEFRAME_PRESETS: { label: string; interval: string; range: string }[] = 
   { label: "Swing · 1h / 3mo", interval: "1h", range: "3mo" },
   { label: "Position · 1d / 1y", interval: "1d", range: "1y" },
 ];
-interface Global { globalTradingHalt: boolean; fearGreed: { value: number; label: string } | null }
+interface Global { globalTradingHalt: boolean; fearGreed: { value: number; label: string } | null; riskSentryHoldings: string[] }
 
 export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; onChanged?: () => void }) {
   const [p, setP] = useState<Portfolio | null>(null);
   const [g, setG] = useState<Global | null>(null);
   const [busy, setBusy] = useState(false);
+  const [holdingsText, setHoldingsText] = useState("");
 
   const load = useCallback(async () => {
     const [list, glob] = await Promise.all([
@@ -56,6 +57,7 @@ export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; o
     ]);
     setP(list.find((x) => x.id === portfolioId) ?? null);
     setG(glob);
+    setHoldingsText(glob.riskSentryHoldings.join(", "));
   }, [portfolioId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -76,6 +78,19 @@ export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; o
       await fetch("/api/settings", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ globalTradingHalt: next }),
+      });
+      await load();
+      onChanged?.();
+    } finally { setBusy(false); }
+  }
+
+  async function saveHoldings() {
+    setBusy(true);
+    try {
+      const tickers = holdingsText.split(/[,\n]/).map((t) => t.trim()).filter(Boolean);
+      await fetch("/api/settings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ riskSentryHoldings: tickers }),
       });
       await load();
       onChanged?.();
@@ -195,6 +210,21 @@ export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; o
         <span className="text-xs text-(--color-muted)">Current drawdown</span>
         <span className="text-xs font-mono">{dd === "0.0" ? "0.0%" : `-${dd}%`}</span>
       </div>
+
+      <div className="mt-3">
+        <div className="text-xs text-(--color-muted) mb-1">Risk Sentry holdings (comma or newline separated)</div>
+        <textarea
+          value={holdingsText}
+          onChange={(e) => setHoldingsText(e.target.value)}
+          rows={2}
+          placeholder="AAPL, MSFT, NVDA"
+          className="w-full rounded-md border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-mono focus:outline-none focus:border-(--color-accent)/50"
+        />
+        <Button size="sm" variant="outline" disabled={busy} className="mt-2" onClick={saveHoldings}>
+          Save holdings
+        </Button>
+      </div>
+
       <div className="flex items-center justify-between gap-2 mt-3">
         <span className="text-xs text-(--color-muted)">Status: {p.status}</span>
         <Button size="sm" variant="outline" disabled={busy}
