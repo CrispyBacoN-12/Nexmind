@@ -26,7 +26,10 @@ test("assertDemoAccount passes on a demo account", async () => {
 });
 
 test("assertDemoAccount throws on a real account", async () => {
-  const bridge = await startFakeBridge({ account: { ...(await startFakeBridge()).state.account, trade_mode: "real" } });
+  const tempBridge = await startFakeBridge();
+  const account = { ...tempBridge.state.account, trade_mode: "real" };
+  await tempBridge.close();
+  const bridge = await startFakeBridge({ account });
   try {
     await withEnv(bridge, async () => {
       await assert.rejects(assertDemoAccount(), /refusing to trade a non-demo account/);
