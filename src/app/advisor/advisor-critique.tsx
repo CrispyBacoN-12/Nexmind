@@ -2,12 +2,15 @@
 
 // RAVEN's block on the advisor card.
 //
-// It is decoration on a card that is already complete: if the button is never
-// pressed, or the backend is down, everything above and below this block is
-// unchanged and still correct. Which is why it never runs on submit — the wait
-// is 10-40s behind a 3-way subprocess queue, and the card must render first.
+// It is decoration on a card that is already complete: if the fetch never
+// resolves, or the backend is down, everything above and below this block is
+// unchanged and still correct. It fires itself on mount rather than on the
+// advisor form's submit — the card (entry/stop/size/ladder) still renders
+// immediately, unblocked by RAVEN's 10-40s wait behind a 3-way subprocess
+// queue; RAVEN just starts that wait itself instead of waiting for a click.
+// The button stays for a manual re-run after a failure.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge, Button, Card, CardTitle } from "@/components/ui";
 import type { ChartBar } from "@/lib/advisor/chartSeries";
@@ -31,6 +34,9 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CritiqueResult | null>(null);
+  // Guards the auto-fire effect against React Strict Mode's dev-only double
+  // invoke, which would otherwise queue two subprocess calls per card.
+  const firedRef = useRef(false);
 
   async function run() {
     setLoading(true);
@@ -60,6 +66,15 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
     }
   }
 
+  // AdvisorCritique remounts (key = formEpoch) on every new card, so "on
+  // mount" already means "once per card" without watching card/chart here.
+  useEffect(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Card className="p-5 space-y-3">
       <CardTitle>RAVEN</CardTitle>
@@ -69,7 +84,7 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
 
       <div className="flex items-center gap-3">
         <Button type="button" onClick={run} disabled={loading}>
-          {loading ? "กำลังหา…" : "หาข้อโต้แย้ง"}
+          {loading ? "กำลังหา…" : "หาข้อโต้แย้งอีกครั้ง"}
         </Button>
         {loading ? <span className="text-xs text-(--color-muted)">อาจใช้เวลา 10-40 วินาที</span> : null}
       </div>
