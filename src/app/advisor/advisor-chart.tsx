@@ -66,8 +66,8 @@ interface Level {
 
 function levelsOf(card: AdvisorCard): Level[] {
   return [
-    { price: card.stop, color: STOP_COLOR, label: `Stop ${fmtMoney(card.stop)}` },
-    { price: card.entry, color: ENTRY_COLOR, label: `Entry ${fmtMoney(card.entry)}` },
+    { price: card.stop, color: STOP_COLOR, label: `จุดตัดขาดทุน ${fmtMoney(card.stop)}` },
+    { price: card.entry, color: ENTRY_COLOR, label: `ราคาเข้า ${fmtMoney(card.entry)}` },
     ...card.ladder.map((row) => ({
       price: row.price,
       color: TARGET_COLOR,
@@ -160,7 +160,7 @@ function BarTooltip({ active, payload }: { active?: boolean; payload?: { payload
         O {fmtMoney(row.o)} · H {fmtMoney(row.h)} · L {fmtMoney(row.l)} · C {fmtMoney(row.c)}
       </div>
       {row.v != null ? (
-        <div className="font-mono tabular-nums text-(--color-muted)">Vol {fmtNumber(row.v, 0)}</div>
+        <div className="font-mono tabular-nums text-(--color-muted)">ปริมาณ {fmtNumber(row.v, 0)}</div>
       ) : null}
       {row.sma50 != null ? (
         <div className="font-mono tabular-nums" style={{ color: SMA_FAST_COLOR }}>
@@ -354,7 +354,7 @@ export function AdvisorChart({
                 strokeOpacity={0.55}
                 strokeWidth={1}
                 label={{
-                  value: `Last close ${fmtMoney(card.lastClose)}`,
+                  value: `ราคาปิดล่าสุด ${fmtMoney(card.lastClose)}`,
                   position: "insideBottomRight",
                   fill: ENTRY_COLOR,
                   fontSize: 10,
@@ -389,18 +389,17 @@ export function AdvisorChart({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 pt-1">
-        <LegendChip color={ENTRY_COLOR}>Entry</LegendChip>
-        <LegendChip color={STOP_COLOR}>Stop · risk zone</LegendChip>
-        <LegendChip color={TARGET_COLOR}>R targets</LegendChip>
+        <LegendChip color={ENTRY_COLOR}>ราคาเข้า</LegendChip>
+        <LegendChip color={STOP_COLOR}>จุดตัดขาดทุน · โซนความเสี่ยง</LegendChip>
+        <LegendChip color={TARGET_COLOR}>เป้าหมาย R</LegendChip>
         <LegendChip color={SMA_FAST_COLOR}>SMA{CHART_SMA_FAST}</LegendChip>
         <LegendChip color={SMA_SLOW_COLOR}>SMA{CHART_SMA_SLOW}</LegendChip>
         <span className="text-xs text-(--color-muted)">
-          Levels are faded over history and solid where they apply. The filled dot is the entry, on
-          the last bar the card was computed from — {card.entrySource === "override"
-            ? "an override, so it sits off that bar's close, which is drawn hollow beside it"
-            : "the close of that bar"}
-          . Click a candle to use its close as the entry. The moving averages are reference, not
-          signal.
+          เส้นระดับจะจางลงในช่วงประวัติที่ผ่านมา และทึบขึ้นในช่วงที่นำไปใช้จริง จุดกลมทึบคือราคาเข้า
+          บนแท่งล่าสุดที่การ์ดนี้คำนวณจาก — {card.entrySource === "override"
+            ? "เป็นค่าที่กำหนดเอง จึงไม่ตรงกับราคาปิดของแท่งนั้น ซึ่งวาดเป็นวงกลมโปร่งอยู่ข้างกัน"
+            : "ราคาปิดของแท่งนั้น"}
+          {" "}คลิกที่แท่งเทียนเพื่อใช้ราคาปิดเป็นราคาเข้า เส้นค่าเฉลี่ยเคลื่อนที่เป็นข้อมูลอ้างอิง ไม่ใช่สัญญาณซื้อขาย
         </span>
       </div>
     </div>

@@ -18,8 +18,8 @@ import { AdvisorChart } from "./advisor-chart";
 import { AdvisorCritique } from "./advisor-critique";
 
 const CAP_LABEL: Record<string, string> = {
-  risk: "RISK BUDGET",
-  affordability: "AFFORDABILITY",
+  risk: "งบความเสี่ยง",
+  affordability: "กำลังซื้อ",
 };
 
 /**
@@ -121,7 +121,7 @@ export function AdvisorForm() {
               "use this ticker's last close", which is the right default for a
               ticker whose price has not been read yet. */}
           <Field
-            label="Ticker"
+            label="ชื่อหุ้น"
             value={ticker}
             onChange={(v) => {
               if (v !== ticker) {
@@ -135,7 +135,7 @@ export function AdvisorForm() {
           />
           <div>
             <Field
-              label="Entry (blank = last close)"
+              label="ราคาเข้า (เว้นว่าง = ราคาปิดล่าสุด)"
               value={entry}
               onChange={(v) => {
                 setEntry(v);
@@ -145,22 +145,22 @@ export function AdvisorForm() {
             />
             {pickedFrom ? (
               <p className="mt-1 text-xs text-(--color-accent)">
-                Taken from the {pickedFrom} candle. Read the structure again to size it.
+                ดึงมาจากแท่งเทียนวันที่ {pickedFrom} กด "อ่านโครงสร้าง" อีกครั้งเพื่อคำนวณขนาดใหม่
               </p>
             ) : null}
           </div>
-          <Field label="Capital ($)" value={capital} onChange={setCapital} />
-          <Field label="Max slots" value={maxSlots} onChange={setMaxSlots} />
-          <Field label="Risk per trade (%)" value={riskPct} onChange={setRiskPct} />
+          <Field label="เงินทุน ($)" value={capital} onChange={setCapital} />
+          <Field label="จำนวนช่องสูงสุด" value={maxSlots} onChange={setMaxSlots} />
+          <Field label="ความเสี่ยงต่อไม้ (%)" value={riskPct} onChange={setRiskPct} />
           <Field
-            label="Currently holding (comma separated)"
+            label="ถืออยู่ตอนนี้ (คั่นด้วยจุลภาค)"
             value={holdings}
             onChange={setHoldings}
             placeholder="MSFT, NVDA"
           />
           <div className="sm:col-span-3">
             <Button type="submit" disabled={loading}>
-              {loading ? "Reading…" : "Read the structure"}
+              {loading ? "กำลังอ่าน…" : "อ่านโครงสร้าง"}
             </Button>
           </div>
         </form>
@@ -168,7 +168,7 @@ export function AdvisorForm() {
 
       {error ? (
         <Card className="p-5 border-rose-500/40">
-          <CardTitle className="text-rose-400">Nothing to show</CardTitle>
+          <CardTitle className="text-rose-400">ไม่มีอะไรให้แสดง</CardTitle>
           <p className="text-sm mt-2">{error}</p>
         </Card>
       ) : null}
@@ -227,8 +227,8 @@ function ResultCard({
       {card.alreadyHeld ? (
         <Card className="p-4 border-amber-500/40">
           <p className="text-sm">
-            <Badge tone="warning">ALREADY HELD</Badge>{" "}
-            You listed {card.ticker} among your current holdings. Everything below sizes a NEW position on top of it.
+            <Badge tone="warning">ถืออยู่แล้ว</Badge>{" "}
+            คุณระบุว่าถือ {card.ticker} อยู่แล้ว ตัวเลขด้านล่างทั้งหมดคือการคำนวณขนาดของโพซิชันใหม่ที่จะเพิ่มเข้าไป
           </p>
         </Card>
       ) : null}
@@ -237,10 +237,10 @@ function ResultCard({
         <Card className="p-5 space-y-3">
           <div className="flex items-baseline justify-between">
             <CardTitle>
-              {card.ticker} · six months, with the levels on it
+              {card.ticker} · ย้อนหลังหกเดือน พร้อมระดับราคาสำคัญ
             </CardTitle>
             <span className="text-xs text-(--color-muted) font-mono">
-              SMA{CHART_SMA_SLOW} computed over two years
+              SMA{CHART_SMA_SLOW} คำนวณจากข้อมูลสองปี
             </span>
           </div>
           <AdvisorChart bars={chart} card={card} onPickEntry={onPickEntry} />
@@ -261,63 +261,63 @@ function ResultCard({
             argues about this exact string, and the owner has to be able to see
             what RAVEN is arguing about. */}
         <p className="text-xs text-(--color-muted)">
-          Next earnings: <span className="font-mono">{earningsPhrase(card.earnings, card.asOf)}</span>
+          ประกาศผลประกอบการครั้งถัดไป: <span className="font-mono">{earningsPhrase(card.earnings, card.asOf)}</span>
         </p>
         <div className="grid gap-4 sm:grid-cols-4">
-          <Stat label="Entry" value={fmtMoney(card.entry)} sub={card.entrySource} />
+          <Stat label="ราคาเข้า" value={fmtMoney(card.entry)} sub={card.entrySource} />
           <Stat
-            label={`Stop (${ADVISOR_ATR_SL_MULT} x ATR)`}
+            label={`จุดตัดขาดทุน (${ADVISOR_ATR_SL_MULT} เท่าของ ATR)`}
             value={fmtMoney(card.stop)}
-            sub={`${fmtMoney(card.slDistance)} away`}
+            sub={`ห่าง ${fmtMoney(card.slDistance)}`}
           />
           <Stat label={`ATR(${ADVISOR_ATR_PERIOD})`} value={fmtMoney(card.atr)} />
           <Stat
-            label="Cost of the round trip"
+            label="ต้นทุนการซื้อขายไป-กลับ"
             value={`${fmtNumber(card.costR, 3)} R`}
-            sub={`${ADVISOR_COST_BPS}bps assumption`}
+            sub={`สมมติฐาน ${ADVISOR_COST_BPS} bps`}
           />
         </div>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">Size</h2>
+        <h2 className="text-lg font-semibold tracking-tight">ขนาดโพซิชัน</h2>
         <div className="grid gap-4 sm:grid-cols-4">
-          <Stat label="Shares" value={fmtNumber(card.sizing.shares, 0)} />
+          <Stat label="จำนวนหุ้น" value={fmtNumber(card.sizing.shares, 0)} />
           <Stat
-            label="Capital deployed"
+            label="เงินทุนที่ใช้"
             value={fmtMoney(card.deployedUsd)}
-            sub={`slot budget ${fmtMoney(card.sizing.slotBudget)}`}
+            sub={`งบต่อช่อง ${fmtMoney(card.sizing.slotBudget)}`}
           />
           <Stat
-            label="Real risk"
+            label="ความเสี่ยงจริง"
             value={fmtMoney(card.sizing.actualRiskUsd)}
-            sub={`${fmtPct(card.sizing.actualRiskPct)} of capital`}
+            sub={`${fmtPct(card.sizing.actualRiskPct)} ของเงินทุน`}
           />
-          <Stat label="Bound by" value={card.sizing.boundBy.map((b) => CAP_LABEL[b] ?? b).join(" + ") || "—"} />
+          <Stat label="ถูกจำกัดโดย" value={card.sizing.boundBy.map((b) => CAP_LABEL[b] ?? b).join(" + ") || "—"} />
         </div>
         <Card className="p-5 space-y-2">
           <p className="text-sm text-(--color-muted)">{card.sizing.reason}</p>
           <p className="text-sm text-(--color-muted)">
-            With the desk&apos;s correlation rule (multiplier {fmtNumber(card.corrMultiplier, 2)}):{" "}
-            {fmtNumber(card.corrAdjustedShares, 0)} share(s). Reported, not applied — the number above is unadjusted.
+            ตามกฎสหสัมพันธ์ของเดสก์ (ตัวคูณ {fmtNumber(card.corrMultiplier, 2)}):{" "}
+            {fmtNumber(card.corrAdjustedShares, 0)} หุ้น เป็นการรายงานเท่านั้น ไม่ได้นำไปปรับใช้ — ตัวเลขด้านบนยังไม่ถูกปรับ
           </p>
         </Card>
       </section>
 
       <Card className="p-5 space-y-3">
-        <CardTitle>R ladder</CardTitle>
+        <CardTitle>บันได R</CardTitle>
         <p className="text-xs text-(--color-muted)">
-          The tool does not pick a target. Three exit geometries in this project disagree, and none survived a deep
-          hold-out.
+          เครื่องมือนี้ไม่ได้เลือกเป้าหมายให้ รูปแบบการออกทั้งสามแบบในโปรเจกต์นี้ให้ผลไม่ตรงกัน
+          และไม่มีแบบไหนผ่านการทดสอบ deep hold-out
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-(--color-muted) text-left">
               <tr>
                 <th className="py-1 pr-4">R</th>
-                <th className="py-1 pr-4">Price</th>
-                <th className="py-1 pr-4">Gain</th>
-                <th className="py-1">P/L on {fmtNumber(card.sizing.shares, 0)} share(s)</th>
+                <th className="py-1 pr-4">ราคา</th>
+                <th className="py-1 pr-4">กำไร</th>
+                <th className="py-1">กำไร-ขาดทุน จาก {fmtNumber(card.sizing.shares, 0)} หุ้น</th>
               </tr>
             </thead>
             <tbody className="font-mono">
@@ -335,37 +335,37 @@ function ResultCard({
       </Card>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold tracking-tight">Slots and market state</h2>
+        <h2 className="text-lg font-semibold tracking-tight">ช่องและสภาวะตลาด</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <Stat
-            label="Free slots"
+            label="ช่องว่าง"
             value={fmtNumber(card.freeSlots, 0)}
             sub={
               card.alreadyHeld
-                ? `${card.ticker} already holds one of your slots`
-                : `${card.ticker} would be one of them`
+                ? `${card.ticker} ครองช่องหนึ่งอยู่แล้ว`
+                : `${card.ticker} จะเป็นหนึ่งในนั้น`
             }
           />
           <Stat
-            label="Gate"
-            value={card.gate.benchAbove == null ? "BLIND" : card.gate.benchAbove ? "ABOVE TREND" : "BELOW TREND"}
-            sub={`${fmtNumber(card.gate.slots, 0)} slot(s) permitted`}
+            label="ประตูตลาด"
+            value={card.gate.benchAbove == null ? "มองไม่เห็น" : card.gate.benchAbove ? "เหนือแนวโน้ม" : "ต่ำกว่าแนวโน้ม"}
+            sub={`อนุญาต ${fmtNumber(card.gate.slots, 0)} ช่อง`}
           />
           <Stat
-            label="Avg correlation to holdings"
+            label="สหสัมพันธ์เฉลี่ยกับที่ถืออยู่"
             value={card.avgCorrelation == null ? "—" : fmtNumber(card.avgCorrelation, 2)}
           />
         </div>
         <Card className="p-5 space-y-2">
           <p className="text-sm text-(--color-muted)">{card.gate.note}</p>
           <p className="text-xs text-(--color-muted)">
-            This is information. The tool blocks nothing — the decision is yours.
+            นี่คือข้อมูลประกอบการตัดสินใจเท่านั้น เครื่องมือนี้ไม่ได้ปิดกั้นอะไร — การตัดสินใจเป็นของคุณ
           </p>
           {card.correlations.length > 0 ? (
             <ul className="text-sm space-y-1">
               {card.correlations.map((c) => (
                 <li key={c.ticker} className="font-mono">
-                  {c.ticker}: {c.correlation == null ? `unknown (${c.note})` : fmtNumber(c.correlation, 2)}
+                  {c.ticker}: {c.correlation == null ? `ไม่ทราบ (${c.note})` : fmtNumber(c.correlation, 2)}
                 </li>
               ))}
             </ul>
@@ -375,7 +375,7 @@ function ResultCard({
 
       {card.warnings.length > 0 ? (
         <Card className="p-5 space-y-2 border-amber-500/40">
-          <CardTitle>What went wrong but did not stop the card</CardTitle>
+          <CardTitle>สิ่งที่ผิดพลาดแต่ไม่ได้ทำให้การ์ดหยุดแสดงผล</CardTitle>
           <ul className="text-sm space-y-1 list-disc pl-5">
             {card.warnings.map((w) => (
               <li key={w}>{w}</li>

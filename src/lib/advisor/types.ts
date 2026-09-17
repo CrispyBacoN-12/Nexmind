@@ -11,9 +11,9 @@ import type { GateDecision } from "@/lib/market/marketGate";
 
 /** Printed on every card, verbatim. Do not soften it. */
 export const ADVISOR_NO_EDGE_CLAIM =
-  "This tool does not predict anything. It reports structure and risk for a " +
-  "ticker you chose. No rule in this project has survived its deep hold-out, " +
-  "so nothing here is a reason to buy.";
+  "เครื่องมือนี้ไม่ได้ทำนายอะไรทั้งสิ้น มันรายงานโครงสร้างและความเสี่ยงของหุ้นที่คุณเลือกเท่านั้น " +
+  "ไม่มีกฎเกณฑ์ใดในโปรเจกต์นี้ที่ผ่านการทดสอบ deep hold-out ได้ " +
+  "ดังนั้นสิ่งที่แสดงอยู่นี้จึงไม่ใช่เหตุผลให้ซื้อ";
 
 /** Round-trip cost assumption, in basis points. Webull charges no stock
  *  commission, so this is spread plus slippage, not fees. It is an assumption,

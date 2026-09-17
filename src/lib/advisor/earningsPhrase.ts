@@ -35,9 +35,9 @@ export function daysBetween(asOf: string, date: string): number | null {
 
 /** Finnhub's session tags, spelled out. An unrecognised tag is passed through. */
 const HOUR_LABEL: Record<string, string> = {
-  bmo: "before the open",
-  amc: "after the close",
-  dmh: "during the session",
+  bmo: "ก่อนตลาดเปิด",
+  amc: "หลังตลาดปิด",
+  dmh: "ระหว่างช่วงตลาด",
 };
 
 /**
@@ -50,13 +50,13 @@ const HOUR_LABEL: Record<string, string> = {
  * reassurance, which is the exact failure mode this project keeps catching.
  */
 export function earningsPhrase(earnings: EarningsInfo | null | undefined, asOf: string): string {
-  if (earnings == null) return "unknown — no earnings lookup was made for this card";
-  if (earnings.date == null) return `unknown — ${earnings.note ?? "no reason was recorded"}`;
+  if (earnings == null) return "ไม่ทราบ — การ์ดนี้ยังไม่ได้ค้นหาวันประกาศผลประกอบการ";
+  if (earnings.date == null) return `ไม่ทราบ — ${earnings.note ?? "ไม่ได้บันทึกเหตุผลไว้"}`;
 
   const when = earnings.hour ? ` ${HOUR_LABEL[earnings.hour] ?? earnings.hour}` : "";
   const days = daysBetween(asOf, earnings.date);
   if (days == null) return `${earnings.date}${when}`;
-  if (days < 0) return `${earnings.date}${when} — already reported, ${-days} calendar day(s) before the as-of date`;
-  if (days === 0) return `${earnings.date}${when} — the as-of date itself`;
-  return `${earnings.date}${when} — ${days} calendar day(s) after the as-of date`;
+  if (days < 0) return `${earnings.date}${when} — ประกาศไปแล้ว ${-days} วัน (นับตามปฏิทิน) ก่อนวันที่การ์ดนี้อ้างอิง`;
+  if (days === 0) return `${earnings.date}${when} — ตรงกับวันที่การ์ดนี้อ้างอิงพอดี`;
+  return `${earnings.date}${when} — อีก ${days} วัน (นับตามปฏิทิน) หลังจากวันที่การ์ดนี้อ้างอิง`;
 }
