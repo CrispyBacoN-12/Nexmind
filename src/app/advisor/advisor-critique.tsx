@@ -2,12 +2,15 @@
 
 // RAVEN's block on the advisor card.
 //
-// It is decoration on a card that is already complete: if the button is never
-// pressed, or the backend is down, everything above and below this block is
-// unchanged and still correct. Which is why it never runs on submit — the wait
-// is 10-40s behind a 3-way subprocess queue, and the card must render first.
+// It is decoration on a card that is already complete: if the fetch below
+// fails, or the backend is down, everything above this block is unchanged and
+// still correct. It runs automatically once per card (a mount-only effect) —
+// the parent remounts this component (key={critiqueKey}) on every new
+// submission or field edit, so a fresh card always gets a fresh critique
+// without a separate click. The wait is 10-40s behind a 3-way subprocess
+// queue; the card itself has already rendered by the time this starts.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge, Button, Card, CardTitle } from "@/components/ui";
 import type { ChartBar } from "@/lib/advisor/chartSeries";
@@ -22,9 +25,9 @@ const SEVERITY_TONE: Record<Severity, "neutral" | "info" | "warning"> = {
 };
 
 const SEVERITY_LABEL: Record<Severity, string> = {
-  note: "note",
-  concern: "concern",
-  serious: "serious",
+  note: "ข้อสังเกต",
+  concern: "ข้อกังวล",
+  serious: "ข้อกังวลร้ายแรง",
 };
 
 export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: ChartBar[] | null }) {
@@ -47,7 +50,7 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
       // otherwise surface to the owner as a JSON parse error.
       const json = (await res.json().catch(() => null)) as CritiqueResult | { ok: false; error: string } | null;
       if (json === null) {
-        setError(`The server answered HTTP ${res.status} with a response this page could not read.`);
+        setError(`เซิร์ฟเวอร์ตอบกลับ HTTP ${res.status} ด้วยข้อมูลที่หน้านี้อ่านไม่ได้`);
       } else if ("ok" in json && json.ok === false) {
         setError(json.error);
       } else {
@@ -60,6 +63,15 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
     }
   }
 
+  // Once per mount — i.e. once per new card, since the parent remounts this
+  // component on every submission or field edit. No dependency on card/chart:
+  // a change to either already produces a new mount via the key prop, so
+  // re-running from a dependency array would fire this twice for the same card.
+  useEffect(() => {
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Card className="p-5 space-y-3">
       <CardTitle>RAVEN</CardTitle>
@@ -67,14 +79,18 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
         RAVEN โต้แย้งได้อย่างเดียว — ไม่บอกให้ซื้อ ไม่บอกให้ขาย ไม่ให้คะแนน
       </p>
 
-      <div className="flex items-center gap-3">
-        <Button type="button" onClick={run} disabled={loading}>
-          {loading ? "กำลังหา…" : "หาข้อโต้แย้ง"}
-        </Button>
-        {loading ? <span className="text-xs text-(--color-muted)">อาจใช้เวลา 10-40 วินาที</span> : null}
-      </div>
+      {loading ? (
+        <p className="text-xs text-(--color-muted)">กำลังหาข้อโต้แย้ง… อาจใช้เวลา 10-40 วินาที</p>
+      ) : null}
 
-      {error ? <p className="text-sm text-rose-400">{error}</p> : null}
+      {error ? (
+        <div className="space-y-2">
+          <p className="text-sm text-rose-400">{error}</p>
+          <Button type="button" onClick={run} disabled={loading}>
+            ลองอีกครั้ง
+          </Button>
+        </div>
+      ) : null}
 
       {result ? <CritiqueBody result={result} /> : null}
     </Card>

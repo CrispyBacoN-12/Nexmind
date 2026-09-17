@@ -61,10 +61,17 @@ const SYSTEM =
   "answer; do not invent one to fill space. The next earnings date IS on the " +
   "card, under [head]: it is no longer a blind spot and must not be listed as " +
   "one. If that date is close to the entry, that is an objection and you must " +
-  "quote the date — name the risk, never the action. If the card says the date " +
-  "is unknown, THAT is a blind spot and worth saying. Also list what the card " +
-  "is blind to (news, sector-wide and peer moves, options positioning, the " +
-  "macro calendar) as short phrases. " +
+  "quote the date — name the risk, never the action. Fundamentals and recent " +
+  "company news ARE on the card too, under [fundamentals] and [news]: they are " +
+  "no longer blind spots either. When they are present, a stretched valuation, " +
+  "a weakening margin or growth trend, or a headline that changes the risk are " +
+  "all fair objections — quote the specific figure or headline, never a vague " +
+  "impression of the company. If either section says the data could not be " +
+  "fetched, note that as evidence rather than treating the absence as a clean " +
+  "bill of health. If the card says the earnings date is unknown, THAT is a " +
+  "blind spot and worth saying. Also list what the card is blind to " +
+  "(sector-wide and peer moves, options positioning, the macro calendar) as " +
+  "short phrases. " +
   'Return JSON {"objections":[{"claim","evidence","severity":"note"|"concern"|"serious"}],"blindSpots":[string]}.';
 
 /** The unvalidated shape the model may or may not have returned. */

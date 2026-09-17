@@ -23,6 +23,10 @@ import {
   ADVISOR_COST_BPS,
   type AdvisorCard,
 } from "@/lib/advisor/types";
+// Type-only: erased at compile time, so this stays true to "no market data" —
+// the caller fetches, this module only knows the shape of what it renders.
+import type { Fundamentals } from "@/lib/market/fundamentals";
+import type { RecentNews } from "@/lib/market/news";
 
 export type Severity = "note" | "concern" | "serious";
 
@@ -37,9 +41,10 @@ export interface Objection {
 export interface CritiqueResult {
   /** 0-4. Zero is a legitimate answer and is rendered as such. */
   objections: Objection[];
-  /** What the card cannot see at all: news, sector-wide moves, options
-   *  positioning, the macro calendar. Earnings came off this list on
-   *  2026-09-14 — the [head] block now carries the date. */
+  /** What the card cannot see at all: sector-wide moves, options positioning,
+   *  the macro calendar. Earnings came off this list on 2026-09-14 (the
+   *  [head] block carries the date); fundamentals and company news came off
+   *  on 2026-09-15 (the [fundamentals] and [news] blocks carry them). */
   blindSpots: string[];
   /** True when the AI backend was unavailable or the call failed. */
   degraded: boolean;
@@ -72,7 +77,12 @@ function yesNo(v: boolean | null): string {
   return v == null ? NA : v ? "yes" : "no";
 }
 
-export function renderCritiqueContext(card: AdvisorCard, chart: ChartBar[] | null): string {
+export function renderCritiqueContext(
+  card: AdvisorCard,
+  chart: ChartBar[] | null,
+  fundamentals?: Fundamentals | null,
+  news?: RecentNews | null,
+): string {
   const s = card.sizing;
   const atrPctOfEntry = card.entry > 0 ? (card.atr / card.entry) * 100 : null;
 
@@ -139,6 +149,12 @@ export function renderCritiqueContext(card: AdvisorCard, chart: ChartBar[] | nul
     "[position in range]",
     ...rangeBlock(card, chart),
     "",
+    "[fundamentals]",
+    ...fundamentalsBlock(fundamentals),
+    "",
+    "[news]",
+    ...newsBlock(news),
+    "",
     "[warnings]",
   );
 
@@ -200,6 +216,37 @@ function rangeBlock(card: AdvisorCard, chart: ChartBar[] | null): string[] {
     );
   }
   return out;
+}
+
+/**
+ * Three distinct states, never collapsed into one another: `undefined` means
+ * the caller did not fetch fundamentals at all (an old caller, or a route
+ * that chose to skip it); `note` set means the fetch ran and found nothing
+ * usable; otherwise every metric renders. Collapsing "not fetched" into "no
+ * data" would read to the model as a clean bill of health it was never given.
+ */
+function fundamentalsBlock(f: Fundamentals | null | undefined): string[] {
+  if (f == null) return ["not fetched for this critique"];
+  if (f.note) return [f.note];
+  return [
+    `name: ${f.name ?? NA} (${f.industry ?? NA})`,
+    `market cap: ${f.marketCapM == null ? NA : `$${f.marketCapM.toFixed(0)}M`}`,
+    `P/E (TTM): ${num(f.peTTM)}`,
+    `P/B: ${num(f.pb)}`,
+    `ROE: ${pct(f.roePct)}`,
+    `net margin: ${pct(f.netMarginPct)}`,
+    `revenue growth: ${pct(f.revenueGrowthPct)}`,
+    `EPS growth: ${pct(f.epsGrowthPct)}`,
+    `debt/equity: ${num(f.debtToEquity)}`,
+    `dividend yield: ${pct(f.dividendYieldPct)}`,
+  ];
+}
+
+/** Same three-state shape as fundamentalsBlock, for the same reason. */
+function newsBlock(n: RecentNews | null | undefined): string[] {
+  if (n == null) return ["not fetched for this critique"];
+  if (n.items.length === 0) return [n.note ?? "no recent company news"];
+  return n.items.map((it) => `${it.date} (${it.source}): ${it.headline}`);
 }
 
 // ---------------------------------------------------------------------------

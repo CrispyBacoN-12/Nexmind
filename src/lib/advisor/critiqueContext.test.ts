@@ -14,6 +14,8 @@ import assert from "node:assert/strict";
 import type { ChartBar } from "@/lib/advisor/chartSeries";
 import { guardObjections, renderCritiqueContext, type Objection } from "@/lib/advisor/critiqueContext";
 import { ADVISOR_NO_EDGE_CLAIM, type AdvisorCard } from "@/lib/advisor/types";
+import type { Fundamentals } from "@/lib/market/fundamentals";
+import type { RecentNews } from "@/lib/market/news";
 
 function makeCard(over: Partial<AdvisorCard> = {}): AdvisorCard {
   return {
@@ -180,12 +182,74 @@ test("the guard preserves order and mixes kept with stripped correctly", () => {
 
 test("renderCritiqueContext: the head block carries the earnings date the owner can see", () => {
   const s = renderCritiqueContext(makeCard({ earnings: { date: "2026-09-13", hour: "bmo" } }), null);
-  assert.match(s, /next earnings: 2026-09-13 before the open — 3 calendar day\(s\) after the as-of date/);
+  assert.match(s, /next earnings: 2026-09-13 ก่อนตลาดเปิด — อีก 3 วัน \(นับตามปฏิทิน\) หลังจากวันที่การ์ดนี้อ้างอิง/);
 });
 
 test("renderCritiqueContext: an unknown earnings date is printed, not omitted", () => {
   // Omitting the line would let the model read "no earnings risk here". The
   // whole reason the line exists is that its absence is a claim.
   const s = renderCritiqueContext(makeCard({ earnings: null }), null);
-  assert.match(s, /next earnings: unknown/);
+  assert.match(s, /next earnings: ไม่ทราบ/);
+});
+
+function makeFundamentals(over: Partial<Fundamentals> = {}): Fundamentals {
+  return {
+    name: "Apple Inc.",
+    industry: "Technology",
+    marketCapM: 3_450_000,
+    peTTM: 34.2,
+    pb: 45.1,
+    roePct: 145.3,
+    netMarginPct: 24.3,
+    revenueGrowthPct: 8.1,
+    epsGrowthPct: 10.2,
+    debtToEquity: 1.45,
+    dividendYieldPct: 0.45,
+    ...over,
+  };
+}
+
+test("the fundamentals section renders every metric when fundamentals were fetched", () => {
+  const text = renderCritiqueContext(makeCard(), null, makeFundamentals(), null);
+  assert.match(text, /\[fundamentals\]/);
+  assert.match(text, /name: Apple Inc\. \(Technology\)/);
+  assert.match(text, /market cap: \$3450000M/);
+  assert.match(text, /P\/E \(TTM\): 34\.20/);
+  assert.match(text, /ROE: 145\.30%/);
+  assert.match(text, /dividend yield: 0\.45%/);
+});
+
+test("the fundamentals section prints the note verbatim when the fetch found nothing usable", () => {
+  const f = makeFundamentals({ note: "FINNHUB_API_KEY not set" });
+  const text = renderCritiqueContext(makeCard(), null, f, null);
+  assert.match(text, /\[fundamentals\]\nFINNHUB_API_KEY not set/);
+});
+
+test("the fundamentals section says so, never vanishing, when the caller did not fetch it at all", () => {
+  const text = renderCritiqueContext(makeCard(), null);
+  assert.match(text, /\[fundamentals\]\nnot fetched for this critique/);
+});
+
+test("the news section lists each headline with its date and source", () => {
+  const news: RecentNews = {
+    items: [
+      { headline: "Apple unveils new chip", source: "Reuters", date: "2026-09-14", url: "https://example.com/a" },
+      { headline: "Supplier reports delay", source: "Bloomberg", date: "2026-09-12", url: "https://example.com/b" },
+    ],
+  };
+  const text = renderCritiqueContext(makeCard(), null, null, news);
+  assert.match(text, /\[news\]/);
+  assert.match(text, /2026-09-14 \(Reuters\): Apple unveils new chip/);
+  assert.match(text, /2026-09-12 \(Bloomberg\): Supplier reports delay/);
+});
+
+test("an empty news result prints its note, not a blank section", () => {
+  const news: RecentNews = { items: [], note: "no company news in the last 7 days" };
+  const text = renderCritiqueContext(makeCard(), null, null, news);
+  assert.match(text, /\[news\]\nno company news in the last 7 days/);
+});
+
+test("the news section says so, never vanishing, when the caller did not fetch it at all", () => {
+  const text = renderCritiqueContext(makeCard(), null);
+  assert.match(text, /\[news\]\nnot fetched for this critique/);
 });

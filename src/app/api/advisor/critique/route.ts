@@ -13,6 +13,8 @@ import type { ChartBar } from "@/lib/advisor/chartSeries";
 import { renderCritiqueContext } from "@/lib/advisor/critiqueContext";
 import type { AdvisorCard } from "@/lib/advisor/types";
 import { critiqueCard } from "@/lib/critic/advisorCritic";
+import { fetchFundamentals } from "@/lib/market/fundamentals";
+import { fetchRecentNews } from "@/lib/market/news";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,7 @@ export async function POST(req: Request) {
   if (typeof c.ticker !== "string" || c.ticker.trim() === "") {
     return Response.json({ ok: false, error: "card.ticker is required" }, { status: 400 });
   }
+  const ticker = c.ticker;
   if (typeof c.entry !== "number" || !Number.isFinite(c.entry)) {
     return Response.json({ ok: false, error: "card.entry must be a number" }, { status: 400 });
   }
@@ -57,13 +60,18 @@ export async function POST(req: Request) {
   // n/a and RAVEN loses one class of argument, not the response.
   const chart = Array.isArray(body.chart) ? (body.chart as ChartBar[]) : null;
 
+  // Both fail soft and never throw — a dead key or a rate limit costs RAVEN
+  // one argument, not the whole critique, the same contract the main advisor
+  // route already relies on for its own optional fetches.
+  const [fundamentals, news] = await Promise.all([fetchFundamentals(ticker), fetchRecentNews(ticker)]);
+
   // The checks above are a shape gate, not full validation: a card that clears
   // them can still be missing a nested field the renderer reads unguarded, and
   // that throws. Catch it here so a malformed card comes back as the 400 the
   // client knows how to read, never as a bare 500 with no body.
   let facts: string;
   try {
-    facts = renderCritiqueContext(card as AdvisorCard, chart);
+    facts = renderCritiqueContext(card as AdvisorCard, chart, fundamentals, news);
   } catch {
     return Response.json({ ok: false, error: "card shape is invalid" }, { status: 400 });
   }
