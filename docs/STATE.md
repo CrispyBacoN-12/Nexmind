@@ -72,23 +72,43 @@ Hard context the code does not state:
 | `Setting` rows | only `fearGreed` and `webull:accessToken` (expires **2026-09-14**). **No `ai:outage` row** — the spend limit predates the latch fix, so it was never recorded |
 | Market gate | **live and readable again** since 08-30: `SPY 769.35 > SMA200 707.41` (+8.8%) on Alpaca bars (§3) |
 | Scheduled tasks | all three (`Stocks scan` 05:00, `Manage positions` /15min, `Research round` Sun 06:00) now share the same power settings; next research fire **2026-09-06 06:00** |
-| Working tree | **dirty**, not clean: branch `stocks-only-pivot` at `859331a`, **52 commits ahead of `origin/stocks-only-pivot`, never pushed** — 16 tracked files touched (10 modified, 6 intent-to-add) plus 28 untracked, none of it yours to stash, clean, or check out over. `xauusd-mt5` was fast-forwarded into this branch on 09-11 and deleted |
-
-The load-bearing part is the owner's uncommitted 2026-09-05 deep-hold-out work —
-`docs/quant/2026-09-05-deep-holdout.md`, `scripts/deep-holdout.mts`, `scripts/cache-deep-history.mts`,
-`scripts/deep-holdout.log`, `src/lib/research/mechanisms.ts` — plus 96 uncommitted lines already in
-this file. `git stash`, `git clean -fd`, or `git checkout --` on any of it destroys real work.
+| Working tree | **clean**, as of 2026-09-17: branch `master` (renamed from `stocks-only-pivot`) at `fd2d76f`, **120 commits ahead of `origin/master`, never pushed**. The 88-file backlog this row used to describe is now 10 scoped commits plus the Risk Sentry merge (§3, 2026-09-17 entry) |
 
 Re-verify with a throwaway script under `scripts/` (delete it afterwards) querying
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 09-16)
+## 3. Done recently (2026-08-23 → 09-17)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
-- **Risk Sentry (Pillar 2) implemented — unattended daily risk-check cron, not yet merged.
-  2026-09-16.** Built per `docs/superpowers/plans/2026-09-16-risk-sentry.md`, the first
+- **Master's 88-file uncommitted backlog split into 10 commits; Risk Sentry merged;
+  gold-mt5-pipeline found fully superseded. 2026-09-17.** The owner's 2026-09-05 deep-hold-out
+  session had left `master` (formerly `stocks-only-pivot`) with 88 dirty files never
+  committed, spanning nine unrelated pieces of work: the AiCall cost ledger, the
+  scan-attempts-per-slot cap, the `maxBars` exit time-stop, the 1998-2016 deep hold-out
+  machinery, the broad-universe (1,173-symbol) weekly replication, the Webull cost-model
+  extraction, gold/XAUUSD pre-registration, advisor Thai localization, and advisor
+  fundamentals+news+RAVEN-auto-fire. Classified by content and committed as 10 scoped commits
+  (`b7ac7b0` through `0176cfd`), `npm test` holding at 773/773 throughout.
+  **Found along the way: master's own committed HEAD was broken** — the already-committed
+  gold pipeline code imported `fetchMt5Account`, `sendMt5Order`, and five more exports from
+  `src/lib/trading/mt5.ts` that did not exist. Fixed in `bb70cd8` (MT5 write-path + swap/
+  rollover cost model), caught only because commit-by-commit staging ran `tsc` between groups.
+  **Then merged `risk-sentry-implementation`** (`fd2d76f`, `--no-ff`): the one real conflict,
+  `src/app/advisor/advisor-critique.tsx`, was two independently-written RAVEN
+  auto-fire-on-mount effects; resolved by hand keeping both the branch's `firedRef` Strict
+  Mode double-invoke guard and its always-visible re-run button. 798/798 tests pass
+  post-merge (+25 from Risk Sentry's own suite), `npx tsc --noEmit` clean.
+  **Also confirmed `gold-mt5-pipeline`'s branch/worktree holds nothing not already on
+  `master`**: it is not an ancestor of `master` (`git merge-base --is-ancestor` false), and its
+  one distinguishing commit (`290b248`, "add Zod schemas...") is byte-identical to master's own
+  independently-authored `7b42e4f` of the same name — master re-did the same work under a fresh
+  SHA and then extended it much further (`3c67886`..`09d3bcb`). **Not deleted**: branch/worktree
+  removal needs the owner's own confirmation, not an automated one.
+
+- **Risk Sentry (Pillar 2) implemented and merged — unattended daily risk-check cron.
+  2026-09-16, merged 2026-09-17.** Built per `docs/superpowers/plans/2026-09-16-risk-sentry.md`, the first
   concrete piece of the Execution & Risk Copilot pivot beyond `/advisor` itself: three
   read-only checks (earnings proximity, market-gate flip, pairwise holdings correlation)
   run daily against owner-configured holdings and post one consolidated Discord alert. Pure
@@ -99,12 +119,9 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   `riskSentry:lastGate`) — no new table. A holdings editor was added to the safety panel
   (`src/app/command/safety-panel.tsx`) so the owner can maintain the list from the UI instead
   of touching the database directly. All 9 plan tasks complete, built TDD, 642/642 tests
-  pass. **Lives on branch `risk-sentry-implementation`** (forked from `stocks-only-pivot` at
-  `cd60fbc`, worktree `.worktrees/risk-sentry`) — **deliberately not yet merged**:
-  `stocks-only-pivot`'s working tree (§2) carries the owner's uncommitted 2026-09-05
-  deep-hold-out work, and merging was deferred rather than risk that uncommitted work during
-  an automated branch switch. Next: merge (or PR) once that uncommitted quant work on the
-  base branch is committed or otherwise set aside.
+  pass. **Merged into `master` 2026-09-17** (`fd2d76f`, see above) once the base branch's
+  uncommitted quant work was safely committed; branch `risk-sentry-implementation` and
+  worktree `.worktrees/risk-sentry` are now safe to remove.
 
 - **Project pivot: NEXMIND is now an Execution & Risk Copilot, not an alpha-seeking desk.
   2026-09-15.** After three non-price data classes (earnings timing, insider transactions,
