@@ -68,6 +68,26 @@ export async function getDrawdownHaltPct(portfolioId: number): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : 10;
 }
 
+/** How many candidates a universe scan may put through the analysts per free
+ *  slot. The scan stops spending model calls once it has tried this many times
+ *  the number of slots it started with.
+ *
+ *  Exists because `slots` only decrements on an *executed* trade, so a scan
+ *  that fills nothing analyses every setup the rule produced. A typical round
+ *  is "18 setups / 79 fetched, 2 slot(s) free": 18 candidates x 3-4 model calls
+ *  for at most 2 fills. Over 115 recorded candidates the desk executed zero, so
+ *  the tail of that list has never once bought a trade.
+ *
+ *  0 disables the cap and restores the pre-2026-09-14 behaviour exactly.
+ *  CHANGING THIS CHANGES THE POPULATION: with a cap, Counterfactual rows are
+ *  the top-N by ADX, not every setup the rule accepted, and rows either side of
+ *  the change are not the same sample. Read `scanAttemptsPerSlot` before
+ *  pooling any run that crosses it. */
+export async function getScanAttemptsPerSlot(): Promise<number> {
+  const n = Number(await getSetting("scanAttemptsPerSlot", "4"));
+  return Number.isFinite(n) && n >= 0 ? n : 4;
+}
+
 /** Manual global emergency brake — blocks new entries across every portfolio. */
 export async function isGlobalTradingHalt(): Promise<boolean> {
   return (await getSetting("globalTradingHalt", "false")) === "true";

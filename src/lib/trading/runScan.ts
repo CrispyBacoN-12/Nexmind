@@ -12,7 +12,7 @@ import { fetchCandles, fetchCandlesBatch } from "@/lib/marketData";
 import { adx } from "@/lib/indicators";
 import { getWatchlist } from "@/lib/trading/watchlist";
 import { UNIVERSES, prepareSymbols } from "@/lib/trading/universe";
-import { getScanTimeframe, getPortfolioStrategy, getPortfolioUniverse, isGlobalTradingHalt, getDrawdownHaltPct, getSetting, setSetting } from "@/lib/settings";
+import { getScanTimeframe, getPortfolioStrategy, getPortfolioUniverse, isGlobalTradingHalt, getDrawdownHaltPct, getScanAttemptsPerSlot, getSetting, setSetting } from "@/lib/settings";
 import { isSwingKind, canPortfolioTrade } from "@/lib/portfolioGuards";
 import { SECONDARY_PASSES } from "@/lib/trading/secondaryPasses";
 import { getCurrentDrawdownPct } from "@/lib/trading/circuitBreaker";
@@ -107,18 +107,35 @@ async function scanUniverse(p: Portfolio, tf: TF, universeKey: string, log: (m: 
   // hands them to the same alphabetical head every week (AAPL, ABBV, ACN, ...),
   // which is not a neutral sample of the rule — it is a five-name portfolio.
   // Strongest trend first is at least a property of the setup rather than of the
-  // ticker's spelling. It is a tie-break among setups the rule already accepted,
-  // NOT a filter: it cannot remove a trade, only reorder who is served first.
-  // Untested as a ranking — worth its own sweep before anyone trusts it.
+  // ticker's spelling. Untested as a ranking — worth its own sweep before anyone
+  // trusts it, and as of the analyst budget below that sweep matters: this used
+  // to be a pure tie-break that could only reorder who was served first, and it
+  // is now the cut line.
   candidates.sort((a, b) => b.adx - a.adx);
+
+  // How far down that list the scan is willing to pay. `slots` only decrements
+  // on an *executed* trade, so without this the loop analyses every candidate
+  // whenever the desk fills nothing — 18 setups x 3-4 model calls to fill at
+  // most 2. The budget is spent in ADX order, which makes the ranking above
+  // load-bearing for the first time: it is no longer only "who is served
+  // first", it now decides who is seen at all. See getScanAttemptsPerSlot for
+  // what that does to the research population, and set it to 0 to turn the cap
+  // off entirely.
+  const perSlot = await getScanAttemptsPerSlot();
+  const budget = perSlot > 0 ? slots * perSlot : Infinity;
   log(
     `#${p.id} ${p.name} universe=${universeKey}: ${candidates.length} setups / ${candleMap.size} fetched, ${slots} slot(s) free` +
-      (shortsSuppressed ? ` (${shortsSuppressed} short setup(s) suppressed — gate is long only)` : ""),
+      (shortsSuppressed ? ` (${shortsSuppressed} short setup(s) suppressed — gate is long only)` : "") +
+      (budget < candidates.length ? ` — analysing the top ${budget} by ADX (${perSlot}/slot)` : ""),
   );
 
   for (const [n, c] of candidates.entries()) {
     if (slots <= 0) {
       log(`#${p.id} ${p.name} position cap ${p.maxOpenPositions} reached — ${candidates.length - n} setup(s) left unspent`);
+      break;
+    }
+    if (n >= budget) {
+      log(`#${p.id} ${p.name} analyst budget ${budget} spent — ${candidates.length - n} setup(s) left unanalysed`);
       break;
     }
     try {
