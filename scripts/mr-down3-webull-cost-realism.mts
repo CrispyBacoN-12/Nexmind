@@ -82,7 +82,11 @@ import { loadPanel, FOLDS, type FoldName } from "@/lib/research/panel";
 import { sliceFold, withSignals, simulateFold, type PreparedSymbol, type PanelExit, type FoldRun } from "@/lib/research/panelRun";
 import { computeEntrySignals, type CostModel } from "@/lib/backtest/engine";
 import { LADDERS, mechanismByKey } from "@/lib/research/mechanisms";
-import { computeStats, type ClosedTrade } from "@/lib/trading/stats";
+import { computeStats } from "@/lib/trading/stats";
+import {
+  SEC_FEE_RATE, SEC_FEE_MIN, FINRA_TAF_RATE, FINRA_TAF_MIN, FINRA_TAF_MAX,
+  priceWholeShareTrade, type RawTrade, type WholeShareTrade,
+} from "@/lib/research/webullCosts";
 
 const MECH = mechanismByKey("mr-down3");
 const ALL_FOLDS: FoldName[] = ["fit", "select", "test1", "test2", "test3"];
@@ -92,13 +96,6 @@ const SLOT_USD = 500;
 const BPS_GRID = [0.5, 1.0, 2.0, 3.0, 5.0, 7.5, 10.0];
 const CENTS_GRID = [0.0, 0.01, 0.02, 0.03, 0.05];
 
-// Webull US-equities disclosed fee schedule. Not swept — these are not unknowns.
-const SEC_FEE_RATE = 0.0000278; // per $ of sell-side dollar volume
-const SEC_FEE_MIN = 0.01;
-const FINRA_TAF_RATE = 0.000166; // per sell-side share
-const FINRA_TAF_MIN = 0.01;
-const FINRA_TAF_MAX = 8.30;
-
 const EXIT_GEOM: Pick<PanelExit, "tp1Mult" | "slMult" | "singleTarget" | "entryAt"> = {
   tp1Mult: LADDERS.flat.tp1Mult,
   slMult: LADDERS.flat.slMult,
@@ -106,63 +103,23 @@ const EXIT_GEOM: Pick<PanelExit, "tp1Mult" | "slMult" | "singleTarget" | "entryA
   entryAt: "close",
 };
 
-interface RawTrade {
-  entry: number;
-  exit: number;
-  sl: number;
-  openedAt: Date;
-  closedAt: Date;
-}
-
-interface PricedTrade extends ClosedTrade {
-  shares: number;
-  grossUsd: number;
-  feesUsd: number;
-  netUsd: number;
-  holdingDays: number;
-}
-
-function secFee(sellDollarVol: number): number {
-  return Math.max(SEC_FEE_MIN, sellDollarVol * SEC_FEE_RATE);
-}
-function finraTaf(shares: number): number {
-  return Math.min(FINRA_TAF_MAX, Math.max(FINRA_TAF_MIN, shares * FINRA_TAF_RATE));
-}
+type PricedTrade = WholeShareTrade;
 
 /** Extract the fields this probe needs, asserting the long-only invariant mechanisms.ts documents. */
 function toRawTrades(run: FoldRun): RawTrade[] {
   return run.trades.map((t) => {
     if (t.side !== "long") throw new Error(`mr-down3 produced a ${t.side} trade — mechanisms.ts says long-only, re-check before trusting this probe`);
-    return { entry: t.entry, exit: t.exit, sl: t.sl, openedAt: t.openedAt, closedAt: t.closedAt };
+    return { side: t.side, entry: t.entry, exit: t.exit, sl: t.sl, openedAt: t.openedAt, closedAt: t.closedAt };
   });
 }
 
 /**
  * Whole-share, $500-notional economics for one trade under one friction model.
- * `entryFill`/`exitFill` already have the swept friction baked in; `raw` supplies
- * the ATR-based stop distance (entry - sl), which is invariant to friction — a
- * PFOF fill shifts the price level, not the ATR multiple the stop is placed at.
- * Returns null when $500 cannot buy even one whole share (excluded, not zeroed).
+ * `entryFill`/`exitFill` already have the swept friction baked in. Thin wrapper
+ * over webullCosts.ts's side-aware pricer, at this probe's own fixed slot size.
  */
 function priceTrade(raw: RawTrade, entryFill: number, exitFill: number): PricedTrade | null {
-  const shares = Math.floor(SLOT_USD / raw.entry);
-  if (shares < 1) return null;
-
-  const grossUsd = (exitFill - entryFill) * shares; // long only: favorable move = exit - entry
-  const sellDollarVol = exitFill * shares; // long-only: the sell leg is always the exit
-  const feesUsd = secFee(sellDollarVol) + finraTaf(shares);
-  const netUsd = grossUsd - feesUsd;
-
-  const riskPerShare = raw.entry - raw.sl; // slMult * ATR, invariant to friction
-  const riskUsd = riskPerShare * shares;
-  const rMultiple = riskUsd > 0 ? netUsd / riskUsd : null;
-
-  const holdingDays = (raw.closedAt.getTime() - raw.openedAt.getTime()) / 86_400_000;
-
-  return {
-    shares, grossUsd, feesUsd, netUsd, holdingDays,
-    pnl: netUsd, rMultiple, outcome: netUsd > 0 ? "win" : netUsd < 0 ? "loss" : "breakeven", closedAt: raw.closedAt,
-  };
+  return priceWholeShareTrade(raw, SLOT_USD, entryFill, exitFill);
 }
 
 interface GridRow {
