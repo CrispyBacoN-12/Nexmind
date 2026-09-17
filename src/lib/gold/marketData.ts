@@ -63,7 +63,7 @@ export const DEFAULT_WEEKLY_CLOSURE: MarketClosureWindow = {
     const dow = d.getUTCDay();
     const hour = d.getUTCHours();
     if (dow === 6) return true;
-    if (dow === 0 && hour < 21) return true;
+    if (dow === 0 && hour < 22) return true;
     if (dow === 5 && hour >= 21) return true;
     return false;
   },
