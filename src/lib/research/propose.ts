@@ -70,6 +70,7 @@ export async function proposeCandidates(
 
   const { data, costUsd } = await callAgentJSON<{ candidates: Candidate[] }>({
     tier: "sonnet",
+    label: "research:candidates",
     system: STRATEGY_CODE_RULES,
     prompt: candidatesPrompt({ brief, symbol, interval, angles }),
     jsonSchema: CANDIDATES_SCHEMA,
@@ -111,6 +112,7 @@ export async function refineCandidate(
 
   const { data, costUsd } = await callAgentJSON<{ code: string; note: string }>({
     tier: "sonnet",
+    label: "research:refine",
     system: STRATEGY_CODE_RULES,
     prompt: `Your previous strategy code:\n${code}\n\nBacktest result: ${JSON.stringify(summary)}\n\nCritique the result and revise the code to improve it (e.g. fewer losing trades, better expectancy). Keep the same overall angle. Return the full revised code body and a short note on what you changed.`,
     jsonSchema: REFINE_SCHEMA,
@@ -127,6 +129,7 @@ export async function fixUnsafeCode(
 
   const { data, costUsd } = await callAgentJSON<{ code: string; note: string }>({
     tier: "sonnet",
+    label: "research:unflag",
     system: STRATEGY_CODE_RULES,
     prompt: `Your strategy code was rejected by the sandbox's safety scan for using: ${flaggedConstructs.join(", ")}.\n\nCode:\n${code}\n\nRewrite it to accomplish the same trading idea WITHOUT any of the flagged constructs. Return the full revised code body.`,
     jsonSchema: REFINE_SCHEMA,

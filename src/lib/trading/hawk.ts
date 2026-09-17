@@ -142,6 +142,7 @@ export async function runHawk(
     personasFor(strategyFamily(opts.strategyKey)).map((persona) =>
       callAgentJSON<{ vote: HawkVote["vote"]; confidence: number; reason: string }>({
         tier: opts.tier ?? "sonnet",
+        label: `hawk:${persona}`,
         system: SYSTEM[persona],
         prompt: buildPrompt(facts, persona),
         maxTokens: MAX_VOTE_TOKENS,

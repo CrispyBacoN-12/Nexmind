@@ -40,6 +40,7 @@ export async function generateLesson(trade: Trade, close: LessonInput): Promise<
 
   const r = await callAgentJSON<{ lesson: string }>({
     tier: "haiku",
+    label: "memo",
     system: SYSTEM,
     prompt: buildPrompt(trade, close),
     maxTokens: 200,

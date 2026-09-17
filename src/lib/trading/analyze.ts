@@ -104,7 +104,7 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
       const results = await Promise.all(
         PERSONAS.map((p) =>
           callAgentJSON<{ view: View; confidence: number; reason: string }>({
-            tier: "sonnet", system: p.system, prompt: `${facts}\n\n${personaLens(p.persona)}\n\n${task}`,
+            tier: "sonnet", label: `analyze:${p.persona}`, system: p.system, prompt: `${facts}\n\n${personaLens(p.persona)}\n\n${task}`,
             maxTokens: 250, jsonSchema: VIEW_SCHEMA,
           }).then((r) => ({ ...r, persona: p.persona })),
         ),
@@ -114,6 +114,7 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
 
       const summaryRes = await callAgent({
         tier: "sonnet",
+        label: "analyze:summary",
         system: "You are HAWK, lead market analyst. Synthesize the team's reads into a clear 3-4 sentence verdict for a trader. No fluff.",
         prompt: `${symbol}. ${snapshotLine(s)}.\n${fundLine}\nAnalyst reads: ${views.map((v) => `${v.persona}=${v.view}(${v.reason})`).join("; ")}.${newsDigest ? ` Intel: ${newsDigest}.` : ""}\nWrite the verdict.`,
         maxTokens: 350,
@@ -123,6 +124,7 @@ export async function analyzeSymbol(symbol: string): Promise<AnalysisResult> {
 
       const riskRes = await callAgentJSON<{ note: string; sl?: number; tp?: number }>({
         tier: "opus",
+        label: "analyze:risk",
         system: "You are SAGE, head of risk. Give a one-to-two sentence risk read for this symbol and a sensible protective stop and first target if someone took the majority-bias trade. JSON {note, sl, tp}.",
         prompt: `${symbol}. ${snapshotLine(s)}. Majority bias: ${majority(views)}. ATR ${fmt(atr)}.`,
         maxTokens: 300, jsonSchema: RISK_SCHEMA,

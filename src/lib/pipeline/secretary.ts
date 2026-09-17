@@ -34,6 +34,7 @@ async function planSteps(command: string): Promise<{ steps: PlannedStep[]; costU
 
   const r = await callAgentJSON<{ steps: PlannedStep[] }>({
     tier: "opus",
+    label: "secretary:plan",
     system:
       "You are ARIA, the Grand Secretary of an AI guild. Given the user's command, produce an ordered " +
       "pipeline of 1–4 steps, each assigned to the single best-suited agent by codename. Pick agents only " +
@@ -54,6 +55,7 @@ async function runStep(agent: AgentDef, task: string, context: string): Promise<
   }
   const r = await callAgent({
     tier: agent.modelTier,
+    label: `secretary:${agent.codename}`,
     system: `You are ${agent.codename} (${agent.name}), ${agent.role} on the ${agent.team} team.${agent.motto ? " Motto: " + agent.motto : ""} Execute the task concisely and concretely; output only your work product.`,
     prompt: context ? `${task}\n\nContext from earlier steps:\n${context}` : task,
     maxTokens: 1200,
@@ -110,6 +112,7 @@ async function summarize(command: string, context: string): Promise<{ text: stri
   if (!aiEnabled()) return { text: `[mock] ARIA summary: ran the pipeline for "${command}". All steps completed.`, costUsd: 0 };
   const r = await callAgent({
     tier: "sonnet",
+    label: "secretary:summary",
     system: "You are ARIA, the Grand Secretary. Summarize what the team accomplished for the user in 3-5 sentences, plainly.",
     prompt: `User command: "${command}"\n\nWork produced:\n${context}\n\nWrite the summary.`,
     maxTokens: 500,

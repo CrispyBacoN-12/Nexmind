@@ -66,7 +66,8 @@ export const ModelName = {
   ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
   Setting: 'Setting',
-  ScanLog: 'ScanLog'
+  ScanLog: 'ScanLog',
+  AiCall: 'AiCall'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -362,6 +363,24 @@ export const ScanLogScalarFieldEnum = {
 } as const
 
 export type ScanLogScalarFieldEnum = (typeof ScanLogScalarFieldEnum)[keyof typeof ScanLogScalarFieldEnum]
+
+
+export const AiCallScalarFieldEnum = {
+  id: 'id',
+  label: 'label',
+  tier: 'tier',
+  backend: 'backend',
+  inputTokens: 'inputTokens',
+  outputTokens: 'outputTokens',
+  cacheCreateTokens: 'cacheCreateTokens',
+  cacheReadTokens: 'cacheReadTokens',
+  costUsd: 'costUsd',
+  reportedCostUsd: 'reportedCostUsd',
+  durationMs: 'durationMs',
+  createdAt: 'createdAt'
+} as const
+
+export type AiCallScalarFieldEnum = (typeof AiCallScalarFieldEnum)[keyof typeof AiCallScalarFieldEnum]
 
 
 export const SortOrder = {

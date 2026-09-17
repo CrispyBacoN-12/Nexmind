@@ -92,5 +92,10 @@ backup-*.json
 # scheduled research-round log (same category as scripts/scan.log above)
 scripts/research-round.log
 
+# desk-session and MT5 bridge process logs (same category: operational, not source)
+scripts/session.log
+mt5-bridge/bridge.out.log
+mt5-bridge/bridge.err.log
+
 # SDD scratch workspace (ledger, task briefs, reports, review packages)
 .superpowers/

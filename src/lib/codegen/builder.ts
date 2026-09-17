@@ -56,6 +56,7 @@ export async function proposeBuild(request: string): Promise<BuildProposal> {
 
   const r = await callAgentJSON<{ files: ProposedFile[]; notes: string }>({
     tier: "sonnet",
+    label: "codegen",
     system: SYSTEM,
     prompt: `Build request: "${request}"\nProduce the file(s). Prefer one focused page or component.`,
     maxTokens: 4000,

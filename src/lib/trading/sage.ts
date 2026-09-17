@@ -56,6 +56,7 @@ export async function runSage(
 
   const r = await callAgentJSON<{ approved: boolean; reason: string; sl?: number; tp1?: number }>({
     tier: "opus", // risk gets the most capable model
+    label: "sage",
     system: SYSTEM,
     prompt,
     maxTokens: 400,

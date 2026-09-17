@@ -399,7 +399,8 @@ export const ModelName = {
   ResearchStrategy: 'ResearchStrategy',
   Report: 'Report',
   Setting: 'Setting',
-  ScanLog: 'ScanLog'
+  ScanLog: 'ScanLog',
+  AiCall: 'AiCall'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -415,7 +416,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "aiCall"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1603,6 +1604,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AiCall: {
+      payload: Prisma.$AiCallPayload<ExtArgs>
+      fields: Prisma.AiCallFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AiCallFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AiCallFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>
+        }
+        findFirst: {
+          args: Prisma.AiCallFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AiCallFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>
+        }
+        findMany: {
+          args: Prisma.AiCallFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>[]
+        }
+        create: {
+          args: Prisma.AiCallCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>
+        }
+        createMany: {
+          args: Prisma.AiCallCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AiCallCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>[]
+        }
+        delete: {
+          args: Prisma.AiCallDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>
+        }
+        update: {
+          args: Prisma.AiCallUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>
+        }
+        deleteMany: {
+          args: Prisma.AiCallDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AiCallUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AiCallUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>[]
+        }
+        upsert: {
+          args: Prisma.AiCallUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AiCallPayload>
+        }
+        aggregate: {
+          args: Prisma.AiCallAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAiCall>
+        }
+        groupBy: {
+          args: Prisma.AiCallGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AiCallGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AiCallCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AiCallCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1921,6 +1996,24 @@ export const ScanLogScalarFieldEnum = {
 export type ScanLogScalarFieldEnum = (typeof ScanLogScalarFieldEnum)[keyof typeof ScanLogScalarFieldEnum]
 
 
+export const AiCallScalarFieldEnum = {
+  id: 'id',
+  label: 'label',
+  tier: 'tier',
+  backend: 'backend',
+  inputTokens: 'inputTokens',
+  outputTokens: 'outputTokens',
+  cacheCreateTokens: 'cacheCreateTokens',
+  cacheReadTokens: 'cacheReadTokens',
+  costUsd: 'costUsd',
+  reportedCostUsd: 'reportedCostUsd',
+  durationMs: 'durationMs',
+  createdAt: 'createdAt'
+} as const
+
+export type AiCallScalarFieldEnum = (typeof AiCallScalarFieldEnum)[keyof typeof AiCallScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2139,6 +2232,7 @@ export type GlobalOmitConfig = {
   report?: Prisma.ReportOmit
   setting?: Prisma.SettingOmit
   scanLog?: Prisma.ScanLogOmit
+  aiCall?: Prisma.AiCallOmit
 }
 
 /* Types for Logging */

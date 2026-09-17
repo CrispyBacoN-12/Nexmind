@@ -109,3 +109,24 @@ export type Setting = Prisma.SettingModel
  * or with the deployed web app that renders the Activity page.
  */
 export type ScanLog = Prisma.ScanLogModel
+/**
+ * Model AiCall
+ * One row per model call, written by lib/anthropic.ts on both backends.
+ * 
+ * Exists because the token counts were being computed and then dropped: no
+ * caller reads AgentResult.inputTokens, and no desk table (Signal, Trade,
+ * Counterfactual) carries a cost column. "What does a scan round cost?" was
+ * only answerable by spawning fresh probe calls and paying for them again.
+ * 
+ * Two cost columns, because on subscription (CLI) auth they mean different
+ * things. `costUsd` is money actually billed — 0 on the CLI, which draws on
+ * the plan quota instead. `reportedCostUsd` is what the backend says the call
+ * was worth at list price; on the CLI that is its `total_cost_usd`, which is
+ * the only signal of quota burn we get.
+ * 
+ * Cache tokens are split out rather than folded into inputTokens. They are
+ * ~99.9% of the real input on the CLI path (a ~6.1k-token fixed prefix per
+ * call) and they price differently from fresh input, so summing them would
+ * hide the one number that actually drives the bill.
+ */
+export type AiCall = Prisma.AiCallModel

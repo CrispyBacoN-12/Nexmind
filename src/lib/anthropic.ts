@@ -133,6 +133,36 @@ function persistOutage(reason: string | null): void {
   })().catch(() => {});
 }
 
+// Same lazy-import, fire-and-forget shape as persistOutage above, for the same
+// reason: this module sits on the import graph of pure-logic units whose tests
+// run with no DATABASE_URL. Losing a telemetry row must never fail the call it
+// was measuring — an unwritable ledger is a worse outcome than a missing row,
+// but a failed trade decision is worse than both.
+function recordAiCall(
+  backend: AiBackend,
+  label: string | undefined,
+  durationMs: number,
+  r: Omit<AgentResult, "text" | "model">,
+): void {
+  void (async () => {
+    const { prisma } = await import("@/lib/db");
+    await prisma.aiCall.create({
+      data: {
+        label: label ?? null,
+        tier: r.tier,
+        backend,
+        inputTokens: r.inputTokens,
+        outputTokens: r.outputTokens,
+        cacheCreateTokens: r.cacheCreateTokens,
+        cacheReadTokens: r.cacheReadTokens,
+        costUsd: r.costUsd,
+        reportedCostUsd: r.reportedCostUsd,
+        durationMs,
+      },
+    });
+  })().catch(() => {});
+}
+
 /** Classify a backend failure: latch the fatal ones, pass the rest through. */
 function backendFailure(detail: string, source: "cli" | "api"): Error {
   const label = source === "cli" ? "claude CLI" : "anthropic api";
@@ -197,7 +227,15 @@ interface CliResult {
   result?: string;
   is_error?: boolean;
   total_cost_usd?: number;
-  usage?: { input_tokens?: number; output_tokens?: number };
+  // The two cache fields carry ~99.9% of the real input on this path — a probe
+  // measuring 8,029 total input tokens reports input_tokens: 2. Leaving them
+  // off the type meant every CLI call was recorded as costing nothing.
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
 }
 
 /**
@@ -250,6 +288,7 @@ async function callAgentCli(opts: CallOptions): Promise<AgentResult> {
   ].join("");
 
   await cliAcquire();
+  const startedAt = Date.now();
   try {
     const raw = await new Promise<string>((resolve, reject) => {
       const child = spawn(`claude -p --output-format json --model ${tier} ${CLI_ISOLATION}`, {
@@ -283,15 +322,18 @@ async function callAgentCli(opts: CallOptions): Promise<AgentResult> {
       throw backendFailure(cliErrorText(raw), "cli");
     }
     persistOutage(null); // the backend just proved itself — clear any stale banner
-    return {
-      text: parsed.result,
-      model: `cli:${tier}`,
+    const accounting = {
       tier,
       inputTokens: parsed.usage?.input_tokens ?? 0,
       outputTokens: parsed.usage?.output_tokens ?? 0,
+      cacheCreateTokens: parsed.usage?.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: parsed.usage?.cache_read_input_tokens ?? 0,
       // Subscription auth: the reported figure is informational, not billed.
       costUsd: 0,
+      reportedCostUsd: parsed.total_cost_usd ?? 0,
     };
+    recordAiCall("cli", opts.label, Date.now() - startedAt, accounting);
+    return { text: parsed.result, model: `cli:${tier}`, ...accounting };
   } finally {
     cliRelease();
   }
@@ -326,9 +368,16 @@ export interface AgentResult {
   text: string;
   model: string;
   tier: ModelTier;
+  /** Money actually billed. Always 0 on the CLI path — subscription auth draws
+   *  on the plan quota, not a card. Use `reportedCostUsd` for quota burn. */
   costUsd: number;
   inputTokens: number;
   outputTokens: number;
+  cacheCreateTokens: number;
+  cacheReadTokens: number;
+  /** What the backend says the call was worth at list price. Equal to costUsd
+   *  on the API path; the CLI's own `total_cost_usd` on the CLI path. */
+  reportedCostUsd: number;
 }
 
 export interface CallOptions {
@@ -338,6 +387,10 @@ export interface CallOptions {
   maxTokens?: number;
   /** When set, constrains the response to this JSON schema (structured outputs). */
   jsonSchema?: Record<string, unknown>;
+  /** Who is calling — "hawk", "sage", "raven", … Recorded on the AiCall row so
+   *  spend can be attributed to an agent instead of to the desk as a whole.
+   *  Affects accounting only; never reaches the model. */
+  label?: string;
 }
 
 function priceOf(tier: ModelTier, inTok: number, outTok: number): number {
@@ -351,6 +404,7 @@ export async function callAgent(opts: CallOptions): Promise<AgentResult> {
 
   const tier = opts.tier ?? "sonnet";
   const model = MODELS[tier].id;
+  const startedAt = Date.now();
 
   let res: Anthropic.Message;
   try {
@@ -379,14 +433,22 @@ export async function callAgent(opts: CallOptions): Promise<AgentResult> {
   const inputTokens = res.usage.input_tokens;
   const outputTokens = res.usage.output_tokens;
 
-  return {
-    text,
-    model,
+  // priceOf covers fresh input and output only. Cache creation and reads bill
+  // at their own multiples of the input rate, so costUsd is a floor whenever
+  // those columns are non-zero — the row keeps them separate so the gap stays
+  // visible instead of being quietly averaged in at the wrong rate.
+  const accounting = {
     tier,
     inputTokens,
     outputTokens,
+    cacheCreateTokens: res.usage.cache_creation_input_tokens ?? 0,
+    cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
     costUsd: priceOf(tier, inputTokens, outputTokens),
+    reportedCostUsd: priceOf(tier, inputTokens, outputTokens),
   };
+  recordAiCall("api", opts.label, Date.now() - startedAt, accounting);
+
+  return { text, model, ...accounting };
 }
 
 /** Call an agent and parse its JSON response. Tolerates stray prose/code fences. */
