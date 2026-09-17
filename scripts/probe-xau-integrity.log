@@ -1,0 +1,23 @@
+﻿GOF_CON: 29706 H1 bars -> 2245 UTC daily bars  2018-11-05 -> 2026-09-08  isDailySeries=true
+
+vs GC=F (Yahoo, explicit period1/period2): 1889 shared days  2018-11-05 -> 2026-09-08
+  ratio  p1=0.9933  p50=1.0043  p99=1.0182  spread=1.025x
+  daily log-return correlation over 1886 pairs: 0.9201
+  largest month-over-month ratio steps (a splice is a step, not noise):
+    2024-03 -> 2024-04  x1.0107
+    2023-09 -> 2023-10  x1.0105
+    2025-03 -> 2025-04  x1.0105
+    2024-06 -> 2024-07  x1.0101
+    2025-09 -> 2025-10  x1.0099
+
+vs GLD (Alpaca SIP, adjustment=all): 1886 shared days  2018-11-05 -> 2026-09-04
+  ratio  p1=10.5622  p50=10.7890  p99=11.0798  spread=1.049x
+  daily log-return correlation over 1883 pairs: 0.8461
+  largest month-over-month ratio steps (a splice is a step, not noise):
+    2023-09 -> 2023-10  x1.0110
+    2024-06 -> 2024-07  x1.0106
+    2024-03 -> 2024-04  x1.0105
+    2023-03 -> 2023-04  x1.0104
+    2023-12 -> 2024-01  x1.0102
+
+Reminder for whatever gets written from this: the broker is both the counterparty and the price source, and spot gold has no consolidated tape. Passing here means no splice was found, not that the feed was verified.

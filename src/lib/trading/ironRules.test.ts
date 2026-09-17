@@ -71,3 +71,105 @@ test("applyIronRules: global trading halt blocks every new trade", () => {
   assert.equal(v.passed, false);
   assert.ok(v.failures.some((f) => /global trading halt/i.test(f)));
 });
+
+// --- leverage guards --------------------------------------------------------
+// A CFD account can lose more than the stop says, so each of these refuses when
+// it cannot evaluate itself. The "unknown" cases below are the point of the
+// rules, not edge cases around them.
+
+const leveredAcc: AccountState = {
+  ...baseAcc,
+  equity: 10_000,
+  openRiskUsd: 200,
+  maxTotalRiskPct: 5,
+  dayStartEquity: 10_000,
+  dailyPnlUsd: -100,
+  dailyLossLimitPct: 3,
+  marginLevel: 800,
+  marginUsed: 500,
+  minMarginLevel: 200,
+};
+const leveredTrade: ProposedTrade = { ...goodLong, riskUsd: 100 };
+
+test("a trade inside every leverage guard passes", () => {
+  const v = applyIronRules(leveredTrade, leveredAcc);
+  assert.deepEqual(v.failures, []);
+});
+
+test("total open risk is capped across positions, not per trade", () => {
+  // 480 already at risk + 100 more = 5.8% of 10k, over the 5% cap, while the
+  // trade's own lot is well inside maxLotPerTrade.
+  const v = applyIronRules(leveredTrade, { ...leveredAcc, openRiskUsd: 480 });
+  assert.equal(v.passed, false);
+  assert.ok(v.failures.some((f) => /total open risk 5\.80% exceeds max 5%/.test(f)));
+});
+
+test("the total risk cap counts the proposed trade, not just what is open", () => {
+  // 400 open is 4% — under the cap on its own; the trade is what breaches it.
+  const under = applyIronRules({ ...leveredTrade, riskUsd: 50 }, { ...leveredAcc, openRiskUsd: 400 });
+  assert.equal(under.passed, true);
+  const over = applyIronRules({ ...leveredTrade, riskUsd: 150 }, { ...leveredAcc, openRiskUsd: 400 });
+  assert.equal(over.passed, false);
+});
+
+test("the total risk cap fails closed when its inputs are missing", () => {
+  const noEquity = applyIronRules(leveredTrade, { ...leveredAcc, equity: undefined });
+  assert.equal(noEquity.passed, false);
+  assert.ok(noEquity.failures.some((f) => /equity is unknown/.test(f)));
+
+  const noRisk = applyIronRules({ ...leveredTrade, riskUsd: undefined }, leveredAcc);
+  assert.equal(noRisk.passed, false);
+  assert.ok(noRisk.failures.some((f) => /open risk is unknown/.test(f)));
+});
+
+test("an unconfigured leverage guard is not enforced", () => {
+  // Absent limits mean the desk has not opted in — only a configured limit that
+  // cannot be evaluated refuses.
+  const v = applyIronRules(goodLong, baseAcc);
+  assert.equal(v.passed, true);
+});
+
+test("the daily loss limit halts at the limit, not past it", () => {
+  const at = applyIronRules(leveredTrade, { ...leveredAcc, dailyPnlUsd: -300 }); // exactly 3%
+  assert.equal(at.passed, false);
+  assert.ok(at.failures.some((f) => /daily loss 3\.00% reached the limit/.test(f)));
+
+  const under = applyIronRules(leveredTrade, { ...leveredAcc, dailyPnlUsd: -299 });
+  assert.equal(under.passed, true);
+});
+
+test("a profitable day never trips the daily loss limit", () => {
+  const v = applyIronRules(leveredTrade, { ...leveredAcc, dailyPnlUsd: 5_000 });
+  assert.equal(v.passed, true);
+});
+
+test("the daily loss limit fails closed when today's P/L is unknown", () => {
+  const v = applyIronRules(leveredTrade, { ...leveredAcc, dailyPnlUsd: undefined });
+  assert.equal(v.passed, false);
+  assert.ok(v.failures.some((f) => /today's P\/L is unknown/.test(f)));
+});
+
+test("margin level floor blocks below the floor", () => {
+  const v = applyIronRules(leveredTrade, { ...leveredAcc, marginLevel: 150 });
+  assert.equal(v.passed, false);
+  assert.ok(v.failures.some((f) => /margin level 150\.0% below floor 200%/.test(f)));
+});
+
+test("margin level 0 on a flat account is not a breach", () => {
+  // MT5 reports margin_level 0 when no margin is in use. Reading that as a
+  // breach would refuse every trade on an empty account.
+  const v = applyIronRules(leveredTrade, { ...leveredAcc, marginLevel: 0, marginUsed: 0 });
+  assert.equal(v.passed, true);
+});
+
+test("margin level 0 with margin in use is a breach", () => {
+  const v = applyIronRules(leveredTrade, { ...leveredAcc, marginLevel: 0, marginUsed: 500 });
+  assert.equal(v.passed, false);
+  assert.ok(v.failures.some((f) => /margin level/.test(f)));
+});
+
+test("the margin floor fails closed when margin is unknown", () => {
+  const v = applyIronRules(leveredTrade, { ...leveredAcc, marginLevel: undefined });
+  assert.equal(v.passed, false);
+  assert.ok(v.failures.some((f) => /margin is unknown/.test(f)));
+});
