@@ -83,9 +83,28 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 09-14)
+## 3. Done recently (2026-08-23 → 09-16)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
+
+- **Risk Sentry (Pillar 2) implemented — unattended daily risk-check cron, not yet merged.
+  2026-09-16.** Built per `docs/superpowers/plans/2026-09-16-risk-sentry.md`, the first
+  concrete piece of the Execution & Risk Copilot pivot beyond `/advisor` itself: three
+  read-only checks (earnings proximity, market-gate flip, pairwise holdings correlation)
+  run daily against owner-configured holdings and post one consolidated Discord alert. Pure
+  check logic lives in `src/lib/riskSentry/`, composed with its only I/O in
+  `src/lib/riskSentry/runRiskSentry.ts`, exposed at the HTTP boundary
+  `src/app/api/cron/risk-sentry/route.ts`. Holdings and the last-seen market-gate reading
+  persist through the existing generic `Setting` key-value table (`riskSentry:holdings`,
+  `riskSentry:lastGate`) — no new table. A holdings editor was added to the safety panel
+  (`src/app/command/safety-panel.tsx`) so the owner can maintain the list from the UI instead
+  of touching the database directly. All 9 plan tasks complete, built TDD, 642/642 tests
+  pass. **Lives on branch `risk-sentry-implementation`** (forked from `stocks-only-pivot` at
+  `cd60fbc`, worktree `.worktrees/risk-sentry`) — **deliberately not yet merged**:
+  `stocks-only-pivot`'s working tree (§2) carries the owner's uncommitted 2026-09-05
+  deep-hold-out work, and merging was deferred rather than risk that uncommitted work during
+  an automated branch switch. Next: merge (or PR) once that uncommitted quant work on the
+  base branch is committed or otherwise set aside.
 
 - **Project pivot: NEXMIND is now an Execution & Risk Copilot, not an alpha-seeking desk.
   2026-09-15.** After three non-price data classes (earnings timing, insider transactions,

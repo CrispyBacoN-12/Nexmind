@@ -2,15 +2,15 @@
 
 // RAVEN's block on the advisor card.
 //
-// It is decoration on a card that is already complete: if the fetch below
-// fails, or the backend is down, everything above this block is unchanged and
-// still correct. It runs automatically once per card (a mount-only effect) —
-// the parent remounts this component (key={critiqueKey}) on every new
-// submission or field edit, so a fresh card always gets a fresh critique
-// without a separate click. The wait is 10-40s behind a 3-way subprocess
-// queue; the card itself has already rendered by the time this starts.
+// It is decoration on a card that is already complete: if the fetch never
+// resolves, or the backend is down, everything above and below this block is
+// unchanged and still correct. It fires itself on mount rather than on the
+// advisor form's submit — the card (entry/stop/size/ladder) still renders
+// immediately, unblocked by RAVEN's 10-40s wait behind a 3-way subprocess
+// queue; RAVEN just starts that wait itself instead of waiting for a click.
+// The button stays for a manual re-run at any time, not just after a failure.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge, Button, Card, CardTitle } from "@/components/ui";
 import type { ChartBar } from "@/lib/advisor/chartSeries";
@@ -34,6 +34,9 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CritiqueResult | null>(null);
+  // Guards the auto-fire effect against React Strict Mode's dev-only double
+  // invoke, which would otherwise queue two subprocess calls per card.
+  const firedRef = useRef(false);
 
   async function run() {
     setLoading(true);
@@ -63,11 +66,13 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
     }
   }
 
-  // Once per mount — i.e. once per new card, since the parent remounts this
-  // component on every submission or field edit. No dependency on card/chart:
-  // a change to either already produces a new mount via the key prop, so
-  // re-running from a dependency array would fire this twice for the same card.
+  // AdvisorCritique remounts (key = formEpoch) on every new card, so "on
+  // mount" already means "once per card" without watching card/chart here.
+  // firedRef guards against React Strict Mode's dev-only double-invoke,
+  // which would otherwise queue two subprocess calls per card.
   useEffect(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -79,9 +84,12 @@ export function AdvisorCritique({ card, chart }: { card: AdvisorCard; chart: Cha
         RAVEN โต้แย้งได้อย่างเดียว — ไม่บอกให้ซื้อ ไม่บอกให้ขาย ไม่ให้คะแนน
       </p>
 
-      {loading ? (
-        <p className="text-xs text-(--color-muted)">กำลังหาข้อโต้แย้ง… อาจใช้เวลา 10-40 วินาที</p>
-      ) : null}
+      <div className="flex items-center gap-3">
+        <Button type="button" onClick={run} disabled={loading}>
+          {loading ? "กำลังหา…" : "หาข้อโต้แย้งอีกครั้ง"}
+        </Button>
+        {loading ? <span className="text-xs text-(--color-muted)">อาจใช้เวลา 10-40 วินาที</span> : null}
+      </div>
 
       {error ? (
         <div className="space-y-2">
