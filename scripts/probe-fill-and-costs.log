@@ -1,0 +1,37 @@
+template fit: 474 symbols
+template select: 476 symbols
+template test1: 483 symbols
+template test2: 488 symbols
+template test3: 491 symbols
+
+### fill=same-bar close (current)  costs=0.5bps (current DEFAULT_COST_MODEL)
+fold     trades   avgR      ctrl p95   margin
+fit       20370     0.0036     0.0250   -0.0214
+select     7065    -0.0436     0.1016   -0.1452
+test1     15606     0.0144     0.0530   -0.0385
+test2     15330    -0.0314     0.0129   -0.0443
+test3     20854    -0.0103     0.0290   -0.0394
+
+### fill=same-bar close (current)  costs=5bps (Vibe-Trading slippage_us)
+fold     trades   avgR      ctrl p95   margin
+fit       20345    -0.0290    -0.0065   -0.0225
+select     7058    -0.0738     0.0734   -0.1473
+test1     15598    -0.0084     0.0287   -0.0371
+test2     15338    -0.0538    -0.0101   -0.0438
+test3     20836    -0.0368     0.0035   -0.0403
+
+### fill=next-bar open  costs=0.5bps (current DEFAULT_COST_MODEL)
+fold     trades   avgR      ctrl p95   margin
+fit       26316     0.0054     0.0219   -0.0165
+select     9051    -0.0426     0.0930   -0.1357
+test1     19367    -0.0051     0.0485   -0.0536
+test2     19568    -0.0277     0.0125   -0.0402
+test3     26582    -0.0108     0.0255   -0.0363
+
+### fill=next-bar open  costs=5bps (Vibe-Trading slippage_us)
+fold     trades   avgR      ctrl p95   margin
+fit       26266    -0.0295    -0.0103   -0.0192
+select     8996    -0.0773     0.0638   -0.1410
+test1     19361    -0.0314     0.0238   -0.0551
+test2     19566    -0.0535    -0.0117   -0.0419
+test3     26617    -0.0391     0.0001   -0.0392

@@ -1,0 +1,94 @@
+loading both panel caches…
+shallow .cache/bars/sp500-1d.json — 491 symbols
+deep    .cache/bars/sp500-1d-deep.json — 453 symbols
+mechanism=mr-down3  ladder=flat  seed=20260825  control=200  orderings=50
+headline: $2,500 capital, 5 slots, >= 1 whole share
+
+fit  2016-01-01..2019-01-01  (3.0y, post-2016 panel)
+  signals offered 17659  ->  taken 705  ·  dropped: slots full 16943, unaffordable 11  ·  median size 9 share(s)
+  annualised return on $2,500:   11.8%   [ordering p5    4.4%, p95   17.8%]   realised maxDD   18.8%
+  control median    9.4%  p95   16.2%   MARGIN    2.3%  beats-median
+  audit rows (no control, not verdicts):
+    $2,500 / 3 slots         taken    417  full  17240  unafford      2  ann    7.2%  · fewer slots, same money
+    $5,000 / 5 slots         taken    700  full  16952  unafford      7  ann    6.2%  · double the capital
+    $25,000 / 5 slots        taken    695  full  16962  unafford      2  ann    8.4%  · ten times the capital — is it the slots or the share price?
+    unconstrained            taken  17659  full      0  unafford      0  ann 492.0$/y  · unconstrained — must reproduce the hold-out
+
+select  2019-01-01..2020-01-01  (1.0y, post-2016 panel)
+  signals offered 5699  ->  taken 253  ·  dropped: slots full 5444, unaffordable 2  ·  median size 8 share(s)
+  annualised return on $2,500:   28.8%   [ordering p5   13.8%, p95   44.3%]   realised maxDD   15.2%
+  control median   26.0%  p95   39.8%   MARGIN    2.9%  beats-median
+  audit rows (no control, not verdicts):
+    $2,500 / 3 slots         taken    160  full   5537  unafford      2  ann   25.0%  · fewer slots, same money
+    $5,000 / 5 slots         taken    260  full   5435  unafford      4  ann   35.5%  · double the capital
+    $25,000 / 5 slots        taken    263  full   5436  unafford      0  ann   35.7%  · ten times the capital — is it the slots or the share price?
+    unconstrained            taken   5699  full      0  unafford      0  ann 2528.0$/y  · unconstrained — must reproduce the hold-out
+
+test1  2020-01-01..2022-01-01  (2.0y, post-2016 panel)
+  signals offered 14216  ->  taken 494  ·  dropped: slots full 13712, unaffordable 10  ·  median size 6 share(s)
+  annualised return on $2,500:   36.3%   [ordering p5   19.5%, p95   49.9%]   realised maxDD   38.1%
+  control median   26.4%  p95   40.6%   MARGIN    9.9%  beats-median
+  audit rows (no control, not verdicts):
+    $2,500 / 3 slots         taken    315  full  13900  unafford      1  ann   41.5%  · fewer slots, same money
+    $5,000 / 5 slots         taken    513  full  13702  unafford      1  ann   36.1%  · double the capital
+    $25,000 / 5 slots        taken    513  full  13702  unafford      1  ann   37.7%  · ten times the capital — is it the slots or the share price?
+    unconstrained            taken  14216  full      0  unafford      0  ann 7824.0$/y  · unconstrained — must reproduce the hold-out
+
+test2  2022-01-01..2024-01-01  (2.0y, post-2016 panel)
+  signals offered 15858  ->  taken 498  ·  dropped: slots full 15345, unaffordable 15  ·  median size 5 share(s)
+  annualised return on $2,500:    9.4%   [ordering p5    0.2%, p95   17.7%]   realised maxDD   19.0%
+  control median    1.9%  p95   13.1%   MARGIN    7.5%  beats-median
+  audit rows (no control, not verdicts):
+    $2,500 / 3 slots         taken    308  full  15548  unafford      2  ann    1.8%  · fewer slots, same money
+    $5,000 / 5 slots         taken    520  full  15334  unafford      4  ann   -1.7%  · double the capital
+    $25,000 / 5 slots        taken    521  full  15335  unafford      2  ann   -3.6%  · ten times the capital — is it the slots or the share price?
+    unconstrained            taken  15858  full      0  unafford      0  ann -7478.8$/y  · unconstrained — must reproduce the hold-out
+
+test3  2024-01-01..2027-01-01  (3.0y, post-2016 panel)
+  signals offered 18593  ->  taken 649  ·  dropped: slots full 17902, unaffordable 42  ·  median size 4 share(s)
+  annualised return on $2,500:   14.6%   [ordering p5    6.2%, p95   22.4%]   realised maxDD   13.4%
+  control median   10.6%  p95   19.2%   MARGIN    4.0%  beats-median
+  audit rows (no control, not verdicts):
+    $2,500 / 3 slots         taken    397  full  18186  unafford     10  ann   11.5%  · fewer slots, same money
+    $5,000 / 5 slots         taken    652  full  17930  unafford     11  ann   10.7%  · double the capital
+    $25,000 / 5 slots        taken    649  full  17942  unafford      2  ann   13.0%  · ten times the capital — is it the slots or the share price?
+    unconstrained            taken  18593  full      0  unafford      0  ann 3258.5$/y  · unconstrained — must reproduce the hold-out
+
+deep1  2000-01-01..2005-01-01  (5.0y, deep panel)
+  signals offered 27521  ->  taken 1255  ·  dropped: slots full 26263, unaffordable 3  ·  median size 41 share(s)
+  annualised return on $2,500:   30.0%   [ordering p5   17.3%, p95   42.8%]   realised maxDD   51.7%
+  control median   10.5%  p95   23.1%   MARGIN   19.4%  beats-median
+  audit rows (no control, not verdicts):
+    $2,500 / 3 slots         taken    758  full  26762  unafford      1  ann   30.6%  · fewer slots, same money
+    $5,000 / 5 slots         taken   1239  full  26282  unafford      0  ann   25.9%  · double the capital
+    $25,000 / 5 slots        taken   1239  full  26282  unafford      0  ann   26.0%  · ten times the capital — is it the slots or the share price?
+    unconstrained            taken  27521  full      0  unafford      0  ann 201.2$/y  · unconstrained — must reproduce the hold-out
+
+deep2  2005-01-01..2010-01-01  (5.0y, deep panel)
+  signals offered 30268  ->  taken 1180  ·  dropped: slots full 29084, unaffordable 4  ·  median size 27 share(s)
+  annualised return on $2,500:   14.0%   [ordering p5    3.6%, p95   21.8%]   realised maxDD   70.8%
+  control median    5.6%  p95   14.1%   MARGIN    8.4%  beats-median
+  audit rows (no control, not verdicts):
+    $2,500 / 3 slots         taken    737  full  29530  unafford      1  ann   17.1%  · fewer slots, same money
+    $5,000 / 5 slots         taken   1177  full  29091  unafford      0  ann   21.6%  · double the capital
+    $25,000 / 5 slots        taken   1177  full  29091  unafford      0  ann   21.7%  · ten times the capital — is it the slots or the share price?
+    unconstrained            taken  30268  full      0  unafford      0  ann 189.5$/y  · unconstrained — must reproduce the hold-out
+
+deep3  2010-01-01..2016-01-01  (6.0y, deep panel)
+  signals offered 38195  ->  taken 1413  ·  dropped: slots full 36774, unaffordable 8  ·  median size 17 share(s)
+  annualised return on $2,500:   16.1%   [ordering p5   11.5%, p95   23.4%]   realised maxDD   26.8%
+  control median   14.1%  p95   19.4%   MARGIN    2.0%  beats-median
+  audit rows (no control, not verdicts):
+    $2,500 / 3 slots         taken    879  full  37314  unafford      2  ann   20.4%  · fewer slots, same money
+    $5,000 / 5 slots         taken   1477  full  36716  unafford      2  ann   22.2%  · double the capital
+    $25,000 / 5 slots        taken   1479  full  36716  unafford      0  ann   22.2%  · ten times the capital — is it the slots or the share price?
+    unconstrained            taken  38195  full      0  unafford      0  ann 1259.8$/y  · unconstrained — must reproduce the hold-out
+
+==============================================================================
+VERDICT — the three pre-registered conditions
+==============================================================================
+  (a) beats control median      post-2016 5/5, deep 3/3   -> MET   (missed: none; only select is permitted)
+  (b) ... and positive there    post-2016 5/5, deep 3/3   -> MET   (missed: none; only select is permitted)
+  (c) ordering p5 > 0           post-2016 5/5                    -> MET
+
+  -> PASS

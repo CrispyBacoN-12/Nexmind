@@ -1,0 +1,98 @@
+mr-down3 @ next-bar-open — pre-registered, see header
+ladder=flat  control=200  seed=20260825  WARMUP=60
+rule: time-series mean reversion: long after 3 consecutive lower closes
+
+==============================================================================
+0. VOIDING CHECK — are open prices real?
+==============================================================================
+  deep (Yahoo 1998+)       1734244/1764184 bars have open != close  (98.30%)
+  modern (Alpaca 2016+)    1266867/1275602 bars have open != close  (99.32%)
+  opens are real in both caches — the open fill is a genuinely different fill.
+
+==============================================================================
+costs = 0.5bps + 1bp  (DEFAULT_COST_MODEL — the verdict cost model)
+==============================================================================
+
+DEEP FOLDS — the verdict folds (1998-2016, never used for any decision)
+
+  fill = same-bar close (what every prior log measured)
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      27521   0.070   59.6%   0.045    0.051    0.025     0.019
+    deep2      30268   0.074   59.9%   0.039    0.044    0.035     0.030
+    deep3      38195   0.132   63.2%   0.076    0.081    0.056     0.051
+
+  fill = next-bar open  (what the advisory tool would actually get)
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      30101   0.032   57.5%   0.047    0.053   -0.015    -0.021
+    deep2      33117   0.037   57.8%   0.039    0.046   -0.002    -0.009
+    deep3      41365   0.085   60.5%   0.076    0.081    0.009     0.004
+
+MODERN FOLDS — context only, NOT part of the verdict (already-seen data)
+
+  fill = same-bar close
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        17659   0.080   60.3%   0.078    0.085    0.002    -0.005
+    select      5699   0.133   63.2%   0.146    0.159   -0.013    -0.026
+    test1      14216   0.152   64.2%   0.097    0.105    0.055     0.047
+    test2      15858   0.022   57.0%   0.012    0.020    0.011     0.002
+    test3      18593   0.108   61.8%   0.061    0.068    0.047     0.040
+
+  fill = next-bar open
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        19178   0.026   57.3%   0.065    0.073   -0.039    -0.048
+    select      5957   0.110   61.9%   0.139    0.151   -0.029    -0.042
+    test1      15258   0.091   60.8%   0.084    0.093    0.007    -0.002
+    test2      17105  -0.003   55.6%   0.012    0.019   -0.015    -0.022
+    test3      20069   0.049   58.5%   0.052    0.059   -0.002    -0.010
+
+==============================================================================
+costs = 5bps + 1bp    (retail slippage — second pre-registered statement)
+==============================================================================
+
+DEEP FOLDS — the verdict folds (1998-2016, never used for any decision)
+
+  fill = same-bar close (what every prior log measured)
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      27585   0.050   59.1%   0.024    0.030    0.026     0.020
+    deep2      30339   0.051   59.2%   0.015    0.020    0.036     0.030
+    deep3      38288   0.105   62.4%   0.047    0.052    0.058     0.053
+
+  fill = next-bar open  (what the advisory tool would actually get)
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      30168   0.011   56.9%   0.025    0.031   -0.014    -0.020
+    deep2      33196   0.012   57.1%   0.014    0.021   -0.002    -0.009
+    deep3      41468   0.055   59.7%   0.046    0.051    0.009     0.004
+
+MODERN FOLDS — context only, NOT part of the verdict (already-seen data)
+
+  fill = same-bar close
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        17705   0.051   59.5%   0.046    0.053    0.005    -0.002
+    select      5717   0.106   62.6%   0.117    0.130   -0.010    -0.024
+    test1      14238   0.129   63.6%   0.074    0.081    0.055     0.048
+    test2      15922  -0.001   56.3%  -0.012   -0.004    0.011     0.002
+    test3      18616   0.081   61.0%   0.035    0.042    0.046     0.039
+
+  fill = next-bar open
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        19259  -0.005   56.5%   0.032    0.041   -0.037    -0.046
+    select      5978   0.081   61.1%   0.110    0.123   -0.030    -0.042
+    test1      15284   0.068   60.2%   0.060    0.069    0.008    -0.001
+    test2      17165  -0.027   54.9%  -0.012   -0.004   -0.015    -0.023
+    test3      20105   0.024   57.9%   0.026    0.033   -0.002    -0.009
+
+==============================================================================
+VERDICT — scored against the header, which was written first
+==============================================================================
+  cost model: 0.5bps + 1bp  (DEFAULT_COST_MODEL — the verdict cost model)
+  (1) ABSOLUTE   beats control median: 1/3 (need >=2)   beats p95: 1/3 (need >=1)  -> FAIL
+  (2) RETENTION  mean margin-over-median  close 0.0387  open -0.0030
+                 retention -7.6% (need >=50%)  -> FAIL
+
+  NEXT-OPEN FILL: REJECTED
+  -> design decision #5 (pre-placed orders, fill at next open) is dead.
+     Remaining options: act near the US close (03:00 Thai), or abandon the tool.
+
+  SECOND STATEMENT (retail costs, 5bps + 1bp):
+    mean deep-fold margin over control median at the open fill: -0.0023
+    -> NOT TRADEABLE at retail slippage — re-open the design before building

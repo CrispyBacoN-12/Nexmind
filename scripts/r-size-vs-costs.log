@@ -1,0 +1,51 @@
+1R as a fraction of price, and cost-in-R by bar size — DIAGNOSTIC, not a verdict
+1R = slMult * ATR, slMult = 1.5 (LADDERS.flat)
+cost as fraction of price = (2*slippageBps + commissionBps) / 1e4
+  because slippage is charged on entry AND exit; commission once per closed trade
+
+==============================================================================================
+1. MEASURED — 1R as a fraction of price, on daily bars
+==============================================================================================
+
+  on bars where mr-down3 actually fires (the population its costs are charged to):
+  deep folds (1998-2016)             n=  187749   p25 2.84%   median 3.92%   p75 5.70%   mean 4.92%
+  modern folds (2016-2026)           n=  161170   p25 2.80%   median 3.53%   p75 4.58%   mean 4.03%
+
+  on all bars, for contrast:
+  deep folds (1998-2016)             n= 1876683   p25 2.68%   median 3.67%   p75 5.31%   mean 4.51%
+  modern folds (2016-2026)           n= 1754178   p25 2.64%   median 3.33%   p75 4.28%   mean 3.72%
+
+  -> median 1R on signal bars, both eras pooled: 3.70% of price
+
+==============================================================================================
+2. CROSS-CHECK — does the measured R explain the cost gap already observed?
+==============================================================================================
+  price gap between the two cost models: 0.0900% of price
+  avgR drop observed across deep1..3 (close fill): 0.0233R
+  -> implied 1R = 3.86% of price
+  -> measured 1R = 3.70% of price
+  -> they differ by 4% — consistent; the model of costs above is right
+
+==============================================================================================
+3. PROJECTED — cost in R by bar size (sqrt-of-time scaling, an APPROXIMATION)
+==============================================================================================
+  mr-down3's measured alpha, for comparison: 0.0387R
+
+  costs = 0.5bps slip + 1bp comm (DEFAULT_COST_MODEL)  (0.020% of price, round trip)
+    bar size            1R (% of price)   cost in R    vs alpha
+    daily (measured)         3.705%      0.0054      0.1x alpha
+    60-min                   1.453%      0.0138      0.4x alpha
+    15-min                   0.727%      0.0275      0.7x alpha
+    5-min                    0.419%      0.0477      1.2x alpha
+
+  costs = 5bps slip + 1bp comm (retail)  (0.110% of price, round trip)
+    bar size            1R (% of price)   cost in R    vs alpha
+    daily (measured)         3.705%      0.0297      0.8x alpha
+    60-min                   1.453%      0.0757      2.0x alpha
+    15-min                   0.727%      0.1514      3.9x alpha
+    5-min                    0.419%      0.2622      6.8x alpha
+
+  Reading this: an edge has to clear its own costs before it clears a control.
+  "Nx alpha" is how many times mr-down3's entire measured edge the toll would be
+  at that bar size. It is not a prediction that an intraday rule would earn the
+  same alpha — no intraday rule has been measured here at all.

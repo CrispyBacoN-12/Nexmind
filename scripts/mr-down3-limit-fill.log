@@ -1,0 +1,144 @@
+mr-down3 @ limit-at-previous-close — pre-registered, see header
+ladder=flat  control=200  seed=20260825  WARMUP=60
+rule: time-series mean reversion: long after 3 consecutive lower closes
+arms: close = baseline · priced = DIAGNOSTIC, not implementable · limit = the real thing
+
+==============================================================================
+0. VOIDING CHECK — is the limit arm well formed?
+==============================================================================
+  deep (Yahoo 1998+)       priced 187755  limit 358168  extra 170413 (90.8% more)  superset violations 0
+  modern (Alpaca 2016+)    priced 161172  limit 314972  extra 153800 (95.4% more)  superset violations 0
+  limit is a strict superset of priced and adds a real population — construction OK.
+
+==============================================================================
+costs = 0.5bps + 1bp  (DEFAULT_COST_MODEL — the verdict cost model)
+==============================================================================
+
+DEEP FOLDS — the verdict folds (1998-2016, never used for any decision)
+
+  close   BASELINE — fill at c[i], what every prior log measured
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      27521   0.070   59.6%   0.045    0.051    0.025     0.019
+    deep2      30268   0.074   59.9%   0.039    0.044    0.035     0.030
+    deep3      38195   0.132   63.2%   0.076    0.081    0.056     0.051
+
+  priced  DIAGNOSTIC ONLY — baseline's trades filled at c[j]. NOT implementable
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      26526  -0.295   39.4%   0.045    0.050   -0.340    -0.345
+    deep2      29194  -0.286   39.9%   0.039    0.044   -0.325    -0.330
+    deep3      37689  -0.246   42.1%   0.077    0.083   -0.323    -0.329
+
+  limit   THE REAL THING — buy limit at c[j] placed the evening before
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      42579  -0.025   54.4%   0.045    0.049   -0.070    -0.074
+    deep2      47423  -0.012   55.1%   0.036    0.040   -0.047    -0.051
+    deep3      60935   0.012   56.5%   0.077    0.080   -0.065    -0.068
+
+MODERN FOLDS — continuity only, NOT part of the verdict
+
+  close   BASELINE
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        17659   0.080   60.3%   0.078    0.085    0.002    -0.005
+    select      5699   0.133   63.2%   0.146    0.159   -0.013    -0.026
+    test1      14216   0.152   64.2%   0.097    0.105    0.055     0.047
+    test2      15858   0.022   57.0%   0.012    0.020    0.011     0.002
+    test3      18593   0.108   61.8%   0.061    0.068    0.047     0.040
+
+  priced  DIAGNOSTIC ONLY
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        17109  -0.280   40.3%   0.078    0.086   -0.358    -0.366
+    select      5437  -0.243   42.3%   0.146    0.160   -0.389    -0.403
+    test1      13696  -0.299   39.2%   0.097    0.105   -0.395    -0.404
+    test2      15711  -0.339   36.9%   0.011    0.020   -0.350    -0.359
+    test3      18256  -0.256   41.6%   0.061    0.068   -0.317    -0.325
+
+  limit   THE REAL THING
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        29082   0.003   56.0%   0.078    0.084   -0.075    -0.081
+    select      9617   0.067   59.5%   0.153    0.161   -0.086    -0.095
+    test1      22194  -0.023   54.5%   0.098    0.104   -0.121    -0.128
+    test2      24284  -0.087   50.9%   0.010    0.015   -0.097    -0.102
+    test3      29169  -0.004   55.6%   0.063    0.068   -0.067    -0.072
+
+==============================================================================
+costs = 5bps + 1bp    (retail slippage — second pre-registered statement)
+==============================================================================
+
+DEEP FOLDS — the verdict folds (1998-2016, never used for any decision)
+
+  close   BASELINE — fill at c[i], what every prior log measured
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      27585   0.050   59.1%   0.024    0.030    0.026     0.020
+    deep2      30339   0.051   59.2%   0.015    0.020    0.036     0.030
+    deep3      38288   0.105   62.4%   0.047    0.052    0.058     0.053
+
+  priced  DIAGNOSTIC ONLY — baseline's trades filled at c[j]. NOT implementable
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      26594  -0.317   38.7%   0.024    0.029   -0.341    -0.346
+    deep2      29299  -0.311   39.1%   0.015    0.020   -0.326    -0.331
+    deep3      37865  -0.277   41.2%   0.047    0.053   -0.324    -0.330
+
+  limit   THE REAL THING — buy limit at c[j] placed the evening before
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    deep1      42636  -0.046   53.8%   0.024    0.027   -0.070    -0.073
+    deep2      47512  -0.035   54.5%   0.012    0.016   -0.047    -0.051
+    deep3      61085  -0.019   55.6%   0.048    0.051   -0.067    -0.069
+
+MODERN FOLDS — continuity only, NOT part of the verdict
+
+  close   BASELINE
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        17705   0.051   59.5%   0.046    0.053    0.005    -0.002
+    select      5717   0.106   62.6%   0.117    0.130   -0.010    -0.024
+    test1      14238   0.129   63.6%   0.074    0.081    0.055     0.048
+    test2      15922  -0.001   56.3%  -0.012   -0.004    0.011     0.002
+    test3      18616   0.081   61.0%   0.035    0.042    0.046     0.039
+
+  priced  DIAGNOSTIC ONLY
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        17172  -0.312   39.4%   0.046    0.053   -0.358    -0.365
+    select      5463  -0.273   41.5%   0.117    0.133   -0.390    -0.405
+    test1      13736  -0.322   38.5%   0.073    0.083   -0.395    -0.405
+    test2      15753  -0.363   36.3%  -0.013   -0.004   -0.350    -0.359
+    test3      18308  -0.280   40.9%   0.035    0.043   -0.316    -0.324
+
+  limit   THE REAL THING
+    fold      trades     avgR     win%   ctrl med  ctrl p95   marg-med  marg-p95
+    fit        29121  -0.029   55.1%   0.046    0.052   -0.075    -0.081
+    select      9655   0.037   58.7%   0.123    0.132   -0.086    -0.095
+    test1      22248  -0.046   53.8%   0.074    0.082   -0.121    -0.128
+    test2      24354  -0.111   50.3%  -0.014   -0.008   -0.097    -0.102
+    test3      29227  -0.029   54.9%   0.038    0.042   -0.066    -0.071
+
+==============================================================================
+HARNESS CHECK — does the close arm still reproduce deep-holdout.log?
+==============================================================================
+  deep1    expected 0.070   got  0.070   match
+  deep2    expected 0.074   got  0.074   match
+  deep3    expected 0.132   got  0.132   match
+
+==============================================================================
+ATTRIBUTION — where does the edge go? (deep folds, verdict cost model)
+==============================================================================
+  baseline, fill at c[i]                      margin over ctrl median  0.0387
+  same trades, fill at c[j]   (DIAGNOSTIC)    margin over ctrl median  -0.3292
+  real limit, fill at c[j]                    margin over ctrl median  -0.0609
+
+  cost of paying yesterday's close  -0.3679R
+  cost of the extra fills (adverse selection)  0.2683R
+
+==============================================================================
+VERDICT — scored against the header, which was written first
+==============================================================================
+  cost model: 0.5bps + 1bp  (DEFAULT_COST_MODEL — the verdict cost model)
+  (1) ABSOLUTE   beats control median: 0/3 (need >=2)   beats p95: 0/3 (need >=1)  -> FAIL
+  (2) RETENTION  mean margin-over-median  close 0.0387  limit -0.0609
+                 retention -157.3% (need >=50%)  -> FAIL
+
+  LIMIT-AT-PREVIOUS-CLOSE: REJECTED
+  -> the pre-registered consequence applies: the only entry timing left is the
+     03:00 Thai MOC. Change the mechanism, not the fill.
+
+  SECOND STATEMENT (retail costs, 5bps + 1bp    (retail slippage — second pre-registered statement)):
+    mean deep-fold margin over control median at the limit fill: -0.0610
+    -> NOT TRADEABLE at retail slippage
