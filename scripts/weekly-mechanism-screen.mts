@@ -77,8 +77,58 @@
 //   npx tsx scripts/weekly-mechanism-screen.mts --checks-only
 //   npx tsx scripts/weekly-mechanism-screen.mts | tee scripts/weekly-mechanism-screen.log
 //
+// ADDED 2026-09-14 — `--panel=` REPLICATION ON A DISJOINT UNIVERSE
+//
+// WHY. Both survivors of this screen were already REJECTED at the weekly deep
+// hold-out (weekly-deep-holdout.log, 2026-09-08): the deep-window CONTROL pays
+// +0.11..+0.17 in those folds, so a rule can make money in all three and still
+// lose. That rejection turns on the TIME PERIOD's regime, not on how many
+// symbols were screened, and this flag cannot reopen it — broad-1d.json is
+// Alpaca-sourced and floors at 2016-01-04 (deep-history-is-free.md), so there
+// is no pre-2016 broad panel to spend a deep hold-out against. What THIS flag
+// answers is a narrower, still-open question: was the FIT/SELECT pass that
+// earned mr-down3 and gap-fade their TEST/DEEP reads itself a small-sample
+// artifact of screening only the 491 most arbitraged tickers on earth, or does
+// it replicate on ~1,172 disjoint names before the deep-fold regime kills it
+// anyway? EXACTLY ONE VARIABLE MOVES, again: the universe — not the bar class,
+// not the mechanism, not the ladder, not the fold set.
+//
+// STRONG PRIOR, stated before running this. The identical swap was already
+// made once, on DAILY bars (STATE.md §4g, 2026-08-26,
+// docs/quant/2026-08-26-broad-universe-rerun.md): same six mechanisms, same
+// baseline, same folds, same ladder, same seed, only `--panel=` differed. Not
+// one of ten fold-cells flipped verdict, and the closing line was explicit:
+// "further universe-swapping on daily OHLCV should not be funded." That prior
+// makes a flip here unlikely — but it was never measured on WEEKLY bars, which
+// is the only bar class where any mechanism has ever cleared FIT+SELECT at
+// all, so inferring the weekly answer from the daily one is exactly the
+// unexamined-constant mistake weekly-bars-reopen-the-entry-axis.md warns
+// against. This run tests it instead of assuming it.
+//
+// HARNESS CHECK ADAPTATION. The fixed DAILY_CLOSE_FILL table below is specific
+// to sp500-1d.json (scripts/mechanism-screen-control.log). Passing `--panel=`
+// selects DAILY_CLOSE_FILL_BROAD instead — sourced the same way, from an
+// INDEPENDENT prior measurement (scripts/mechanism-screen-broad-control.log,
+// 2026-08-26, `mechanism-screen.mts --panel=.cache/bars/broad-1d.json`), not
+// invented for this run. The check still asserts rather than prints, for the
+// same reason as always: a resampler or engine regression must not be able to
+// look like a finding just because nobody had numbers to catch it against.
+//
+// CONSEQUENCE. A pass (mr-down3 and/or gap-fade clear FIT+SELECT on the broad
+// panel too) closes the small-sample objection to the ORIGINAL weekly screen
+// without changing either mechanism's status: both stay REJECTED at deep.
+// Nothing here is promotable — the promotion-bar language below still prints,
+// but it describes what advancing would have meant before deep closed this
+// door, not a live option. A fail (broad panel does NOT replicate) would be
+// the more interesting outcome: it would mean the original S&P weekly pass was
+// itself likely noise, one layer earlier than the deep rejection already
+// found.
+//
+//   npx tsx scripts/weekly-mechanism-screen.mts --panel=.cache/bars/broad-1d.json --checks-only
+//   npx tsx scripts/weekly-mechanism-screen.mts --panel=.cache/bars/broad-1d.json | tee scripts/weekly-mechanism-screen-broad.log
+//
 import "dotenv/config";
-import { loadPanel, FOLDS, type Fold, type Panel } from "@/lib/research/panel";
+import { loadPanel, FOLDS, PANEL_CACHE_PATH, type Fold, type Panel } from "@/lib/research/panel";
 import { weeklyPanel, WEEKLY_PANEL_WARMUP_BARS } from "@/lib/research/weekly";
 import {
   sliceFold,
@@ -114,6 +164,25 @@ const DAILY_CLOSE_FILL: Record<string, Record<string, number>> = {
   "vol-dryup": { fit: 0.108, select: 0.083 },
   "range-expand": { fit: -0.014, select: 0.002 },
 };
+
+const BROAD_PANEL_CACHE_PATH = ".cache/bars/broad-1d.json";
+
+/** Close-fill DAILY avgR on the broad panel, from scripts/mechanism-screen-broad-control.log (2026-08-26). */
+const DAILY_CLOSE_FILL_BROAD: Record<string, Record<string, number>> = {
+  "mr-down3": { fit: 0.052, select: 0.086 },
+  nr7: { fit: -0.015, select: -0.037 },
+  "gap-fade": { fit: -0.004, select: -0.031 },
+  "turn-of-month": { fit: 0.035, select: 0.061 },
+  "vol-dryup": { fit: 0.056, select: 0.053 },
+  "range-expand": { fit: -0.037, select: -0.034 },
+};
+
+/** Which recorded close-fill table applies to a given daily panel's cache path. */
+const HARNESS_TABLE_BY_CACHE_PATH: Record<string, Record<string, Record<string, number>>> = {
+  [PANEL_CACHE_PATH]: DAILY_CLOSE_FILL,
+  [BROAD_PANEL_CACHE_PATH]: DAILY_CLOSE_FILL_BROAD,
+};
+
 const HARNESS_TOLERANCE_R = 0.002;
 const MIN_OPEN_DIFFERS = 0.99;
 
@@ -149,11 +218,17 @@ function openDiffersFraction(panel: Panel): number {
 
 /** HARNESS CHECK. Returns the failing "mech/fold" labels — never the numbers. */
 function harnessMismatches(daily: Panel): string[] {
+  const table = HARNESS_TABLE_BY_CACHE_PATH[daily.cachePath];
   const bad: string[] = [];
+  if (!table) {
+    return SCREENED.flatMap((mech) =>
+      SCREEN_FOLDS.map((fold) => `${mech.key}/${fold.name} (no recorded close-fill table for ${daily.cachePath})`),
+    );
+  }
   for (const fold of SCREEN_FOLDS) {
     const slices = sliceFold(daily, fold);
     for (const mech of SCREENED) {
-      const expected = DAILY_CLOSE_FILL[mech.key]?.[fold.name];
+      const expected = table[mech.key]?.[fold.name];
       if (expected == null) {
         bad.push(`${mech.key}/${fold.name} (no recorded close-fill value)`);
         continue;
@@ -239,17 +314,18 @@ function printRow(r: Row): void {
 
 async function main() {
   const checksOnly = process.argv.includes("--checks-only");
+  const panelPath = process.argv.find((a) => a.startsWith("--panel="))?.split("=")[1];
 
   console.log("weekly-bar mechanism screen — livable fill only, fit + select only");
   console.log("PRE-REGISTERED: see this script's header. Nothing here may be approved.");
 
   console.log("\nloading daily panel cache…");
-  const daily = loadPanel();
+  const daily = panelPath ? loadPanel(panelPath) : loadPanel();
   console.log(`panel ${daily.cachePath} — ${daily.symbols.length} symbols, fetchedAt ${daily.fetchedAt}`);
 
   // HARNESS CHECK — daily, close fill, asserted not printed.
   const bad = harnessMismatches(daily);
-  console.log(`HARNESS CHECK (daily panel reproduces mechanism-screen-control.log to ${HARNESS_TOLERANCE_R}R): ` +
+  console.log(`HARNESS CHECK (daily panel reproduces its recorded close-fill numbers to ${HARNESS_TOLERANCE_R}R): ` +
     (bad.length ? `mismatch — ${bad.join(", ")}` : "match"));
   if (bad.length) {
     console.error("aborting: the harness does not reproduce its own recorded numbers, so nothing below would mean anything.");
