@@ -168,6 +168,10 @@ export interface SimPosition extends OpenPosition {
   openedAt: Date;
   ladder: LadderState;
   costs: CostModel;
+  /** Bars this position has been managed on, incremented once per stepPosition call. */
+  barsHeld: number;
+  /** Force-close once barsHeld reaches this count, regardless of SL/TP/trail. See ExitOptions.maxBars. */
+  maxBars?: number;
 }
 
 export type StepResult = { status: "open" } | { status: "closed"; trade: Omit<SimTrade, "symbol"> };
@@ -178,6 +182,7 @@ export type StepResult = { status: "open" } | { status: "closed"; trade: Omit<Si
  * BEFORE the favorable one, so a bar touching both SL and TP books the loss.
  */
 export function stepPosition(pos: SimPosition, bar: Candle): StepResult {
+  pos.barsHeld += 1;
   const adverse = pos.side === "long" ? bar.l : bar.h;
   const favorable = pos.side === "long" ? bar.h : bar.l;
 
@@ -192,13 +197,30 @@ export function stepPosition(pos: SimPosition, bar: Candle): StepResult {
   // the favorable price.
   if (action.kind === "hold" || action.kind === "trail-update") action = decideAction(pos, pos.ladder, favorable);
 
-  // Ratchet: still open, no fill involved — just persist the tightened SL and
-  // the new best-price-since-entry so the next bar's decideAction call sees it.
+  // Ratchet: still open, no fill involved — persist the tightened SL and the
+  // new best-price-since-entry so the next bar's decideAction call sees it. Not
+  // an early return: a bar that ratchets the trail can still be the bar the
+  // time stop fires on, so it falls through to that check below on equal
+  // footing with an ordinary "hold".
   if (action.kind === "trail-update") {
     pos.sl = action.sl;
     pos.ladder = { ...pos.ladder, trailExtreme: action.extreme };
-    return { status: "open" };
+    action = { kind: "hold" };
   }
+
+  // Time stop: an intrabar SL/TP/trail touch this same bar already resolved
+  // `action` to something other than "hold" above and takes priority — the
+  // clock is the exit of last resort, not a race with price. Closes at THIS
+  // bar's close (decided now, fills now), the same convention every other exit
+  // here uses; there is nothing left to wait for once the trigger is time
+  // itself rather than a level. See ExitOptions.maxBars.
+  if (action.kind === "hold" && pos.maxBars != null && pos.barsHeld >= pos.maxBars) {
+    const favorableMove = pos.side === "long" ? bar.c - pos.entry : pos.entry - bar.c;
+    const outcome = favorableMove > 0 ? "win" : favorableMove < 0 ? "loss" : "breakeven";
+    action = { kind: "close", outcome, exit: bar.c };
+  }
+
+  if (action.kind === "hold") return { status: "open" };
 
   // Closing a long is a sell (fills lower than theoretical); closing a short is
   // a buy-to-cover (fills higher). Always worse for the trader, on both the
@@ -269,6 +291,7 @@ export function openPosition(
   costs: CostModel = NO_COSTS,
   slMult = ATR_SL_MULT,
   trailMult?: { activateMult: number; offsetMult: number },
+  maxBars?: number,
 ): SimPosition {
   const dir = side === "long" ? 1 : -1;
   // Buying (long) fills higher than the signal price, selling (short) fills
@@ -286,6 +309,8 @@ export function openPosition(
     ladder: trail ? { origSl: sl } : {},
     tp1: fillEntry + dir * tp1Mult * atrVal,
     tp2: singleTarget ? null : fillEntry + dir * tp1Mult * TP2_FACTOR * atrVal,
+    barsHeld: 0,
+    maxBars,
   };
 }
 
@@ -361,6 +386,19 @@ export interface ExitOptions {
    * on ordinary bars. Running all three rows attributes the difference.
    */
   entryAt?: "close" | "open" | "open-unmanaged";
+  /**
+   * Force-close a position once it has been managed for this many bars,
+   * regardless of where SL/TP/trail sit. Undefined/null = no time stop (default).
+   *
+   * This is the one exit-geometry class LADDER_OPTIONS cannot express — every
+   * TP/SL/trail geometry there was confirmed dead against a zero-information
+   * entry (see the nexmind-exit-alone-is-long-drift memory): all six "clear
+   * zero" only via long-side market drift, none survive the long/short
+   * diagnostic. A bar-count stop is a genuinely different mechanism (time,
+   * not price), which is why it needs this field rather than another point on
+   * that same geometry family's parameter grid.
+   */
+  maxBars?: number;
 }
 
 /**
@@ -419,6 +457,7 @@ export function simulateExits(
     trail,
     entryFrom = 0,
     entryAt = "close",
+    maxBars,
   } = opts;
 
   const trades: SimTrade[] = [];
@@ -449,7 +488,7 @@ export function simulateExits(
     const opensAtOpen = entryAt === "open" || entryAt === "open-unmanaged";
     const atEntry = opensAtOpen ? bar.o : bar.c;
     const atrAtEntry = opensAtOpen ? signals.atrs[i - 1] : signals.atrs[i];
-    open = openPosition(side, atEntry, atrAtEntry, lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs, slMult, trail);
+    open = openPosition(side, atEntry, atrAtEntry, lot, new Date(bar.t * 1000), singleTarget, tp1Mult, costs, slMult, trail, maxBars);
 
     // An open fill has the rest of the signal bar left to run, so that bar gets
     // managed too — otherwise a same-day stop-out is invisible and a same-day

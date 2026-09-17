@@ -1,0 +1,70 @@
+bar-count time stop atop BASELINE_EXIT on matched-random entries — fit + select only, daily bars, close fill
+PRE-REGISTERED: see this script's header. Nothing here may be approved.
+
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+maxBars sweep: {1, 2, 3, 5, 8, 13, 21, 34}  atop BASELINE_EXIT (1.5/1.5)  control=200 runs  seed=20260825  costs=DEFAULT_COST_MODEL
+
+fit (2016-01-01..2019-01-01, post-2015 correction recovery through the 2018 Q4 selloff)
+  geometry       real avgR   ctrl p5  ctrl med  ctrl p95  verdict
+  maxBars=1       -0.009  -0.005  -0.003  -0.000  —
+  maxBars=2       -0.009  -0.002  +0.001  +0.005  —
+  maxBars=3       -0.009  -0.000  +0.004  +0.009  —
+  maxBars=5       -0.007  +0.002  +0.008  +0.014  RANDOM CLEARS ZERO
+  maxBars=8       -0.002  +0.006  +0.013  +0.020  RANDOM CLEARS ZERO
+  maxBars=13      +0.001  +0.007  +0.016  +0.023  RANDOM CLEARS ZERO
+  maxBars=21      +0.001  +0.009  +0.017  +0.025  RANDOM CLEARS ZERO
+  maxBars=34      +0.003  +0.009  +0.018  +0.026  RANDOM CLEARS ZERO
+
+select (2019-01-01..2020-01-01, 2019 melt-up on falling rates)
+  geometry       real avgR   ctrl p5  ctrl med  ctrl p95  verdict
+  maxBars=1       -0.011  +0.005  +0.008  +0.012  RANDOM CLEARS ZERO
+  maxBars=2       -0.020  +0.017  +0.023  +0.028  RANDOM CLEARS ZERO
+  maxBars=3       -0.029  +0.027  +0.034  +0.040  RANDOM CLEARS ZERO
+  maxBars=5       -0.033  +0.041  +0.050  +0.058  RANDOM CLEARS ZERO
+  maxBars=8       -0.040  +0.056  +0.066  +0.077  RANDOM CLEARS ZERO
+  maxBars=13      -0.046  +0.065  +0.078  +0.091  RANDOM CLEARS ZERO
+  maxBars=21      -0.043  +0.071  +0.085  +0.099  RANDOM CLEARS ZERO
+  maxBars=34      -0.044  +0.073  +0.086  +0.101  RANDOM CLEARS ZERO
+
+====================================================================================================
+PROMOTION BAR: matched-random control's p5 > 0 in BOTH fit and select.
+CANDIDATES: maxBars=5, maxBars=8, maxBars=13, maxBars=21, maxBars=34 — running the long-only / short-only diagnostic.
+
+maxBars=5
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.058  +0.061  +0.065
+  fit       short  -0.083  -0.080  -0.076
+  select     long  +0.116  +0.123  +0.128
+  select    short  -0.144  -0.138  -0.132
+
+maxBars=8
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.075  +0.078  +0.083
+  fit       short  -0.102  -0.098  -0.094
+  select     long  +0.152  +0.159  +0.166
+  select    short  -0.183  -0.176  -0.169
+
+maxBars=13
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.085  +0.089  +0.094
+  fit       short  -0.114  -0.109  -0.105
+  select     long  +0.175  +0.183  +0.192
+  select    short  -0.208  -0.200  -0.192
+
+maxBars=21
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.091  +0.096  +0.101
+  fit       short  -0.121  -0.116  -0.112
+  select     long  +0.189  +0.197  +0.206
+  select    short  -0.223  -0.214  -0.207
+
+maxBars=34
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.093  +0.098  +0.103
+  fit       short  -0.123  -0.118  -0.114
+  select     long  +0.192  +0.200  +0.209
+  select    short  -0.226  -0.217  -0.210
+
+Read the side-split narrowly: a candidate positive on BOTH sides is a mechanical effect of the
+time stop; a candidate positive on longs only and flat/negative on shorts is long-side drift wearing
+an exit-geometry costume (nexmind-regime-side-is-beta), not a management discovery.

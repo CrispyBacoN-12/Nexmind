@@ -146,6 +146,7 @@ function positionFrom(levels: ProposedLevels, side: "long" | "short", lot: numbe
     openedAt,
     costs: DEFAULT_COST_MODEL,
     ladder: levels.trail ? { origSl: levels.sl } : {},
+    barsHeld: 0,
   };
 }
 

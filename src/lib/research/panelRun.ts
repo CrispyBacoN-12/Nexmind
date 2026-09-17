@@ -85,6 +85,14 @@ export interface PanelExit {
    * the open would not be a control, it would be a second strategy.
    */
   entryAt?: "close" | "open" | "open-unmanaged";
+  /**
+   * Force-close a position after this many managed bars, regardless of
+   * SL/TP/trail. See ExitOptions.maxBars — the one exit-geometry class
+   * outside runResearch's ExitLadder/LADDER_OPTIONS, added here (not there)
+   * because PanelExit is the prisma-free description ad hoc scripts like
+   * exit-on-random-entry.mts already build against.
+   */
+  maxBars?: number;
 }
 
 export const PANEL_LOT = 0.1;
@@ -216,6 +224,7 @@ export function simulateFold(prepared: PreparedSymbol[], fold: Fold, exit: Panel
       costs: exit.costs ?? DEFAULT_COST_MODEL,
       entryFrom: p.entryFrom,
       entryAt: exit.entryAt,
+      maxBars: exit.maxBars,
     });
     signals += r.signals;
     if (r.trades.length) symbolsTraded++;

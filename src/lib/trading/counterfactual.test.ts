@@ -81,6 +81,7 @@ function longPos(over: Partial<SimPosition> = {}): SimPosition {
   return {
     side: "long", entry: 100, sl: 98, tp1: 104, tp2: null, trail: null,
     lot: 1, openedAt: new Date(T0 * 1000), costs: DEFAULT_COST_MODEL, ladder: {},
+    barsHeld: 0,
     ...over,
   };
 }

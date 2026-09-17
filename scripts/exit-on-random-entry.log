@@ -1,0 +1,73 @@
+exit geometry on matched-random entries — fit + select only, daily bars, close fill
+PRE-REGISTERED: see this script's header. Nothing here may be approved.
+
+panel .cache/bars/sp500-1d.json — 491 symbols, fetchedAt 2026-08-16T20:39:45.212Z
+ladder: 6 geometries  control=200 runs  seed=20260825  costs=DEFAULT_COST_MODEL
+
+fit (2016-01-01..2019-01-01, post-2015 correction recovery through the 2018 Q4 selloff)
+  geometry         real avgR   ctrl p5  ctrl med  ctrl p95  verdict
+  single 1.5/1.5    +0.004  +0.009  +0.018  +0.025  RANDOM CLEARS ZERO
+  single 2/1.5      +0.010  +0.017  +0.026  +0.036  RANDOM CLEARS ZERO
+  single 2.5/1.5    +0.013  +0.024  +0.037  +0.049  RANDOM CLEARS ZERO
+  single 3/1.5      +0.023  +0.031  +0.046  +0.061  RANDOM CLEARS ZERO
+  trail 1/1.5       +0.049  +0.074  +0.085  +0.095  RANDOM CLEARS ZERO
+  trail 1.5/1.5     +0.050  +0.081  +0.094  +0.105  RANDOM CLEARS ZERO
+
+select (2019-01-01..2020-01-01, 2019 melt-up on falling rates)
+  geometry         real avgR   ctrl p5  ctrl med  ctrl p95  verdict
+  single 1.5/1.5    -0.044  +0.073  +0.087  +0.102  RANDOM CLEARS ZERO
+  single 2/1.5      -0.045  +0.104  +0.119  +0.136  RANDOM CLEARS ZERO
+  single 2.5/1.5    -0.065  +0.132  +0.154  +0.174  RANDOM CLEARS ZERO
+  single 3/1.5      -0.072  +0.161  +0.184  +0.207  RANDOM CLEARS ZERO
+  trail 1/1.5       -0.059  +0.139  +0.154  +0.170  RANDOM CLEARS ZERO
+  trail 1.5/1.5     -0.059  +0.156  +0.177  +0.196  RANDOM CLEARS ZERO
+
+====================================================================================================
+PROMOTION BAR: matched-random control's p5 > 0 in BOTH fit and select.
+CANDIDATES: single 1.5/1.5, single 2/1.5, single 2.5/1.5, single 3/1.5, trail 1/1.5, trail 1.5/1.5 — running the long-only / short-only diagnostic.
+
+single 1.5/1.5
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.094  +0.098  +0.103
+  fit       short  -0.124  -0.119  -0.114
+  select     long  +0.193  +0.201  +0.210
+  select    short  -0.226  -0.218  -0.211
+
+single 2/1.5
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.124  +0.130  +0.135
+  fit       short  -0.145  -0.140  -0.133
+  select     long  +0.257  +0.267  +0.277
+  select    short  -0.285  -0.275  -0.267
+
+single 2.5/1.5
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.155  +0.161  +0.167
+  fit       short  -0.167  -0.161  -0.156
+  select     long  +0.319  +0.330  +0.341
+  select    short  -0.329  -0.320  -0.311
+
+single 3/1.5
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.185  +0.192  +0.199
+  fit       short  -0.187  -0.181  -0.175
+  select     long  +0.377  +0.390  +0.403
+  select    short  -0.373  -0.364  -0.355
+
+trail 1/1.5
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.188  +0.195  +0.202
+  fit       short  -0.089  -0.083  -0.078
+  select     long  +0.288  +0.299  +0.310
+  select    short  -0.215  -0.209  -0.199
+
+trail 1.5/1.5
+  fold       side   ctrl p5  ctrl med  ctrl p95
+  fit        long  +0.211  +0.218  +0.226
+  fit       short  -0.104  -0.098  -0.093
+  select     long  +0.329  +0.343  +0.354
+  select    short  -0.253  -0.246  -0.237
+
+Read the side-split narrowly: a candidate positive on BOTH sides is a mechanical effect of the
+geometry; a candidate positive on longs only and flat/negative on shorts is long-side drift wearing
+an exit-geometry costume (nexmind-regime-side-is-beta), not a management discovery.

@@ -400,3 +400,97 @@ test('entryAt "open" manages the entry bar; a close fill cannot be resolved by i
   assert.equal(open.trades.length, 1, "same-session stop-out is booked on an open fill");
   assert.equal(close.trades.length, 0, "the close fill is still open — the next bar never reaches 98.5");
 });
+
+// ---- time stop: openPosition(maxBars) / stepPosition ----
+// The one exit-geometry class LADDER_OPTIONS cannot express — see
+// ExitOptions.maxBars and the nexmind-exit-alone-is-long-drift memory.
+
+test("openPosition threads maxBars through to the returned position; barsHeld starts at 0", () => {
+  const p = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, {}, 1.5, undefined, 5);
+  assert.equal(p.maxBars, 5);
+  assert.equal(p.barsHeld, 0);
+});
+
+test("openPosition without maxBars leaves the position unbounded in time", () => {
+  const p = freshLong();
+  assert.equal(p.maxBars, undefined);
+  assert.equal(p.barsHeld, 0);
+});
+
+test("no maxBars set: position never force-closes no matter how many quiet bars pass", () => {
+  const p = freshLong();
+  for (let i = 1; i <= 50; i++) {
+    assert.deepEqual(stepPosition(p, bar(i, 102, 99)), { status: "open" });
+  }
+  assert.equal(p.barsHeld, 50);
+});
+
+test("maxBars force-closes at bar close once barsHeld reaches it; sign follows close vs entry", () => {
+  // win: close above entry
+  const win = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, {}, 1.5, undefined, 2);
+  assert.deepEqual(stepPosition(win, bar(1, 102, 99)), { status: "open" }); // barsHeld 1 < maxBars 2
+  const rWin = stepPosition(win, bar(2, 103, 101)); // barsHeld 2 >= maxBars 2, close=102
+  assert.equal(rWin.status, "closed");
+  if (rWin.status === "closed") {
+    assert.equal(rWin.trade.outcome, "win");
+    assert.equal(rWin.trade.exit, 102);
+  }
+
+  // loss: close below entry, without ever touching SL(97)/TP1(105)
+  const loss = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, {}, 1.5, undefined, 2);
+  stepPosition(loss, bar(1, 100.5, 99));
+  const rLoss = stepPosition(loss, bar(2, 100.5, 99)); // close 99.75
+  assert.equal(rLoss.status, "closed");
+  if (rLoss.status === "closed") {
+    assert.equal(rLoss.trade.outcome, "loss");
+    assert.equal(rLoss.trade.exit, 99.75);
+  }
+
+  // breakeven: close exactly at entry
+  const flat = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, {}, 1.5, undefined, 2);
+  stepPosition(flat, bar(1, 101, 99));
+  const rFlat = stepPosition(flat, bar(2, 101, 99)); // close 100
+  assert.equal(rFlat.status, "closed");
+  if (rFlat.status === "closed") {
+    assert.equal(rFlat.trade.outcome, "breakeven");
+    assert.equal(rFlat.trade.exit, 100);
+  }
+});
+
+test("an intrabar SL touch on the same bar takes priority over an equal-or-later maxBars trigger", () => {
+  const p = openPosition("long", 100, 2, 0.2, new Date(t0 * 1000), false, 2.5, {}, 1.5, undefined, 1);
+  // Same bar as "SL bar books a full loss": low 96.5 clears the SL at 97 on
+  // the very first managed bar, the same bar barsHeld reaches maxBars(1).
+  const r = stepPosition(p, bar(1, 99, 96.5));
+  assert.equal(r.status, "closed");
+  if (r.status === "closed") {
+    assert.equal(r.trade.outcome, "loss");
+    assert.equal(r.trade.exit, 97, "the SL price, not the bar's close — price beats the clock in a tie");
+  }
+});
+
+test("a trail-update ratchet on the maxBars bar still falls through to the time stop instead of returning early", () => {
+  // Same geometry as freshLongTrail (sl=96, activateDist=2, offsetDist=3.5),
+  // plus maxBars=1. Regression target: stepPosition used to `return` right
+  // after persisting a ratchet, which would silently disable the time stop on
+  // any bar that also happens to move the trail.
+  const p = openPosition(
+    "long", 100, 2, 0.2, new Date(t0 * 1000), true, 3.5, {}, 2.0,
+    { activateMult: 1, offsetMult: 1.75 }, 1,
+  );
+  const r = stepPosition(p, bar(1, 106, 101)); // ratchets extreme->106, sl->102.5, then barsHeld 1 >= maxBars 1
+  assert.equal(r.status, "closed");
+  if (r.status === "closed") {
+    assert.equal(r.trade.outcome, "win");
+    assert.equal(r.trade.exit, 103.5, "closes at the bar's close (103.5), not the ratcheted trail stop (102.5)");
+    assert.equal(r.trade.sl, 96, "origSl, the true initial risk");
+    assert.ok(Math.abs((r.trade.rMultiple ?? 0) - 0.7 / 0.8) < 1e-9);
+  }
+});
+
+test("simulateExits threads ExitOptions.maxBars through to opened positions", () => {
+  const { candles, signals } = openFillSeries(AT, () => 1, WARMUP + 4);
+  const r = simulateExits("X", candles, signals, { slMult: 1.5, singleTarget: true, maxBars: 1 });
+  assert.equal(r.trades.length, 1, "position must be force-closed by the time stop, not left open at the end");
+  assert.equal(r.openAtEnd, false);
+});
