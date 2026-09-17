@@ -78,210 +78,25 @@
 //      The 1.2/1.5 ladder was never designed for a fade, but sweeping it before
 //      the fill question is settled fits two things at once and settles neither.
 //
+// ADDENDUM 2026-09-05 — where the mechanisms went
+//
+// LADDERS and MECHANISMS now live in src/lib/research/mechanisms.ts, imported
+// below rather than defined here. Nothing about them changed; they moved so that
+// scripts/deep-holdout.mts can run the SAME objects over the pre-2016 folds
+// instead of a copy that could drift. The numbers in
+// scripts/mechanism-screen-control.log are unaffected and were re-verified
+// against this file after the move.
+//
 import "dotenv/config";
 import { loadPanel, FOLDS, type Fold, type FoldName } from "@/lib/research/panel";
 import {
-  sliceFold, withSignals, simulateFold, runControl, PANEL_LOT, PANEL_SEED,
-  type PanelExit, type FoldSliceRow,
+  sliceFold, withSignals, simulateFold, runControl, PANEL_SEED,
+  type FoldSliceRow,
 } from "@/lib/research/panelRun";
-import {
-  computeEntrySignals, DEFAULT_COST_MODEL, WARMUP, type EntryRule,
-} from "@/lib/backtest/engine";
-import { sma, trueRange, type Candle } from "@/lib/indicators";
-
-const LADDERS: Record<string, PanelExit> = {
-  flat: { tp1Mult: 1.2, slMult: 1.5, singleTarget: true, lot: PANEL_LOT, costs: DEFAULT_COST_MODEL },
-  trail: {
-    tp1Mult: 1.2, slMult: 1.5, singleTarget: true, lot: PANEL_LOT, costs: DEFAULT_COST_MODEL,
-    trail: { activateMult: 1.5, offsetMult: 1.5 },
-  },
-};
+import { LADDERS, MECHANISMS, type Mechanism } from "@/lib/research/mechanisms";
+import { computeEntrySignals, WARMUP } from "@/lib/backtest/engine";
 
 const FOLD_ORDER: FoldName[] = ["fit", "select", "test1", "test2", "test3"];
-
-interface Mechanism {
-  key: string;
-  /** one line, printed above the row — what claim is being tested */
-  blurb: string;
-  /** null means "use the built-in decideSetup", i.e. the baseline reference row */
-  rule: ((candles: Candle[]) => EntryRule) | null;
-  /**
-   * Fill price. Omitted = "close", which is what every row screened on
-   * 2026-08-26 used and the only legal value for a rule that reads bar i's
-   * close. Set it ONLY for a rule decidable from the opening print; see
-   * ExitOptions.entryAt in the engine for what that costs and guarantees.
-   */
-  entryAt?: "close" | "open" | "open-unmanaged";
-}
-
-// ---------------------------------------------------------------------------
-// Shared helpers. All read strictly indices <= i: simulateExits fills at the
-// CLOSE of the signal bar, so bar i's own o/h/l/c/v is known and bar i+1 is not.
-// ---------------------------------------------------------------------------
-
-/** True when x is the smallest of the `period` values ending at i (inclusive). */
-function isMinOfWindow(values: number[], i: number, period: number): boolean {
-  if (i < period - 1) return false;
-  const x = values[i];
-  for (let k = i - period + 1; k < i; k++) if (values[k] <= x) return false;
-  return true;
-}
-
-/** True when x is the largest of the `period` values ending at i (inclusive). */
-function isMaxOfWindow(values: number[], i: number, period: number): boolean {
-  if (i < period - 1) return false;
-  const x = values[i];
-  for (let k = i - period + 1; k < i; k++) if (values[k] >= x) return false;
-  return true;
-}
-
-/**
- * The last weekday of the calendar month containing `t`.
- *
- * Deliberately computed from the CALENDAR and not from the bar array. Asking
- * "is candles[i+1] in a new month?" would be lookahead — it reads a bar that has
- * not printed. The last weekday of March is knowable in January, so a desk could
- * genuinely place this order; a market holiday simply means no bar exists that
- * day and the rule fires on nothing.
- */
-function isLastWeekdayOfMonth(t: number): boolean {
-  const d = new Date(t * 1000);
-  const y = d.getUTCFullYear(), m = d.getUTCMonth();
-  const last = new Date(Date.UTC(y, m + 1, 0));
-  while (last.getUTCDay() === 0 || last.getUTCDay() === 6) last.setUTCDate(last.getUTCDate() - 1);
-  return d.getUTCDate() === last.getUTCDate();
-}
-
-// ---------------------------------------------------------------------------
-// The six. Each returns an EntryRule closed over one symbol's candles.
-// ---------------------------------------------------------------------------
-
-const MECHANISMS: Mechanism[] = [
-  {
-    key: "baseline",
-    blurb: "decideSetup() — the desk's trend-pullback rule, printed as the reference row",
-    rule: null,
-  },
-  {
-    key: "mr-down3",
-    blurb: "time-series mean reversion: long after 3 consecutive lower closes",
-    // NOT the cross-sectional mean reversion that was rejected. That one ranked
-    // names against each other and traded the spread; this reads only the
-    // symbol's own path and never compares two symbols. Different mechanism,
-    // different failure mode, so the closed loop does not cover it.
-    rule: (c) => (i) => {
-      if (i < 3) return null;
-      return c[i].c < c[i - 1].c && c[i - 1].c < c[i - 2].c && c[i - 2].c < c[i - 3].c ? "long" : null;
-    },
-  },
-  {
-    key: "nr7",
-    blurb: "volatility contraction: narrowest range of 7, direction from the symbol's own SMA50",
-    // The trigger is the COMPRESSION, not a level break — which is what keeps it
-    // out of the rejected breakout family. Direction has to come from somewhere
-    // and SMA50 is the cheapest self-normalising choice available at bar i.
-    rule: (c) => {
-      const ranges = c.map((b) => b.h - b.l);
-      const s50 = sma(c.map((b) => b.c), 50);
-      return (i) => {
-        if (!isMinOfWindow(ranges, i, 7)) return null;
-        const m = s50[i];
-        if (m == null) return null;
-        return c[i].c > m ? "long" : "short";
-      };
-    },
-  },
-  {
-    key: "gap-fade",
-    blurb: "gap fade: long when the open gapped below yesterday's low, short above yesterday's high",
-    // Fills at the CLOSE of the gap bar, not at the open — simulateExits has no
-    // intrabar entry. So this is "the gap happened this morning, fade it into
-    // the close", a strictly weaker and strictly implementable version.
-    rule: (c) => (i) => {
-      if (i < 1) return null;
-      if (c[i].o < c[i - 1].l) return "long";
-      if (c[i].o > c[i - 1].h) return "short";
-      return null;
-    },
-  },
-  {
-    key: "gap-fade-open",
-    blurb: "gap fade, filled at the OPEN — same rule, the price the mechanism actually describes",
-    // Identical rule to gap-fade. The ONLY difference is entryAt, which is why
-    // the two rows are printed from the same run over the same folds with the
-    // same PANEL_SEED: the pair IS the measurement, and comparing this row to a
-    // gap-fade number quoted from a different run would not be.
-    //
-    // Legal here and nowhere else in this file: the trigger reads bar i's OPEN
-    // and bar i-1's high/low, both known at 09:30. The stop is sized off
-    // atrs[i-1] and the entry bar is managed, both handled in simulateExits.
-    entryAt: "open",
-    rule: (c) => (i) => {
-      if (i < 1) return null;
-      if (c[i].o < c[i - 1].l) return "long";
-      if (c[i].o > c[i - 1].h) return "short";
-      return null;
-    },
-  },
-  {
-    key: "gap-fade-open-nomanage",
-    blurb: "DIAGNOSTIC ONLY, not implementable — open fill with the entry session left unmanaged",
-    // Attribution row, added 2026-08-26 AFTER gap-fade-open failed, and it cannot
-    // rescue it: the pre-registered verdict is recorded on the two rows above and
-    // does not depend on this one. What it decides is something else — whether
-    // intraday bars are still worth building. gap-fade-open moved the fill AND
-    // started managing the entry session pessimistically, and gap bars have wide
-    // ranges, so the control (which enters on ordinary bars) cannot subtract that
-    // second effect. If the damage is the fill price, intraday data cannot help.
-    // If it is the same-session ambiguity, intraday data is exactly what resolves
-    // it. This row separates the two and is quotable for nothing else.
-    entryAt: "open-unmanaged",
-    rule: (c) => (i) => {
-      if (i < 1) return null;
-      if (c[i].o < c[i - 1].l) return "long";
-      if (c[i].o > c[i - 1].h) return "short";
-      return null;
-    },
-  },
-  {
-    key: "turn-of-month",
-    blurb: "calendar: long on the last weekday of each month — zero parameters, zero price input",
-    // Included precisely because it is orthogonal to everything above: it cannot
-    // be a repackaging of trend, breakout or reversion, since it never reads a
-    // price. If the whole screen is noise, this row is the cleanest evidence of
-    // it, because a calendar has no story about why THIS universe.
-    rule: (c) => (i) => (isLastWeekdayOfMonth(c[i].t) ? "long" : null),
-  },
-  {
-    key: "vol-dryup",
-    blurb: "volume dry-up: lowest volume of 20 while the close holds above its own SMA50",
-    rule: (c) => {
-      const vols = c.map((b) => b.v);
-      const s50 = sma(c.map((b) => b.c), 50);
-      return (i) => {
-        const m = s50[i];
-        if (m == null || c[i].c <= m) return null;
-        return isMinOfWindow(vols, i, 20) ? "long" : null;
-      };
-    },
-  },
-  {
-    key: "range-expand",
-    blurb: "range expansion: largest true range of 20, closing in the top/bottom quarter of its own bar",
-    rule: (c) => {
-      const tr = trueRange(c);
-      return (i) => {
-        if (!isMaxOfWindow(tr, i, 20)) return null;
-        const span = c[i].h - c[i].l;
-        if (span <= 0) return null;
-        const pos = (c[i].c - c[i].l) / span;
-        if (pos >= 0.75) return "long";
-        if (pos <= 0.25) return "short";
-        return null;
-      };
-    },
-  },
-];
 
 // ---------------------------------------------------------------------------
 

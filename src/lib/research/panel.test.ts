@@ -10,6 +10,7 @@ import {
   foldSlice, FOLDS, FIT_FOLD, SELECT_FOLD, TEST_FOLDS, PANEL_WARMUP_BARS,
   PANEL_VALIDATION, LEGACY_VALIDATION, isPlaceholderBar, sanitizeSeries,
   loadPanel, resetPanelCache, type Fold,
+  DEEP_FOLDS, DEEP_FOLD_LIST, DEEP_CACHE_START, DEEP_PANEL_CACHE_PATH, PANEL_CACHE_PATH,
 } from "./panel";
 
 const DAY = 86_400;
@@ -167,6 +168,75 @@ test("loadPanel applies the sanitizer itself and reports what each symbol lost",
     assert.deepEqual(panel.bars.DIRTY.map((b) => b.t), [t0, t0 + 2 * DAY]);
     assert.deepEqual(panel.droppedBars, { DIRTY: 2 }, "only symbols that lost bars are listed");
     assert.ok(panel.bars.DIRTY.every((b) => !isPlaceholderBar(b)));
+  } finally {
+    resetPanelCache();
+  }
+});
+
+// ---- deep folds ----
+
+test("the deep folds are disjoint, ordered, and every one of them ends before FIT begins", () => {
+  // The whole value of these three windows is that no decision in this project
+  // has ever seen them. An overlap with FIT would quietly make the hold-out a
+  // re-read of the training set, which is the same fault the panel replaced —
+  // just harder to notice, because the numbers would still look new.
+  for (let i = 1; i < DEEP_FOLD_LIST.length; i++) {
+    assert.ok(
+      epoch(DEEP_FOLD_LIST[i].from) >= epoch(DEEP_FOLD_LIST[i - 1].to),
+      `${DEEP_FOLD_LIST[i].name} starts before ${DEEP_FOLD_LIST[i - 1].name} ends`,
+    );
+  }
+  for (const d of DEEP_FOLD_LIST) {
+    assert.ok(epoch(d.to) <= epoch(FIT_FOLD.from), `${d.name} runs past the start of FIT`);
+  }
+  assert.deepEqual(new Set(Object.keys(DEEP_FOLDS)), new Set(DEEP_FOLD_LIST.map((f) => f.name)));
+});
+
+test("the deep cache starts early enough to warm the first deep fold", () => {
+  // PANEL_WARMUP_BARS is 250 TRADING days. A cache that began the month before
+  // deep1 would hand it about twenty, leaving deep1's indicators cold while
+  // deep2 and deep3 ran warm — a boundary artifact that would surface as deep1
+  // disagreeing with the other two, i.e. as a regime finding.
+  const tradingDaysPerYear = 252;
+  const years = (epoch(DEEP_FOLD_LIST[0].from) - epoch(DEEP_CACHE_START)) / (365.25 * DAY);
+  assert.ok(
+    years * tradingDaysPerYear >= PANEL_WARMUP_BARS,
+    `${DEEP_CACHE_START} gives deep1 only ~${Math.round(years * tradingDaysPerYear)} warm-up bars`,
+  );
+});
+
+test("the deep cache is a different file from the panel cache", () => {
+  // Splicing the two would make "which data produced this number" unanswerable
+  // from the number, and the deep folds are only worth running because that
+  // question has an answer.
+  assert.notEqual(DEEP_PANEL_CACHE_PATH, PANEL_CACHE_PATH);
+});
+
+test("loadPanel alternating between two caches in one process returns each one's own bars", () => {
+  // loadPanel memoises into a single slot keyed on the path. The deep hold-out
+  // is the first caller that reads two caches in one process, and a memo that
+  // returned the first cache's bars for the second path would silently run the
+  // pre-2016 folds against post-2016 data — producing a full, plausible, wrong
+  // verdict with no error anywhere.
+  const dir = mkdtempSync(join(tmpdir(), "nexmind-panel-two-"));
+  const shallowPath = join(dir, "shallow.json");
+  const deepPath = join(dir, "deep.json");
+  writeFileSync(shallowPath, JSON.stringify({ fetchedAt: "2026-01-01T00:00:00.000Z", bars: { SHALLOW: dailyBars("2020-01-01", 5) } }));
+  writeFileSync(deepPath, JSON.stringify({ fetchedAt: "2026-02-02T00:00:00.000Z", bars: { DEEP: dailyBars("2001-01-01", 7) } }));
+
+  resetPanelCache();
+  try {
+    for (let round = 0; round < 2; round++) {
+      const shallow = loadPanel(shallowPath);
+      assert.deepEqual(shallow.symbols, ["SHALLOW"]);
+      assert.equal(shallow.bars.SHALLOW.length, 5);
+      assert.equal(shallow.fetchedAt, "2026-01-01T00:00:00.000Z");
+
+      const deep = loadPanel(deepPath);
+      assert.deepEqual(deep.symbols, ["DEEP"]);
+      assert.equal(deep.bars.DEEP.length, 7);
+      assert.equal(deep.fetchedAt, "2026-02-02T00:00:00.000Z");
+    }
   } finally {
     resetPanelCache();
   }

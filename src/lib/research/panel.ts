@@ -35,8 +35,42 @@ export const PANEL_WARMUP_BARS = 250;
 
 export type FoldName = "fit" | "select" | "test1" | "test2" | "test3";
 
-export interface Fold {
-  name: FoldName;
+/**
+ * The pre-2016 folds, which live in a SEPARATE cache and a separate name space.
+ *
+ * Kept out of FoldName rather than appended to it, because the two are not
+ * interchangeable and the type is what stops them being mixed. Only a `FoldName`
+ * may be persisted in a PanelFoldReport or reach the desk gate; a deep fold is a
+ * research instrument that has never been part of the approval path and must not
+ * become one by being assignable to the same field.
+ */
+export type DeepFoldName = "deep1" | "deep2" | "deep3";
+
+/**
+ * The XAUUSD folds — a third name space, on the same principle and for a
+ * stronger reason.
+ *
+ * The table itself, the pass bar and the caveat every gold verdict carries live
+ * in research/xauFolds.ts; only the NAME lives here, so that `Fold`'s union can
+ * mention it without this module depending on that one. Gold is one symbol with
+ * no cross-section and no ticker-disjoint replication, so an `xau-v1` result is
+ * a weaker class of evidence than a `panel-v1` one, and nothing named here may
+ * ever be persisted where a `FoldName` is expected.
+ */
+export type XauFoldName = "xfit" | "xselect" | "xtest1" | "xtest2" | "xtest3";
+
+/**
+ * A window of market, named.
+ *
+ * The generic parameter exists only to keep the name spaces apart at the call
+ * sites that care: `Fold<FoldName>` is what FOLDS and TEST_FOLDS hand out, so
+ * blindTest's persisted `fold: FoldName` still type-checks, while a bare `Fold`
+ * (the union) is what the fold-agnostic machinery — foldSlice, sliceFold,
+ * simulateFold, runControl — accepts, so a deep or gold fold runs through
+ * exactly the same code as a shallow one with no second implementation to drift.
+ */
+export interface Fold<N extends string = FoldName | DeepFoldName | XauFoldName> {
+  name: N;
   /** inclusive, ISO date */
   from: string;
   /** exclusive, ISO date */
@@ -68,7 +102,7 @@ export interface Fold {
  * and a real limitation for tuning. It is the price of having any untouched
  * data left at all, given that the cache starts in 2016.
  */
-export const FOLDS: Record<FoldName, Fold> = {
+export const FOLDS: Record<FoldName, Fold<FoldName>> = {
   fit: { name: "fit", from: "2016-01-01", to: "2019-01-01", regime: "post-2015 correction recovery through the 2018 Q4 selloff" },
   select: { name: "select", from: "2019-01-01", to: "2020-01-01", regime: "2019 melt-up on falling rates" },
   test1: { name: "test1", from: "2020-01-01", to: "2022-01-01", regime: "COVID crash and the liquidity-driven recovery" },
@@ -78,7 +112,65 @@ export const FOLDS: Record<FoldName, Fold> = {
 
 export const FIT_FOLD = FOLDS.fit;
 export const SELECT_FOLD = FOLDS.select;
-export const TEST_FOLDS: Fold[] = [FOLDS.test1, FOLDS.test2, FOLDS.test3];
+export const TEST_FOLDS: Fold<FoldName>[] = [FOLDS.test1, FOLDS.test2, FOLDS.test3];
+
+/** The pre-2016 cache. A different file on purpose — see DEEP_FOLDS. */
+export const DEEP_PANEL_CACHE_PATH = ".cache/bars/sp500-1d-deep.json";
+
+/**
+ * Sixteen years of market that no fold above has ever touched.
+ *
+ * WHY THESE EXIST. The 2016 floor of the main cache is a routing artifact, not
+ * a limit on price history: marketData's provider chain reaches Yahoo only when
+ * Alpaca errors, Alpaca never errors, and Alpaca's equity data starts
+ * 2016-01-04. Yahoo serves the same split- and dividend-adjusted daily bars back
+ * to the 1990s for most of these names, so the untouched data was there the
+ * whole time and simply never fetched.
+ *
+ * WHAT THEY ARE FOR, and the line that must not be crossed. FIT and SELECT are
+ * spent — every mechanism in scripts/mechanism-screen.mts has been read on them
+ * — and so, by now, are the three TEST folds, because their numbers have been
+ * read while deciding what to look at next. Data whose numbers are known cannot
+ * adjudicate the hypothesis those numbers suggested. These three folds are the
+ * only windows left where that is not true, which makes them expensive: they are
+ * for settling a hypothesis written down BEFORE the run, once, not for screening
+ * ideas. A script that reads them without a pre-registered pass bar in its own
+ * header is spending them for nothing.
+ *
+ * They are strictly earlier than FIT rather than later, which buys a property no
+ * amount of extra 2020s data could: three regimes with no structural overlap
+ * with the ones already used — two full bear markets (2000-02, 2007-09) against
+ * a panel whose only bear folds are a one-month crash and a single rate-hike
+ * year. A mechanism that survives here has survived market structure, not just
+ * more of the same decade.
+ *
+ * The cost, stated plainly: these bars come from a different provider than the
+ * 2016+ ones, and the survivorship bias is WORSE here than in the main cache,
+ * because a name in today's index that also traded in 2000 survived twenty-six
+ * years rather than ten. The margin over the matched control absorbs the level
+ * of that bias but is not proof it absorbs all of it — see
+ * PANEL_SURVIVORSHIP_CAVEAT and the quartile diagnostic in
+ * scripts/deep-holdout.mts, which measures the residual instead of assuming it.
+ */
+export const DEEP_FOLDS: Record<DeepFoldName, Fold<DeepFoldName>> = {
+  deep1: { name: "deep1", from: "2000-01-01", to: "2005-01-01", regime: "dot-com bust and the 2002 bottom" },
+  deep2: { name: "deep2", from: "2005-01-01", to: "2010-01-01", regime: "housing bubble, 2008 crisis, and the 2009 bottom" },
+  deep3: { name: "deep3", from: "2010-01-01", to: "2016-01-01", regime: "QE recovery, flash crash, 2011 and 2015 corrections" },
+};
+
+export const DEEP_FOLD_LIST: Fold<DeepFoldName>[] = [DEEP_FOLDS.deep1, DEEP_FOLDS.deep2, DEEP_FOLDS.deep3];
+
+/**
+ * Bars fetched BEFORE the first deep fold, so deep1 gets the same warm-up every
+ * other fold gets.
+ *
+ * PANEL_WARMUP_BARS is 250 trading days; a cache starting in December 1999 would
+ * hand deep1 about twenty. The indicators would then be cold for deep1 and warm
+ * for deep2/deep3, which is precisely the boundary artifact PANEL_WARMUP_BARS
+ * exists to prevent — and it would show up as deep1 disagreeing with the others,
+ * i.e. as a regime finding.
+ */
+export const DEEP_CACHE_START = "1998-01-01";
 
 export interface Panel {
   /** when the cache was fetched — pinned into every result so a re-run is comparable */
@@ -155,9 +247,13 @@ export function loadPanel(cachePath: string = PANEL_CACHE_PATH): Panel {
   try {
     raw = JSON.parse(readFileSync(cachePath, "utf8"));
   } catch (e) {
+    const rebuild =
+      cachePath === DEEP_PANEL_CACHE_PATH
+        ? `npx tsx scripts/cache-deep-history.mts`
+        : `node --env-file=.env --import tsx scripts/cache-daily-bars.mts sp500`;
     throw new Error(
       `panel cache unreadable at ${cachePath} (${e instanceof Error ? e.message : String(e)}) — ` +
-        `rebuild it with: node --env-file=.env --import tsx scripts/cache-daily-bars.mts sp500`,
+        `rebuild it with: ${rebuild}`,
     );
   }
   if (!raw.bars || typeof raw.bars !== "object") {

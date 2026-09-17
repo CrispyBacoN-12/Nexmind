@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isPlaceholderBar, sanitizeSeries, FROZEN_VOLUME_FRACTION } from "./bars";
+import {
+  isPlaceholderBar, sanitizeSeries, FROZEN_VOLUME_FRACTION,
+  medianBarSpacingDays, isDailySeries, MAX_DAILY_BAR_SPACING, MIN_DAILY_BAR_SPACING,
+  isIntradaySeries, INTRADAY_SPACING_TOLERANCE,
+} from "./bars";
 import type { Candle } from "@/lib/indicators";
 
 // Why the shape rule alone is not enough
@@ -86,4 +90,119 @@ test("typical size is judged by the median, so a long filler run cannot drag the
 
 test("an empty series is unchanged", () => {
   assert.deepEqual(sanitizeSeries([]), { candles: [], dropped: 0 });
+});
+
+// ---- bar spacing ----
+//
+// A different failure from everything above: not a bad bar inside a good series,
+// but a series that is the wrong RESOLUTION end to end. Yahoo answers
+// `interval=1d` over a long range with weekly or monthly aggregates, and every
+// one of those bars is well-formed — real open, real high, real volume, correctly
+// adjusted. sanitizeSeries passes all of them because there is nothing wrong with
+// any of them individually. Only the spacing between them says what they are.
+
+/** `n` bars `stepDays` apart, all otherwise normal. */
+const spaced = (n: number, stepDays: number): Candle[] =>
+  Array.from({ length: n }, (_, i) => bar(i * stepDays * DAY, 70 + i, 29_600_000));
+
+test("medianBarSpacingDays reads the typical gap, not the widest one", () => {
+  assert.equal(medianBarSpacingDays(spaced(50, 1)), 1);
+  assert.equal(medianBarSpacingDays(spaced(50, 7)), 7);
+  // Too short to have a spacing at all — null, not 0, because 0 would read as
+  // "bars on top of each other" and pass the daily check.
+  assert.equal(medianBarSpacingDays([]), null);
+  assert.equal(medianBarSpacingDays(spaced(1, 1)), null);
+});
+
+test("a real market closure cannot move the median", () => {
+  // The September 2001 four-session closure is one gap in four thousand. If a
+  // single wide gap could flip the verdict, the check would reject genuine
+  // history for having had a real event in it.
+  const rows = spaced(4000, 1);
+  const shifted = rows.map((b, i) => (i >= 2000 ? { ...b, t: b.t + 6 * DAY } : b));
+  assert.equal(medianBarSpacingDays(shifted), 1);
+  assert.equal(isDailySeries(shifted), true);
+});
+
+test("isDailySeries rejects the interval Yahoo silently downgrades to", () => {
+  // Weekly bars land at 7 and monthly near 30; MAX_DAILY_BAR_SPACING sits at 4,
+  // in the empty space above a weekend and far below either.
+  assert.equal(isDailySeries(spaced(200, 7)), false, "weekly");
+  assert.equal(isDailySeries(spaced(200, 30)), false, "monthly");
+  assert.equal(isDailySeries(spaced(200, 91)), false, "quarterly");
+  assert.equal(isDailySeries(spaced(200, 1)), true);
+  // The threshold has to clear a weekend with room to spare, or a thinly traded
+  // name that only prints a few days a week gets thrown out as weekly data.
+  assert.ok(MAX_DAILY_BAR_SPACING > 3 && MAX_DAILY_BAR_SPACING < 7);
+  assert.equal(isDailySeries(spaced(200, 3)), true, "a market that only prints Mon/Wed/Fri is still daily-resolution");
+});
+
+test("isDailySeries rejects everything BELOW a day too, not just above", () => {
+  // The upper bound alone is half a check: every one of these has a median
+  // spacing <= 4 and none of them is a daily series.
+  assert.equal(isDailySeries(spaced(200, 1 / 24)), false, "hourly");
+  assert.equal(isDailySeries(spaced(200, 1 / 96)), false, "15-minute");
+  assert.equal(isDailySeries(spaced(200, 0)), false, "duplicate timestamps");
+  assert.ok(MIN_DAILY_BAR_SPACING > 1 / 24 && MIN_DAILY_BAR_SPACING < 1);
+});
+
+test("a reverse-ordered series is not accepted as daily", () => {
+  // sanitizeSeries filters bars, it does not order them, so newest-first really
+  // can arrive here. Its gaps are all -1, which clears an upper bound of 4 and
+  // would have been read as clean daily history.
+  const newestFirst = [...spaced(200, 1)].reverse();
+  assert.equal(medianBarSpacingDays(newestFirst), -1);
+  assert.equal(isDailySeries(newestFirst), false);
+});
+
+test("a series with no spacing at all is not a daily series", () => {
+  // Refusing to answer beats answering "yes" from one bar: an empty or
+  // single-bar response is exactly what a wrong symbol returns, and the cache
+  // builder must not write it as though it had been checked.
+  assert.equal(isDailySeries([]), false);
+  assert.equal(isDailySeries(spaced(1, 1)), false);
+});
+
+const MIN = 1 / 1440;
+
+test("isIntradaySeries accepts the resolution it was asked about", () => {
+  assert.equal(isIntradaySeries(spaced(500, 60 * MIN), 60), true, "H1");
+  assert.equal(isIntradaySeries(spaced(500, 15 * MIN), 15), true, "M15");
+  assert.equal(isIntradaySeries(spaced(500, 240 * MIN), 240), true, "H4");
+});
+
+test("isIntradaySeries rejects the ADJACENT timeframe, which is the whole point", () => {
+  // An MT5 server with no history at the timeframe asked for does not error, it
+  // answers shorter and coarser. The tightest step it can move is 2x — M15 to
+  // M30 — so the band has to be narrower than that or the downgrade passes.
+  assert.equal(isIntradaySeries(spaced(500, 30 * MIN), 15), false, "M15 served as M30");
+  assert.equal(isIntradaySeries(spaced(500, 60 * MIN), 30), false, "M30 served as H1");
+  assert.equal(isIntradaySeries(spaced(500, 240 * MIN), 60), false, "H1 served as H4");
+  assert.equal(isIntradaySeries(spaced(500, 1), 60), false, "H1 served as D1");
+  assert.ok(INTRADAY_SPACING_TOLERANCE.max < 2 && INTRADAY_SPACING_TOLERANCE.min > 0.5);
+});
+
+test("isIntradaySeries rejects a FINER series too", () => {
+  // Asking for H1 and being handed M15 is just as wrong, and reads 0.25.
+  assert.equal(isIntradaySeries(spaced(500, 15 * MIN), 60), false);
+  assert.equal(isIntradaySeries(spaced(500, MIN), 15), false);
+});
+
+test("a 24/5 weekend gap cannot move the intraday verdict", () => {
+  // Gold trades round the clock Monday to Friday and stops for ~49 hours. On H1
+  // that is one gap in about 120, and the median does not notice it — which is
+  // the reason this reads the median and not the mean.
+  const rows = spaced(2400, 60 * MIN);
+  const withWeekends = rows.map((b, i) =>
+    ({ ...b, t: b.t + Math.floor(i / 120) * 49 * 3600 }));
+  assert.equal(isIntradaySeries(withWeekends, 60), true);
+});
+
+test("isIntradaySeries refuses rather than guesses on degenerate input", () => {
+  assert.equal(isIntradaySeries([], 60), false, "empty");
+  assert.equal(isIntradaySeries(spaced(1, 60 * MIN), 60), false, "one bar");
+  assert.equal(isIntradaySeries(spaced(500, 0), 60), false, "duplicate timestamps");
+  assert.equal(isIntradaySeries([...spaced(500, 60 * MIN)].reverse(), 60), false, "newest-first");
+  assert.equal(isIntradaySeries(spaced(500, 60 * MIN), 0), false, "no resolution asked about");
+  assert.equal(isIntradaySeries(spaced(500, 60 * MIN), -60), false, "negative resolution");
 });

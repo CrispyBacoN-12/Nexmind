@@ -1,0 +1,144 @@
+loading deep panel cache…
+panel .cache/bars/sp500-1d-deep.json — 453 symbols, fetchedAt 2026-09-05T14:42:19.951Z
+  dropped 1481 placeholder bar(s) across 41 symbol(s): AMCR 703, ODFL 310, DECK 104, NDAQ 92, MNST 66, CHTR 39, ACGL 35, TTWO 21, CSGP 15, IVZ 15, TSCO 9, BRO 7, …
+ladder=flat "no trail"  control=200  seed=20260825  WARMUP=60
+deep folds all end before FIT begins (2016-01-01):
+  deep1  2000-01-01..2005-01-01  — dot-com bust and the 2002 bottom
+  deep2  2005-01-01..2010-01-01  — housing bubble, 2008 crisis, and the 2009 bottom
+  deep3  2010-01-01..2016-01-01  — QE recovery, flash crash, 2011 and 2015 corrections
+  deep1: 377 symbols participate
+  deep2: 410 symbols participate
+  deep3: 453 symbols participate
+
+==============================================================================
+1. DEEP HOLD-OUT — one hypothesis (mr-down3), eight audit rows
+==============================================================================
+
+baseline   (audit row, not under test)
+  decideSetup() — the desk's trend-pullback rule, printed as the reference row
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      35981      373   0.002   55.9%   0.011    0.016   -0.014  LOSES-to-median
+    deep2      38522      406   0.011   56.4%   0.004    0.010    0.002  beats-median
+    deep3      49620      452  -0.010   55.3%   0.013    0.017   -0.028  LOSES-to-median
+    signs ++-
+
+mr-down3   <-- THE HYPOTHESIS
+  time-series mean reversion: long after 3 consecutive lower closes
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      27521      373   0.070   59.6%   0.045    0.051    0.019  beats-median
+    deep2      30268      407   0.074   59.9%   0.039    0.044    0.030  beats-median
+    deep3      38195      452   0.132   63.2%   0.076    0.081    0.051  beats-median
+    signs +++
+
+nr7   (audit row, not under test)
+  volatility contraction: narrowest range of 7, direction from the symbol's own SMA50
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      38233      373   0.003   55.9%   0.009    0.017   -0.015  LOSES-to-median
+    deep2      42207      407   0.012   56.4%   0.005    0.012   -0.000  beats-median
+    deep3      57050      451  -0.012   55.2%   0.019    0.025   -0.037  LOSES-to-median
+    signs ++-
+
+gap-fade   (audit row, not under test)
+  gap fade: long when the open gapped below yesterday's low, short above yesterday's high
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      52992      373  -0.011   55.2%  -0.016   -0.010   -0.001  beats-median
+    deep2      61838      407   0.017   56.7%  -0.012   -0.005    0.022  beats-median
+    deep3      91593      452   0.008   56.3%  -0.023   -0.018    0.026  beats-median
+    signs -++
+
+gap-fade-open   (audit row, not under test)
+  gap fade, filled at the OPEN — same rule, the price the mechanism actually describes
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      60599      373  -0.043   53.4%  -0.016   -0.010   -0.033  LOSES-to-median
+    deep2      70774      407  -0.008   55.3%  -0.011   -0.005   -0.003  beats-median
+    deep3     104807      452  -0.064   52.3%  -0.022   -0.018   -0.046  LOSES-to-median
+    signs ---
+
+gap-fade-open-nomanage   (audit row, not under test)
+  DIAGNOSTIC ONLY, not implementable — open fill with the entry session left unmanaged
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      59762      373  -0.043   53.4%  -0.023   -0.017   -0.026  LOSES-to-median
+    deep2      69842      407  -0.010   55.2%  -0.018   -0.012    0.001  beats-median
+    deep3     103689      452  -0.065   52.2%  -0.028   -0.024   -0.040  LOSES-to-median
+    signs ---
+
+turn-of-month   (audit row, not under test)
+  calendar: long on the last weekday of each month — zero parameters, zero price input
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      19852      373   0.065   59.4%   0.051    0.060    0.005  beats-median
+    deep2      22804      407   0.054   58.8%   0.045    0.053    0.001  beats-median
+    deep3      29502      452   0.099   61.3%   0.080    0.089    0.010  beats-median
+    signs +++
+
+vol-dryup   (audit row, not under test)
+  volume dry-up: lowest volume of 20 while the close holds above its own SMA50
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      11700      373   0.079   60.2%   0.053    0.064    0.015  beats-median
+    deep2      12881      407   0.047   58.4%   0.046    0.057   -0.010  beats-median
+    deep3      18834      452   0.043   58.2%   0.083    0.091   -0.048  LOSES-to-median
+    signs +++
+
+range-expand   (audit row, not under test)
+  range expansion: largest true range of 20, closing in the top/bottom quarter of its own bar
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1      15436      370  -0.014   55.0%   0.002    0.014   -0.028  LOSES-to-median
+    deep2      17219      407  -0.018   54.8%  -0.001    0.011   -0.030  LOSES-to-median
+    deep3      23084      451  -0.018   54.8%  -0.007    0.003   -0.021  LOSES-to-median
+    signs ---
+
+==============================================================================
+2. SURVIVORSHIP DIAGNOSTIC — mr-down3 by the symbol's own deep-window return
+==============================================================================
+449 symbols with >= 1y of deep history, 112/112/112/113 per quartile (every symbol in exactly one bucket, none dropped)
+
+mr-down3 · Q1 (worst compounders)
+  annualised return -27.8% .. 7.3%
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1       7694       97   0.039   57.9%   0.015    0.026    0.013  beats-median
+    deep2       7812      103   0.071   59.7%   0.028    0.038    0.033  beats-median
+    deep3       9766      112   0.092   60.9%   0.049    0.060    0.032  beats-median
+    signs +++
+
+mr-down3 · Q2
+  annualised return 7.3% .. 10.7%
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1       8223      107   0.064   59.3%   0.040    0.051    0.012  beats-median
+    deep2       8362      111   0.075   60.0%   0.032    0.044    0.031  beats-median
+    deep3       9973      112   0.129   63.0%   0.076    0.084    0.045  beats-median
+    signs +++
+
+mr-down3 · Q3
+  annualised return 10.7% .. 15.7%
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1       7096       99   0.092   60.9%   0.065    0.077    0.015  beats-median
+    deep2       7891      108   0.073   59.8%   0.046    0.057    0.016  beats-median
+    deep3       9569      112   0.140   63.6%   0.086    0.096    0.043  beats-median
+    signs +++
+
+mr-down3 · Q4 (best compounders)
+  annualised return 15.7% .. 99.9%
+    fold      trades  symbols    avgR     win%   ctrl med  ctrl p95   margin
+    deep1       4508       70   0.102   61.4%   0.072    0.085    0.016  beats-median
+    deep2       6203       85   0.077   60.0%   0.053    0.066    0.011  beats-median
+    deep3       8871      113   0.171   65.3%   0.097    0.110    0.060  beats-median
+    signs +++
+
+==============================================================================
+3. VERDICT
+==============================================================================
+
+hold-out rule: beats control median >= 2/3 AND beats control p95 >= 1/3
+  beats median: 3/3   beats p95: 3/3
+  -> PASS
+
+survivorship rule: mean margin over control median, averaged across the three deep folds
+  Q1:  0.037
+  Q2:  0.040
+  Q3:  0.036
+  Q4:  0.042
+  -> WINNER-DRIFT OBJECTION FALLS — the rule works on the worst compounders too (delisting survivorship is NOT tested here and stays open)
+
+Both rules were written into the header of this file before it was first run.
+The eight non-mr-down3 rows above are an audit trail. Promoting one of them from
+this log would spend the last untouched data in the project on a rule chosen after
+seeing its numbers, which is the exact mistake this run exists to avoid.

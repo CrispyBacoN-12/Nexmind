@@ -55,6 +55,102 @@ function typicalVolume(bars: Candle[]): number | null {
 }
 
 /**
+ * The typical number of CALENDAR days between consecutive bars, or null for a
+ * series too short to have a spacing.
+ *
+ * This exists to catch a silent corruption sanitizeSeries structurally cannot:
+ * Yahoo's `/v8/finance/chart` treats `interval` as a request, not a contract,
+ * and over a long `range` it quietly serves weekly, monthly or quarterly bars
+ * under `interval=1d` — AAPL over `range=max` returns 169 bars for 42 years.
+ * Every one of those bars is a real, well-formed, correctly adjusted session
+ * aggregate, so no per-bar check can reject them; the only evidence of the
+ * downgrade is the SPACING between them. A panel built from such a series would
+ * run every indicator, every fold and every control without complaint and report
+ * numbers for a strategy nobody could trade.
+ *
+ * The MEDIAN, so a real market closure cannot move it: daily US equity bars sit
+ * 1 day apart Tuesday to Friday and 3 across a weekend, giving a median of 1,
+ * and the September 2001 four-session closure is one gap in four thousand.
+ */
+export function medianBarSpacingDays(bars: Candle[]): number | null {
+  if (bars.length < 2) return null;
+  const gaps: number[] = [];
+  for (let i = 1; i < bars.length; i++) gaps.push((bars[i].t - bars[i - 1].t) / 86_400);
+  gaps.sort((a, b) => a - b);
+  const mid = gaps.length >> 1;
+  return gaps.length % 2 ? gaps[mid] : (gaps[mid - 1] + gaps[mid]) / 2;
+}
+
+/**
+ * Loosest spacing a series may have and still be daily bars.
+ *
+ * A weekend puts 3 calendar days between Friday and Monday, so a genuinely daily
+ * series can have a median of 1 and never more than 3. Weekly bars land at 7.
+ * Four sits in the empty space between the two, far from both.
+ */
+export const MAX_DAILY_BAR_SPACING = 4;
+
+/**
+ * Tightest spacing a series may have and still be daily bars.
+ *
+ * The upper bound alone is not a resolution check, it is half of one. Anything
+ * below a day also satisfies `<= 4`: intraday bars (a 1h series has a median
+ * spacing of ~0.04), duplicate timestamps (0), and a series handed to us newest
+ * -first, whose gaps are all NEGATIVE. sanitizeSeries filters bars but does not
+ * order them, so reverse order is a shape this function really can receive.
+ * Half a day sits below any daily series and above every intraday one.
+ */
+export const MIN_DAILY_BAR_SPACING = 0.5;
+
+/** Does this series actually have the daily resolution it claims? See medianBarSpacingDays. */
+export function isDailySeries(bars: Candle[]): boolean {
+  const spacing = medianBarSpacingDays(bars);
+  return spacing != null && spacing >= MIN_DAILY_BAR_SPACING && spacing <= MAX_DAILY_BAR_SPACING;
+}
+
+/**
+ * How far an intraday series' median spacing may sit from the resolution it
+ * claims, as a multiple of that resolution.
+ *
+ * The band has to be narrower than the tightest step between two adjacent MT5
+ * timeframes, or a downgrade lands inside it and passes. That step is 2x
+ * (M15 to M30, and M30 to H1); everything else is 3x or wider. So the upper
+ * bound sits at 1.5 and the lower at 0.75 — a series served one timeframe
+ * coarser reads 2.0 and is rejected, one finer reads 0.5 and is rejected, and
+ * neither bound is close enough to 1 for ordinary feed noise to trip it.
+ */
+export const INTRADAY_SPACING_TOLERANCE = { min: 0.75, max: 1.5 };
+
+/**
+ * Does this series actually have the intraday resolution it claims?
+ *
+ * The daily version of this check exists because Yahoo silently downgrades
+ * `interval` over a long `range`. An MT5 broker can hand back the same shape for
+ * a different reason: a timeframe the server has no history for is not an error,
+ * it is a shorter answer, and one assembled from whatever it does hold. Either
+ * way the bars are individually well-formed and only the spacing between them
+ * says what happened.
+ *
+ * The median, and only the median, for the reason medianBarSpacingDays gives:
+ * a 24/5 instrument puts a ~49-hour gap between Friday's last bar and Sunday's
+ * first, which on H1 is one gap in about 120. A mean would be dragged by it; the
+ * median is not. That also means this answers "what resolution is this?" and NOT
+ * "is this series complete" — a feed missing a third of its bars still has the
+ * right median. Completeness is a separate count, and the probe reports it
+ * separately.
+ */
+export function isIntradaySeries(bars: Candle[], expectedMinutes: number): boolean {
+  if (!(expectedMinutes > 0)) return false;
+  const spacing = medianBarSpacingDays(bars);
+  if (spacing == null) return false;
+  const expected = expectedMinutes / 1440;
+  return (
+    spacing >= expected * INTRADAY_SPACING_TOLERANCE.min &&
+    spacing <= expected * INTRADAY_SPACING_TOLERANCE.max
+  );
+}
+
+/**
  * Drop placeholder bars from one symbol's history.
  *
  * Two rules, because the second needs context the first cannot have.
