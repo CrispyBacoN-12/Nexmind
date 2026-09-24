@@ -99,6 +99,28 @@ export interface EarningsInfo {
   note?: string;
 }
 
+/**
+ * The worst overnight gap against a long in the sample, in units of the stop.
+ * See gapRisk.ts for the formula and for why ATR_{t-1} is the denominator.
+ */
+export interface GapRisk {
+  /** Sessions that could be measured (prior ATR available). */
+  sessions: number;
+  /** YYYY-MM-DD span of the history the figure was read from. */
+  from: string;
+  to: string;
+  /** max over t of max(0, C_{t-1} - O_t) / (slMult * ATR_{t-1}). */
+  worstStops: number;
+  /** Session the worst gap opened on; null when no session gapped down at all. */
+  worstDate: string | null;
+  /** 1 + worstStops: the loss had that gap hit a position resting just above its stop. */
+  worstLossR: number;
+  /** Sessions whose adverse gap alone was at least half a stop. */
+  overHalfStop: number;
+  /** Sessions whose adverse gap alone was a full stop or more — a stop-out past -1R even from entry. */
+  overOneStop: number;
+}
+
 export interface CorrelationLine {
   ticker: string;
   /** null when the holding's candles could not be fetched or had no variance. */
@@ -135,6 +157,9 @@ export interface AdvisorInput {
   /** Fetched by the caller, like everything else here. Omitted or null means the
    *  card says the date is unknown — never that there is no report coming. */
   earnings?: EarningsInfo | null;
+  /** Longer daily history (the route's 2y pull) read ONLY for gap risk, so the
+   *  6mo figures above do not move. Omitted or null: the card says unknown. */
+  gapHistory?: Candle[] | null;
 }
 
 export interface AdvisorCard {
@@ -168,6 +193,12 @@ export interface AdvisorCard {
    *  so a date near the entry is a risk disclosure and nothing more. Nothing on
    *  this card sizes, stops or ladders differently because of it. */
   earnings: EarningsInfo | null;
+  /** Reported, never applied: sizing still assumes the stop fills at the stop.
+   *  null when the history was missing or too short to read. */
+  gapRisk: GapRisk | null;
+  /** shares * slDistance * gapRisk.worstLossR — dollars at stake if the worst
+   *  sampled gap hit today's position resting just above its stop. */
+  gapWorstLossUsd: number | null;
   /** True when the asked-about ticker is already in holdings. Shown at the top. */
   alreadyHeld: boolean;
   /** Everything that went wrong but did not stop the card rendering. */

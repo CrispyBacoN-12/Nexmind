@@ -17,6 +17,7 @@ import { gateSlots, type GateDecision } from "@/lib/market/marketGate";
 import { dailyReturns, pearsonCorrelation } from "@/lib/trading/correlation";
 import { corrMultiplierFor } from "@/lib/trading/positionSizing";
 
+import { gapRisk } from "./gapRisk";
 import { rLadder, costInR } from "./rLadder";
 import { sizeShares } from "./sizing";
 import {
@@ -139,6 +140,20 @@ export function advise(input: AdvisorInput): AdvisorResult {
     warnings.push("The benchmark (SPY) could not be fetched, so the market regime is unknown.");
   }
 
+  // Gap-through risk, from the longer history when the route supplied it. It is
+  // disclosed, not applied: the size above still assumes a -1R stop-out, and the
+  // owner sees next to it what the sample says a bad open would have cost.
+  const gap = gapRisk(input.gapHistory ?? candles);
+  const gapWorstLossUsd = gap ? sizing.shares * slDistance * gap.worstLossR : null;
+  if (!gap) {
+    warnings.push(`Too little daily history to read ${ticker}'s overnight gap risk, so the -1R stop-out on this card is unchecked against gaps.`);
+  } else if (gap.overOneStop > 0) {
+    warnings.push(
+      `${ticker} opened a full stop or more below the prior close on ${gap.overOneStop} of ${gap.sessions} sessions ` +
+        `(${gap.from} to ${gap.to}). On those nights a stop does not cap the loss at 1R.`,
+    );
+  }
+
   const alreadyHeld = input.holdings.some((h) => h.ticker.trim().toUpperCase() === ticker);
 
   const card: AdvisorCard = {
@@ -164,6 +179,8 @@ export function advise(input: AdvisorInput): AdvisorResult {
     // check this date against anything; it carries it to the card so that the
     // card and the facts sheet are looking at the same object.
     earnings: input.earnings ?? null,
+    gapRisk: gap,
+    gapWorstLossUsd,
     alreadyHeld,
     warnings,
     noEdgeClaim: ADVISOR_NO_EDGE_CLAIM,

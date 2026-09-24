@@ -53,6 +53,8 @@ function makeCard(over: Partial<AdvisorCard> = {}): AdvisorCard {
     // A known date by default, so that a test which cares about the unknown
     // wording has to ask for it and cannot pass by accident.
     earnings: { date: "2026-10-28", hour: "amc" },
+    gapRisk: null,
+    gapWorstLossUsd: null,
     alreadyHeld: false,
     warnings: [],
     noEdgeClaim: ADVISOR_NO_EDGE_CLAIM,
@@ -252,4 +254,23 @@ test("an empty news result prints its note, not a blank section", () => {
 test("the news section says so, never vanishing, when the caller did not fetch it at all", () => {
   const text = renderCritiqueContext(makeCard(), null);
   assert.match(text, /\[news\]\nnot fetched for this critique/);
+});
+
+test("gap-through risk is quoted in stops and R when measured, and n/a when not", () => {
+  const measured = renderCritiqueContext(
+    makeCard({
+      gapRisk: {
+        sessions: 480, from: "2024-09-10", to: "2026-09-10",
+        worstStops: 1.8, worstDate: "2025-04-04", worstLossR: 2.8,
+        overHalfStop: 9, overOneStop: 2,
+      },
+      gapWorstLossUsd: 51.9,
+    }),
+    makeBars(40),
+  );
+  assert.match(measured, /worst overnight gap-through \(2024-09-10 to 2026-09-10, 480 sessions\): 1\.80 stops on 2025-04-04, i\.e\. up to 2\.80 R/);
+  assert.match(measured, /2 sessions gapped a full stop or more/);
+
+  const unknown = renderCritiqueContext(makeCard(), makeBars(40));
+  assert.match(unknown, /worst overnight gap-through: n\/a/);
 });

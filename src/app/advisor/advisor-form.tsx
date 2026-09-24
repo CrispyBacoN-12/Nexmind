@@ -301,6 +301,25 @@ function ResultCard({
             ตามกฎสหสัมพันธ์ของเดสก์ (ตัวคูณ {fmtNumber(card.corrMultiplier, 2)}):{" "}
             {fmtNumber(card.corrAdjustedShares, 0)} หุ้น เป็นการรายงานเท่านั้น ไม่ได้นำไปปรับใช้ — ตัวเลขด้านบนยังไม่ถูกปรับ
           </p>
+          {/* Gap-through: the "actual risk" above assumes the stop fills AT the stop.
+              This is the sample's worst night against that assumption — disclosed,
+              never folded into the share count. */}
+          <p className="text-sm text-(--color-muted)">
+            {card.gapRisk ? (
+              <>
+                ความเสี่ยงเปิดกระโดดข้ามจุดตัดขาดทุน (Gap-through): แย่สุดใน {fmtNumber(card.gapRisk.sessions, 0)} วันทำการ
+                ({card.gapRisk.from} ถึง {card.gapRisk.to}) เปิดต่ำกว่าราคาปิดวันก่อน{" "}
+                <span className="font-mono">{fmtNumber(card.gapRisk.worstStops, 2)}</span> เท่าของระยะ stop
+                {card.gapRisk.worstDate ? ` (${card.gapRisk.worstDate})` : ""} — ถ้าเกิดตอนราคาอยู่ใกล้ stop จะขาดทุนได้ถึง{" "}
+                <span className="font-mono">{fmtNumber(card.gapRisk.worstLossR, 2)} R</span>
+                {card.gapWorstLossUsd != null ? ` ≈ ${fmtMoney(card.gapWorstLossUsd)}` : ""} แทนที่จะเป็น 1R ·
+                เปิดกระโดด ≥ 1 stop {card.gapRisk.overOneStop} ครั้ง, ≥ ครึ่ง stop {card.gapRisk.overHalfStop} ครั้ง ·
+                เป็นสถิติย้อนหลัง ไม่ใช่เพดานของความเสี่ยง และไม่ได้นำไปปรับจำนวนหุ้น
+              </>
+            ) : (
+              "ความเสี่ยงเปิดกระโดดข้ามจุดตัดขาดทุน (Gap-through): ข้อมูลรายวันไม่พอจะวัด — ขาดทุน -1R ข้างบนยังไม่ได้ตรวจกับการเปิดกระโดด"
+            )}
+          </p>
         </Card>
       </section>
 

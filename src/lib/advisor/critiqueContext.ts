@@ -104,6 +104,12 @@ export function renderCritiqueContext(
     `stop distance: ${num(card.slDistance)} (${ADVISOR_ATR_SL_MULT} x ATR)`,
     `stop: ${usd(card.stop)}`,
     `round-trip cost at ${ADVISOR_COST_BPS} bps: ${num(card.costR)} R`,
+    // Printed as n/a rather than omitted, for the same reason as earnings.
+    card.gapRisk
+      ? `worst overnight gap-through (${card.gapRisk.from} to ${card.gapRisk.to}, ${card.gapRisk.sessions} sessions): ` +
+        `${num(card.gapRisk.worstStops)} stops on ${card.gapRisk.worstDate ?? NA}, i.e. up to ${num(card.gapRisk.worstLossR)} R ` +
+        `(${card.gapRisk.overOneStop} sessions gapped a full stop or more)`
+      : `worst overnight gap-through: ${NA}`,
     "",
     "[sizing]",
     `shares: ${s.shares}`,

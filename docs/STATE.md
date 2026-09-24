@@ -78,9 +78,20 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 09-17)
+## 3. Done recently (2026-08-23 → 09-25)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
+
+- **`/advisor` now discloses overnight gap-through risk. 2026-09-25.** Every loss on the card
+  (and in the whole backtest engine, `positionRules.ts` books stops at `t.sl`) assumed a stop
+  fills AT the stop. `src/lib/advisor/gapRisk.ts` measures, over the 2y daily pull,
+  `G_t = max(0, C_{t-1} − O_t) / (1.5 × ATR_{t-1})` — the adverse overnight gap in units of the
+  stop that would have been set the evening before (ATR_{t-1}, never ATR_t, which contains the
+  gap). Card carries `gapRisk` (worst G, its date, worst loss `1+G` R, counts ≥½ and ≥1 stop)
+  and `gapWorstLossUsd`; RAVEN's `[risk]` block quotes it; a warning fires when any session
+  gapped ≥1 stop. **Disclosed, never applied to sizing**, same rule as correlation. It is a
+  floor on the tail, not a ceiling — 2y is ~8 earnings nights. Live check: NVDA worst 2.07 stops
+  on 2025-01-27 (DeepSeek) → 3.07R ≈ $55 on a 2-share card instead of the printed ~$18.
 
 - **Master's 88-file uncommitted backlog split into 10 commits; Risk Sentry merged;
   gold-mt5-pipeline found fully superseded. 2026-09-17.** The owner's 2026-09-05 deep-hold-out

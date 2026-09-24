@@ -221,6 +221,9 @@ export async function POST(req: Request) {
     holdings,
     benchmark,
     earnings,
+    // The same 2y series the chart draws, read for gap risk only: six months
+    // hold about two earnings reports, which is too few nights to find a tail.
+    gapHistory: chartCandles,
   });
 
   // `chart` rides alongside the card rather than inside it: `advise` is pure and
