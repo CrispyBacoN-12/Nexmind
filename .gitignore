@@ -99,3 +99,9 @@ mt5-bridge/bridge.err.log
 
 # SDD scratch workspace (ledger, task briefs, reports, review packages)
 .superpowers/
+
+# local-only: parked xau work and run scratch output (kept out of bridge diffs)
+/docs/superpowers/plans/2026-09-18-xau-v1-phase0-1-unblock.md
+/scripts/inspect-xau-regimes.mts
+/scripts/*.out
+/scripts/*.progress
