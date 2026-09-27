@@ -154,3 +154,21 @@ export type ScanLog = Prisma.ScanLogModel
  * hide the one number that actually drives the bill.
  */
 export type AiCall = Prisma.AiCallModel
+/**
+ * Model JournalTrade
+ * A trade the owner placed BY HAND (the broker is Webull, which NEXMIND can
+ * only read). Open while exitDate is null; the open rows are the book the
+ * portfolio gates in src/lib/portfolio/ evaluate against. Nothing here was
+ * placed by the desk — that is `Trade`.
+ */
+export type JournalTrade = Prisma.JournalTradeModel
+/**
+ * Model NavSnapshot
+ * The owner's account value, typed in once a day. Drives the drawdown gate.
+ */
+export type NavSnapshot = Prisma.NavSnapshotModel
+/**
+ * Model GateOverride
+ * Audit trail: a gate that failed, which the owner traded through anyway, and why.
+ */
+export type GateOverride = Prisma.GateOverrideModel

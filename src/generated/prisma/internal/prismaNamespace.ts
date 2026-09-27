@@ -400,7 +400,10 @@ export const ModelName = {
   Report: 'Report',
   Setting: 'Setting',
   ScanLog: 'ScanLog',
-  AiCall: 'AiCall'
+  AiCall: 'AiCall',
+  JournalTrade: 'JournalTrade',
+  NavSnapshot: 'NavSnapshot',
+  GateOverride: 'GateOverride'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -416,7 +419,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "aiCall"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "aiCall" | "journalTrade" | "navSnapshot" | "gateOverride"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1678,6 +1681,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    JournalTrade: {
+      payload: Prisma.$JournalTradePayload<ExtArgs>
+      fields: Prisma.JournalTradeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.JournalTradeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.JournalTradeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>
+        }
+        findFirst: {
+          args: Prisma.JournalTradeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.JournalTradeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>
+        }
+        findMany: {
+          args: Prisma.JournalTradeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>[]
+        }
+        create: {
+          args: Prisma.JournalTradeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>
+        }
+        createMany: {
+          args: Prisma.JournalTradeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.JournalTradeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>[]
+        }
+        delete: {
+          args: Prisma.JournalTradeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>
+        }
+        update: {
+          args: Prisma.JournalTradeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>
+        }
+        deleteMany: {
+          args: Prisma.JournalTradeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.JournalTradeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.JournalTradeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>[]
+        }
+        upsert: {
+          args: Prisma.JournalTradeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$JournalTradePayload>
+        }
+        aggregate: {
+          args: Prisma.JournalTradeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateJournalTrade>
+        }
+        groupBy: {
+          args: Prisma.JournalTradeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.JournalTradeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.JournalTradeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.JournalTradeCountAggregateOutputType> | number
+        }
+      }
+    }
+    NavSnapshot: {
+      payload: Prisma.$NavSnapshotPayload<ExtArgs>
+      fields: Prisma.NavSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.NavSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.NavSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.NavSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.NavSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.NavSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.NavSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.NavSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.NavSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.NavSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>
+        }
+        update: {
+          args: Prisma.NavSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.NavSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.NavSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.NavSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.NavSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NavSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.NavSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateNavSnapshot>
+        }
+        groupBy: {
+          args: Prisma.NavSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NavSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.NavSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NavSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
+    GateOverride: {
+      payload: Prisma.$GateOverridePayload<ExtArgs>
+      fields: Prisma.GateOverrideFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GateOverrideFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GateOverrideFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>
+        }
+        findFirst: {
+          args: Prisma.GateOverrideFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GateOverrideFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>
+        }
+        findMany: {
+          args: Prisma.GateOverrideFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>[]
+        }
+        create: {
+          args: Prisma.GateOverrideCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>
+        }
+        createMany: {
+          args: Prisma.GateOverrideCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GateOverrideCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>[]
+        }
+        delete: {
+          args: Prisma.GateOverrideDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>
+        }
+        update: {
+          args: Prisma.GateOverrideUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>
+        }
+        deleteMany: {
+          args: Prisma.GateOverrideDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GateOverrideUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GateOverrideUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>[]
+        }
+        upsert: {
+          args: Prisma.GateOverrideUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GateOverridePayload>
+        }
+        aggregate: {
+          args: Prisma.GateOverrideAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGateOverride>
+        }
+        groupBy: {
+          args: Prisma.GateOverrideGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GateOverrideGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GateOverrideCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GateOverrideCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2014,6 +2239,51 @@ export const AiCallScalarFieldEnum = {
 export type AiCallScalarFieldEnum = (typeof AiCallScalarFieldEnum)[keyof typeof AiCallScalarFieldEnum]
 
 
+export const JournalTradeScalarFieldEnum = {
+  id: 'id',
+  ticker: 'ticker',
+  sector: 'sector',
+  shares: 'shares',
+  entryPrice: 'entryPrice',
+  entryDate: 'entryDate',
+  stop: 'stop',
+  worstLossR: 'worstLossR',
+  exitPrice: 'exitPrice',
+  exitDate: 'exitDate',
+  note: 'note',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type JournalTradeScalarFieldEnum = (typeof JournalTradeScalarFieldEnum)[keyof typeof JournalTradeScalarFieldEnum]
+
+
+export const NavSnapshotScalarFieldEnum = {
+  date: 'date',
+  nav: 'nav',
+  cash: 'cash',
+  note: 'note',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NavSnapshotScalarFieldEnum = (typeof NavSnapshotScalarFieldEnum)[keyof typeof NavSnapshotScalarFieldEnum]
+
+
+export const GateOverrideScalarFieldEnum = {
+  id: 'id',
+  ticker: 'ticker',
+  gate: 'gate',
+  severity: 'severity',
+  message: 'message',
+  reason: 'reason',
+  tradeId: 'tradeId',
+  createdAt: 'createdAt'
+} as const
+
+export type GateOverrideScalarFieldEnum = (typeof GateOverrideScalarFieldEnum)[keyof typeof GateOverrideScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2233,6 +2503,9 @@ export type GlobalOmitConfig = {
   setting?: Prisma.SettingOmit
   scanLog?: Prisma.ScanLogOmit
   aiCall?: Prisma.AiCallOmit
+  journalTrade?: Prisma.JournalTradeOmit
+  navSnapshot?: Prisma.NavSnapshotOmit
+  gateOverride?: Prisma.GateOverrideOmit
 }
 
 /* Types for Logging */

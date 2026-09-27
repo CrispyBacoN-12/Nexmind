@@ -16,6 +16,7 @@ import { fmtMoney, fmtNumber, fmtPct } from "@/lib/utils";
 
 import { AdvisorChart } from "./advisor-chart";
 import { AdvisorCritique } from "./advisor-critique";
+import { PortfolioGates } from "./portfolio-gates";
 
 const CAP_LABEL: Record<string, string> = {
   risk: "งบความเสี่ยง",
@@ -402,6 +403,8 @@ function ResultCard({
           </ul>
         </Card>
       ) : null}
+
+      <PortfolioGates key={`gates-${critiqueKey}`} card={card} />
 
       <AdvisorCritique key={critiqueKey} card={card} chart={chart} />
 

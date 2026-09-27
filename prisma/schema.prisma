@@ -342,3 +342,55 @@ model AiCall {
   @@index([createdAt])
   @@index([label, createdAt])
 }
+
+/// A trade the owner placed BY HAND (the broker is Webull, which NEXMIND can
+/// only read). Open while exitDate is null; the open rows are the book the
+/// portfolio gates in src/lib/portfolio/ evaluate against. Nothing here was
+/// placed by the desk — that is `Trade`.
+model JournalTrade {
+  id         Int            @id @default(autoincrement())
+  ticker     String
+  /// GICS sector resolved at entry (src/lib/portfolio/sectorMap.ts); "Other" = unknown.
+  sector     String
+  shares     Int
+  entryPrice Float
+  /// YYYY-MM-DD
+  entryDate  String
+  stop       Float
+  /// gapRisk().worstLossR at entry; null = not measured.
+  worstLossR Float?
+  exitPrice  Float?
+  /// YYYY-MM-DD; null while open.
+  exitDate   String?
+  note       String         @default("")
+  overrides  GateOverride[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([exitDate])
+}
+
+/// The owner's account value, typed in once a day. Drives the drawdown gate.
+model NavSnapshot {
+  /// YYYY-MM-DD, one row per day (a second entry the same day replaces the first).
+  date      String   @id
+  nav       Float
+  cash      Float?
+  note      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Audit trail: a gate that failed, which the owner traded through anyway, and why.
+model GateOverride {
+  id        Int           @id @default(autoincrement())
+  ticker    String
+  gate      String
+  severity  String
+  /// The gate's own message at the moment of override.
+  message   String
+  reason    String
+  tradeId   Int?
+  trade     JournalTrade? @relation(fields: [tradeId], references: [id], onDelete: SetNull)
+  createdAt DateTime      @default(now())
+}

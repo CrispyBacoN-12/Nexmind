@@ -67,7 +67,10 @@ export const ModelName = {
   Report: 'Report',
   Setting: 'Setting',
   ScanLog: 'ScanLog',
-  AiCall: 'AiCall'
+  AiCall: 'AiCall',
+  JournalTrade: 'JournalTrade',
+  NavSnapshot: 'NavSnapshot',
+  GateOverride: 'GateOverride'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -381,6 +384,51 @@ export const AiCallScalarFieldEnum = {
 } as const
 
 export type AiCallScalarFieldEnum = (typeof AiCallScalarFieldEnum)[keyof typeof AiCallScalarFieldEnum]
+
+
+export const JournalTradeScalarFieldEnum = {
+  id: 'id',
+  ticker: 'ticker',
+  sector: 'sector',
+  shares: 'shares',
+  entryPrice: 'entryPrice',
+  entryDate: 'entryDate',
+  stop: 'stop',
+  worstLossR: 'worstLossR',
+  exitPrice: 'exitPrice',
+  exitDate: 'exitDate',
+  note: 'note',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type JournalTradeScalarFieldEnum = (typeof JournalTradeScalarFieldEnum)[keyof typeof JournalTradeScalarFieldEnum]
+
+
+export const NavSnapshotScalarFieldEnum = {
+  date: 'date',
+  nav: 'nav',
+  cash: 'cash',
+  note: 'note',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NavSnapshotScalarFieldEnum = (typeof NavSnapshotScalarFieldEnum)[keyof typeof NavSnapshotScalarFieldEnum]
+
+
+export const GateOverrideScalarFieldEnum = {
+  id: 'id',
+  ticker: 'ticker',
+  gate: 'gate',
+  severity: 'severity',
+  message: 'message',
+  reason: 'reason',
+  tradeId: 'tradeId',
+  createdAt: 'createdAt'
+} as const
+
+export type GateOverrideScalarFieldEnum = (typeof GateOverrideScalarFieldEnum)[keyof typeof GateOverrideScalarFieldEnum]
 
 
 export const SortOrder = {

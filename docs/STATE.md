@@ -78,10 +78,45 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 `portfolio.findMany` (the field is `status`, **not** `active`),
 `trade.groupBy({ by: ["status"] })` and `researchStrategy.groupBy({ by: ["status"] })`.
 
-## 3. Done recently (2026-08-23 → 09-25)
+## 3. Done recently (2026-08-23 → 09-27)
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
+- **Portfolio layer, steps 1–3 of 4: trade journal + NAV log, the pure gate module, and the gate panel on `/advisor`. 2026-09-27.**
+  The owner chose (2026-09-27) to build the portfolio/risk layer first ("path A") and then run ONE
+  pre-registered test of stock ranking on the same code ("path B"). Built so far:
+  - `src/lib/portfolio/` (pure, no I/O): `evaluatePortfolio` runs six gates in a fixed order —
+    CAPACITY (5 slots, already-held), SECTOR (≤2 per GICS sector), CORRELATION (60d ρ > 0.70
+    blocks), REGIME (SPY < SMA200 caps the book at 2), DRAWDOWN (−3% since the previous NAV log
+    stops the day, 8% below the high-water mark halves size, 15% is safe mode), GAP_HEAT
+    (Σ risk$ × worstLossR > 10% of NAV). **A missing or stale input fails closed at WARN**, never
+    passes. `strictMode: true` (simulator) ignores overrides; `false` (/advisor) lets a non-blank
+    written reason un-block a gate, but the drawdown size cut applies even when overridden.
+    `allocateSlots` is the priority queue Test B needs: score desc, ticker tie-break, each name
+    checked against the book as filled so far in the same session.
+  - `sectorMap.ts`: `finnhubIndustry` → 11 GICS sectors, keyed on the values Finnhub ACTUALLY
+    returns (probed on 124 S&P names). Finnhub has no "Software"/"IT Services" — AAPL, MSFT, ORCL
+    and CRM all come back as "Technology" — so a map keyed on GICS industry names resolves almost
+    nothing. "Retail" is split per symbol (WMT/COST/KR/TGT/DG/DLTR/BJ → Staples). Unmapped → "Other",
+    which the SECTOR gate treats as unknown.
+  - Prisma: `JournalTrade`, `NavSnapshot`, `GateOverride` (additive `db push`, diff checked empty
+    beforehand). `/journal` page + `/api/journal` (open/close/delete/nav). Sector and 2y worst
+    gap-through are recorded at entry, fail-soft. Verified live: NVDA → Information Technology,
+    3.07R (same figure the advisor card shows); test row deleted.
+  - Step 3: `/api/portfolio/evaluate` (POST ticker/entry/stop/baseShares/worstLossR/overrides/commit)
+    reads the OPEN JOURNAL rows and NAV log (not the card's typed holdings list), fetches sector,
+    1y daily candles for the candidate + each held name, and SPY 2y, then runs `evaluatePortfolio`
+    non-strict. `marketInputs.ts` (pure): `dateAlignedCorrelation` pairs returns BY DATE over the
+    last 60 shared sessions (null under 40) — unlike the card's `pearsonCorrelation`, which zips by
+    trailing index; `regimeFromBenchmark` reuses the desk's MAX_TREND_EXTENSION guard. `commit:true`
+    writes one `GateOverride` row per overridden gate, and ONLY when the ticket is then unlocked
+    (still-blocked → 400, nothing logged). `portfolio-gates.tsx` renders on the advisor card above
+    RAVEN: NAV, nominal + tail heat, suggested shares vs the card's, each gate with a reason box when
+    red. Verified live on the dev server: with an empty journal and no NAV log, DRAWDOWN and GAP_HEAT
+    fail closed at WARN; two reasons unlocked it and wrote two rows (then deleted).
+  - **Not yet:** step 4 (write `PRE_REGISTRATION_TEST_B.md` and commit it BEFORE building the
+    simulator). Risk Sentry still reads `riskSentry:holdings`, not the journal. Nothing in steps
+    1–3 is committed yet.
 - **`/advisor` now discloses overnight gap-through risk. 2026-09-25.** Every loss on the card
   (and in the whole backtest engine, `positionRules.ts` books stops at `t.sl`) assumed a stop
   fills AT the stop. `src/lib/advisor/gapRisk.ts` measures, over the 2y daily pull,
