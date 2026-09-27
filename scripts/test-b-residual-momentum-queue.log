@@ -1,0 +1,51 @@
+Test B — residual momentum as the mr-down3 slot queue
+pre-registration: docs/quant/PRE_REGISTRATION_TEST_B.md (committed df0f51a, before this file)
+panel .cache/bars/sp500-1d-deep.json fetched 2026-09-05T14:42:19.951Z; 452 traded names + SPY
+ladder=flat  fill=next-bar open  seed=20260825  control walks=500  C=$100,000
+sector "Other" (SECTOR gate fails closed): 0/452
+
+==============================================================================
+0. HARNESS CHECKS (abort on failure)
+==============================================================================
+  reproduce deep1 @ 5bps+1bp: 30168 trades avgR 0.011  (log: 30168 / 0.011)
+    87 SPY trades dropped from the candidate set (§2)
+  reproduce deep1 @ 0.5bps+1bp: 30101 trades avgR 0.032  (log: 30101 / 0.032)
+  reproduce deep2 @ 5bps+1bp: 33196 trades avgR 0.012  (log: 33196 / 0.012)
+    82 SPY trades dropped from the candidate set (§2)
+  reproduce deep2 @ 0.5bps+1bp: 33117 trades avgR 0.037  (log: 33117 / 0.037)
+  reproduce deep3 @ 5bps+1bp: 41468 trades avgR 0.055  (log: 41468 / 0.055)
+    95 SPY trades dropped from the candidate set (§2)
+  reproduce deep3 @ 0.5bps+1bp: 41365 trades avgR 0.085  (log: 41365 / 0.085)
+  trade sets reproduce: OK
+  correlation equivalence: 200 samples, max |diff| 0.00e+0, 16 null in both: OK
+  deep1: 30081 candidates, 655 null score, 49 unmeasured gap, 1245 stops gapped through (mean extra loss 0.401R); unranked avgR raw 0.0113 adj -0.0052
+  deep2: 33114 candidates, 528 null score, 41 unmeasured gap, 1452 stops gapped through (mean extra loss 0.338R); unranked avgR raw 0.0124 adj -0.0024
+  deep3: 41373 candidates, 560 null score, 62 unmeasured gap, 1865 stops gapped through (mean extra loss 0.390R); unranked avgR raw 0.0557 adj 0.0381
+  compact-NAV equivalence: checked on every candidate day of the treatment walk: OK
+
+==============================================================================
+1. CONTEXT (printed, never part of the verdict)
+==============================================================================
+  per fold, C=$100k, 5bps+1bp, gap-adjusted:
+    fold    taken   S_treat   ctrl med  ctrl p95   S_raw    bottleneck days  S on bottleneck days  maxDD%   final NAV
+    deep1     785    0.0028   -0.0329    0.0616    0.0089    1190/1245         0.0023           16.1       93882
+    deep2     402   -0.0654   -0.0130    0.0338   -0.0402    1052/1211        -0.0594           17.2       84058
+    deep3    1286    0.0427    0.0029    0.0501    0.0579    1342/1439         0.0350           13.9      112104
+  treatment gate blocks (candidates evaluated before the cap filled): CAPACITY 115  SECTOR 508  CORRELATION 207  REGIME 0  DRAWDOWN 932  GAP_HEAT 4066
+  treatment: zero-share rejects 0, unfilled-slot days 1143, safe-mode days 935, stale-NAV days 1
+  control mean safe-mode days per walk: 1642.3
+  pooled S unadjusted (engine-booked stops): treatment 0.0264  control median 0.0143
+  treatment S at 0.5bps+1bp: 0.0319  (2798 trades)
+  $2,500 restatement (treatment): S 0.0084  2094 trades, 32 zero-share rejects, final NAV per fold 2177 / 2403 / 2544
+  control walks took 358s
+
+==============================================================================
+VERDICT — the §7 conjunct, scored against the pre-registration
+==============================================================================
+  S_treatment (pooled deep1-3, gap-adjusted, 5bps+1bp): 0.0125  over 2473 trades
+  control (500 random-queue walks): median -0.0016  p95 0.0314  max 0.0491
+  (1) SELECTION  S_treatment > p95(S_random): 0.0125 > 0.0314  -> NO
+  (2) USABLE     S_treatment > 0:             0.0125 > 0  -> YES
+
+  TEST B: FAIL
+  Final for this test (§7): no rescue search on these folds.

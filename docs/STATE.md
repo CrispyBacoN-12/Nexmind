@@ -82,7 +82,20 @@ Re-verify with a throwaway script under `scripts/` (delete it afterwards) queryi
 
 Older entries are compressed to one line each; their reasoning is in the commit bodies.
 
-- **Portfolio layer, steps 1–3 of 4: trade journal + NAV log, the pure gate module, and the gate panel on `/advisor`. 2026-09-27.**
+- **Test B (residual momentum as the mr-down3 slot queue): FAIL. Run once, 2026-09-27.**
+  Pre-registered as df0f51a before the simulator existed, and scored exactly as written. On the
+  pooled deep1-3 folds (gap-adjusted, 5+1 bps, $100k), S_treatment = **+0.0125** over 2,473 trades.
+  The 500 random-queue walks have median −0.0016 and **p95 +0.0314**. Selection fails; the rule is
+  usable (S > 0) but not a selector. Per §7 this is final, with no other lookback, skip, β window,
+  ladder or cost cell on these folds. Write-up: `docs/quant/2026-09-27-test-b-results.md`, log:
+  `scripts/test-b-residual-momentum-queue.log`.
+  Side findings:
+  - Stops gapping through cost 0.34-0.40R each on about 4% of candidates. That turns the unranked
+    pool's avgR negative in deep1 and deep2.
+  - GAP_HEAT made 4,066 of 5,828 gate blocks.
+  - The drawdown safe mode never releases under strict mode (see §5).
+  This closes the portfolio-layer plan: steps 1–3 were built, and step 4 is answered.
+- **Portfolio layer, steps 1–4 of 4 (step 4 = Test B, FAIL above): trade journal + NAV log, the pure gate module, and the gate panel on `/advisor`. 2026-09-27.**
   The owner chose (2026-09-27) to build the portfolio/risk layer first ("path A") and then run ONE
   pre-registered test of stock ranking on the same code ("path B"). Built so far:
   - `src/lib/portfolio/` (pure, no I/O): `evaluatePortfolio` runs six gates in a fixed order —
@@ -114,9 +127,9 @@ Older entries are compressed to one line each; their reasoning is in the commit 
     RAVEN: NAV, nominal + tail heat, suggested shares vs the card's, each gate with a reason box when
     red. Verified live on the dev server: with an empty journal and no NAV log, DRAWDOWN and GAP_HEAT
     fail closed at WARN; two reasons unlocked it and wrote two rows (then deleted).
-  - **Not yet:** step 4 (write `PRE_REGISTRATION_TEST_B.md` and commit it BEFORE building the
-    simulator). Risk Sentry still reads `riskSentry:holdings`, not the journal. Nothing in steps
-    1–3 is committed yet.
+  - Steps 1–3 committed as `63837ef`. Step 4: `docs/quant/PRE_REGISTRATION_TEST_B.md` committed
+    as `df0f51a` BEFORE the simulator existed; result in the Test B entry above. Risk Sentry still
+    reads `riskSentry:holdings`, not the journal.
 - **`/advisor` now discloses overnight gap-through risk. 2026-09-25.** Every loss on the card
   (and in the whole backtest engine, `positionRules.ts` books stops at `t.sl`) assumed a stop
   fills AT the stop. `src/lib/advisor/gapRisk.ts` measures, over the 2y daily pull,
@@ -1459,6 +1472,13 @@ earlier in this section: two bar classes, two independent universe swaps, zero f
 
 ## 5. Traps — read before touching these areas
 
+- **Under `strictMode: true` the DRAWDOWN safe mode never releases.** Safe mode clears only when
+  NAV comes back within 15% of the high-water mark. A strict book in safe mode takes no trades, and
+  once it is flat its NAV cannot move, so it stays in safe mode forever. In Test B that happened in
+  deep1 and deep2: the treatment spent 935 of 3,895 candidate days in safe mode, and the control
+  walks averaged 1,642. On `/advisor` the only way out is a written override, which is by design.
+  But any simulator run that crosses 15% drawdown is dead for the rest of the fold, so read
+  per-fold trade counts with that in mind (`src/lib/portfolio/evaluate.ts`, drawdown gate).
 - **A raw avgR from the panel carries no information on its own.** Demonstrated three times
   now (regime features, the mechanism screen, then the broad-universe re-run — where
   `turn-of-month`, a rule that reads no price at all, again showed a test-fold avgR of +0.268
