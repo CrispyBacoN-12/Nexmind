@@ -136,8 +136,8 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   last bar is a finished session; same power settings as the desk jobs, 30-min limit. **This is the
   only enabled NEXMIND task** — it is read-only monitoring, not the paused desk; the three desk
   jobs stay Disabled. First run (manual `Start-ScheduledTask`, 14:26 ICT): result 0, gate
-  `unknown -> above` stored as baseline, no alerts. **`.env` has no `DISCORD_WEBHOOK_URL`**, so
-  alerts currently go only to the log — see §6.
+  `unknown -> above` stored as baseline, no alerts. `DISCORD_WEBHOOK_URL` added to `.env` by the
+  owner the same day (§6), so alerts go to Discord as well as the log.
 - **Risk Sentry now watches open journal positions. 2026-10-01.** It used to read only the
   hand-typed `riskSentry:holdings` list, so a position opened through `/journal` was invisible to
   the daily earnings/gate/correlation alert. `runRiskSentry` now checks
@@ -1740,9 +1740,9 @@ be reported as blockers while the runtime stays local:
   06:00**, and `StartWhenAvailable` means a missed slot is caught up rather than lost. The DB's
   newest `ResearchRun` is still **#110 from 08-24** and **0 `panel-v1` rows** exist; that will
   not change until the budget above is restored.
-- **Add `DISCORD_WEBHOOK_URL` to `.env`** (owner creates the webhook and pastes it; do not
-  handle it). Until then the daily `NEXMIND Risk Sentry` job writes its alerts — stop hits
-  included — only to `scripts/risk-sentry.log`, which nobody reads.
+- ~~**Add `DISCORD_WEBHOOK_URL` to `.env`**~~ — **DONE 2026-10-01** by the owner; a read-only
+  GET on the webhook returned 200 (webhook "Claudius", bound to a channel). Risk Sentry alerts
+  now reach Discord.
 - `git rm -r --quiet rl mt5-bridge/__pycache__` — `rl/` is still tracked after the pivot.
 - ~~Confirm why desk #11 runs **`combo-vote`** and not `trend-pullback`~~ — **ANSWERED and
   switched, 2026-09-02** (§3). `combo-vote` was never intended on weekly bars: `orb` cannot fire
