@@ -105,3 +105,6 @@ mt5-bridge/bridge.err.log
 /scripts/inspect-xau-regimes.mts
 /scripts/*.out
 /scripts/*.progress
+
+# daily Risk Sentry log (scripts/risk-sentry.cmd)
+scripts/risk-sentry.log
