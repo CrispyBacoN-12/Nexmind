@@ -55,7 +55,7 @@ Hard context the code does not state:
 | Research (archive) | newest `ResearchRun` #113 `skipped`. `panel-v1`: 3, all rejected. Legacy: 6 approved (off-universe, never desk-eligible), 37 demoted, 171 rejected, 1 proposed |
 | `Counterfactual` / `AiCall` | 123 rows, last 2026-09-14 / 90 rows |
 | `Setting` keys | `fearGreed`, `lastDeskSessionAt`, `riskSentry:holdings`, `riskSentry:lastGate`, `ai:outage`, `webull:accessToken` |
-| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`: parked gold work, gitignored on master |
+| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`: gold work, **finished** (xau-v1 REJECT, §3), gitignored on master; kept until the owner says delete |
 
 To re-verify, use a throwaway script under `scripts/` and delete it afterwards. It should query:
 - `portfolio.findMany`; the field is `status`, not `active`
@@ -68,6 +68,21 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-10-01: xau-v1 gold validation ran. All 4 hypotheses REJECT; XAUUSD is closed.**
+  - The owner chose to validate the pre-registered xau-v1 screen (H1, Exness `XAUUSDm`, 5 folds,
+    `LADDERS.flat`, p90 cost) before any MT5 bridge or order work. No orders were placed.
+  - mr-down3, session-break and asia-fade fail on the edge lines alone. daily-trend was the
+    near-miss (p95 3/5, median 5/5) but bootstrap is 2/5, one p95 "beat" is a tie on a losing
+    fold, and its lift is long-side drift.
+  - Per pre-registration §0, failing closes gold as an instrument: **no other timeframe,
+    parameter or ladder**. Phase 2 of the unblock plan (MT5 bridge, risk gates, demo orders) is
+    dead.
+  - Disclosed, not amended (§9): the fold table was unpassable for everyone (`xtest1` is 12
+    months vs a 24-month floor; `xfit` has 613 bars vs a 200-trade floor). The first run's swap
+    column read 0.000 because `pointValuePerLot` was missing; it is fixed and the verdicts are
+    byte-identical. Swap is still reported beside avgR, not subtracted from it.
+  - Evidence lives on branch `xau-v1-phase0-1-unblock`: `docs/quant/2026-10-01-xau-v1-results.md`,
+    `scripts/xau-screen.log`, commits `08ff7b0` and `2ed722d`.
 - **2026-10-01: Risk Sentry runs locally.**
   - Task `NEXMIND Risk Sentry` runs `scripts/risk-sentry.cmd` → `risk-sentry.mts`, with the same
     deps as `/api/cron/risk-sentry`. The log is `scripts/risk-sentry.log` (gitignored).
@@ -164,7 +179,8 @@ There are no open research directions; the owner closed the search. Work items:
    - Have `/advisor`'s holdings field default to the open journal positions.
 4. **Housekeeping, the owner's call:**
    - push `master` (never pushed)
-   - decide whether the two parked `xau-*` worktrees/branches and `wip/mt5-xauusd` stay
+   - delete the two `xau-*` worktrees/branches and `wip/mt5-xauusd`, or keep them as the
+     evidence trail for the xau-v1 REJECT. Gold is closed either way.
    - decide whether `stocks-only-pivot` is deleted (fully merged into master)
 
 ## 5. Traps — read before touching these areas
