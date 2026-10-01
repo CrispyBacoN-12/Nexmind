@@ -128,8 +128,14 @@ Older entries are compressed to one line each; their reasoning is in the commit 
     red. Verified live on the dev server: with an empty journal and no NAV log, DRAWDOWN and GAP_HEAT
     fail closed at WARN; two reasons unlocked it and wrote two rows (then deleted).
   - Steps 1–3 committed as `63837ef`. Step 4: `docs/quant/PRE_REGISTRATION_TEST_B.md` committed
-    as `df0f51a` BEFORE the simulator existed; result in the Test B entry above. Risk Sentry still
-    reads `riskSentry:holdings`, not the journal.
+    as `df0f51a` BEFORE the simulator existed; result in the Test B entry above.
+- **Risk Sentry now watches open journal positions. 2026-10-01.** It used to read only the
+  hand-typed `riskSentry:holdings` list, so a position opened through `/journal` was invisible to
+  the daily earnings/gate/correlation alert. `runRiskSentry` now checks
+  `mergeHoldingSources(journalOpen, manual)`: open `JournalTrade` tickers first, then the manual
+  list as extras for names held outside the journal, deduped, capped at 20 with manual dropped
+  first. The safety-panel field is relabelled "extra holdings". Live read 2026-10-01: journal
+  empty, manual `AAPL, MSFT`.
 - **`/advisor` now discloses overnight gap-through risk. 2026-09-25.** Every loss on the card
   (and in the whole backtest engine, `positionRules.ts` books stops at `t.sl`) assumed a stop
   fills AT the stop. `src/lib/advisor/gapRisk.ts` measures, over the 2y daily pull,

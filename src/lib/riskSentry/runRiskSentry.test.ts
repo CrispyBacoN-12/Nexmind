@@ -33,6 +33,7 @@ const NO_EARNINGS: EarningsInfo = { date: null, hour: null, note: "no report sch
 function baseDeps(overrides: Partial<RunRiskSentryDeps> = {}): RunRiskSentryDeps {
   return {
     getRiskSentryHoldings: async () => [],
+    getJournalOpenTickers: async () => [],
     setRiskSentryHoldings: async () => {},
     fetchCandlesBatch: async () => new Map(),
     fetchCandles: async () => ({ candles: uptrend() }),
@@ -47,6 +48,34 @@ test("no holdings configured returns skipped with no message", async () => {
   const summary = await runRiskSentry(baseDeps(), TODAY);
   assert.equal(summary.skipped, true);
   assert.equal(summary.message, null);
+});
+
+test("open journal positions are checked even when the manual list is empty", async () => {
+  let fetched: string[] = [];
+  const deps = baseDeps({
+    getJournalOpenTickers: async () => ["KO"],
+    fetchCandlesBatch: async (symbols) => {
+      fetched = symbols;
+      return new Map([["KO", { candles: uptrend() }]]);
+    },
+  });
+  const summary = await runRiskSentry(deps, TODAY);
+  assert.equal(summary.skipped, false);
+  assert.deepEqual(fetched, ["KO"]);
+});
+
+test("journal and manual holdings are checked together, a shared ticker once", async () => {
+  let fetched: string[] = [];
+  const deps = baseDeps({
+    getJournalOpenTickers: async () => ["KO", "XOM"],
+    getRiskSentryHoldings: async () => ["xom", "AAPL"],
+    fetchCandlesBatch: async (symbols) => {
+      fetched = symbols;
+      return new Map();
+    },
+  });
+  await runRiskSentry(deps, TODAY);
+  assert.deepEqual(fetched, ["KO", "XOM", "AAPL"]);
 });
 
 test("all-clear holdings produce a null message", async () => {

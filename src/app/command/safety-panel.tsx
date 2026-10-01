@@ -212,7 +212,7 @@ export function SafetyPanel({ portfolioId, onChanged }: { portfolioId: number; o
       </div>
 
       <div className="mt-3">
-        <div className="text-xs text-(--color-muted) mb-1">Risk Sentry holdings (comma or newline separated)</div>
+        <div className="text-xs text-(--color-muted) mb-1">Risk Sentry extra holdings — open journal positions are watched automatically (comma or newline separated)</div>
         <textarea
           value={holdingsText}
           onChange={(e) => setHoldingsText(e.target.value)}

@@ -27,6 +27,21 @@ export function normalizeHoldingTickers(raw: unknown): string[] {
   return tickers;
 }
 
+/** Pure: what Risk Sentry watches = open journal positions first, then the
+ *  owner's manual extras (names held outside the journal). Journal rows go first
+ *  so the cap never drops a position the gates already count. */
+export function mergeHoldingSources(journalOpen: string[], manual: string[]): string[] {
+  return normalizeHoldingTickers([...journalOpen, ...manual]);
+}
+
+/** Tickers of every open JournalTrade (exitDate null) — the same rows
+ *  /api/portfolio/evaluate treats as the book. */
+export async function getJournalOpenTickers(): Promise<string[]> {
+  const { prisma } = await import("@/lib/db");
+  const rows = await prisma.journalTrade.findMany({ where: { exitDate: null }, select: { ticker: true } });
+  return rows.map((r) => r.ticker);
+}
+
 export async function getRiskSentryHoldings(): Promise<string[]> {
   const { getSetting } = await import("@/lib/settings");
   const raw = await getSetting(RISK_SENTRY_HOLDINGS_SETTING, "[]");

@@ -9,12 +9,14 @@ import { gateSlots } from "@/lib/market/marketGate";
 import { BENCHMARK } from "@/lib/market/regime";
 import { earningsWatchdog, type EarningsWatchdogHit } from "./earningsWatchdog";
 import { correlationAlert, type CorrelationAlertPair } from "./correlationAlert";
+import { mergeHoldingSources } from "./holdings";
 import { marketGateAlert, type MarketGateAlertResult, type GateReading } from "./marketGateAlert";
 
 export const RISK_SENTRY_LAST_GATE_SETTING = "riskSentry:lastGate";
 
 export interface RunRiskSentryDeps {
   getRiskSentryHoldings: () => Promise<string[]>;
+  getJournalOpenTickers: () => Promise<string[]>;
   setRiskSentryHoldings: (tickers: string[]) => Promise<void>;
   fetchCandlesBatch: (symbols: string[], range: "2y", interval: "1d") => Promise<Map<string, { candles: Candle[] }>>;
   fetchCandles: (symbol: string, range: "2y", interval: "1d", minDays: number) => Promise<{ candles: Candle[] }>;
@@ -61,7 +63,8 @@ export async function runRiskSentry(
   deps: RunRiskSentryDeps,
   today: Date = new Date(),
 ): Promise<RunRiskSentrySummary> {
-  const holdings = await deps.getRiskSentryHoldings();
+  const [journalOpen, manual] = await Promise.all([deps.getJournalOpenTickers(), deps.getRiskSentryHoldings()]);
+  const holdings = mergeHoldingSources(journalOpen, manual);
   if (holdings.length === 0) {
     return {
       skipped: true,

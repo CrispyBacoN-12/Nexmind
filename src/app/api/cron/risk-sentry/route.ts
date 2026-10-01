@@ -6,7 +6,7 @@
 // /api/cron/* route (mirrors src/app/api/cron/scan/route.ts's shape).
 
 import { runRiskSentry } from "@/lib/riskSentry/runRiskSentry";
-import { getRiskSentryHoldings, setRiskSentryHoldings } from "@/lib/riskSentry/holdings";
+import { getJournalOpenTickers, getRiskSentryHoldings, setRiskSentryHoldings } from "@/lib/riskSentry/holdings";
 import { fetchCandles, fetchCandlesBatch } from "@/lib/marketData";
 import { fetchNextEarnings } from "@/lib/market/earnings";
 import { getSetting, setSetting } from "@/lib/settings";
@@ -23,6 +23,7 @@ export async function GET(req: Request) {
   try {
     const summary = await runRiskSentry({
       getRiskSentryHoldings,
+      getJournalOpenTickers,
       setRiskSentryHoldings,
       fetchCandlesBatch,
       fetchCandles,
