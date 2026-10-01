@@ -136,6 +136,12 @@ Older entries are compressed to one line each; their reasoning is in the commit 
   list as extras for names held outside the journal, deduped, capped at 20 with manual dropped
   first. The safety-panel field is relabelled "extra holdings". Live read 2026-10-01: journal
   empty, manual `AAPL, MSFT`.
+  **Plus a fourth check, `stopWatch`:** an open journal position whose last daily bar closed
+  at/below its stop is `breached` ("exit if no stop order is resting"); a low through the stop
+  with a close above it is `touched` ("check whether the stop filled"). It leads the Discord
+  message. Manual-list names have no stop and are never stop-checked. Relies on the 12:00 UTC
+  pre-open schedule for the last bar to be a finished session. Dry-run on live bars with a
+  fake KO stop: fired `breached` on the 2026-09-30 bar, no Discord send, no gate write.
 - **`/advisor` now discloses overnight gap-through risk. 2026-09-25.** Every loss on the card
   (and in the whole backtest engine, `positionRules.ts` books stops at `t.sl`) assumed a stop
   fills AT the stop. `src/lib/advisor/gapRisk.ts` measures, over the 2y daily pull,

@@ -34,12 +34,11 @@ export function mergeHoldingSources(journalOpen: string[], manual: string[]): st
   return normalizeHoldingTickers([...journalOpen, ...manual]);
 }
 
-/** Tickers of every open JournalTrade (exitDate null) — the same rows
+/** Every open JournalTrade (exitDate null) — the same rows
  *  /api/portfolio/evaluate treats as the book. */
-export async function getJournalOpenTickers(): Promise<string[]> {
+export async function getJournalOpenPositions(): Promise<{ ticker: string; stop: number }[]> {
   const { prisma } = await import("@/lib/db");
-  const rows = await prisma.journalTrade.findMany({ where: { exitDate: null }, select: { ticker: true } });
-  return rows.map((r) => r.ticker);
+  return prisma.journalTrade.findMany({ where: { exitDate: null }, select: { ticker: true, stop: true } });
 }
 
 export async function getRiskSentryHoldings(): Promise<string[]> {

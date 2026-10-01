@@ -10,13 +10,14 @@ import { BENCHMARK } from "@/lib/market/regime";
 import { earningsWatchdog, type EarningsWatchdogHit } from "./earningsWatchdog";
 import { correlationAlert, type CorrelationAlertPair } from "./correlationAlert";
 import { mergeHoldingSources } from "./holdings";
+import { stopWatch, type StopWatchHit } from "./stopWatch";
 import { marketGateAlert, type MarketGateAlertResult, type GateReading } from "./marketGateAlert";
 
 export const RISK_SENTRY_LAST_GATE_SETTING = "riskSentry:lastGate";
 
 export interface RunRiskSentryDeps {
   getRiskSentryHoldings: () => Promise<string[]>;
-  getJournalOpenTickers: () => Promise<string[]>;
+  getJournalOpenPositions: () => Promise<{ ticker: string; stop: number }[]>;
   setRiskSentryHoldings: (tickers: string[]) => Promise<void>;
   fetchCandlesBatch: (symbols: string[], range: "2y", interval: "1d") => Promise<Map<string, { candles: Candle[] }>>;
   fetchCandles: (symbol: string, range: "2y", interval: "1d", minDays: number) => Promise<{ candles: Candle[] }>;
@@ -28,6 +29,7 @@ export interface RunRiskSentryDeps {
 export interface RunRiskSentrySummary {
   skipped: boolean;
   message: string | null;
+  stops: StopWatchHit[];
   earnings: EarningsWatchdogHit[];
   gate: MarketGateAlertResult;
   correlations: CorrelationAlertPair[];
@@ -36,11 +38,24 @@ export interface RunRiskSentrySummary {
 const GATE_READINGS: readonly GateReading[] = ["above", "below", "unknown"];
 
 function composeMessage(
+  stops: StopWatchHit[],
   earnings: EarningsWatchdogHit[],
   gate: MarketGateAlertResult,
   correlations: CorrelationAlertPair[],
 ): string | null {
   const sections: string[] = [];
+  if (stops.length > 0) {
+    sections.push(
+      "**Stop hit**\n" +
+        stops
+          .map((s) =>
+            s.kind === "breached"
+              ? `${s.ticker}: closed ${s.close.toFixed(2)} at/below stop ${s.stop.toFixed(2)} on ${s.date} — exit if no stop order is resting`
+              : `${s.ticker}: low ${s.low.toFixed(2)} traded through stop ${s.stop.toFixed(2)} on ${s.date}, closed ${s.close.toFixed(2)} — check whether the stop filled`,
+          )
+          .join("\n"),
+    );
+  }
   if (earnings.length > 0) {
     sections.push(
       "**Earnings this week**\n" +
@@ -63,12 +78,16 @@ export async function runRiskSentry(
   deps: RunRiskSentryDeps,
   today: Date = new Date(),
 ): Promise<RunRiskSentrySummary> {
-  const [journalOpen, manual] = await Promise.all([deps.getJournalOpenTickers(), deps.getRiskSentryHoldings()]);
-  const holdings = mergeHoldingSources(journalOpen, manual);
+  const [journalOpen, manual] = await Promise.all([deps.getJournalOpenPositions(), deps.getRiskSentryHoldings()]);
+  const holdings = mergeHoldingSources(
+    journalOpen.map((p) => p.ticker),
+    manual,
+  );
   if (holdings.length === 0) {
     return {
       skipped: true,
       message: null,
+      stops: [],
       earnings: [],
       gate: { flipped: false, from: "unknown", to: "unknown", note: "no holdings configured" },
       correlations: [],
@@ -88,6 +107,10 @@ export async function runRiskSentry(
 
   const holdingCandles = holdings.map((ticker) => ({ ticker, candles: candleMap.get(ticker)?.candles ?? null }));
 
+  const stopHits = stopWatch(
+    journalOpen.map((p) => ({ ticker: p.ticker.toUpperCase(), stop: p.stop })),
+    new Map(holdingCandles.map((h) => [h.ticker, h.candles])),
+  );
   const earningsHits = earningsWatchdog(earningsResults, today);
   const gateDecision = gateSlots(benchmarkResp.candles, 0);
   const gateResult = marketGateAlert(gateDecision, lastReading);
@@ -97,7 +120,8 @@ export async function runRiskSentry(
 
   return {
     skipped: false,
-    message: composeMessage(earningsHits, gateResult, correlationHits),
+    message: composeMessage(stopHits, earningsHits, gateResult, correlationHits),
+    stops: stopHits,
     earnings: earningsHits,
     gate: gateResult,
     correlations: correlationHits,
