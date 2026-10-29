@@ -6,6 +6,7 @@ import { Badge, Button, Card, CardTitle, Empty, Stat } from "@/components/ui";
 import { readNav } from "@/lib/portfolio/evaluate";
 import { realizedR } from "@/lib/portfolio/journalInput";
 import { DEFAULT_PORTFOLIO_CONFIG } from "@/lib/portfolio/types";
+import type { StopWatchHit } from "@/lib/riskSentry/stopWatch";
 import { fmtMoney, fmtNumber } from "@/lib/utils";
 
 interface TradeRow {
@@ -41,6 +42,12 @@ interface Snapshot {
   closed: TradeRow[];
   nav: NavRow[];
   overrides: OverrideRow[];
+}
+/** /api/journal/stops: Risk Sentry's stopWatch run against the open rows. */
+interface StopCheck {
+  hits: StopWatchHit[];
+  unchecked: string[];
+  lastBar: string | null;
 }
 
 /** Local calendar date, YYYY-MM-DD. The module never reads a clock; the page supplies it. */
@@ -79,12 +86,43 @@ export function JournalPanel() {
 
   const [closing, setClosing] = useState<Record<number, { exitPrice: string; exitDate: string }>>({});
 
+  /** Keyed by openKey below, so a result for an older set of positions is never shown. */
+  const [stopState, setStopState] = useState<{ key: string; check?: StopCheck; error?: string } | null>(null);
+
   useEffect(() => {
     fetch("/api/journal")
       .then((r) => r.json())
       .then((j) => (j.ok ? setData(j) : setError(j.error)))
       .catch((e) => setError(String(e)));
   }, []);
+
+  // Re-run the stop check whenever the set of open positions or their stops
+  // changes. It fetches prices, so it stays off the main snapshot and fails on
+  // its own without blanking the page.
+  const openKey = data ? data.open.map((t) => `${t.ticker}:${t.stop}`).join(",") : null;
+  useEffect(() => {
+    if (!openKey) return;
+    let cancelled = false;
+    fetch("/api/journal/stops")
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        setStopState(
+          j.ok
+            ? { key: openKey, check: { hits: j.hits, unchecked: j.unchecked, lastBar: j.lastBar } }
+            : { key: openKey, error: j.error },
+        );
+      })
+      .catch((e) => !cancelled && setStopState({ key: openKey, error: String(e) }));
+    return () => {
+      cancelled = true;
+    };
+  }, [openKey]);
+
+  const currentStops = stopState?.key === openKey ? stopState : null;
+  const stops = currentStops?.check ?? null;
+  const stopsError = currentStops?.error ?? null;
+  const hitByTicker = new Map((stops?.hits ?? []).map((h) => [h.ticker, h]));
 
   async function post(payload: Record<string, unknown>): Promise<boolean> {
     setBusy(true);
@@ -182,6 +220,27 @@ export function JournalPanel() {
 
       <Card>
         <CardTitle>สถานะที่ถืออยู่ ({data?.open.length ?? 0} / {cfg.maxSlots} ช่อง)</CardTitle>
+        {data && data.open.length > 0 && (
+          <div className="text-xs mb-3 space-y-1">
+            {stopsError ? (
+              <p className="text-amber-400">ตรวจ stop ไม่สำเร็จ: {stopsError}</p>
+            ) : !stops ? (
+              <p className="text-(--color-muted)">กำลังตรวจว่าราคาแตะ stop หรือยัง…</p>
+            ) : (
+              <>
+                <p className={stops.hits.length > 0 ? "text-rose-400" : "text-(--color-muted)"}>
+                  {stops.hits.length > 0
+                    ? `ราคาแตะ stop ${stops.hits.length} ตัว`
+                    : "ยังไม่มีตัวไหนแตะ stop"}
+                  {stops.lastBar ? ` · ตรวจจากแท่งรายวันล่าสุด ${stops.lastBar}` : ""} · ถ้าตลาดสหรัฐฯ ยังเปิดอยู่ แท่งนี้ยังไม่จบ
+                </p>
+                {stops.unchecked.length > 0 && (
+                  <p className="text-amber-400">ดึงราคาไม่ได้ ยังไม่ได้ตรวจ: {stops.unchecked.join(", ")}</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {!data ? (
           <p className="text-sm text-(--color-muted)">กำลังโหลด…</p>
         ) : data.open.length === 0 ? (
@@ -204,12 +263,29 @@ export function JournalPanel() {
                 {data.open.map((t) => {
                   const c = closing[t.id] ?? { exitPrice: "", exitDate: today };
                   const set = (patch: Partial<typeof c>) => setClosing((s) => ({ ...s, [t.id]: { ...c, ...patch } }));
+                  const hit = hitByTicker.get(t.ticker.toUpperCase());
                   return (
                     <tr key={t.id} className="border-t border-(--color-border) align-top">
                       <td className="py-2 pr-3 font-medium">{t.ticker}<div className="text-xs text-(--color-muted)">{t.entryDate}</div></td>
                       <td className="pr-3">{t.sector === "Other" ? <Badge tone="warning">ไม่ทราบ</Badge> : t.sector}</td>
                       <td className="pr-3">{t.shares} × {fmtMoney(t.entryPrice)}</td>
-                      <td className="pr-3">{fmtMoney(t.stop)}</td>
+                      <td className="pr-3">
+                        {fmtMoney(t.stop)}
+                        {hit && (
+                          <div className="text-xs mt-1">
+                            {hit.kind === "breached" ? (
+                              <Badge tone="negative" title="ถ้าไม่มีคำสั่ง stop ค้างอยู่ ให้ขายเอง">
+                                ปิดต่ำกว่า stop {fmtMoney(hit.close)}
+                              </Badge>
+                            ) : (
+                              <Badge tone="warning" title="เช็กใน Webull ว่าคำสั่ง stop ถูก fill หรือยัง">
+                                low {fmtMoney(hit.low)} ทะลุ stop
+                              </Badge>
+                            )}
+                            <div className="text-(--color-muted) mt-0.5">{hit.date}</div>
+                          </div>
+                        )}
+                      </td>
                       <td className="pr-3">{fmtMoney((t.entryPrice - t.stop) * t.shares)}</td>
                       <td className="pr-3">{t.worstLossR != null ? `${fmtNumber(t.worstLossR, 2)} R` : <Badge tone="warning">ไม่ได้วัด</Badge>}</td>
                       <td>

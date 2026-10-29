@@ -39,8 +39,8 @@ resume research rounds and do not tune that code without a new owner decision. K
 Hard context the code does not state:
 - **Orders are manual, on Webull, whole shares, $2-3k.** Webull is data-only here. Go-Live is dead,
   not deferred.
-- **Dev server is port 3275.** For preview, use launch config `nexmind-dev-web`, never `nexmind`
-  (see §5).
+- **Dev server is port 3275.** For preview, use launch config `dev:web` (`next dev -p 3275`),
+  never `nexmind` (see §5).
 
 ## 2. Live state (verified by query, 2026-10-01)
 
@@ -68,7 +68,15 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-10-13: Gold strategies exported to MQL5 (uncommitted, owner request).**
+- **2026-10-29: Copilot polish shipped (owner sign-off in chat).**
+  - `/journal` runs Risk Sentry's `stopWatch` on demand through the new `GET /api/journal/stops`.
+    Each open row shows a red "closed below stop" or amber "low traded through stop" badge, and
+    tickers with no candles are listed as unchecked. The same bar-still-forming caveat applies.
+  - `/advisor`'s holdings field prefills from open journal positions until the owner types or
+    submits.
+  - Checked in the browser with a stubbed `fetch` only. No test rows were written, because the dev
+    DB is the live Neon DB. `*.ex5` is now gitignored.
+- **2026-10-13: Gold strategies exported to MQL5 (owner request, committed `1010f4d`).**
   - `mql5/`: 56 EAs cover all 60 non-mock `GC=F` research rows and the 4 xau-v1 hypotheses.
     `mql5/Experts/NEXMIND_Gold/NexCore.mqh` (next to the EAs, quoted include) ports `indicators.ts`, `computeSnapshots` and the
     single-target/trail exits. Install steps and every deviation are in `mql5/README.md`.
@@ -183,10 +191,7 @@ There are no open research directions; the owner closed the search. Work items:
    This is the owner's workflow, not code.
 2. **Check that Risk Sentry keeps running.** Read `scripts/risk-sentry.log` and the task's
    `LastTaskResult` after a few weekdays.
-3. **Possible copilot polish, not started.** Each needs owner sign-off:
-   - Show `stopWatch` hits on `/journal` itself.
-   - Have `/advisor`'s holdings field default to the open journal positions.
-4. **Housekeeping, the owner's call:**
+3. **Housekeeping, the owner's call:**
    - push `master` (never pushed)
    - delete the two `xau-*` worktrees/branches and `wip/mt5-xauusd`, or keep them as the
      evidence trail for the xau-v1 REJECT. Gold is closed either way.
@@ -195,7 +200,7 @@ There are no open research directions; the owner closed the search. Work items:
 ## 5. Traps — read before touching these areas
 
 **Process:**
-- **Preview with `nexmind-dev-web`, never `nexmind`.** `nexmind` runs `scripts/dev.mts`, which
+- **Preview with `dev:web`, never `nexmind`.** `nexmind` runs `scripts/dev.mts`, which
   spawns a real desk session that spends Claude budget. This happened on 2026-09-15.
 - **Never start a dev server with Bash.** It outlives the turn and holds port 3275. After a cold
   start, the first `navigate` fails while Next compiles; check `preview_logs` for "Ready in".

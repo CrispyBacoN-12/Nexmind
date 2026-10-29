@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge, Button, Card, CardTitle, Stat } from "@/components/ui";
 import { CHART_SMA_SLOW, type ChartBar } from "@/lib/advisor/chartSeries";
@@ -39,6 +40,26 @@ export function AdvisorForm() {
   const [maxSlots, setMaxSlots] = useState("5");
   const [riskPct, setRiskPct] = useState("1");
   const [holdings, setHoldings] = useState("");
+  /** The open journal tickers the holdings field was prefilled with, if any. */
+  const [holdingsFromJournal, setHoldingsFromJournal] = useState<string | null>(null);
+  // Set once the owner types in the field or submits: the prefill must never
+  // land on top of their own input or change holdings under a card already shown.
+  const holdingsTouched = useRef(false);
+
+  // Default the holdings field to the open journal positions — the same rows
+  // the portfolio gates below treat as the book. Fails soft to an empty field.
+  useEffect(() => {
+    fetch("/api/journal")
+      .then((r) => r.json())
+      .then((j: { ok: boolean; open?: { ticker: string }[] }) => {
+        const tickers = j.ok ? Array.from(new Set((j.open ?? []).map((t) => t.ticker.toUpperCase()))) : [];
+        if (tickers.length === 0 || holdingsTouched.current) return;
+        const joined = tickers.join(", ");
+        setHoldings(joined);
+        setHoldingsFromJournal(joined);
+      })
+      .catch(() => {});
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +92,7 @@ export function AdvisorForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    holdingsTouched.current = true;
     setLoading(true);
     setError(null);
     setCard(null);
@@ -153,12 +175,22 @@ export function AdvisorForm() {
           <Field label="เงินทุน ($)" value={capital} onChange={setCapital} />
           <Field label="จำนวนช่องสูงสุด" value={maxSlots} onChange={setMaxSlots} />
           <Field label="ความเสี่ยงต่อไม้ (%)" value={riskPct} onChange={setRiskPct} />
-          <Field
-            label="ถืออยู่ตอนนี้ (คั่นด้วยจุลภาค)"
-            value={holdings}
-            onChange={setHoldings}
-            placeholder="MSFT, NVDA"
-          />
+          <div>
+            <Field
+              label="ถืออยู่ตอนนี้ (คั่นด้วยจุลภาค)"
+              value={holdings}
+              onChange={(v) => {
+                holdingsTouched.current = true;
+                setHoldings(v);
+              }}
+              placeholder="MSFT, NVDA"
+            />
+            {holdingsFromJournal != null && holdings === holdingsFromJournal ? (
+              <p className="mt-1 text-xs text-(--color-muted)">
+                ดึงจากสถานะเปิดใน<Link className="underline" href="/journal">สมุดบันทึกเทรด</Link> · เพิ่มหุ้นที่ถือนอกสมุดได้เอง
+              </p>
+            ) : null}
+          </div>
           <div className="sm:col-span-3">
             <Button type="submit" disabled={loading}>
               {loading ? "กำลังอ่าน…" : "อ่านโครงสร้าง"}

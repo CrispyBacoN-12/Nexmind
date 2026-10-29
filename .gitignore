@@ -78,6 +78,9 @@ graphify-out/
 # python bytecode (mt5-bridge)
 __pycache__/
 
+# compiled MT5 experts (MetaEditor output; the .mq5 sources are committed)
+*.ex5
+
 .cache/
 
 # Personal vault notes that have nothing to do with this repo and should not
