@@ -46,7 +46,7 @@ Hard context the code does not state:
 
 | Thing | Value |
 |---|---|
-| Branch | `master` at `06174fd`, **131 commits ahead of `origin/master`, never pushed**. Tree clean |
+| Branch | `master` **pushed to `origin` 2026-10-29** (`d973e28`). The push auto-deployed Vercel production (see §6) |
 | Tests | `npm test` **847 pass / 0 fail** |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
@@ -192,7 +192,6 @@ There are no open research directions; the owner closed the search. Work items:
 2. **Check that Risk Sentry keeps running.** Read `scripts/risk-sentry.log` and the task's
    `LastTaskResult` after a few weekdays.
 3. **Housekeeping, the owner's call:**
-   - push `master` (never pushed)
    - delete the two `xau-*` worktrees/branches and `wip/mt5-xauusd`, or keep them as the
      evidence trail for the xau-v1 REJECT. Gold is closed either way.
    - decide whether `stocks-only-pivot` is deleted (fully merged into master)
@@ -264,7 +263,12 @@ There are no open research directions; the owner closed the search. Work items:
 
 ## 6. Blocked on the user (still open)
 
-- **Push `master`?** It is 131 commits ahead and has never been pushed; it was never requested.
+- **Vercel cron vs. local runner.** Pushing `master` (2026-10-29) auto-deployed Vercel production,
+  and `vercel.json` schedules `/api/cron/risk-sentry` at 12:00 UTC Mon-Fri. That is the same slot
+  as the local `NEXMIND Risk Sentry` task, whose runtime is local by decision (`8cfffa9`). The
+  previous production build (`8f74b90`) had `crons: []`. Whether the Vercel run succeeds depends
+  on its env (`CRON_SECRET`, `DATABASE_URL`, `DISCORD_WEBHOOK_URL`), which was not checked. If both
+  run, Discord may get duplicate alerts. Fix: set `crons` back to `[]` and push, or keep one runner.
 - **Dormant, only if a cloud schedule is ever re-enabled:**
   - Vercel has no `ANTHROPIC_API_KEY`.
   - The GH runner's CLI produced `mock`, and why is unexplained.
