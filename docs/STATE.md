@@ -46,7 +46,7 @@ Hard context the code does not state:
 
 | Thing | Value |
 |---|---|
-| Branch | `master` **pushed to `origin` 2026-10-29** (`d973e28`). The push auto-deployed Vercel production (see §6) |
+| Branch | `master` **pushed to `origin` 2026-10-29**. Every push auto-deploys Vercel production |
 | Tests | `npm test` **847 pass / 0 fail** |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
@@ -201,6 +201,9 @@ There are no open research directions; the owner closed the search. Work items:
 **Process:**
 - **Preview with `dev:web`, never `nexmind`.** `nexmind` runs `scripts/dev.mts`, which
   spawns a real desk session that spends Claude budget. This happened on 2026-09-15.
+- **Keep `vercel.json` `crons: []`.** A push to `master` auto-deploys Vercel production, and
+  Risk Sentry runs locally by decision (`8cfffa9`). On 2026-10-29 a push briefly deployed a
+  12:00 UTC Vercel cron in the local task's slot; it was reverted the same day.
 - **Never start a dev server with Bash.** It outlives the turn and holds port 3275. After a cold
   start, the first `navigate` fails while Next compiles; check `preview_logs` for "Ready in".
 - **`scripts/*.cmd` must be ASCII-only.** An em-dash broke cmd.exe under the Thai codepage.
@@ -263,12 +266,6 @@ There are no open research directions; the owner closed the search. Work items:
 
 ## 6. Blocked on the user (still open)
 
-- **Vercel cron vs. local runner.** Pushing `master` (2026-10-29) auto-deployed Vercel production,
-  and `vercel.json` schedules `/api/cron/risk-sentry` at 12:00 UTC Mon-Fri. That is the same slot
-  as the local `NEXMIND Risk Sentry` task, whose runtime is local by decision (`8cfffa9`). The
-  previous production build (`8f74b90`) had `crons: []`. Whether the Vercel run succeeds depends
-  on its env (`CRON_SECRET`, `DATABASE_URL`, `DISCORD_WEBHOOK_URL`), which was not checked. If both
-  run, Discord may get duplicate alerts. Fix: set `crons` back to `[]` and push, or keep one runner.
 - **Dormant, only if a cloud schedule is ever re-enabled:**
   - Vercel has no `ANTHROPIC_API_KEY`.
   - The GH runner's CLI produced `mock`, and why is unexplained.

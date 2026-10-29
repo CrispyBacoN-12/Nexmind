@@ -1,5 +1,3 @@
 {
-  "crons": [
-    { "path": "/api/cron/risk-sentry", "schedule": "0 12 * * 1-5" }
-  ]
+  "crons": []
 }
