@@ -68,6 +68,15 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-10-13: Gold strategies exported to MQL5 (uncommitted, owner request).**
+  - `mql5/`: 56 EAs cover all 60 non-mock `GC=F` research rows and the 4 xau-v1 hypotheses.
+    `mql5/Experts/NEXMIND_Gold/NexCore.mqh` (next to the EAs, quoted include) ports `indicators.ts`, `computeSnapshots` and the
+    single-target/trail exits. Install steps and every deviation are in `mql5/README.md`.
+  - All 56 compile with 0 errors and 0 warnings. Parity with the TS backtester was **not** run.
+  - This is for re-running backtests in the MT5 tester. It does not reopen gold: the xau-v1 REJECT
+    and §0 still stand.
+  - MetaEditor's `/compile:` fails silently on a path with a space (`CLAUDE WEB`). Copy the tree
+    to a path without spaces to compile from the command line.
 - **2026-10-01: xau-v1 gold validation ran. All 4 hypotheses REJECT; XAUUSD is closed.**
   - The owner chose to validate the pre-registered xau-v1 screen (H1, Exness `XAUUSDm`, 5 folds,
     `LADDERS.flat`, p90 cost) before any MT5 bridge or order work. No orders were placed.
