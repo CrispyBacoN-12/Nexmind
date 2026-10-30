@@ -47,7 +47,7 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Branch | `master` **pushed to `origin` 2026-10-29**. Every push auto-deploys Vercel production |
-| Tests | `npm test` **847 pass / 0 fail** |
+| Tests | `npm test` **876 pass / 0 fail** (2026-10-30) |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
@@ -68,6 +68,41 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-10-30: Two ideas from day-trader-skill (MIT, read as data, nothing installed). `cf04836`, `9971cff`; not pushed.**
+  - **Risk Sentry reads SEC 8-Ks.** `src/lib/market/secFilings.ts` (EDGAR submissions API, no key,
+    optional `SEC_USER_AGENT`) feeds the pure `riskSentry/filingWatch.ts`. 8-K items are tiered red
+    (1.03, 1.05, 2.04, 2.06, 3.01, 4.01, 4.02), notable (1.01, 1.02, 2.01, 2.05, 3.02, 3.03, 5.01,
+    5.02) or quiet (2.02, 7.01, 8.01, 9.01 and the rest never alert). Hits sit right after stop hits
+    in the message, in New York time with the filing link.
+    - Window: `(since, run start]`, with `since` from Setting `riskSentry:filingsCheckedTo` (first
+      run 3 days back, cap 14). It advances only when every ticker was read; an EDGAR failure is
+      named in the message as "NOT checked", never a quiet all-clear.
+    - Live dry run over 60 days on AAPL/MSFT/KO/INTC/BRK-B: one hit (AAPL 8-K/A 5.02).
+  - **`/advisor` fill guard** (`advisor/fillGuard.ts`, quote from `market/quote.ts`, Finnhub
+    `/quote`). The stop is a price, so a fill above the entry carries more risk than the card sized.
+    - Walk-away price: the highest fill where the card's shares still fit both caps. Needs no quote.
+    - A quote under 15 min old and above the entry is re-measured against the same stop and
+      re-sized. Past the walk-away it also becomes a card warning.
+    - Reported, never applied: `sizing` is unchanged. Checked live on KO (entry 90 → quote 94.37:
+      5 shares would risk $34.02, i.e. 1.36% of capital; re-sized at that quote: 3 shares).
+- **2026-10-30: xau-vp-v1, volume profile on gold. All 3 REJECT. Gold testing is now open-ended.**
+  - The owner overrode xau-v1's §0 to test volume profile as an H1 entry an AI agent could trade
+    on MT5. It was pre-registered (`7c0c7c9`) and coded (`643b6d8`) before the run.
+  - Hypotheses: prior-day value-area re-entry fade ("80% rule"), its acceptance mirror, and #137's
+    sweep + VP entry. Four 2017-04+ folds, all TEST. Same exit, costs and control as xau-v1.
+  - Results: re-entry p95 0/4; acceptance p95 1/4, only in the 2024-26 bull fold and carried by
+    longs; sweep loses money in every fold and misses the trade floors. The control itself loses
+    money on gold H1 at these costs, so "beats the median" was a low bar here.
+  - The corrected folds also re-ran xau-v1's daily-trend as an audit row. It still fails (p95 2/4),
+    so the xau-v1 REJECT was not an artifact of its broken fold table.
+  - Evidence: branch `xau-vp-v1` (worktree `.worktrees/xau-vp-v1`), `docs/quant/2026-10-30-xau-vp-v1-results.md`,
+    `scripts/xau-vp-screen.log`, commit `e854fdc`. Not merged to master.
+  - The run carried a stop rule (all REJECT closes gold). **The owner dropped it after the run** and
+    chose open-ended gold testing. The guard that replaces it is `docs/quant/xau-test-ledger.md` on
+    branch `xau-vp-v1`. Every gold rule is logged there, the bar does not loosen as the count rises,
+    and a PASS stays provisional until it also holds on bars after 2026-09-18, which no test has read.
+    Round 3 (plain 20-bar sweep, EMA 20/50 cross) is pre-registered in `5777a8f`.
+  - The AI-agent order path is not built. It waits on a rule that clears the forward check.
 - **2026-10-29: Copilot polish shipped (owner sign-off in chat).**
   - `/journal` runs Risk Sentry's `stopWatch` on demand through the new `GET /api/journal/stops`.
     Each open row shows a red "closed below stop" or amber "low traded through stop" badge, and
@@ -251,6 +286,9 @@ There are no open research directions; the owner closed the search. Work items:
   - the six screened mechanisms
   - insider, earnings-timing and 13F data
   - universe swapping
+  - any XAUUSD rule already in `docs/quant/xau-test-ledger.md` (branch `xau-vp-v1`). Gold testing is
+    open-ended by owner decision, but a rejected row is never re-tuned, and a new rule gets a new
+    ledger row and its own pre-registration first
 - **"Add one more confirmation" is predicted to fail**, because the entry rule is already late.
   Lateness numbers past t−3 are lookahead, not edge.
 - **Pre-registered constants:**
