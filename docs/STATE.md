@@ -46,8 +46,8 @@ Hard context the code does not state:
 
 | Thing | Value |
 |---|---|
-| Branch | `master` **pushed to `origin` 2026-10-29**. Every push auto-deploys Vercel production |
-| Tests | `npm test` **876 pass / 0 fail** (2026-10-30) |
+| Branch | `master` **pushed to `origin` 2026-10-30**. Every push auto-deploys Vercel production |
+| Tests | `npm test` **882 pass / 0 fail** (2026-10-30) |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
@@ -68,7 +68,15 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-10-30: Two ideas from day-trader-skill (MIT, read as data, nothing installed). `cf04836`, `9971cff`; not pushed.**
+- **2026-10-30: `/advisor` base-rate columns on the R ladder (idea 3 from day-trader-skill). `0167ea0`, pushed.**
+  - `advisor/baseRate.ts` (pure) replays the card's stop (1.5×ATR) and each R rung from the close
+    of every session in the 2y history, walked forward at most 20 sessions. It reports target first,
+    stop first, neither, and the 1/(1+R) break-even line.
+  - Fill conventions never flatter the target: a session touching both counts as stop; a gap-open
+    past either side resolves at once; windows running past the last bar are dropped.
+  - It is a zero-information entry, so it shows the stock's drift. The card says so and prints the
+    buy-and-hold move beside it. Live KO (+59.7% over the sample): 1R first 53.2% vs 50.0% break-even.
+- **2026-10-30: Two ideas from day-trader-skill (MIT, read as data, nothing installed). `cf04836`, `9971cff`, pushed.**
   - **Risk Sentry reads SEC 8-Ks.** `src/lib/market/secFilings.ts` (EDGAR submissions API, no key,
     optional `SEC_USER_AGENT`) feeds the pure `riskSentry/filingWatch.ts`. 8-K items are tiered red
     (1.03, 1.05, 2.04, 2.06, 3.01, 4.01, 4.02), notable (1.01, 1.02, 2.01, 2.05, 3.02, 3.03, 5.01,
