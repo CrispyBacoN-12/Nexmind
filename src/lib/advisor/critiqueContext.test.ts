@@ -63,6 +63,7 @@ function makeCard(over: Partial<AdvisorCard> = {}): AdvisorCard {
       atQuote: null,
       belowStop: false,
     },
+    baseRate: null,
     alreadyHeld: false,
     warnings: [],
     noEdgeClaim: ADVISOR_NO_EDGE_CLAIM,

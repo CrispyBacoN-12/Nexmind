@@ -295,6 +295,7 @@ function ResultCard({
   /** Changes on any form edit; remounting AdvisorCritique is how it clears. */
   critiqueKey: number;
 }) {
+  const br = card.baseRate;
   return (
     <div className="space-y-4">
       {/* The already-held banner stays above the chart: it changes how every
@@ -413,21 +414,59 @@ function ResultCard({
                 <th className="py-1 pr-4">R</th>
                 <th className="py-1 pr-4">ราคา</th>
                 <th className="py-1 pr-4">กำไร</th>
-                <th className="py-1">กำไร-ขาดทุน จาก {fmtNumber(card.sizing.shares, 0)} หุ้น</th>
+                <th className="py-1 pr-4">กำไร-ขาดทุน จาก {fmtNumber(card.sizing.shares, 0)} หุ้น</th>
+                {br ? (
+                  <>
+                    <th className="py-1 pr-4">ถึงเป้าก่อน</th>
+                    <th className="py-1 pr-4">โดน stop ก่อน</th>
+                    <th className="py-1 pr-4">ไม่จบใน {br.horizon} วัน</th>
+                    <th className="py-1">จุดคุ้มทุน</th>
+                  </>
+                ) : null}
               </tr>
             </thead>
             <tbody className="font-mono">
-              {card.ladder.map((row) => (
-                <tr key={row.r} className="border-t border-(--color-border)">
-                  <td className="py-1 pr-4">{fmtNumber(row.r, 1)}R</td>
-                  <td className="py-1 pr-4">{fmtMoney(row.price)}</td>
-                  <td className="py-1 pr-4">{fmtPct(row.gainPct)}</td>
-                  <td className="py-1">{fmtMoney(row.plUsd)}</td>
-                </tr>
-              ))}
+              {card.ladder.map((row) => {
+                const b = br?.rows.find((x) => x.r === row.r);
+                return (
+                  <tr key={row.r} className="border-t border-(--color-border)">
+                    <td className="py-1 pr-4">{fmtNumber(row.r, 1)}R</td>
+                    <td className="py-1 pr-4">{fmtMoney(row.price)}</td>
+                    <td className="py-1 pr-4">{fmtPct(row.gainPct)}</td>
+                    <td className="py-1 pr-4">{fmtMoney(row.plUsd)}</td>
+                    {br ? (
+                      b ? (
+                        <>
+                          <td className="py-1 pr-4">{fmtPct(b.targetFirstPct)}</td>
+                          <td className="py-1 pr-4">{fmtPct(b.stopFirstPct)}</td>
+                          <td className="py-1 pr-4">{fmtPct(b.openPct)}</td>
+                          <td className="py-1 text-(--color-muted)">{fmtPct(b.breakEvenPct)}</td>
+                        </>
+                      ) : (
+                        <td className="py-1" colSpan={4}>—</td>
+                      )
+                    ) : null}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        {/* A zero-information entry on every session: whatever this shows is the
+            stock's own drift over the sample, which is why the buy-and-hold move
+            sits in the same sentence. */}
+        {br ? (
+          <p className="text-xs text-(--color-muted)">
+            สถิติพื้นฐาน: ถ้าเข้าซื้อที่ราคาปิดของ<span className="font-mono">ทุกวัน</span> ({fmtNumber(br.entries, 0)} วัน,{" "}
+            {br.from} ถึง {br.to}) ด้วย stop {ADVISOR_ATR_SL_MULT}×ATR แบบเดียวกับการ์ดนี้ แล้วดูต่อไม่เกิน {br.horizon} วันทำการ ·
+            วันที่แท่งเดียวแตะทั้ง stop และเป้า นับเป็นโดน stop ({fmtNumber(br.sameBarBoth, 0)} ครั้ง) · ช่วงนี้หุ้นตัวนี้เปลี่ยนไป{" "}
+            <span className="font-mono">{fmtPct(br.buyHoldPct)}</span> ถ้าเกินจุดคุ้มทุน ส่วนใหญ่คือแนวโน้มของหุ้นช่วงนั้น
+            ไม่ใช่ความได้เปรียบ · วันที่ติดกันใช้เส้นทางราคาเดียวกัน ตัวอย่างอิสระจริงน้อยกว่าจำนวนวันหลายเท่า ·
+            ยังไม่หักต้นทุน {fmtNumber(card.costR, 3)}R ต่อรอบ
+          </p>
+        ) : (
+          <p className="text-xs text-(--color-muted)">สถิติพื้นฐาน: ประวัติราคารายวันไม่พอจะคำนวณ</p>
+        )}
       </Card>
 
       <section className="space-y-3">

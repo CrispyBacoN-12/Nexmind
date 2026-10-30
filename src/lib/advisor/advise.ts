@@ -17,6 +17,7 @@ import { gateSlots, type GateDecision } from "@/lib/market/marketGate";
 import { dailyReturns, pearsonCorrelation } from "@/lib/trading/correlation";
 import { corrMultiplierFor } from "@/lib/trading/positionSizing";
 
+import { baseRate } from "./baseRate";
 import { fillGuard } from "./fillGuard";
 import { gapRisk } from "./gapRisk";
 import { rLadder, costInR } from "./rLadder";
@@ -196,6 +197,9 @@ export function advise(input: AdvisorInput): AdvisorResult {
     gapRisk: gap,
     gapWorstLossUsd,
     fillGuard: guard,
+    // From the 2y history only: the 6mo series leaves too few complete windows,
+    // and a base rate off a quarter of data would be a story about that quarter.
+    baseRate: baseRate(input.gapHistory),
     alreadyHeld,
     warnings,
     noEdgeClaim: ADVISOR_NO_EDGE_CLAIM,

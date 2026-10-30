@@ -101,6 +101,37 @@ export interface EarningsInfo {
   note?: string;
 }
 
+/** One rung of the base-rate table. Percent units throughout. */
+export interface BaseRateRow {
+  r: number;
+  /** Reached entry + r * stop distance before the stop, within the horizon. */
+  targetFirstPct: number;
+  stopFirstPct: number;
+  /** Neither within the horizon. */
+  openPct: number;
+  /** 1 / (1 + r): the target-first share at which this rung only breaks even, before costs. */
+  breakEvenPct: number;
+}
+
+/**
+ * The card's geometry replayed from every close in the sample. See baseRate.ts:
+ * it is the stock's drift and volatility, not an edge.
+ */
+export interface BaseRate {
+  /** Entries replayed (one per eligible session; windows overlap). */
+  entries: number;
+  /** Sessions each entry was walked forward. */
+  horizon: number;
+  /** First and last ENTRY date, YYYY-MM-DD. */
+  from: string;
+  to: string;
+  /** Entries whose resolving session touched both stop and 1R target (counted as stop). */
+  sameBarBoth: number;
+  /** The stock's own move over the sample, first entry close to last bar close. */
+  buyHoldPct: number;
+  rows: BaseRateRow[];
+}
+
 /**
  * The last trade price, fetched by the route. Same never-a-bare-null contract as
  * EarningsInfo: a missing price always carries the reason.
@@ -219,6 +250,9 @@ export interface AdvisorCard {
   /** What a fill above the entry does to this card's risk. Reported, never
    *  applied: `sizing` above is still sized at `entry`. See fillGuard.ts. */
   fillGuard: FillGuard;
+  /** The card's stop and ladder replayed from every close in the 2y sample.
+   *  The stock's drift, not an edge — see baseRate.ts. null when history is short. */
+  baseRate: BaseRate | null;
   /** True when the asked-about ticker is already in holdings. Shown at the top. */
   alreadyHeld: boolean;
   /** Everything that went wrong but did not stop the card rendering. */
