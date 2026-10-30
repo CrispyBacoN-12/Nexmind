@@ -9,6 +9,8 @@
 import type { Candle } from "@/lib/indicators";
 import type { GateDecision } from "@/lib/market/marketGate";
 
+import type { FillGuard } from "./fillGuard";
+
 /** Printed on every card, verbatim. Do not soften it. */
 export const ADVISOR_NO_EDGE_CLAIM =
   "เครื่องมือนี้ไม่ได้ทำนายอะไรทั้งสิ้น มันรายงานโครงสร้างและความเสี่ยงของหุ้นที่คุณเลือกเท่านั้น " +
@@ -100,6 +102,17 @@ export interface EarningsInfo {
 }
 
 /**
+ * The last trade price, fetched by the route. Same never-a-bare-null contract as
+ * EarningsInfo: a missing price always carries the reason.
+ */
+export interface LiveQuote {
+  price: number | null;
+  /** Epoch SECONDS of the price, as the vendor stamps it. */
+  at: number | null;
+  note?: string;
+}
+
+/**
  * The worst overnight gap against a long in the sample, in units of the stop.
  * See gapRisk.ts for the formula and for why ATR_{t-1} is the denominator.
  */
@@ -160,6 +173,10 @@ export interface AdvisorInput {
   /** Longer daily history (the route's 2y pull) read ONLY for gap risk, so the
    *  6mo figures above do not move. Omitted or null: the card says unknown. */
   gapHistory?: Candle[] | null;
+  /** The last trade price, fetched by the route. Omitted: the fill guard says no quote. */
+  quote?: LiveQuote | null;
+  /** Epoch seconds at request time — used ONLY to age `quote`. advise() reads no clock. */
+  nowSec?: number | null;
 }
 
 export interface AdvisorCard {
@@ -199,6 +216,9 @@ export interface AdvisorCard {
   /** shares * slDistance * gapRisk.worstLossR — dollars at stake if the worst
    *  sampled gap hit today's position resting just above its stop. */
   gapWorstLossUsd: number | null;
+  /** What a fill above the entry does to this card's risk. Reported, never
+   *  applied: `sizing` above is still sized at `entry`. See fillGuard.ts. */
+  fillGuard: FillGuard;
   /** True when the asked-about ticker is already in holdings. Shown at the top. */
   alreadyHeld: boolean;
   /** Everything that went wrong but did not stop the card rendering. */

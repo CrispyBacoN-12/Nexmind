@@ -240,6 +240,49 @@ function Field({
   );
 }
 
+/**
+ * The stop on this card is a PRICE. A fill above the entry keeps that price and
+ * so carries more risk per share than the card sized for. Reported, never
+ * applied — the share count above is still the one sized at the entry.
+ */
+function FillGuardCard({ card }: { card: AdvisorCard }) {
+  const g = card.fillGuard;
+  const over = g.belowStop || g.atQuote?.overWalkAway;
+  return (
+    <Card className={`p-5 space-y-2 ${over ? "border-amber-500/40" : ""}`}>
+      <CardTitle>ถ้าราคาวิ่งขึ้นก่อนส่งคำสั่ง</CardTitle>
+      {g.walkAwayPrice != null ? (
+        <p className="text-sm">
+          ราคาสูงสุดที่ยังซื้อ {fmtNumber(card.sizing.shares, 0)} หุ้นได้:{" "}
+          <span className="font-mono font-semibold">{fmtMoney(g.walkAwayPrice)}</span>{" "}
+          <span className="text-(--color-muted)">
+            (ติดเพดาน{g.walkAwayBoundBy ? CAP_LABEL[g.walkAwayBoundBy] : ""}) · stop ยังอยู่ที่ {fmtMoney(card.stop)}{" "}
+            ถ้าได้ราคาสูงกว่านี้ ความเสี่ยงจะเกินแผน ให้กดคำนวณใหม่ด้วยราคาที่ได้จริง
+          </span>
+        </p>
+      ) : (
+        <p className="text-sm text-(--color-muted)">ขนาดเป็นศูนย์ จึงไม่มีราคาเพดาน</p>
+      )}
+      {g.quote?.fresh ? (
+        <p className="text-sm">
+          ราคาล่าสุด <span className="font-mono">{fmtMoney(g.quote.price)}</span>{" "}
+          <span className="text-(--color-muted)">(อายุ {fmtNumber(g.quote.ageMin, 0)} นาที)</span>
+          {g.atQuote ? (
+            <>
+              {" "}
+              · ถ้าซื้อ {fmtNumber(card.sizing.shares, 0)} หุ้นตอนนี้ เสี่ยง{" "}
+              <span className="font-mono">{fmtMoney(g.atQuote.plannedRiskUsd)}</span> (
+              {fmtPct(g.atQuote.plannedRiskPct)} ของเงินทุน) · ขนาดที่ถูกต้องที่ราคานี้{" "}
+              <span className="font-mono font-semibold">{fmtNumber(g.atQuote.resized.shares, 0)} หุ้น</span>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      <p className="text-xs text-(--color-muted)">{g.quoteNote}</p>
+    </Card>
+  );
+}
+
 function ResultCard({
   card,
   chart,
@@ -354,6 +397,7 @@ function ResultCard({
             )}
           </p>
         </Card>
+        <FillGuardCard card={card} />
       </section>
 
       <Card className="p-5 space-y-3">

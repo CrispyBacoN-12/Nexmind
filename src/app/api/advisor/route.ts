@@ -10,6 +10,7 @@ import { advise } from "@/lib/advisor/advise";
 import { chartSeries, CHART_MIN_SESSIONS } from "@/lib/advisor/chartSeries";
 import type { HoldingInput } from "@/lib/advisor/types";
 import { fetchNextEarnings } from "@/lib/market/earnings";
+import { fetchLiveQuote } from "@/lib/market/quote";
 import { BENCHMARK } from "@/lib/market/regime";
 import { fetchCandles, fetchCandlesBatch } from "@/lib/marketData";
 import type { CandleResponse } from "@/lib/yahoo";
@@ -197,7 +198,9 @@ export async function POST(req: Request) {
   // it never rejects and never throws — a failure comes back as a null date
   // carrying the reason, which the card prints as "unknown — <reason>" rather
   // than silently omitting the line.
-  const [benchmark, chartCandles, earnings] = await Promise.all([
+  // The live quote joins on the same terms as earnings: it never rejects, and a
+  // miss carries its reason to the card's fill-guard line.
+  const [benchmark, chartCandles, earnings, quote] = await Promise.all([
     // 2y at 1d with a 300-day floor, so SMA200 has the 200 sessions it needs.
     fetchCandles(BENCHMARK, "2y", "1d", 300)
       .then((r) => (r.candles.length > 0 ? r.candles : null))
@@ -206,6 +209,7 @@ export async function POST(req: Request) {
       .then((r) => (r.candles.length > 0 ? r.candles : null))
       .catch(() => null),
     fetchNextEarnings(ticker),
+    fetchLiveQuote(ticker),
   ]);
 
   const chart = chartCandles ? chartSeries(chartCandles) : null;
@@ -224,6 +228,9 @@ export async function POST(req: Request) {
     // The same 2y series the chart draws, read for gap risk only: six months
     // hold about two earnings reports, which is too few nights to find a tail.
     gapHistory: chartCandles,
+    quote,
+    // The route owns the clock; advise() only uses it to age the quote.
+    nowSec: Math.floor(Date.now() / 1000),
   });
 
   // `chart` rides alongside the card rather than inside it: `advise` is pure and

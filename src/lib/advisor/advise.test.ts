@@ -233,3 +233,15 @@ test("inputNotes are prepended to the card's warnings, ahead of any core warning
   const coreIndex = res.card.warnings.findIndex((w) => /benchmark/i.test(w));
   assert.ok(coreIndex > 0, "the core-generated warning must follow the caller's notes");
 });
+
+test("a fresh quote past the walk-away price is a warning; the card's own size is untouched", () => {
+  const candles = bars(40, 100);
+  const nowSec = candles[candles.length - 1].t + 3600;
+  const plain = advise({ ...BASE, candles });
+  const moved = advise({ ...BASE, candles, quote: { price: 120, at: nowSec - 60 }, nowSec });
+  assert.ok(plain.ok && moved.ok);
+  assert.equal(moved.card.sizing.shares, plain.card.sizing.shares);
+  assert.equal(moved.card.fillGuard.atQuote?.overWalkAway, true);
+  assert.ok(moved.card.warnings.includes(moved.card.fillGuard.quoteNote));
+  assert.equal(plain.card.fillGuard.quote, null);
+});

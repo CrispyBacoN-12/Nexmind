@@ -17,6 +17,7 @@ import { gateSlots, type GateDecision } from "@/lib/market/marketGate";
 import { dailyReturns, pearsonCorrelation } from "@/lib/trading/correlation";
 import { corrMultiplierFor } from "@/lib/trading/positionSizing";
 
+import { fillGuard } from "./fillGuard";
 import { gapRisk } from "./gapRisk";
 import { rLadder, costInR } from "./rLadder";
 import { sizeShares } from "./sizing";
@@ -154,6 +155,19 @@ export function advise(input: AdvisorInput): AdvisorResult {
     );
   }
 
+  // The card is sized at `entry`; this says what a higher fill does to that size.
+  const guard = fillGuard({
+    entry,
+    stop,
+    sizing,
+    capital: input.capital,
+    maxSlots: input.maxSlots,
+    riskPct: input.riskPct,
+    quote: input.quote ?? null,
+    nowSec: input.nowSec ?? null,
+  });
+  if (guard.belowStop || guard.atQuote?.overWalkAway) warnings.push(guard.quoteNote);
+
   const alreadyHeld = input.holdings.some((h) => h.ticker.trim().toUpperCase() === ticker);
 
   const card: AdvisorCard = {
@@ -181,6 +195,7 @@ export function advise(input: AdvisorInput): AdvisorResult {
     earnings: input.earnings ?? null,
     gapRisk: gap,
     gapWorstLossUsd,
+    fillGuard: guard,
     alreadyHeld,
     warnings,
     noEdgeClaim: ADVISOR_NO_EDGE_CLAIM,
