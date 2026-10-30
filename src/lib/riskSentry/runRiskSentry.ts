@@ -12,8 +12,11 @@ import { correlationAlert, type CorrelationAlertPair } from "./correlationAlert"
 import { mergeHoldingSources } from "./holdings";
 import { stopWatch, type StopWatchHit } from "./stopWatch";
 import { marketGateAlert, type MarketGateAlertResult, type GateReading } from "./marketGateAlert";
+import { filingWatch, filingWindowStart, type FilingFetchResult, type FilingWatchResult } from "./filingWatch";
 
 export const RISK_SENTRY_LAST_GATE_SETTING = "riskSentry:lastGate";
+/** The end of the last 8-K window that was fully checked, ISO UTC. */
+export const RISK_SENTRY_FILINGS_CHECKED_TO_SETTING = "riskSentry:filingsCheckedTo";
 
 export interface RunRiskSentryDeps {
   getRiskSentryHoldings: () => Promise<string[]>;
@@ -22,6 +25,8 @@ export interface RunRiskSentryDeps {
   fetchCandlesBatch: (symbols: string[], range: "2y", interval: "1d") => Promise<Map<string, { candles: Candle[] }>>;
   fetchCandles: (symbol: string, range: "2y", interval: "1d", minDays: number) => Promise<{ candles: Candle[] }>;
   fetchNextEarnings: (ticker: string) => Promise<EarningsInfo>;
+  /** Never rejects: a failed ticker comes back as `{ error }`. */
+  fetchRecentFilings: (tickers: string[]) => Promise<Map<string, FilingFetchResult>>;
   getSetting: (key: string, fallback: string) => Promise<string>;
   setSetting: (key: string, value: string) => Promise<void>;
 }
@@ -33,12 +38,37 @@ export interface RunRiskSentrySummary {
   earnings: EarningsWatchdogHit[];
   gate: MarketGateAlertResult;
   correlations: CorrelationAlertPair[];
+  filings: FilingWatchResult;
+  /** ISO UTC start of the 8-K window this run read. null when skipped. */
+  filingsSince: string | null;
+}
+
+const NO_FILINGS: FilingWatchResult = { hits: [], failed: [], noFiler: [] };
+
+/** EDGAR stamps UTC; the owner trades US hours, so the alert reads in New York time. */
+function etTime(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return (
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .format(d)
+      .replace(",", "") + " ET"
+  );
 }
 
 const GATE_READINGS: readonly GateReading[] = ["above", "below", "unknown"];
 
 function composeMessage(
   stops: StopWatchHit[],
+  filings: FilingWatchResult,
   earnings: EarningsWatchdogHit[],
   gate: MarketGateAlertResult,
   correlations: CorrelationAlertPair[],
@@ -55,6 +85,22 @@ function composeMessage(
           )
           .join("\n"),
     );
+  }
+  // Right after stop hits: a restatement or an auditor change can matter more
+  // than anything below it, and nothing scheduled would have warned about it.
+  if (filings.hits.length > 0 || filings.failed.length > 0) {
+    const lines = filings.hits.map(
+      (h) =>
+        `${h.ticker}${h.tier === "red" ? " — RED" : ""}: ${h.form} ${etTime(h.acceptedAt)} — ` +
+        `${h.items.map((i) => `${i.code} ${i.label}`).join("; ")}\n${h.url}`,
+    );
+    if (filings.failed.length > 0) {
+      lines.push(
+        `NOT checked (EDGAR failed, read these yourself): ` +
+          filings.failed.map((f) => `${f.ticker} (${f.reason})`).join(", "),
+      );
+    }
+    sections.push("**SEC 8-K filings**\n" + lines.join("\n"));
   }
   if (earnings.length > 0) {
     sections.push(
@@ -91,14 +137,18 @@ export async function runRiskSentry(
       earnings: [],
       gate: { flipped: false, from: "unknown", to: "unknown", note: "no holdings configured" },
       correlations: [],
+      filings: NO_FILINGS,
+      filingsSince: null,
     };
   }
 
-  const [candleMap, benchmarkResp, earningsResults, lastReadingRaw] = await Promise.all([
+  const [candleMap, benchmarkResp, earningsResults, lastReadingRaw, filingMap, filingsCheckedTo] = await Promise.all([
     deps.fetchCandlesBatch(holdings, "2y", "1d"),
     deps.fetchCandles(BENCHMARK, "2y", "1d", 300),
     Promise.all(holdings.map(async (ticker) => ({ ticker, earnings: await deps.fetchNextEarnings(ticker) }))),
     deps.getSetting(RISK_SENTRY_LAST_GATE_SETTING, "unknown"),
+    deps.fetchRecentFilings(holdings),
+    deps.getSetting(RISK_SENTRY_FILINGS_CHECKED_TO_SETTING, ""),
   ]);
 
   const lastReading: GateReading = GATE_READINGS.includes(lastReadingRaw as GateReading)
@@ -116,14 +166,32 @@ export async function runRiskSentry(
   const gateResult = marketGateAlert(gateDecision, lastReading);
   const correlationHits = correlationAlert(holdingCandles);
 
+  const filingsSince = filingWindowStart(filingsCheckedTo || null, today);
+  const filingResult = filingWatch(
+    holdings.map((ticker) => ({
+      ticker,
+      result: filingMap.get(ticker) ?? { error: "no result came back for this ticker" },
+    })),
+    filingsSince,
+    today,
+  );
+
   await deps.setSetting(RISK_SENTRY_LAST_GATE_SETTING, gateResult.to);
+  // The window only advances when every name was read. One failed ticker holds
+  // it where it was, so the next run re-reads the same days rather than losing
+  // that ticker's filings; the names that did succeed may repeat once.
+  if (filingResult.failed.length === 0) {
+    await deps.setSetting(RISK_SENTRY_FILINGS_CHECKED_TO_SETTING, today.toISOString());
+  }
 
   return {
     skipped: false,
-    message: composeMessage(stopHits, earningsHits, gateResult, correlationHits),
+    message: composeMessage(stopHits, filingResult, earningsHits, gateResult, correlationHits),
     stops: stopHits,
     earnings: earningsHits,
     gate: gateResult,
     correlations: correlationHits,
+    filings: filingResult,
+    filingsSince: filingsSince.toISOString(),
   };
 }

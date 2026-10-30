@@ -9,6 +9,7 @@ import { runRiskSentry } from "@/lib/riskSentry/runRiskSentry";
 import { getJournalOpenPositions, getRiskSentryHoldings, setRiskSentryHoldings } from "@/lib/riskSentry/holdings";
 import { fetchCandles, fetchCandlesBatch } from "@/lib/marketData";
 import { fetchNextEarnings } from "@/lib/market/earnings";
+import { fetchRecentFilings } from "@/lib/market/secFilings";
 import { getSetting, setSetting } from "@/lib/settings";
 import { sendDiscordNotification } from "@/lib/notify/discord";
 
@@ -23,6 +24,7 @@ async function main() {
       fetchCandlesBatch,
       fetchCandles,
       fetchNextEarnings,
+      fetchRecentFilings,
       getSetting,
       setSetting,
     });
@@ -30,7 +32,7 @@ async function main() {
       log("risk-sentry: no holdings (journal empty, manual list empty)");
       return;
     }
-    log(`risk-sentry: stops ${s.stops.length}, earnings ${s.earnings.length}, gate ${s.gate.from}->${s.gate.to}${s.gate.flipped ? " FLIPPED" : ""}, correlated pairs ${s.correlations.length}`);
+    log(`risk-sentry: stops ${s.stops.length}, earnings ${s.earnings.length}, gate ${s.gate.from}->${s.gate.to}${s.gate.flipped ? " FLIPPED" : ""}, correlated pairs ${s.correlations.length}, 8-K hits ${s.filings.hits.length} since ${s.filingsSince}${s.filings.failed.length ? `, 8-K UNCHECKED ${s.filings.failed.map((f) => f.ticker).join(",")}` : ""}${s.filings.noFiler.length ? `, no SEC filer ${s.filings.noFiler.join(",")}` : ""}`);
     if (s.message) {
       log(`risk-sentry alert:\n${s.message}`);
       await sendDiscordNotification(s.message, "warning");

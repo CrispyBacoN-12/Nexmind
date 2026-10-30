@@ -9,6 +9,7 @@ import { runRiskSentry } from "@/lib/riskSentry/runRiskSentry";
 import { getJournalOpenPositions, getRiskSentryHoldings, setRiskSentryHoldings } from "@/lib/riskSentry/holdings";
 import { fetchCandles, fetchCandlesBatch } from "@/lib/marketData";
 import { fetchNextEarnings } from "@/lib/market/earnings";
+import { fetchRecentFilings } from "@/lib/market/secFilings";
 import { getSetting, setSetting } from "@/lib/settings";
 import { assertCronAuth } from "@/lib/cronAuth";
 import { sendDiscordNotification } from "@/lib/notify/discord";
@@ -28,6 +29,7 @@ export async function GET(req: Request) {
       fetchCandlesBatch,
       fetchCandles,
       fetchNextEarnings,
+      fetchRecentFilings,
       getSetting,
       setSetting,
     });

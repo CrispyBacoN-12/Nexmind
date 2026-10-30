@@ -2,7 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
 import type { EarningsInfo } from "@/lib/advisor/types";
-import { runRiskSentry, RISK_SENTRY_LAST_GATE_SETTING, type RunRiskSentryDeps } from "./runRiskSentry";
+import {
+  runRiskSentry,
+  RISK_SENTRY_FILINGS_CHECKED_TO_SETTING,
+  RISK_SENTRY_LAST_GATE_SETTING,
+  type RunRiskSentryDeps,
+} from "./runRiskSentry";
+import type { FilingFetchResult } from "./filingWatch";
 
 const TODAY = new Date("2026-09-16T12:00:00Z");
 const DAY_SEC = 86_400;
@@ -38,6 +44,8 @@ function baseDeps(overrides: Partial<RunRiskSentryDeps> = {}): RunRiskSentryDeps
     fetchCandlesBatch: async () => new Map(),
     fetchCandles: async () => ({ candles: uptrend() }),
     fetchNextEarnings: async () => NO_EARNINGS,
+    fetchRecentFilings: async (tickers: string[]) =>
+      new Map<string, FilingFetchResult>(tickers.map((t) => [t, { filings: [] }])),
     getSetting: async (_k: string, fallback: string) => fallback,
     setSetting: async () => {},
     ...overrides,
@@ -135,9 +143,83 @@ test("persists the new gate reading via setSetting", async () => {
     getRiskSentryHoldings: async () => ["AAPL"],
     fetchCandlesBatch: async () => new Map([["AAPL", { candles: uptrend() }]]),
     setSetting: async (key: string, value: string) => {
-      persisted = [key, value];
+      if (key === RISK_SENTRY_LAST_GATE_SETTING) persisted = [key, value];
     },
   });
   await runRiskSentry(deps, TODAY);
   assert.deepEqual(persisted, [RISK_SENTRY_LAST_GATE_SETTING, "above"]);
+});
+
+const restatement = (acceptedAt: string): FilingFetchResult => ({
+  filings: [{ form: "8-K", items: ["4.02", "9.01"], acceptedAt, url: "https://www.sec.gov/x" }],
+});
+
+test("a red 8-K sits right after stop hits and reads in New York time", async () => {
+  const deps = baseDeps({
+    getJournalOpenPositions: async () => [{ ticker: "KO", stop: 400 }],
+    getRiskSentryHoldings: async () => ["AAPL"],
+    fetchCandlesBatch: async () => new Map([["KO", { candles: uptrend() }], ["AAPL", { candles: uptrend() }]]),
+    fetchNextEarnings: async () => ({ date: "2026-09-17", hour: "amc" }),
+    fetchRecentFilings: async () => new Map([["KO", { filings: [] }], ["AAPL", restatement("2026-09-15T20:05:00.000Z")]]),
+  });
+  const summary = await runRiskSentry(deps, TODAY);
+  const msg = summary.message ?? "";
+  assert.equal(summary.filings.hits.length, 1);
+  assert.ok(msg.indexOf("**Stop hit**") < msg.indexOf("**SEC 8-K filings**"));
+  assert.ok(msg.indexOf("**SEC 8-K filings**") < msg.indexOf("**Earnings this week**"));
+  assert.match(msg, /AAPL — RED: 8-K 2026-09-15 16:05 ET — 4\.02 prior financial statements/);
+});
+
+test("the first run reads the last three days and stores the run start as the next window start", async () => {
+  const writes = new Map<string, string>();
+  const deps = baseDeps({
+    getRiskSentryHoldings: async () => ["AAPL"],
+    fetchCandlesBatch: async () => new Map([["AAPL", { candles: uptrend() }]]),
+    fetchRecentFilings: async () => new Map([["AAPL", restatement("2026-09-10T00:00:00.000Z")]]), // 6 days old
+    setSetting: async (k: string, v: string) => {
+      writes.set(k, v);
+    },
+  });
+  const summary = await runRiskSentry(deps, TODAY);
+  assert.equal(summary.filingsSince, "2026-09-13T12:00:00.000Z");
+  assert.deepEqual(summary.filings.hits, []);
+  assert.equal(writes.get(RISK_SENTRY_FILINGS_CHECKED_TO_SETTING), TODAY.toISOString());
+});
+
+test("a stored window end is resumed from, so an older filing still inside it alerts", async () => {
+  const deps = baseDeps({
+    getRiskSentryHoldings: async () => ["AAPL"],
+    fetchCandlesBatch: async () => new Map([["AAPL", { candles: uptrend() }]]),
+    fetchRecentFilings: async () => new Map([["AAPL", restatement("2026-09-10T00:00:00.000Z")]]),
+    getSetting: async (k: string, fallback: string) =>
+      k === RISK_SENTRY_FILINGS_CHECKED_TO_SETTING ? "2026-09-08T12:00:00.000Z" : fallback,
+  });
+  const summary = await runRiskSentry(deps, TODAY);
+  assert.equal(summary.filings.hits.length, 1);
+});
+
+test("an EDGAR failure is named in the message and holds the window where it was", async () => {
+  const writes = new Map<string, string>();
+  const deps = baseDeps({
+    getRiskSentryHoldings: async () => ["AAPL"],
+    fetchCandlesBatch: async () => new Map([["AAPL", { candles: uptrend() }]]),
+    fetchRecentFilings: async () => new Map([["AAPL", { error: "sec HTTP 503" }]]),
+    setSetting: async (k: string, v: string) => {
+      writes.set(k, v);
+    },
+  });
+  const summary = await runRiskSentry(deps, TODAY);
+  assert.match(summary.message ?? "", /NOT checked \(EDGAR failed, read these yourself\): AAPL \(sec HTTP 503\)/);
+  assert.equal(writes.has(RISK_SENTRY_FILINGS_CHECKED_TO_SETTING), false);
+});
+
+test("a fund with no SEC filer is not an alert", async () => {
+  const deps = baseDeps({
+    getRiskSentryHoldings: async () => ["SPY"],
+    fetchCandlesBatch: async () => new Map([["SPY", { candles: uptrend() }]]),
+    fetchRecentFilings: async () => new Map([["SPY", { noFiler: true as const }]]),
+  });
+  const summary = await runRiskSentry(deps, TODAY);
+  assert.equal(summary.message, null);
+  assert.deepEqual(summary.filings.noFiler, ["SPY"]);
 });
