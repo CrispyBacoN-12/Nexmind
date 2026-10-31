@@ -66,8 +66,9 @@ export function findSetup(
     return none(ticker, "ATR คำนวณไม่ได้");
   }
 
-  // 2. Most recent bar that pierced a level and closed back above it, while
-  // the latest close is still above that level.
+  // 2. Most recent bar that came from above a level (opened above it), pierced
+  // it and closed back above it, while the latest close is still above that
+  // level. A bar that opens below and closes above is a reclaim, not a sweep.
   const last = regular[regular.length - 1];
   let sweepIdx = -1;
   let sweptLevels: LevelName[] = [];
@@ -75,7 +76,7 @@ export function findSetup(
     const b = regular[i];
     const hit = SWEEP_LEVELS.filter((name) => {
       const L = levels[name];
-      return L !== null && b.l < L && b.c > L && last.c > L;
+      return L !== null && b.o > L && b.l < L && b.c > L && last.c > L;
     });
     if (hit.length > 0) {
       sweepIdx = i;

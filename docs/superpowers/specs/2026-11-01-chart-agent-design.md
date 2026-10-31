@@ -70,9 +70,11 @@ that function returns them.
 | `PMH`, `PML` | today's pre-market high / low (absent if no pre-market bars) |
 | `dPOC` | developing profile of today's regular-session bars so far (drawn, used as a target) |
 
-**Sweep (owner-approved definition).** A regular-session bar today whose **low trades below** a
-sweep level `L ∈ {PDL, PML, pVAL}` and whose **close is back above** `L`, with the **latest close
-still above** `L`. If several bars qualify, the most recent one is used; if one bar sweeps several
+**Sweep (owner-approved definition).** A regular-session bar today that **opens above** a sweep
+level `L ∈ {PDL, PML, pVAL}`, whose **low trades below** `L` and whose **close is back above** `L`,
+with the **latest close still above** `L`. A bar that opens below `L` and closes above it is a
+reclaim from below, not a sweep (final review: a day trading under PDL all session would otherwise
+"sweep" it on the first close back above). If several bars qualify, the most recent one is used; if one bar sweeps several
 levels, the setup names all of them.
 
 **Setup (call).**

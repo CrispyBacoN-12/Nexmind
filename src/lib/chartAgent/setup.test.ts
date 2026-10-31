@@ -86,6 +86,50 @@ test("a wick below the level that also closes below is not a sweep", () => {
   assert.equal(out.ticker, "AAPL");
 });
 
+/** A bar with its own open, for the sweep-from-above tests (bar() sets o = c). */
+function obar(i: number, o: number, h: number, l: number, c: number): Candle {
+  return { t: T0 + i * 300, o, h, l, c, v: 1000 };
+}
+
+// DVA-shaped day: every regular bar trades under PDL 184.27, then a bar opens
+// BELOW it and closes above it, and price stays above. That is a reclaim from
+// below, not a sweep: no stop under the run of lows is a swept liquidity level.
+test("a bar that opens below the level and closes above it is not a sweep", () => {
+  const pdl = 184.27;
+  const regular = [
+    obar(0, 183.6, 184.0, 183.0, 183.3),
+    obar(1, 183.3, 183.9, 182.9, 183.14),
+    obar(2, 183.14, 184.6, 183.0, 184.47),
+    obar(3, 184.47, 184.8, 184.3, 184.6),
+  ];
+  const out = asNone(
+    findSetup("DVA", split(regular), levels({ PDL: pdl, PDH: 190 }), ATR),
+  );
+  assert.equal(out.reason, "ยังไม่มี sweep");
+});
+
+test("a bar that opens above the level, wicks below and closes above is a sweep", () => {
+  const pdl = 184.27;
+  const sweep = obar(1, 184.5, 184.7, 183.9, 184.47);
+  const last = obar(2, 184.47, 184.8, 184.3, 184.6);
+  const regular = [obar(0, 185, 185.2, 184.6, 184.9), sweep, last];
+  const s = asSetup(
+    findSetup("DVA", split(regular), levels({ PDL: pdl, PDH: 190 }), ATR),
+  );
+  assert.equal(s.sweepBar, sweep);
+  assert.deepEqual(s.sweptLevels, ["PDL"]);
+  assert.equal(s.stop, sweep.l - CHART_STOP_BUFFER_ATR * ATR);
+  assert.equal(s.entry, last.c);
+});
+
+test("a bar that opens exactly at the level is not a sweep", () => {
+  const regular = [bar(0, 101.5, 100.5, 101.2), obar(1, PDL, 100.6, 99.5, 100.4), LAST];
+  const out = asNone(
+    findSetup("AAPL", split(regular), levels({ PDL, PDH: 104 }), ATR),
+  );
+  assert.equal(out.reason, "ยังไม่มี sweep");
+});
+
 test("a sweep whose latest close is back below the level is not a setup", () => {
   const regular = [bar(0, 101.5, 100.5, 101.2), SWEEP, bar(2, 100.3, 99.7, 99.9)];
   const out = asNone(
