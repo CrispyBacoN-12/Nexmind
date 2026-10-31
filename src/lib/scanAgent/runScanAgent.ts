@@ -53,6 +53,8 @@ const NEWS_DAYS = 2;
 const NEWS_LIMIT = 3;
 const NEWS_CONCURRENCY = 5;
 const MISSING_LISTED = 10;
+/** Below this share of the universe the table is partial and the source says so. */
+const MIN_COVERAGE = 0.9;
 const AI_FAILED_PREFIX = "AI ใช้ไม่ได้: ";
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -122,6 +124,8 @@ export async function runScanAgent(
     tvRows.push(r);
   }
   const covered = tvRows.length;
+  // A 200 with no rows is a broken screen, not a quiet market.
+  if (covered === 0) return { ok: false, error: "TradingView: returned no rows" };
   const missing = universe.filter((s) => !seen.has(s));
 
   // 2. Base filter, tag, triggers.
@@ -205,7 +209,7 @@ export async function runScanAgent(
     try {
       const news = await deps.fetchRecentNews(row.ticker, NEWS_DAYS, NEWS_LIMIT);
       if (news.items.length === 0 && news.note) newsFailed++;
-      row.headlines = news.items;
+      row.headlines = news.items.slice(0, NEWS_LIMIT);
     } catch {
       newsFailed++;
     }
@@ -259,7 +263,7 @@ export async function runScanAgent(
     passed: rows.length,
     rows,
     econ,
-    sources: [{ name: "TradingView", ok: true, note: tvNote }, filingSource, newsSource, econSource, aiSource],
+    sources: [{ name: "TradingView", ok: covered >= universe.length * MIN_COVERAGE, note: tvNote }, filingSource, newsSource, econSource, aiSource],
     scoreFormula: SCAN_SCORE_FORMULA,
   };
 }

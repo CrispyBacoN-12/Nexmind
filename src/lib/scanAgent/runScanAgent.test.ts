@@ -153,7 +153,6 @@ test("secondary failures are named and the table still renders", async () => {
   assert.equal(byName.get("Finnhub news")?.ok, false);
   assert.ok(byName.get("Finnhub news")?.note.includes("2"));
   assert.equal(byName.get("ปฏิทินเศรษฐกิจ")?.ok, false);
-  assert.equal(byName.get("TradingView")?.ok, true);
 });
 
 test("a news fetch that throws counts as failed too", async () => {
@@ -366,4 +365,58 @@ test("an AI call that throws leaves the table and flags the AI source", async ()
   assert.equal(result.rows[0].note, null);
   assert.ok(result.rows[0].noteReason);
   assert.equal(result.sources.find((s) => s.name === "AI")?.ok, false);
+});
+
+test("an empty TradingView result is an error, not a clean scan", async () => {
+  const result = await runScanAgent(deps({ fetchTradingViewRows: async () => [] }), NOW);
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error, "TradingView: returned no rows");
+});
+
+test("thin coverage keeps the table but fails the TradingView source", async () => {
+  const thin = ok(
+    await runScanAgent(
+      deps({ fetchTradingViewRows: async () => [tv(SYMBOLS[0], { premarketChangePct: 5 })] }),
+      NOW,
+    ),
+  );
+  assert.equal(thin.rows.length, 1);
+  const source = thin.sources.find((s) => s.name === "TradingView");
+  assert.equal(source?.ok, false);
+  assert.ok(source?.note.includes("1 จาก"), source?.note);
+  assert.ok(source?.note.includes(SYMBOLS[1]));
+});
+
+test("full coverage marks the TradingView source ok", async () => {
+  const full = ok(
+    await runScanAgent(deps({ fetchTradingViewRows: async () => SYMBOLS.map((s) => tv(s)) }), NOW),
+  );
+  assert.equal(full.sources.find((s) => s.name === "TradingView")?.ok, true);
+});
+
+test("headlines are capped at 3 on the row and in the facts line", async () => {
+  let facts = "";
+  const five = Array.from({ length: 5 }, (_, i) => ({
+    headline: `headline-${i}`,
+    source: "x",
+    date: "2026-10-30",
+    url: "u",
+  }));
+  const result = ok(
+    await runScanAgent(
+      deps({
+        fetchTradingViewRows: async () => [tv(SYMBOLS[0], { premarketChangePct: 5 })],
+        fetchRecentNews: async () => ({ items: five }),
+        annotateRows: async (inputs) => {
+          facts = inputs[0].facts;
+          return { notes: new Map(), status: OK_AI };
+        },
+      }),
+      NOW,
+    ),
+  );
+  assert.equal(result.rows[0].headlines.length, 3);
+  assert.ok(facts.includes("headline-2"));
+  assert.ok(!facts.includes("headline-3"));
 });
