@@ -45,6 +45,15 @@ export function etDate(epochSec: number): string {
   return etParts(epochSec * 1000).date;
 }
 
+/**
+ * The New York calendar date and minutes since 00:00 ET of an epoch-seconds
+ * timestamp. The chart agent splits 5-minute bars into sessions with this.
+ */
+export function etClock(epochSec: number): { date: string; minutes: number } {
+  const { date, minutes } = etParts(epochSec * 1000);
+  return { date, minutes };
+}
+
 /** Calendar arithmetic on a YYYY-MM-DD string, free of any timezone. */
 function addDays(date: string, days: number): string {
   const [y, m, d] = date.split("-").map(Number);
