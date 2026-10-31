@@ -86,6 +86,8 @@ export interface ScanRow {
   earnings: EarningsTag;
   triggers: Trigger[];
   filings: FilingHit[];
+  /** True when the 8-K check for this ticker failed: no tag means "not looked at", not "clean". */
+  filingsUnchecked: boolean;
   headlines: NewsHeadline[];
   note: string | null;
   noteReason: string | null;

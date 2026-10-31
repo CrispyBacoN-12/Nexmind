@@ -41,7 +41,10 @@ function deps(over: Partial<ScanDeps> = {}): ScanDeps {
     fetchTradingViewRows: async () => [],
     fetchRecentFilings: async (tickers) =>
       new Map<string, FilingFetchResult>(tickers.map((t) => [t, { filings: [] }])),
-    fetchRecentNews: async (): Promise<RecentNews> => ({ items: [] }),
+    fetchRecentNews: async (): Promise<RecentNews> => ({
+      items: [],
+      note: "no company news in the last 2 days",
+    }),
     fetchEconEvents: async (): Promise<EconEvent[]> => [],
     annotateRows: async () => ({ notes: new Map(), status: OK_AI }),
     ...over,
@@ -137,7 +140,7 @@ test("secondary failures are named and the table still renders", async () => {
         ],
         fetchRecentFilings: async (tickers) =>
           new Map<string, FilingFetchResult>(tickers.map((t) => [t, { error: "EDGAR 500" }])),
-        fetchRecentNews: async () => ({ items: [], note: "Finnhub HTTP 429" }),
+        fetchRecentNews: async () => ({ items: [], note: "Finnhub HTTP 429", failed: true }),
         fetchEconEvents: async () => {
           throw new Error("calendar down");
         },
@@ -150,6 +153,11 @@ test("secondary failures are named and the table still renders", async () => {
   const byName = new Map(result.sources.map((s) => [s.name, s]));
   assert.equal(byName.get("SEC 8-K")?.ok, false);
   assert.ok(byName.get("SEC 8-K")?.note.includes(a));
+  assert.ok(byName.get("SEC 8-K")?.note.includes("EDGAR 500"), "the first failure reason is in the note");
+  assert.deepEqual(
+    result.rows.map((r) => r.filingsUnchecked),
+    [true, true],
+  );
   assert.equal(byName.get("Finnhub news")?.ok, false);
   assert.ok(byName.get("Finnhub news")?.note.includes("2"));
   assert.equal(byName.get("ปฏิทินเศรษฐกิจ")?.ok, false);
@@ -171,16 +179,91 @@ test("a news fetch that throws counts as failed too", async () => {
   assert.equal(result.sources.find((s) => s.name === "Finnhub news")?.ok, false);
 });
 
-test("an empty news list without a note is a clean fetch", async () => {
+test("a quiet stock (empty news with a note, not failed) is a clean fetch", async () => {
+  // This is the shape the real fetchRecentNews returns for a stock with no headlines.
   const result = ok(
     await runScanAgent(
-      deps({ fetchTradingViewRows: async () => [tv(SYMBOLS[0], { premarketChangePct: 5 })] }),
+      deps({
+        fetchTradingViewRows: async () => [tv(SYMBOLS[0], { premarketChangePct: 5 })],
+        fetchRecentNews: async (): Promise<RecentNews> => ({
+          items: [],
+          note: "no company news in the last 2 days",
+        }),
+      }),
       NOW,
     ),
   );
   assert.equal(result.sources.find((s) => s.name === "Finnhub news")?.ok, true);
   assert.equal(result.sources.find((s) => s.name === "SEC 8-K")?.ok, true);
   assert.equal(result.sources.find((s) => s.name === "ปฏิทินเศรษฐกิจ")?.ok, true);
+  assert.equal(result.rows[0].filingsUnchecked, false);
+});
+
+test("only failed news fetches are counted, quiet ones are not", async () => {
+  const [a, b, c] = SYMBOLS;
+  const result = ok(
+    await runScanAgent(
+      deps({
+        fetchTradingViewRows: async () => [
+          tv(a, { premarketChangePct: 6 }),
+          tv(b, { premarketChangePct: 5 }),
+          tv(c, { premarketChangePct: 4 }),
+        ],
+        fetchRecentNews: async (symbol): Promise<RecentNews> =>
+          symbol === a
+            ? { items: [], note: "no company news in the last 2 days" }
+            : symbol === b
+              ? { items: [], note: "Finnhub HTTP 500", failed: true }
+              : { items: [] },
+      }),
+      NOW,
+    ),
+  );
+  const news = result.sources.find((s) => s.name === "Finnhub news");
+  assert.equal(news?.ok, false);
+  assert.ok(news?.note.includes("1 จาก 3"), news?.note);
+});
+
+test("a partial 8-K failure marks only the unchecked rows and names the first reason", async () => {
+  const [a, b] = SYMBOLS;
+  const result = ok(
+    await runScanAgent(
+      deps({
+        fetchTradingViewRows: async () => [
+          tv(a, { premarketChangePct: 6 }),
+          tv(b, { premarketChangePct: 5 }),
+        ],
+        fetchRecentFilings: async () =>
+          new Map<string, FilingFetchResult>([
+            [a, { filings: [] }],
+            [b, { error: "sec HTTP 429" }],
+          ]),
+      }),
+      NOW,
+    ),
+  );
+  const byTicker = new Map(result.rows.map((r) => [r.ticker, r]));
+  assert.equal(byTicker.get(a)?.filingsUnchecked, false);
+  assert.equal(byTicker.get(b)?.filingsUnchecked, true);
+  const sec = result.sources.find((s) => s.name === "SEC 8-K");
+  assert.equal(sec?.ok, false);
+  assert.ok(sec?.note.includes("sec HTTP 429"), sec?.note);
+  assert.ok(sec?.note.includes(b) && !sec?.note.includes(a));
+});
+
+test("a rejected 8-K fetch marks every row unchecked", async () => {
+  const result = ok(
+    await runScanAgent(
+      deps({
+        fetchTradingViewRows: async () => [tv(SYMBOLS[0], { premarketChangePct: 5 })],
+        fetchRecentFilings: async () => {
+          throw new Error("EDGAR down");
+        },
+      }),
+      NOW,
+    ),
+  );
+  assert.equal(result.rows[0].filingsUnchecked, true);
 });
 
 test("an expensive row is flagged fractional", async () => {

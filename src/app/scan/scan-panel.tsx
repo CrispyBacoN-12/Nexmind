@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Badge, Button, Card, CardTitle } from "@/components/ui";
 import { SCAN_SCORE_FORMULA } from "@/lib/scanAgent/filter";
+import { safeHttpUrl } from "@/lib/scanAgent/url";
 import {
   SCAN_GAP_TRIGGER_PCT,
   SCAN_MIN_ATR_PCT,
@@ -247,6 +248,13 @@ function Tags({ row }: { row: ScanRow }) {
       );
     }
   }
+  if (row.filingsUnchecked) {
+    tags.push(
+      <Badge key="unchecked" tone="neutral" title="ดึงข้อมูล 8-K จาก SEC ไม่สำเร็จ ไม่ได้แปลว่าไม่มี 8-K">
+        8-K ตรวจไม่ได้
+      </Badge>,
+    );
+  }
   if (row.fractional) {
     tags.push(
       <Badge key="frac" tone="neutral" title={`ราคาเกิน ${fmtMoney(SCAN_SLOT_BUDGET)} ต่อช่อง ซื้อเป็นหุ้นเต็มไม่ได้`}>
@@ -259,10 +267,43 @@ function Tags({ row }: { row: ScanRow }) {
 }
 
 function NoteCell({ row }: { row: ScanRow }) {
+  return (
+    <div className="space-y-1">
+      <NoteText row={row} />
+      <Headlines row={row} />
+    </div>
+  );
+}
+
+function NoteText({ row }: { row: ScanRow }) {
   if (row.note !== null) return <span>{row.note}</span>;
   if (row.noteReason !== null) return <span className="text-(--color-muted)">{row.noteReason}</span>;
   // Both null: the row sat outside the AI's top 30. That is not a failure.
   return <span className="text-(--color-muted)">ไม่ได้สรุป (นอก 30 อันดับแรก)</span>;
+}
+
+/** Up to 3 headlines. Third-party text, rendered as React text only; only http(s) URLs become links. */
+function Headlines({ row }: { row: ScanRow }) {
+  if (row.headlines.length === 0) return null;
+  return (
+    <ul className="space-y-0.5 text-[11px] leading-snug text-(--color-muted)">
+      {row.headlines.slice(0, 3).map((h, i) => {
+        const href = safeHttpUrl(h.url);
+        const label = `${h.headline} (${h.source}, ${h.date})`;
+        return (
+          <li key={`${i}-${h.url}`} className="break-words">
+            {href ? (
+              <a href={href} target="_blank" rel="noreferrer" className="hover:underline">
+                {label}
+              </a>
+            ) : (
+              <span>{label}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 function Footer() {

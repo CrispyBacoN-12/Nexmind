@@ -19,9 +19,14 @@ export interface NewsHeadline {
 
 export interface RecentNews {
   items: NewsHeadline[];
-  /** Why `items` is empty, when it is — absent only when the fetch ran and
-   *  genuinely found nothing to report beyond "no news in the window". */
+  /** Why `items` is empty, when it is. A quiet stock also carries a note
+   *  ("no company news in the last N days"): that is an answer, not a failure. */
   note?: string;
+  /** True only when the fetch itself did not work (missing key, HTTP error,
+   *  bad shape, network error). A genuinely quiet stock and a non-equity symbol
+   *  are not failures, so callers that count outages must read this and never
+   *  infer failure from `items` being empty. */
+  failed?: boolean;
 }
 
 export const NEWS_LOOKBACK_DAYS = 7;
@@ -38,8 +43,9 @@ interface FinnhubCompanyNews {
   source?: string;
 }
 
-/** Never throws: a failure comes back as an empty list carrying the reason,
- *  the same fail-soft contract as fetchFundamentals and fetchNextEarnings. */
+/** Never throws: a failure comes back as an empty list carrying the reason
+ *  and `failed: true`, the same fail-soft contract as fetchFundamentals and
+ *  fetchNextEarnings. */
 export async function fetchRecentNews(
   symbol: string,
   days: number = NEWS_LOOKBACK_DAYS,
@@ -47,7 +53,7 @@ export async function fetchRecentNews(
 ): Promise<RecentNews> {
   if (NON_EQUITY.test(symbol)) return { items: [], note: "not a single stock — it has no company news feed" };
   const key = process.env.FINNHUB_API_KEY;
-  if (!key) return { items: [], note: "FINNHUB_API_KEY not set" };
+  if (!key) return { items: [], note: "FINNHUB_API_KEY not set", failed: true };
 
   const now = new Date();
   const to = isoDay(now);
@@ -58,10 +64,10 @@ export async function fetchRecentNews(
       `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(symbol)}` +
         `&from=${from}&to=${to}&token=${key}`,
     );
-    if (!res.ok) return { items: [], note: `Finnhub HTTP ${res.status}` };
+    if (!res.ok) return { items: [], note: `Finnhub HTTP ${res.status}`, failed: true };
 
     const body = await res.json();
-    if (!Array.isArray(body)) return { items: [], note: "Finnhub returned an unexpected shape" };
+    if (!Array.isArray(body)) return { items: [], note: "Finnhub returned an unexpected shape", failed: true };
 
     // Sorted rather than taken as given, same reasoning as intel/news.ts: the
     // endpoint's ordering is not part of any contract we are owed.
@@ -86,6 +92,6 @@ export async function fetchRecentNews(
     if (items.length === 0) return { items: [], note: `no company news in the last ${days} days` };
     return { items };
   } catch (e) {
-    return { items: [], note: `news fetch failed: ${String(e).slice(0, 80)}` };
+    return { items: [], note: `news fetch failed: ${String(e).slice(0, 80)}`, failed: true };
   }
 }

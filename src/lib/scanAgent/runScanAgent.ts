@@ -38,7 +38,7 @@ export interface ScanDeps {
   fetchTradingViewRows(symbols: string[]): Promise<TvRow[]>;
   /** Never rejects: a failed ticker comes back as `{ error }`. A rejection is still survived. */
   fetchRecentFilings(tickers: string[]): Promise<Map<string, FilingFetchResult>>;
-  /** Never rejects: a failure is an empty list carrying `note`. A rejection is still survived. */
+  /** Never rejects: a failure is an empty list with `failed: true` and a `note`. A rejection is still survived. */
   fetchRecentNews(symbol: string, days: number, limit: number): Promise<RecentNews>;
   /** Returns a session-1d..+1d window; the orchestrator narrows it to the session. */
   fetchEconEvents(session: string): Promise<EconEvent[]>;
@@ -140,6 +140,7 @@ export async function runScanAgent(
 
   // 3. 8-Ks since the previous session's close.
   const filingsByTicker = new Map<string, FilingHit[]>();
+  const unchecked = new Set<string>();
   let filingSource: SourceStatus;
   if (passedRows.length === 0) {
     filingSource = { name: "SEC 8-K", ok: true, note: "ไม่มีแถวให้ตรวจ" };
@@ -160,15 +161,20 @@ export async function runScanAgent(
         list.push(hit);
         filingsByTicker.set(hit.ticker, list);
       }
+      for (const f of result.failed) unchecked.add(f.ticker);
+      const shown = result.failed.slice(0, MISSING_LISTED).map((f) => f.ticker).join(", ");
       filingSource =
         result.failed.length > 0
           ? {
               name: "SEC 8-K",
               ok: false,
-              note: `ตรวจไม่ได้ ${result.failed.length} ตัว: ${result.failed.map((f) => f.ticker).join(", ")}`,
+              note:
+                `ตรวจไม่ได้ ${result.failed.length} ตัว (สาเหตุแรก: ${result.failed[0].reason}): ` +
+                `${shown}${result.failed.length > MISSING_LISTED ? " …" : ""}`,
             }
           : { name: "SEC 8-K", ok: true, note: `ตรวจ ${tickers.length} ตัว` };
     } catch (e) {
+      for (const t of tickers) unchecked.add(t);
       filingSource = { name: "SEC 8-K", ok: false, note: `ตรวจไม่ได้ทั้งหมด: ${message(e)}` };
     }
   }
@@ -190,6 +196,7 @@ export async function runScanAgent(
         earnings: tag,
         triggers,
         filings,
+        filingsUnchecked: unchecked.has(tv.ticker),
         headlines: [] as NewsHeadline[],
         note: null,
         noteReason: null,
@@ -208,7 +215,8 @@ export async function runScanAgent(
   await mapLimit(newsRows, NEWS_CONCURRENCY, async (row) => {
     try {
       const news = await deps.fetchRecentNews(row.ticker, NEWS_DAYS, NEWS_LIMIT);
-      if (news.items.length === 0 && news.note) newsFailed++;
+      // Only an explicit failure counts: a quiet stock also comes back empty with a note.
+      if (news.failed) newsFailed++;
       row.headlines = news.items.slice(0, NEWS_LIMIT);
     } catch {
       newsFailed++;
