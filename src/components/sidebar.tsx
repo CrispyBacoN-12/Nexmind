@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Compass, NotebookPen } from "lucide-react";
+import { Activity, Compass, NotebookPen, Radar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
+  { href: "/scan", label: "Scanner", icon: Radar },
   { href: "/advisor", label: "Trade Advisor", icon: Compass },
   { href: "/journal", label: "Trade Journal", icon: NotebookPen },
 ];

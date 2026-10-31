@@ -15,8 +15,13 @@ _Last verified against the live DB, Task Scheduler and `npm test`: **2026-10-01*
 decided this explicitly. Finding fully automated alpha on the S&P 500 with $2-3k of capital, whole
 shares, about 5 slots and free data conflicts with how the market works. Every price entry rule,
 every exit geometry and three non-price data classes were screened, and none survived a deep
-hold-out (§3). The repo's value now lives in three surfaces:
+hold-out (§3). The repo's value now lives in four surfaces:
 
+- **`/scan`** (first in the sidebar): a button-only scan of the S&P 500 that lists what is moving today,
+  with 8-K tags, headlines, the economic calendar and a one-line AI note per row.
+  - It ranks activity, not odds. No rule in this repo has passed a hold-out, and the page says so.
+  - It runs only when the button is pressed: no auto-run on page load, no schedule.
+  - Each row links to `/advisor?ticker=` to prefill the ticker. Nothing auto-submits.
 - **`/advisor`**: the owner types a ticker they already chose and gets back structure and risk only:
   - the ATR stop (1.5 × ATR14) and the R ladder in prices
   - whole-share sizing at real capital
@@ -50,7 +55,7 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Branch | `master` **pushed to `origin` 2026-10-30**. Every push auto-deploys Vercel production |
-| Tests | `npm test` **880 pass / 0 fail** (2026-10-31) |
+| Tests | `npm test` **927 pass / 0 fail** (2026-10-31, on branch `scan-agent`) |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
@@ -71,6 +76,16 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-10-31: Scan agent (`/scan`, `POST /api/scan`). Branch `scan-agent`, commits `6007ba1..` through `feat(scan): /scan page, route and Advisor prefill`. Not merged.**
+  - `src/lib/scanAgent/`: TradingView screener client, New York session clock, base filter + triggers +
+    activity score, economic calendar, AI notes, and the `runScanAgent` orchestrator (all I/O injected).
+  - Only the TradingView fetch is fatal (route returns 502 with the error). Every other source
+    degrades to a named `ok: false` entry in the sources strip.
+  - Rows beyond the AI's top 30 show "ไม่ได้สรุป (นอก 30 อันดับแรก)", which is not a failure. A row
+    priced above the $500 slot carries the fractional-share tag.
+  - Data is 15 minutes late and the clock does not know US market holidays. Both are on the page.
+  - Browser check is the controller's: `next build` under Turbopack fails inside a worktree
+    (the `node_modules` symlink points out of the root); `next build --webpack` is clean.
 - **2026-10-31: Web layer cut to the copilot. Uncommitted.**
   - Kept: `/advisor`, `/journal`, and APIs `advisor`, `advisor/critique`, `journal`, `journal/stops`,
     `portfolio/evaluate`, `cron/risk-sentry`. `/` redirects to `/advisor`.

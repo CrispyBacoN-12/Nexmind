@@ -33,8 +33,10 @@ const CAP_LABEL: Record<string, string> = {
  */
 type AdvisorResponse = AdvisorResult & { chart?: ChartBar[] | null };
 
-export function AdvisorForm() {
-  const [ticker, setTicker] = useState("");
+export function AdvisorForm({ initialTicker = "" }: { initialTicker?: string }) {
+  // Prefilled from /advisor?ticker= (the Scanner's "→ Advisor" link). It only
+  // fills the field: the owner still presses submit, nothing runs on arrival.
+  const [ticker, setTicker] = useState(initialTicker);
   const [entry, setEntry] = useState("");
   const [capital, setCapital] = useState("2500");
   const [maxSlots, setMaxSlots] = useState("5");
