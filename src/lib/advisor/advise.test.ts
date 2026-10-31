@@ -4,8 +4,17 @@ import assert from "node:assert/strict";
 import { atr, type Candle } from "@/lib/indicators";
 import { advise } from "./advise";
 import { baseRate, BASE_RATE_HORIZON } from "./baseRate";
+import { fillGuard } from "./fillGuard";
+import { gapRisk } from "./gapRisk";
+import { costInR } from "./rLadder";
 import { sizeShares } from "./sizing";
-import { ADVISOR_ATR_PERIOD, ADVISOR_ATR_SL_MULT, ADVISOR_NO_EDGE_CLAIM, ADVISOR_R_STEPS } from "./types";
+import {
+  ADVISOR_ATR_PERIOD,
+  ADVISOR_ATR_SL_MULT,
+  ADVISOR_COST_BPS,
+  ADVISOR_NO_EDGE_CLAIM,
+  ADVISOR_R_STEPS,
+} from "./types";
 
 const DAY = 86_400;
 const T0 = Date.parse("2020-01-01T00:00:00Z") / 1000;
@@ -343,4 +352,46 @@ test("the base-rate table replays the card's stop multiple, not the constant", (
     withChart.card.baseRate?.rows[0].stopFirstPct,
     plain.card.baseRate?.rows[0].stopFirstPct,
   );
+});
+
+test("a chart stop reaches gap risk, cost in R and the fill guard, not only sizing", () => {
+  const hist = walkBars(400, 100);
+  const candles = bars(60, 100, 6);
+  const nowSec = candles[candles.length - 1].t + 3600;
+  const quote = { price: 100.5, at: nowSec - 60 };
+  const common = { ...BASE, candles, entryOverride: 100, gapHistory: hist, quote, nowSec };
+  const withChart = advise({ ...common, stopOverride: 98 });
+  const plain = advise(common);
+  assert.ok(withChart.ok && plain.ok);
+  const card = withChart.card;
+  assert.equal(card.stopSource, "chart");
+  assert.equal(card.stop, 98);
+
+  // Gap risk is measured in the chart stop's multiple, and its dollar figure in its distance.
+  assert.deepEqual(card.gapRisk, gapRisk(hist, card.stopAtrMult));
+  assert.ok(card.gapRisk);
+  assert.equal(card.gapWorstLossUsd, card.sizing.shares * 2 * card.gapRisk.worstLossR);
+  assert.notDeepEqual(card.gapRisk, plain.card.gapRisk);
+
+  // Round-trip cost against the 2-point chart distance, not the 9-point ATR one.
+  assert.equal(card.costR, costInR(100, 100 - 98, ADVISOR_COST_BPS));
+  assert.ok(card.costR > plain.card.costR);
+
+  // The fill guard measures risk at the quote down to the chart stop.
+  assert.deepEqual(
+    card.fillGuard,
+    fillGuard({
+      entry: 100,
+      stop: 98,
+      sizing: card.sizing,
+      capital: BASE.capital,
+      maxSlots: BASE.maxSlots,
+      riskPct: BASE.riskPct,
+      quote,
+      nowSec,
+    }),
+  );
+  assert.ok(card.fillGuard.atQuote);
+  assert.equal(card.fillGuard.atQuote.plannedRiskUsd, card.sizing.shares * (100.5 - 98));
+  assert.notEqual(card.fillGuard.walkAwayPrice, plain.card.fillGuard.walkAwayPrice);
 });
