@@ -11,26 +11,115 @@ import type { FilingFetchResult, FilingRow } from "@/lib/riskSentry/filingWatch"
 /** SEC asks every caller to identify itself and to stay under 10 requests/second. */
 const UA = process.env.SEC_USER_AGENT || "NEXMIND risk-sentry (personal, non-commercial; contact via repository owner)";
 const CONCURRENCY = 4;
-const RETRIES = 3;
+const ATTEMPTS = 4;
+/** SEC's published ceiling is 10 requests/second; start no two requests closer than this. */
+export const SEC_MIN_GAP_MS = 125;
+/** Floor for a 403/429 wait when the response names no Retry-After. */
+export const SEC_THROTTLE_MIN_WAIT_MS = 1500;
+/** A server asking for more than this is not worth waiting for inside one request. */
+const MAX_RETRY_AFTER_MS = 30_000;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-async function getJson(url: string): Promise<unknown> {
+/**
+ * One limiter shared by every worker: `wait()` resolves when this caller may
+ * start a request, no two starts closer than `minGapMs`. The slot is reserved
+ * synchronously, so concurrent callers queue in order and never share one.
+ * `penalize(ms)` pushes every later start back, so a throttled response slows
+ * all workers, not just the one that saw it. Clock and sleep are injected.
+ */
+export function createRequestLimiter(
+  minGapMs: number,
+  now: () => number,
+  sleepFn: (ms: number) => Promise<void>,
+): { wait(): Promise<void>; penalize(ms: number): void } {
+  let nextStart = 0;
+  return {
+    async wait() {
+      const t = now();
+      const start = Math.max(t, nextStart);
+      nextStart = start + minGapMs;
+      if (start > t) await sleepFn(start - t);
+    },
+    penalize(ms: number) {
+      nextStart = Math.max(nextStart, now() + ms);
+    },
+  };
+}
+
+/** Retry-After is delta-seconds or an HTTP date. Returns ms, or null when absent or unreadable. */
+export function parseRetryAfter(header: string | null | undefined, nowMs: number): number | null {
+  if (header == null) return null;
+  const v = header.trim();
+  if (v === "") return null;
+  if (/^\d+$/.test(v)) return Number(v) * 1000;
+  const at = Date.parse(v);
+  return Number.isFinite(at) ? Math.max(0, at - nowMs) : null;
+}
+
+/**
+ * How long to wait before retrying after a failed attempt (0-based). A 403 or
+ * 429 is SEC saying slow down: honour Retry-After when it is sent (capped),
+ * else at least SEC_THROTTLE_MIN_WAIT_MS and growing. Anything else backs off
+ * 0.4 / 0.8 / 1.6 s.
+ */
+export function retryDelayMs(
+  status: number | null,
+  retryAfter: string | null | undefined,
+  attempt: number,
+  nowMs: number,
+): number {
+  if (status === 403 || status === 429) {
+    const asked = parseRetryAfter(retryAfter, nowMs);
+    if (asked !== null) return Math.min(asked, MAX_RETRY_AFTER_MS);
+    return SEC_THROTTLE_MIN_WAIT_MS * 2 ** attempt;
+  }
+  return 400 * 2 ** attempt;
+}
+
+export interface SecHttpDeps {
+  fetch: (url: string, init: { headers: Record<string, string> }) => Promise<Response>;
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+  limiter: { wait(): Promise<void>; penalize(ms: number): void };
+}
+
+/** A 404 is an answer ("no such submissions file"); every other failure is retried. */
+export async function getJsonWith(url: string, deps: SecHttpDeps, attempts: number = ATTEMPTS): Promise<unknown> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt < RETRIES; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    let status: number | null = null;
+    let retryAfter: string | null = null;
     try {
-      const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });
-      // A 404 is an answer ("no such submissions file"), not a transient failure.
+      await deps.limiter.wait();
+      const res = await deps.fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });
       if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`sec HTTP ${res.status}`);
+      if (!res.ok) {
+        status = res.status;
+        retryAfter = res.headers?.get("retry-after") ?? null;
+        throw new Error(`sec HTTP ${res.status}`);
+      }
       return await res.json();
     } catch (e) {
       lastErr = e;
-      await sleep(400 * 2 ** attempt);
+    }
+    if (attempt < attempts - 1) {
+      const ms = retryDelayMs(status, retryAfter, attempt, deps.now());
+      if (status === 403 || status === 429) deps.limiter.penalize(ms);
+      await deps.sleep(ms);
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
+
+const liveDeps: SecHttpDeps = {
+  fetch: (url, init) => fetch(url, init),
+  sleep,
+  now: Date.now,
+  limiter: createRequestLimiter(SEC_MIN_GAP_MS, Date.now, sleep),
+};
+
+const getJson = (url: string) => getJsonWith(url, liveDeps);
 
 interface RecentBlock {
   form?: string[];
