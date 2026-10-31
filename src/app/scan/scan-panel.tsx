@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Badge, Button, Card, CardTitle } from "@/components/ui";
+import type { ChartAgentResult } from "@/lib/chartAgent/runChartAgent";
+import { CHART_TOP_N } from "@/lib/chartAgent/types";
 import { SCAN_SCORE_FORMULA } from "@/lib/scanAgent/filter";
 import { safeHttpUrl } from "@/lib/scanAgent/url";
 import {
@@ -14,51 +16,46 @@ import {
   SCAN_PREMARKET_VOLUME_TRIGGER_PCT,
   SCAN_RVOL_TRIGGER,
   SCAN_SLOT_BUDGET,
-  type MarketPhase,
   type ScanResult,
   type ScanRow,
 } from "@/lib/scanAgent/types";
 import { cn, colorForChange, fmtMoney, fmtNumber, fmtPct } from "@/lib/utils";
 
+import { PHASE_LABEL, bangkokTime } from "./format";
+import { SetupPanel } from "./setup-panel";
+
 type OkScan = Extract<ScanResult, { ok: true }>;
-
-const PHASE_LABEL: Record<MarketPhase, string> = {
-  pre: "ก่อนตลาดเปิด",
-  open: "ตลาดเปิด",
-  closed: "ตลาดปิด — ตัวเลขของวันทำการล่าสุด",
-};
-
-const bangkokFormat = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Asia/Bangkok",
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-
-/** "31 Oct, 20:12" in Thai time, whatever zone the browser is in. */
-function bangkokTime(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : bangkokFormat.format(d);
-}
 
 export function ScanPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scan, setScan] = useState<OkScan | null>(null);
+  const [chart, setChart] = useState<ChartAgentResult | null>(null);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
+  // Which scan a chart reading belongs to. A reading that comes back after a
+  // newer scan has started is for a stale table and is dropped.
+  const scanId = useRef(0);
 
   async function runScan() {
+    const id = ++scanId.current;
     setLoading(true);
     setError(null);
     setScan(null);
+    setChart(null);
+    setChartLoading(false);
+    setChartOpen(false);
     try {
       const res = await fetch("/api/scan", { method: "POST" });
       // An error body that is not this route's JSON (a platform 504 page, say)
       // must not surface as a JSON parse error.
       const json = (await res.json().catch(() => null)) as ScanResult | null;
-      if (json && json.ok) setScan(json);
-      else if (json && !json.ok) setError(json.error);
+      if (json && json.ok) {
+        setScan(json);
+        // The chart agent starts only after a scan succeeded, and the table
+        // above never waits on it.
+        if (json.rows.length > 0) void runChartAgent(id, json.rows.slice(0, CHART_TOP_N).map((r) => r.ticker));
+      } else if (json && !json.ok) setError(json.error);
       else setError(`The server answered HTTP ${res.status} with a response this page could not read.`);
     } catch (err) {
       setError((err as Error).message);
@@ -67,12 +64,41 @@ export function ScanPanel() {
     }
   }
 
+  async function runChartAgent(id: number, tickers: string[]) {
+    setChartLoading(true);
+    let result: ChartAgentResult;
+    try {
+      const res = await fetch("/api/chart-agent", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tickers }),
+      });
+      const json = (await res.json().catch(() => null)) as ChartAgentResult | null;
+      result = json ?? {
+        ok: false,
+        error: `The server answered HTTP ${res.status} with a response this page could not read.`,
+      };
+    } catch (err) {
+      result = { ok: false, error: (err as Error).message };
+    }
+    if (id !== scanId.current) return;
+    setChart(result);
+    setChartLoading(false);
+    setChartOpen(true);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={runScan} disabled={loading}>
           {loading ? "กำลังสแกน…" : "สแกนตอนนี้"}
         </Button>
+        {chartLoading && <span className="text-xs text-(--color-muted)">กำลังอ่านกราฟ…</span>}
+        {chart && !chartOpen && (
+          <Button variant="outline" size="sm" onClick={() => setChartOpen(true)}>
+            ดู setup
+          </Button>
+        )}
         {scan ? (
           <span className="text-xs text-(--color-muted)">
             สแกนล่าสุด {bangkokTime(scan.scannedAt)} เวลาไทย · {PHASE_LABEL[scan.phase]} · ผ่านชั้นแรก {scan.passed} จาก{" "}
@@ -98,6 +124,8 @@ export function ScanPanel() {
       {scan && <ScanResultView scan={scan} />}
 
       <Footer />
+
+      {chart && chartOpen && <SetupPanel result={chart} onClose={() => setChartOpen(false)} />}
     </div>
   );
 }
