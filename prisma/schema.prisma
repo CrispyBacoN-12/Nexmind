@@ -394,3 +394,33 @@ model GateOverride {
   trade     JournalTrade? @relation(fields: [tradeId], references: [id], onDelete: SetNull)
   createdAt DateTime      @default(now())
 }
+
+/// One row per setup the chart agent found, shown or not. They exist so a later
+/// spec can grade "T1 before stop" against a random-entry control; nothing reads
+/// them yet. `status` is shown | ai_rejected | guard_stripped | capped.
+model ChartSetup {
+  id             Int      @id @default(autoincrement())
+  createdAt      DateTime @default(now())
+  runId          String
+  ticker         String
+  status         String
+  /// ISO time the newest bar used ended.
+  dataAsOf       String
+  entry          Float
+  stop           Float
+  t1             Float
+  t2             Float?
+  r1             Float
+  r2             Float?
+  sweptLevels    String[]
+  /// ISO start time of the bar that swept the level(s).
+  sweepBarAt     String
+  /// The eight named levels (a LevelName -> price|null map).
+  levels         Json
+  aiReading      String?
+  aiRejectReason String?
+  aiBackend      String
+
+  @@index([createdAt])
+  @@index([ticker])
+}

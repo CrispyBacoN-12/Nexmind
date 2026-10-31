@@ -70,7 +70,8 @@ export const ModelName = {
   AiCall: 'AiCall',
   JournalTrade: 'JournalTrade',
   NavSnapshot: 'NavSnapshot',
-  GateOverride: 'GateOverride'
+  GateOverride: 'GateOverride',
+  ChartSetup: 'ChartSetup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -431,12 +432,43 @@ export const GateOverrideScalarFieldEnum = {
 export type GateOverrideScalarFieldEnum = (typeof GateOverrideScalarFieldEnum)[keyof typeof GateOverrideScalarFieldEnum]
 
 
+export const ChartSetupScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  runId: 'runId',
+  ticker: 'ticker',
+  status: 'status',
+  dataAsOf: 'dataAsOf',
+  entry: 'entry',
+  stop: 'stop',
+  t1: 't1',
+  t2: 't2',
+  r1: 'r1',
+  r2: 'r2',
+  sweptLevels: 'sweptLevels',
+  sweepBarAt: 'sweepBarAt',
+  levels: 'levels',
+  aiReading: 'aiReading',
+  aiRejectReason: 'aiRejectReason',
+  aiBackend: 'aiBackend'
+} as const
+
+export type ChartSetupScalarFieldEnum = (typeof ChartSetupScalarFieldEnum)[keyof typeof ChartSetupScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
 } as const
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {
@@ -453,4 +485,13 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 

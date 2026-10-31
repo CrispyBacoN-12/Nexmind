@@ -172,3 +172,10 @@ export type NavSnapshot = Prisma.NavSnapshotModel
  * Audit trail: a gate that failed, which the owner traded through anyway, and why.
  */
 export type GateOverride = Prisma.GateOverrideModel
+/**
+ * Model ChartSetup
+ * One row per setup the chart agent found, shown or not. They exist so a later
+ * spec can grade "T1 before stop" against a random-entry control; nothing reads
+ * them yet. `status` is shown | ai_rejected | guard_stripped | capped.
+ */
+export type ChartSetup = Prisma.ChartSetupModel

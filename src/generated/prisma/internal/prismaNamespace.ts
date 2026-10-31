@@ -403,7 +403,8 @@ export const ModelName = {
   AiCall: 'AiCall',
   JournalTrade: 'JournalTrade',
   NavSnapshot: 'NavSnapshot',
-  GateOverride: 'GateOverride'
+  GateOverride: 'GateOverride',
+  ChartSetup: 'ChartSetup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -419,7 +420,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "aiCall" | "journalTrade" | "navSnapshot" | "gateOverride"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "aiCall" | "journalTrade" | "navSnapshot" | "gateOverride" | "chartSetup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1903,6 +1904,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ChartSetup: {
+      payload: Prisma.$ChartSetupPayload<ExtArgs>
+      fields: Prisma.ChartSetupFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ChartSetupFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ChartSetupFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>
+        }
+        findFirst: {
+          args: Prisma.ChartSetupFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ChartSetupFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>
+        }
+        findMany: {
+          args: Prisma.ChartSetupFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>[]
+        }
+        create: {
+          args: Prisma.ChartSetupCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>
+        }
+        createMany: {
+          args: Prisma.ChartSetupCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ChartSetupCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>[]
+        }
+        delete: {
+          args: Prisma.ChartSetupDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>
+        }
+        update: {
+          args: Prisma.ChartSetupUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>
+        }
+        deleteMany: {
+          args: Prisma.ChartSetupDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ChartSetupUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ChartSetupUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>[]
+        }
+        upsert: {
+          args: Prisma.ChartSetupUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChartSetupPayload>
+        }
+        aggregate: {
+          args: Prisma.ChartSetupAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateChartSetup>
+        }
+        groupBy: {
+          args: Prisma.ChartSetupGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ChartSetupGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ChartSetupCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ChartSetupCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2284,12 +2359,43 @@ export const GateOverrideScalarFieldEnum = {
 export type GateOverrideScalarFieldEnum = (typeof GateOverrideScalarFieldEnum)[keyof typeof GateOverrideScalarFieldEnum]
 
 
+export const ChartSetupScalarFieldEnum = {
+  id: 'id',
+  createdAt: 'createdAt',
+  runId: 'runId',
+  ticker: 'ticker',
+  status: 'status',
+  dataAsOf: 'dataAsOf',
+  entry: 'entry',
+  stop: 'stop',
+  t1: 't1',
+  t2: 't2',
+  r1: 'r1',
+  r2: 'r2',
+  sweptLevels: 'sweptLevels',
+  sweepBarAt: 'sweepBarAt',
+  levels: 'levels',
+  aiReading: 'aiReading',
+  aiRejectReason: 'aiRejectReason',
+  aiBackend: 'aiBackend'
+} as const
+
+export type ChartSetupScalarFieldEnum = (typeof ChartSetupScalarFieldEnum)[keyof typeof ChartSetupScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
 } as const
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const QueryMode = {
@@ -2306,6 +2412,15 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 
 
 
@@ -2374,6 +2489,20 @@ export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMode
  * Reference to a field of type 'Boolean'
  */
 export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
     
 
 /**
@@ -2506,6 +2635,7 @@ export type GlobalOmitConfig = {
   journalTrade?: Prisma.JournalTradeOmit
   navSnapshot?: Prisma.NavSnapshotOmit
   gateOverride?: Prisma.GateOverrideOmit
+  chartSetup?: Prisma.ChartSetupOmit
 }
 
 /* Types for Logging */
