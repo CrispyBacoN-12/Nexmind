@@ -12,14 +12,18 @@ export const SCAN_MIN_AVG_VOLUME = 1_000_000;
 /** ATR as a percent of price; below this the stop is inside the noise. */
 export const SCAN_MIN_ATR_PCT = 1.5;
 
-/** A name triggers on a gap of at least this many percent, either direction. */
+/** Gap trigger threshold, in percent (compared against TvRow.gapPct). */
 export const SCAN_GAP_TRIGGER_PCT = 2;
-/** A name triggers on relative volume at or above this multiple. */
+/** Relative-volume trigger threshold, as a multiple of normal volume. */
 export const SCAN_RVOL_TRIGGER = 2;
-/** Pre-market only: pre-market volume as a percent of 10-day average volume. */
+/** Pre-market volume trigger threshold, in percent of 10-day average volume. */
 export const SCAN_PREMARKET_VOLUME_TRIGGER_PCT = 3;
 
-/** How many universe symbols one TradingView request may carry. */
+/**
+ * Per-slot dollar budget: $2,500 capital / 5 slots, the /advisor defaults. A row whose
+ * close is above it cannot be bought as a whole share inside a slot, so it carries the
+ * fractional-share tag ("เศษหุ้น · ตั้ง stop ไม่ได้ ต้องเฝ้าเอง").
+ */
 export const SCAN_SLOT_BUDGET = 500;
 /** Rows that get headlines fetched. */
 export const SCAN_NEWS_TOP_N = 30;
