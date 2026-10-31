@@ -13,7 +13,7 @@
 import { isDirectional } from "@/lib/advisor/critiqueContext";
 import { aiBackend, aiOutageReason, callAgentJSON } from "@/lib/anthropic";
 import type { Candle } from "@/lib/indicators";
-import { safeFailureReason } from "@/lib/scanAgent/annotate";
+import { RAW_WITHHELD_REASON, safeFailureReason } from "@/lib/scanAgent/annotate";
 import { etClock } from "@/lib/scanAgent/session";
 import { CHART_AI_BARS, type Setup } from "@/lib/chartAgent/types";
 
@@ -34,7 +34,6 @@ export interface ReviewItem {
 const STRIPPED_REASON = "ตัดออก: มีคำทำนาย";
 const NO_REASON = "AI ตัดออกโดยไม่ให้เหตุผลที่แสดงได้";
 const UNREAD_REASON = "AI ไม่ได้อ่าน";
-const RAW_WITHHELD_REASON = "อ่านคำตอบของ AI ไม่ได้ (ข้อความดิบถูกตัดออก)";
 
 /**
  * What the chart prompt forbids that the advisor's guard does not catch:
@@ -60,11 +59,13 @@ export function isChartPrediction(text: string): boolean {
 }
 
 export const REVIEW_SYSTEM =
-  "คุณเป็นเทรดเดอร์ที่อ่านกราฟ 5 นาทีของหุ้นสหรัฐ ระบบโค้ดหา setup ฝั่งซื้อ (long) จากการกวาดสภาพคล่อง (liquidity sweep) ให้แล้ว " +
+  "คุณเป็นเทรดเดอร์ที่อ่านกราฟ 5 นาทีของหุ้นสหรัฐ ระบบโค้ดหา setup ฝั่งซื้อ จากการกวาดสภาพคล่อง (liquidity sweep) ให้แล้ว " +
   `ระดับราคา จุดเข้า จุดตัดขาดทุน และเป้าหมายทุกตัวคำนวณโดยโค้ด ข้อมูลแต่ละ setup ประกอบด้วยระดับราคา แท่งที่กวาด และแท่งล่าสุดไม่เกิน ${CHART_AI_BARS} แท่ง (เวลาเป็น ET) ` +
   "งานของคุณ: อธิบายโครงสร้างของแต่ละตัวแบบเทรดเดอร์ 2-3 บรรทัดเป็นภาษาไทย เช่น แท่งที่กวาดปิดกลับมาอย่างไร แรงซื้อหลังกวาดเป็นอย่างไร ราคาอยู่ตรงไหนเทียบกับระดับสำคัญ " +
   "คุณปฏิเสธ setup ที่โครงสร้างอ่านแล้วไม่ดีได้ (keep เป็น false) และต้องให้เหตุผลเป็นภาษาไทยใน rejectReason ถ้าเก็บไว้ให้ rejectReason เป็นสตริงว่าง " +
   "ห้ามทำนายทิศทางราคา ห้ามบอกโอกาสหรือความแน่นอน ห้ามแนะนำซื้อ ขาย หรือถือ ห้ามเปลี่ยนตัวเลขใดๆ และห้ามเสนอระดับราคาใหม่ " +
+  "เขียนเป็นภาษาไทยล้วน ห้ามใช้คำอังกฤษ long, short, enter, avoid, suggest, should และห้ามใช้คำว่า ไม่ควร หรือ แนะนำ " +
+  "เพราะระบบจะลบคำอ่านทั้งก้อนที่มีคำเหล่านี้ทิ้ง (ชื่อระดับราคาอย่าง PDL, VAL และคำว่า sweep ใช้ได้) " +
   'ตอบเป็น JSON เท่านั้น: {"reviews":[{"ticker","keep","reading","rejectReason"}]} ให้ครบทุกตัวที่ส่งไป';
 
 const REVIEW_SCHEMA = {
@@ -138,7 +139,8 @@ function unread(tickers: string[]): Map<string, Review> {
 /**
  * Turn whatever came back into one review per requested ticker, running the
  * prediction guard on every reading and every rejection reason. A reading that
- * trips the guard is stripped even if the model also rejected the setup.
+ * trips the guard is stripped (only when the setup is kept); a rejection is
+ * honoured and its reading is dropped.
  * Exported for the tests.
  */
 export function normalizeReviews(raw: unknown, tickers: string[]): Map<string, Review> {
@@ -165,14 +167,14 @@ export function normalizeReviews(raw: unknown, tickers: string[]): Map<string, R
   for (const t of tickers) {
     const a = answered.get(t);
     if (a === undefined) continue;
-    const reading = a.reading === "" ? null : a.reading;
-    if (reading !== null && isChartPrediction(reading)) {
-      out.set(t, { status: "stripped", reading: null, reason: STRIPPED_REASON });
-    } else if (!a.keep) {
+    if (!a.keep) {
+      // A rejection is honoured whatever the reading says; the reading is not shown.
       const reason = a.reason === "" || isChartPrediction(a.reason) ? NO_REASON : a.reason;
-      out.set(t, { status: "rejected", reading, reason });
+      out.set(t, { status: "rejected", reading: null, reason });
+    } else if (a.reading !== "" && isChartPrediction(a.reading)) {
+      out.set(t, { status: "stripped", reading: null, reason: STRIPPED_REASON });
     } else {
-      out.set(t, { status: "kept", reading, reason: null });
+      out.set(t, { status: "kept", reading: a.reading === "" ? null : a.reading, reason: null });
     }
   }
   return out;
@@ -193,7 +195,7 @@ export async function reviewSetups(
       label: "chart-agent",
       system: REVIEW_SYSTEM,
       prompt: buildReviewPrompt(items),
-      maxTokens: 3000,
+      maxTokens: 6000,
       jsonSchema: REVIEW_SCHEMA,
     });
     return { reviews: normalizeReviews(r.data, tickers), backend, note: null };

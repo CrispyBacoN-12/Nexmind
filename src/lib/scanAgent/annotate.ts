@@ -29,7 +29,7 @@ const SOURCE_NAME = "AI";
 const STRIPPED_REASON = "ตัดออก: มีคำชี้นำ";
 const MISSING_REASON = "AI ไม่ได้ตอบตัวนี้";
 const UNAVAILABLE_PREFIX = "AI ใช้ไม่ได้: ";
-const RAW_WITHHELD_REASON = "อ่านคำตอบของ AI ไม่ได้ (ข้อความดิบถูกตัดออก)";
+export const RAW_WITHHELD_REASON = "อ่านคำตอบของ AI ไม่ได้ (ข้อความดิบถูกตัดออก)";
 
 /**
  * What the scan prompt forbids that the advisor's guard does not catch: price
