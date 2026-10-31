@@ -1,7 +1,7 @@
 // One or two Thai lines per scanned stock saying what is happening today.
 //
 // The note describes, it never advises. The model is told so, and then the
-// reply is checked anyway: every note passes isDirectional before it can reach
+// reply is checked anyway: every note passes isScanDirectional before it can reach
 // the page, because a prompt is a request and a guard is a guarantee. A note
 // that trips the guard is dropped and the row says so ("ตัดออก: มีคำชี้นำ"), it
 // is never silently blank.
@@ -30,6 +30,54 @@ const STRIPPED_REASON = "ตัดออก: มีคำชี้นำ";
 const MISSING_REASON = "AI ไม่ได้ตอบตัวนี้";
 const UNAVAILABLE_PREFIX = "AI ใช้ไม่ได้: ";
 const RAW_WITHHELD_REASON = "อ่านคำตอบของ AI ไม่ได้ (ข้อความดิบถูกตัดออก)";
+
+/**
+ * What the scan prompt forbids that the advisor's guard does not catch: price
+ * predictions, entry calls and rankings. Plain substrings, because Thai has no
+ * word boundaries. Bare ซื้อ and ขาย are deliberately absent: they would strip
+ * ordinary descriptions such as ยอดขาย and แรงขาย.
+ */
+export const SCAN_DIRECTIONAL_PHRASES_TH: readonly string[] = [
+  "จะขึ้น",
+  "จะลง",
+  "น่าจะขึ้น",
+  "น่าจะลง",
+  "มีโอกาสขึ้น",
+  "มีโอกาสลง",
+  "มีโอกาสทะลุ",
+  "เข้าซื้อ",
+  "จังหวะเข้า",
+  "ตัวเด่น",
+  "น่าสนใจที่สุด",
+  "ดีที่สุด",
+  "เป้าหมายราคา",
+  "ราคาเป้าหมาย",
+];
+
+/** The advisor's guard plus the scan-only phrases above. */
+export function isScanDirectional(text: string): boolean {
+  return isDirectional(text) || SCAN_DIRECTIONAL_PHRASES_TH.some((p) => text.includes(p));
+}
+
+/**
+ * The reason string that may reach the page for a failed AI batch. A model
+ * that broke its contract can leak its own prose through the error: our
+ * parseJsonLoose message embeds a slice of it, and V8's SyntaxError message
+ * quotes the offending text. Those, and anything the scan guard flags, are
+ * replaced by a fixed note. Real backend errors (spend limit, timeout, OAuth)
+ * pass through unchanged.
+ */
+export function safeFailureReason(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (
+    err instanceof SyntaxError ||
+    message.startsWith("Agent did not return valid JSON") ||
+    isScanDirectional(message)
+  ) {
+    return RAW_WITHHELD_REASON;
+  }
+  return message;
+}
 
 export const ANNOTATE_SYSTEM =
   "คุณช่วยสรุปหุ้นให้เจ้าของพอร์ตอ่านตอนก่อนตลาดเปิด/ช่วงเปิดตลาด " +
@@ -89,7 +137,7 @@ export function normalizeNotes(raw: unknown, tickers: string[]): Map<string, Not
   for (const t of tickers) {
     const note = answered.get(t);
     if (note === undefined) out.set(t, { note: null, reason: MISSING_REASON });
-    else if (isDirectional(note)) out.set(t, { note: null, reason: STRIPPED_REASON });
+    else if (isScanDirectional(note)) out.set(t, { note: null, reason: STRIPPED_REASON });
     else out.set(t, { note, reason: null });
   }
   return out;
@@ -131,16 +179,9 @@ export async function annotateRows(
       });
       for (const [t, o] of normalizeNotes(r.data, batch.map((b) => b.ticker))) notes.set(t, o);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // parseJsonLoose's error embeds a slice of the model's raw prose. If the
-      // model broke its contract and said something directional, forwarding it
-      // would bypass the guard, so those reasons are replaced with a fixed note.
-      const safe =
-        message.startsWith("Agent did not return valid JSON") || isDirectional(message)
-          ? RAW_WITHHELD_REASON
-          : message;
+      const safe = safeFailureReason(err);
       if (safe === RAW_WITHHELD_REASON) {
-        console.error("scan-agent: withholding raw model text from the page:", message);
+        console.error("scan-agent: withholding raw model text from the page:", err instanceof Error ? err.message : String(err));
       }
       failed++;
       if (firstFailure === "") firstFailure = safe;
