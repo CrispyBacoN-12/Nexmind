@@ -17,7 +17,7 @@ import { gateSlots, type GateDecision } from "@/lib/market/marketGate";
 import { dailyReturns, pearsonCorrelation } from "@/lib/trading/correlation";
 import { corrMultiplierFor } from "@/lib/trading/positionSizing";
 
-import { baseRate } from "./baseRate";
+import { baseRate, BASE_RATE_HORIZON } from "./baseRate";
 import { fillGuard } from "./fillGuard";
 import { gapRisk } from "./gapRisk";
 import { rLadder, costInR } from "./rLadder";
@@ -27,6 +27,7 @@ import {
   ADVISOR_ATR_SL_MULT,
   ADVISOR_COST_BPS,
   ADVISOR_NO_EDGE_CLAIM,
+  ADVISOR_R_STEPS,
   type AdvisorCard,
   type AdvisorInput,
   type AdvisorResult,
@@ -72,8 +73,22 @@ export function advise(input: AdvisorInput): AdvisorResult {
   const entry = useOverride ? (override as number) : lastClose;
   const entrySource: AdvisorCard["entrySource"] = useOverride ? "override" : "last close";
 
-  const slDistance = ADVISOR_ATR_SL_MULT * atrValue;
-  const stop = entry - slDistance;
+  // A chart stop is judged against the FINAL entry (override or last close). A
+  // stop that is not strictly below it would give a zero or negative distance
+  // and so no size, or a short's geometry on a long-only card — it is ignored,
+  // loudly, and the ATR stop stands.
+  const stopGiven = input.stopOverride;
+  const useChartStop =
+    stopGiven != null && Number.isFinite(stopGiven) && stopGiven > 0 && stopGiven < entry;
+  if (stopGiven != null && !useChartStop) {
+    warnings.push(`Stop จากกราฟ (${stopGiven}) ไม่ได้อยู่ใต้ราคาเข้า จึงใช้ ${ADVISOR_ATR_SL_MULT}×ATR แทน`);
+  }
+  const stopSource: AdvisorCard["stopSource"] = useChartStop ? "chart" : "atr";
+  const slDistance = useChartStop ? entry - (stopGiven as number) : ADVISOR_ATR_SL_MULT * atrValue;
+  const stop = useChartStop ? (stopGiven as number) : entry - slDistance;
+  // Exactly the constant for an ATR stop (not slDistance / atr, which can drift
+  // in the last bit); the chart stop's multiple is whatever it works out to.
+  const stopAtrMult = useChartStop ? slDistance / atrValue : ADVISOR_ATR_SL_MULT;
 
   const sizing = sizeShares({
     entry,
@@ -145,7 +160,7 @@ export function advise(input: AdvisorInput): AdvisorResult {
   // Gap-through risk, from the longer history when the route supplied it. It is
   // disclosed, not applied: the size above still assumes a -1R stop-out, and the
   // owner sees next to it what the sample says a bad open would have cost.
-  const gap = gapRisk(input.gapHistory ?? candles);
+  const gap = gapRisk(input.gapHistory ?? candles, stopAtrMult);
   const gapWorstLossUsd = gap ? sizing.shares * slDistance * gap.worstLossR : null;
   if (!gap) {
     warnings.push(`Too little daily history to read ${ticker}'s overnight gap risk, so the -1R stop-out on this card is unchecked against gaps.`);
@@ -180,6 +195,8 @@ export function advise(input: AdvisorInput): AdvisorResult {
     atr: atrValue,
     slDistance,
     stop,
+    stopSource,
+    stopAtrMult,
     sizing,
     deployedUsd: sizing.shares * entry,
     ladder,
@@ -199,7 +216,9 @@ export function advise(input: AdvisorInput): AdvisorResult {
     fillGuard: guard,
     // From the 2y history only: the 6mo series leaves too few complete windows,
     // and a base rate off a quarter of data would be a story about that quarter.
-    baseRate: baseRate(input.gapHistory),
+    // Replayed at the card's own stop multiple (1.5 for an ATR stop, the chart
+    // stop's k otherwise), so the table describes the stop the card sized.
+    baseRate: baseRate(input.gapHistory, ADVISOR_R_STEPS, BASE_RATE_HORIZON, stopAtrMult),
     alreadyHeld,
     warnings,
     noEdgeClaim: ADVISOR_NO_EDGE_CLAIM,

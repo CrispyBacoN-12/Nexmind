@@ -27,6 +27,8 @@ function makeCard(over: Partial<AdvisorCard> = {}): AdvisorCard {
     atr: 4.12,
     slDistance: 6.18,
     stop: 220.22,
+    stopSource: "atr",
+    stopAtrMult: 1.5,
     sizing: {
       shares: 4,
       riskShares: 4,
@@ -282,4 +284,12 @@ test("gap-through risk is quoted in stops and R when measured, and n/a when not"
 
   const unknown = renderCritiqueContext(makeCard(), makeBars(40));
   assert.match(unknown, /worst overnight gap-through: n\/a/);
+});
+
+test("the stop line names the card's own ATR multiple and where the stop came from", () => {
+  const atrCard = renderCritiqueContext(makeCard(), makeBars(40));
+  assert.match(atrCard, /stop distance: 6\.18 \(1\.50 x ATR, ATR rule\)/);
+
+  const chartCard = renderCritiqueContext(makeCard({ stopSource: "chart", stopAtrMult: 0.83 }), makeBars(40));
+  assert.match(chartCard, /stop distance: 6\.18 \(0\.83 x ATR, stop from the chart\)/);
 });

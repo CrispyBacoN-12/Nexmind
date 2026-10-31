@@ -143,6 +143,7 @@ export async function POST(req: Request) {
     maxSlots: readPositive(body.maxSlots, "Max slots"),
     riskPct: readPositive(body.riskPct, "Risk per trade", MAX_RISK_PCT),
     entry: readPositive(body.entry, "Entry"),
+    stop: readPositive(body.stop, "Stop"),
   };
   const malformed = Object.values(fields).find((f) => f.error);
   if (malformed?.error) {
@@ -154,6 +155,10 @@ export async function POST(req: Request) {
   const riskPct = fields.riskPct.value ?? 1;
   // Blank entry means "use the last close" — that is the designed default.
   const entryOverride = fields.entry.value;
+  // Blank stop means the 1.5 x ATR stop. A stop that parses but sits at or above
+  // the final entry is not rejected here: advise() judges it against the entry
+  // it actually uses, and falls back with a card warning.
+  const stopOverride = fields.stop.value;
 
   const { tickers: holdingTickers, notes: inputNotes } = readHoldings(body.holdings);
 
@@ -218,6 +223,7 @@ export async function POST(req: Request) {
     ticker,
     candles: main.candles,
     entryOverride,
+    stopOverride,
     capital,
     maxSlots,
     riskPct,

@@ -33,11 +33,22 @@ const CAP_LABEL: Record<string, string> = {
  */
 type AdvisorResponse = AdvisorResult & { chart?: ChartBar[] | null };
 
-export function AdvisorForm({ initialTicker = "" }: { initialTicker?: string }) {
-  // Prefilled from /advisor?ticker= (the Scanner's "→ Advisor" link). It only
-  // fills the field: the owner still presses submit, nothing runs on arrival.
+export function AdvisorForm({
+  initialTicker = "",
+  initialEntry = "",
+  initialStop = "",
+}: {
+  initialTicker?: string;
+  initialEntry?: string;
+  initialStop?: string;
+}) {
+  // Prefilled from /advisor?ticker= (the Scanner's "→ Advisor" link) and from
+  // ?entry=&stop= (the chart agent's setup panel). It only fills the fields: the
+  // owner still presses submit, nothing runs on arrival. Entry and stop are
+  // kept as the strings the URL carried; only the route parses them.
   const [ticker, setTicker] = useState(initialTicker);
-  const [entry, setEntry] = useState("");
+  const [entry, setEntry] = useState(initialEntry);
+  const [stop, setStop] = useState(initialStop);
   const [capital, setCapital] = useState("2500");
   const [maxSlots, setMaxSlots] = useState("5");
   const [riskPct, setRiskPct] = useState("1");
@@ -107,6 +118,7 @@ export function AdvisorForm({ initialTicker = "" }: { initialTicker?: string }) 
         body: JSON.stringify({
           ticker,
           entry,
+          stop,
           capital,
           maxSlots,
           riskPct,
@@ -137,20 +149,24 @@ export function AdvisorForm({ initialTicker = "" }: { initialTicker?: string }) 
           onChange={() => setFormEpoch((n) => n + 1)}
           className="grid gap-4 sm:grid-cols-3"
         >
-          {/* Changing the ticker clears the entry.
+          {/* Changing the ticker clears the entry AND the stop.
               An entry typed — or clicked off a candle — for one name is a
               price in that name's range, and carrying it into another turns
               the card into an override nobody asked for: the entry level and
               the whole R ladder float away from the price action, and the
               chart stops showing the latest price as the entry. Blank means
               "use this ticker's last close", which is the right default for a
-              ticker whose price has not been read yet. */}
+              ticker whose price has not been read yet. A stop is the same
+              kind of price: carried to another name it would be sized as a
+              chart stop that was never drawn for it, so a blank stop (the
+              1.5 x ATR default) is the only safe thing to leave behind. */}
           <Field
             label="ชื่อหุ้น"
             value={ticker}
             onChange={(v) => {
               if (v !== ticker) {
                 setEntry("");
+                setStop("");
                 setPickedFrom(null);
               }
               setTicker(v);
@@ -174,6 +190,16 @@ export function AdvisorForm({ initialTicker = "" }: { initialTicker?: string }) 
               </p>
             ) : null}
           </div>
+          {/* Shown only when a stop came in from the chart (or is typed in it):
+              everyone else sizes from the 1.5 x ATR stop and has no use for it. */}
+          {initialStop !== "" || stop !== "" ? (
+            <Field
+              label="Stop จากกราฟ (เว้นว่าง = 1.5×ATR)"
+              value={stop}
+              onChange={setStop}
+              placeholder="171.00"
+            />
+          ) : null}
           <Field label="เงินทุน ($)" value={capital} onChange={setCapital} />
           <Field label="จำนวนช่องสูงสุด" value={maxSlots} onChange={setMaxSlots} />
           <Field label="ความเสี่ยงต่อไม้ (%)" value={riskPct} onChange={setRiskPct} />
@@ -345,9 +371,13 @@ function ResultCard({
         <div className="grid gap-4 sm:grid-cols-4">
           <Stat label="ราคาเข้า" value={fmtMoney(card.entry)} sub={card.entrySource} />
           <Stat
-            label={`จุดตัดขาดทุน (${ADVISOR_ATR_SL_MULT} เท่าของ ATR)`}
+            label={card.stopSource === "chart" ? "จุดตัดขาดทุน" : `จุดตัดขาดทุน (${ADVISOR_ATR_SL_MULT} เท่าของ ATR)`}
             value={fmtMoney(card.stop)}
-            sub={`ห่าง ${fmtMoney(card.slDistance)}`}
+            sub={
+              card.stopSource === "chart"
+                ? `stop จากกราฟ (${fmtNumber(card.stopAtrMult, 2)}×ATR) · ห่าง ${fmtMoney(card.slDistance)}`
+                : `ห่าง ${fmtMoney(card.slDistance)}`
+            }
           />
           <Stat label={`ATR(${ADVISOR_ATR_PERIOD})`} value={fmtMoney(card.atr)} />
           <Stat
@@ -460,7 +490,7 @@ function ResultCard({
         {br ? (
           <p className="text-xs text-(--color-muted)">
             สถิติพื้นฐาน: ถ้าเข้าซื้อที่ราคาปิดของ<span className="font-mono">ทุกวัน</span> ({fmtNumber(br.entries, 0)} วัน,{" "}
-            {br.from} ถึง {br.to}) ด้วย stop {ADVISOR_ATR_SL_MULT}×ATR แบบเดียวกับการ์ดนี้ แล้วดูต่อไม่เกิน {br.horizon} วันทำการ ·
+            {br.from} ถึง {br.to}) ด้วย stop {fmtNumber(card.stopAtrMult, 2)}×ATR แบบเดียวกับการ์ดนี้ แล้วดูต่อไม่เกิน {br.horizon} วันทำการ ·
             วันที่แท่งเดียวแตะทั้ง stop และเป้า นับเป็นโดน stop ({fmtNumber(br.sameBarBoth, 0)} ครั้ง) · ช่วงนี้หุ้นตัวนี้เปลี่ยนไป{" "}
             <span className="font-mono">{fmtPct(br.buyHoldPct)}</span> ถ้าเกินจุดคุ้มทุน ส่วนใหญ่คือแนวโน้มของหุ้นช่วงนั้น
             ไม่ใช่ความได้เปรียบ · วันที่ติดกันใช้เส้นทางราคาเดียวกัน ตัวอย่างอิสระจริงน้อยกว่าจำนวนวันหลายเท่า ·

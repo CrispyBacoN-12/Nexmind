@@ -19,7 +19,6 @@ import type { ChartBar } from "@/lib/advisor/chartSeries";
 import { earningsPhrase } from "@/lib/advisor/earningsPhrase";
 import {
   ADVISOR_ATR_PERIOD,
-  ADVISOR_ATR_SL_MULT,
   ADVISOR_COST_BPS,
   type AdvisorCard,
 } from "@/lib/advisor/types";
@@ -101,7 +100,10 @@ export function renderCritiqueContext(
     "",
     "[risk]",
     `ATR(${ADVISOR_ATR_PERIOD}): ${num(card.atr)} (${pct(atrPctOfEntry)} of entry)`,
-    `stop distance: ${num(card.slDistance)} (${ADVISOR_ATR_SL_MULT} x ATR)`,
+    // The multiple is the card's own: 1.5 for the ATR rule, whatever the chart
+    // stop works out to otherwise. Printing the constant here would tell the
+    // model a structural stop was the volatility rule.
+    `stop distance: ${num(card.slDistance)} (${num(card.stopAtrMult)} x ATR, ${card.stopSource === "chart" ? "stop from the chart" : "ATR rule"})`,
     `stop: ${usd(card.stop)}`,
     `round-trip cost at ${ADVISOR_COST_BPS} bps: ${num(card.costR)} R`,
     // Printed as n/a rather than omitted, for the same reason as earnings.

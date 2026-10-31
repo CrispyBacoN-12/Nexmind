@@ -187,6 +187,10 @@ export interface AdvisorInput {
   candles: Candle[];
   /** Blank in the form means "use the last close". */
   entryOverride?: number | null;
+  /** A structural stop (from the chart agent). Used only when finite and
+   *  0 < stop < the final entry; otherwise ignored with a card warning. Absent
+   *  or null means the 1.5 x ATR stop. */
+  stopOverride?: number | null;
   capital: number;
   maxSlots: number;
   /** Percent units: 1 = 1%. */
@@ -220,6 +224,10 @@ export interface AdvisorCard {
   atr: number;
   slDistance: number;
   stop: number;
+  /** Where `stop` came from: the 1.5 x ATR rule, or a stop passed in from the chart. */
+  stopSource: "atr" | "chart";
+  /** slDistance / atr. Always set: exactly ADVISOR_ATR_SL_MULT for an ATR stop. */
+  stopAtrMult: number;
   sizing: ShareSizingResult;
   /** shares * entry */
   deployedUsd: number;

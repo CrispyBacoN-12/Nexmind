@@ -1,6 +1,7 @@
 // Base rate: how often THIS ticker reached each rung of the card's R ladder
-// before its 1.5 x ATR stop, if a long had been opened at the close of every
-// session in the sample.
+// before its stop (1.5 x ATR by default; advise() passes the multiple of a chart
+// stop when the card was sized from one), if a long had been opened at the
+// close of every session in the sample.
 //
 // What it is. The card's geometry (stop at 1.5 x ATR14 below a close, targets
 // at whole and half R above it) replayed from every eligible close in the two

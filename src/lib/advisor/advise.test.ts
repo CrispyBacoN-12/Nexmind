@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 
 import { atr, type Candle } from "@/lib/indicators";
 import { advise } from "./advise";
+import { baseRate, BASE_RATE_HORIZON } from "./baseRate";
 import { sizeShares } from "./sizing";
-import { ADVISOR_ATR_PERIOD, ADVISOR_ATR_SL_MULT, ADVISOR_NO_EDGE_CLAIM } from "./types";
+import { ADVISOR_ATR_PERIOD, ADVISOR_ATR_SL_MULT, ADVISOR_NO_EDGE_CLAIM, ADVISOR_R_STEPS } from "./types";
 
 const DAY = 86_400;
 const T0 = Date.parse("2020-01-01T00:00:00Z") / 1000;
@@ -244,4 +245,102 @@ test("a fresh quote past the walk-away price is a warning; the card's own size i
   assert.equal(moved.card.fillGuard.atQuote?.overWalkAway, true);
   assert.ok(moved.card.warnings.includes(moved.card.fillGuard.quoteNote));
   assert.equal(plain.card.fillGuard.quote, null);
+});
+
+// --- chart stop (?stop=) -----------------------------------------------------
+
+/** A deterministic random walk, so stop-first counts differ between stop multiples. */
+function walkBars(n: number, start: number): Candle[] {
+  let seed = 12345;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const out: Candle[] = [];
+  let prev = start;
+  for (let i = 0; i < n; i++) {
+    const o = prev * (1 + (rnd() - 0.5) * 0.01);
+    const c = o * (1 + (rnd() - 0.5) * 0.03);
+    const h = Math.max(o, c) * (1 + rnd() * 0.01);
+    const l = Math.min(o, c) * (1 - rnd() * 0.01);
+    out.push({ t: T0 + i * DAY, o, h, l, c, v: 1_000_000 });
+    prev = c;
+  }
+  return out;
+}
+
+test("a chart stop below the entry replaces the ATR stop and drives the sizing", () => {
+  const res = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, stopOverride: 95 });
+  assert.ok(res.ok);
+  const card = res.card;
+  assert.equal(card.stop, 95);
+  assert.equal(card.slDistance, 5);
+  assert.equal(card.stopSource, "chart");
+  assert.ok(Math.abs(card.stopAtrMult - 5 / 6) < 1e-12);
+  const expected = sizeShares({ entry: 100, slDistance: 5, capital: 2500, maxSlots: 5, riskPct: 1 });
+  assert.deepEqual(card.sizing, expected);
+  assert.equal(card.ladder[0].price, 105);
+  assert.equal(card.warnings.some((w) => /Stop จากกราฟ/.test(w)), false);
+});
+
+test("a chart stop is judged against the FINAL entry, the last close when no entry is given", () => {
+  const res = advise({ ...BASE, candles: bars(60, 100, 6), stopOverride: 96 });
+  assert.ok(res.ok);
+  assert.equal(res.card.entry, 100);
+  assert.equal(res.card.stop, 96);
+  assert.equal(res.card.stopSource, "chart");
+});
+
+test("a chart stop above the entry is ignored with a warning and the ATR stop is used", () => {
+  const res = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, stopOverride: 101 });
+  assert.ok(res.ok);
+  const card = res.card;
+  assert.equal(card.stopSource, "atr");
+  assert.equal(card.stop, 100 - ADVISOR_ATR_SL_MULT * 6);
+  assert.equal(card.stopAtrMult, ADVISOR_ATR_SL_MULT);
+  assert.ok(card.warnings.includes("Stop จากกราฟ (101) ไม่ได้อยู่ใต้ราคาเข้า จึงใช้ 1.5×ATR แทน"));
+});
+
+test("a chart stop equal to the entry, non-finite, or not positive is ignored", () => {
+  for (const bad of [100, 0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const res = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, stopOverride: bad });
+    assert.ok(res.ok);
+    assert.equal(res.card.stopSource, "atr", `stop ${bad}`);
+    assert.equal(res.card.stop, 91, `stop ${bad}`);
+    assert.ok(res.card.warnings.some((w) => /^Stop จากกราฟ \(/.test(w)), `stop ${bad}`);
+  }
+});
+
+test("no stop override: ATR stop, stopAtrMult is exactly 1.5, no warning", () => {
+  const res = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100 });
+  assert.ok(res.ok);
+  assert.equal(res.card.stopSource, "atr");
+  assert.equal(res.card.stopAtrMult, 1.5);
+  assert.equal(res.card.warnings.some((w) => /Stop จากกราฟ/.test(w)), false);
+  const nul = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, stopOverride: null });
+  assert.ok(nul.ok);
+  assert.equal(nul.card.stopSource, "atr");
+});
+
+test("the base-rate table replays the card's stop multiple, not the constant", () => {
+  const hist = walkBars(400, 100);
+  const withChart = advise({
+    ...BASE,
+    candles: bars(60, 100, 6),
+    entryOverride: 100,
+    stopOverride: 98, // 2 / 6 ATR: far tighter than 1.5
+    gapHistory: hist,
+  });
+  const plain = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, gapHistory: hist });
+  assert.ok(withChart.ok && plain.ok);
+  const mult = withChart.card.stopAtrMult;
+  assert.ok(Math.abs(mult - 2 / 6) < 1e-12);
+
+  assert.deepEqual(withChart.card.baseRate, baseRate(hist, ADVISOR_R_STEPS, BASE_RATE_HORIZON, mult));
+  assert.deepEqual(plain.card.baseRate, baseRate(hist));
+  // The fixture must actually discriminate between the two multiples.
+  assert.notEqual(
+    withChart.card.baseRate?.rows[0].stopFirstPct,
+    plain.card.baseRate?.rows[0].stopFirstPct,
+  );
 });
