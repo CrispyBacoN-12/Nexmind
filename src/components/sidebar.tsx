@@ -2,26 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Radar, FileBarChart, Activity, LineChart, FlaskConical, ScrollText, Microscope, Compass, NotebookPen } from "lucide-react";
+import { Activity, Compass, NotebookPen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/advisor", label: "Trade Advisor", icon: Compass },
   { href: "/journal", label: "Trade Journal", icon: NotebookPen },
-  { href: "/", label: "War Room (archive)", icon: Radar },
-  { href: "/analyze", label: "AI Analysis (archive)", icon: LineChart },
-  { href: "/backtest", label: "Backtest Lab (archive)", icon: FlaskConical },
-  { href: "/research", label: "Quant Research (archive)", icon: Microscope },
-  { href: "/activity", label: "Scan Activity (archive)", icon: ScrollText },
-  { href: "/reports", label: "Reports (archive)", icon: FileBarChart },
 ];
 
-export function Sidebar({ online = 0 }: { online?: number }) {
+export function Sidebar() {
   const pathname = usePathname();
   return (
     <aside className="w-60 shrink-0 border-r border-(--color-border) bg-(--color-card) flex flex-col">
       <div className="px-5 py-6 border-b border-(--color-border)">
-        <Link href="/" className="flex items-center gap-2 font-semibold text-lg tracking-tight">
+        <Link href="/advisor" className="flex items-center gap-2 font-semibold text-lg tracking-tight">
           <Activity className="h-5 w-5 text-(--color-accent)" />
           <span>NEXMIND</span>
         </Link>
@@ -29,7 +23,7 @@ export function Sidebar({ online = 0 }: { online?: number }) {
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
         {nav.map((item) => {
-          const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          const active = pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link
@@ -47,9 +41,7 @@ export function Sidebar({ online = 0 }: { online?: number }) {
         })}
       </nav>
       <div className="px-5 py-4 border-t border-(--color-border) text-xs text-(--color-muted) font-mono">
-        <span className="inline-block h-2 w-2 rounded-full bg-(--color-muted) mr-2 align-middle" />
-        autonomous desk: paused ({online} agents online)
-        <div className="mt-1 text-[10px]">no rule survived its hold-out — advisor is the tool now</div>
+        no rule survived its hold-out — this tool sizes and watches risk, it does not pick
       </div>
     </aside>
   );

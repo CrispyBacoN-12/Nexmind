@@ -32,9 +32,12 @@ hold-out (§3). The repo's value now lives in three surfaces:
   - market-gate flip
   - correlated holdings
 
-**The autonomous desk is paused, not removed.** It was SCANNER → HAWK×3 → SAGE → Iron Rules, plus
-`panel-v1` research. Its three Task Scheduler jobs stay **Disabled**. Do not re-enable them, do not
-resume research rounds and do not tune that code without a new owner decision. Keep it as reference.
+**The autonomous desk is paused, and its web layer is gone (2026-10-31, owner request).** It was
+SCANNER → HAWK×3 → SAGE → Iron Rules, plus `panel-v1` research. The site is now only `/advisor`
+and `/journal`; every archive page and the API routes only they used were deleted (git has them).
+The desk's `src/lib` code, research scripts and DB tables are **kept** as reference. Its three Task
+Scheduler jobs stay **Disabled**. Do not re-enable them or resume research rounds without a new
+owner decision. **Next, by owner request: rebuild AI agents one at a time, design to be discussed.**
 
 Hard context the code does not state:
 - **Orders are manual, on Webull, whole shares, $2-3k.** Webull is data-only here. Go-Live is dead,
@@ -47,7 +50,7 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Branch | `master` **pushed to `origin` 2026-10-30**. Every push auto-deploys Vercel production |
-| Tests | `npm test` **882 pass / 0 fail** (2026-10-30) |
+| Tests | `npm test` **880 pass / 0 fail** (2026-10-31) |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
@@ -68,6 +71,16 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-10-31: Web layer cut to the copilot. Uncommitted.**
+  - Kept: `/advisor`, `/journal`, and APIs `advisor`, `advisor/critique`, `journal`, `journal/stops`,
+    `portfolio/evaluate`, `cron/risk-sentry`. `/` redirects to `/advisor`.
+  - Deleted: 12 pages (War Room, analyze, backtest, research, activity, reports, command, build,
+    graph, roster, scoreboard, webull, a-futuristic), `components/office`, `components/research`, 25 API
+    routes, and the `research-round` / `cleanup-signals` workflows whose only target was a deleted
+    route. The 2 `/api/gold/status` tests went with their route (880 tests now).
+  - The Risk Sentry manual-extras editor moved from `/command` to `/journal`, behind the new
+    `/api/risk-sentry/holdings`. `globalTradingHalt` and the desk's settings panel are gone.
+  - `next build` clean. `scripts/bot.ts` still calls the removed `/api/settings` and `/api/portfolios`.
 - **2026-10-30: `/advisor` base-rate columns on the R ladder (idea 3 from day-trader-skill). `0167ea0`, pushed.**
   - `advisor/baseRate.ts` (pure) replays the card's stop (1.5×ATR) and each R rung from the close
     of every session in the 2y history, walked forward at most 20 sessions. It reports target first,
