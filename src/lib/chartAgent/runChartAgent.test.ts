@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
 import type { Review } from "./review";
 import type { ChartSetupRow } from "./logRows";
-import { CHART_MAX_SETUPS } from "./types";
+import { SIP_DELAY_MS } from "@/lib/alpaca";
+import { CHART_BAR_SECONDS, CHART_MAX_SETUPS } from "./types";
 import { runChartAgent, type ChartDeps } from "./runChartAgent";
 
 // Monday 2026-11-02 10:30 ET (EST, UTC-5) -> the regular session is open.
@@ -144,7 +145,14 @@ test("an intraday fetch that throws is ok:false", async () => {
       throw new Error("boom");
     },
   });
-  const r = await runChartAgent(["AAA"], deps);
+  const origWarn = console.warn;
+  console.warn = () => {};
+  let r;
+  try {
+    r = await runChartAgent(["AAA"], deps);
+  } finally {
+    console.warn = origWarn;
+  }
   assert.deepEqual(r, { ok: false, error: "ไม่มีข้อมูลแท่ง 5 นาที" });
 });
 
@@ -294,6 +302,94 @@ test("AI unavailable (unread everywhere): every setup is eligible and the note i
   assert.ok(r.shown.every((s) => s.review.status === "unread"));
   assert.equal(r.aiNote, "no AI backend");
   assert.equal(r.backend, "mock");
+});
+
+// --- still-forming bars ------------------------------------------------------
+// Alpaca's end is now - SIP_DELAY_MS and not bar-aligned, so its newest bar can
+// be partial. A bar is read only once its end is at or before that cutoff.
+
+/** Previous session + 09:30 quiet bar + 09:35 sweep bar (ends 09:40 ET). */
+const sweepAsLastBar = (): Candle[] => [...previousSession(), ...sweepToday().slice(0, 2)];
+const SWEEP_BAR_END_MS = (TODAY_OPEN + 300 + CHART_BAR_SECONDS) * 1000;
+
+test("a bar that ends after now minus the SIP delay is ignored", async () => {
+  // 1 ms short of a finished 09:35 bar: it would otherwise be the sweep bar.
+  const now = SWEEP_BAR_END_MS + SIP_DELAY_MS - 1;
+  const { deps, calls } = makeDeps({ now: () => now, bars: new Map([["AAA", sweepAsLastBar()]]) });
+  const r = await runChartAgent(["AAA"], deps);
+  assert.ok(r.ok);
+  assert.equal(r.phase, "open");
+  assert.deepEqual(r.shown, []);
+  assert.deepEqual(r.none, [{ ticker: "AAA", reason: "ยังไม่มี sweep" }]);
+  assert.equal(r.dataAsOf, new Date(TODAY_OPEN * 1000 + CHART_BAR_SECONDS * 1000).toISOString());
+  assert.equal(calls.review.length, 0);
+  assert.equal(calls.logged.length, 0);
+});
+
+test("a bar that ends exactly at now minus the SIP delay is read", async () => {
+  const now = SWEEP_BAR_END_MS + SIP_DELAY_MS;
+  const { deps } = makeDeps({ now: () => now, bars: new Map([["AAA", sweepAsLastBar()]]) });
+  const r = await runChartAgent(["AAA"], deps);
+  assert.ok(r.ok);
+  assert.deepEqual(r.shown.map((s) => s.setup.ticker), ["AAA"]);
+  assert.equal(r.shown[0].setup.sweepBar.t, TODAY_OPEN + 300);
+  assert.equal(r.dataAsOf, new Date(SWEEP_BAR_END_MS).toISOString());
+});
+
+test("a forming bar does not move the entry or join the chart bars", async () => {
+  // NOW_OPEN is 10:30 ET: the cutoff is 10:14, so a 10:10 bar is still forming.
+  const forming = bar(TODAY_OPEN + 40 * 60, 100.5, 99.9, 100.4);
+  const { deps } = makeDeps({ bars: new Map([["AAA", [...setupBars(), forming]]]) });
+  const r = await runChartAgent(["AAA"], deps);
+  assert.ok(r.ok);
+  assert.equal(r.shown.length, 1);
+  assert.equal(r.shown[0].setup.entry, 100);
+  assert.equal(r.shown[0].bars.length, setupBars().length);
+});
+
+// --- superseded runs ---------------------------------------------------------
+
+test("an already-aborted signal: no review, no log, ok:false cancelled", async () => {
+  const { deps, calls } = makeDeps({ bars: new Map([["AAA", setupBars()]]), signal: AbortSignal.abort() });
+  const r = await runChartAgent(["AAA"], deps);
+  assert.deepEqual(r, { ok: false, error: "ยกเลิกแล้ว" });
+  assert.equal(calls.review.length, 0);
+  assert.equal(calls.logged.length, 0);
+});
+
+test("a signal aborted during the review: the run is cancelled and nothing is logged", async () => {
+  const ctrl = new AbortController();
+  const { deps: base } = makeDeps({ bars: new Map([["AAA", setupBars()]]) });
+  const { deps, calls } = makeDeps({
+    bars: new Map([["AAA", setupBars()]]),
+    signal: ctrl.signal,
+    review: async (items) => {
+      ctrl.abort();
+      return base.review(items);
+    },
+  });
+  const r = await runChartAgent(["AAA"], deps);
+  assert.deepEqual(r, { ok: false, error: "ยกเลิกแล้ว" });
+  assert.equal(calls.logged.length, 0);
+});
+
+test("an intraday fetch failure is logged with its message", async () => {
+  const { deps } = makeDeps({
+    fetchIntraday: async () => {
+      throw new Error("alpaca 500");
+    },
+  });
+  const warned: unknown[][] = [];
+  const origWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warned.push(args);
+  };
+  try {
+    await runChartAgent(["AAA"], deps);
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.deepEqual(warned, [["chart-agent: intraday fetch failed:", "alpaca 500"]]);
 });
 
 test("a log failure sets logNote and never fails the run", async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge, Button, Card, CardTitle } from "@/components/ui";
 import type { ChartAgentResult } from "@/lib/chartAgent/runChartAgent";
@@ -36,9 +36,17 @@ export function ScanPanel() {
   // Which scan a chart reading belongs to. A reading that comes back after a
   // newer scan has started is for a stale table and is dropped.
   const scanId = useRef(0);
+  // The in-flight chart-agent request. A new scan (or leaving the page) aborts
+  // it, so the server stops before the AI call and the log: a superseded run
+  // spends nothing and writes nothing.
+  const chartAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => chartAbort.current?.abort(), []);
 
   async function runScan() {
     const id = ++scanId.current;
+    chartAbort.current?.abort();
+    chartAbort.current = null;
     setLoading(true);
     setError(null);
     setScan(null);
@@ -65,6 +73,8 @@ export function ScanPanel() {
   }
 
   async function runChartAgent(id: number, tickers: string[]) {
+    const ctrl = new AbortController();
+    chartAbort.current = ctrl;
     setChartLoading(true);
     let result: ChartAgentResult;
     try {
@@ -72,6 +82,7 @@ export function ScanPanel() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ tickers }),
+        signal: ctrl.signal,
       });
       const json = (await res.json().catch(() => null)) as ChartAgentResult | null;
       result = json ?? {
@@ -79,9 +90,12 @@ export function ScanPanel() {
         error: `The server answered HTTP ${res.status} with a response this page could not read.`,
       };
     } catch (err) {
+      // Aborted on purpose (a newer scan, or the page went away): silent.
+      if (ctrl.signal.aborted) return;
       result = { ok: false, error: (err as Error).message };
     }
-    if (id !== scanId.current) return;
+    if (id !== scanId.current || ctrl.signal.aborted) return;
+    chartAbort.current = null;
     setChart(result);
     setChartLoading(false);
     setChartOpen(true);

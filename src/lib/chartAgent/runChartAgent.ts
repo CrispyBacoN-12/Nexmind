@@ -8,6 +8,7 @@
 //
 // Read-only: it finds and describes setups, it never places an order.
 
+import { SIP_DELAY_MS } from "@/lib/alpaca";
 import { atr, type Candle } from "@/lib/indicators";
 import { etDate, marketPhase, sessionDates } from "@/lib/scanAgent/session";
 import type { MarketPhase } from "@/lib/scanAgent/types";
@@ -19,6 +20,7 @@ import { findSetup } from "./setup";
 import {
   CHART_AI_BARS,
   CHART_ATR_PERIOD,
+  CHART_BAR_SECONDS,
   CHART_MAX_SETUPS,
   type Setup,
   type SessionSplit,
@@ -33,6 +35,12 @@ export interface ChartDeps {
   review: typeof reviewSetups;
   log: (rows: ChartSetupRow[]) => Promise<void>;
   runId: () => string;
+  /**
+   * The request's signal. Once aborted (the page started a newer run or went
+   * away) the run stops before the AI call and before the log, so a superseded
+   * run spends nothing and writes nothing.
+   */
+  signal?: AbortSignal;
 }
 
 /** `bars` = previous + pre-market + regular 5-minute bars, for the chart. */
@@ -60,6 +68,8 @@ export type ChartAgentResult =
 const NO_INTRADAY = "ไม่มีข้อมูลแท่ง 5 นาที";
 const NO_BARS_FOR_TICKER = "ไม่มีแท่งของตัวนี้";
 const UNREAD_REASON = "AI ไม่ได้อ่าน";
+/** A superseded or abandoned run: the page that asked is no longer waiting. */
+const CANCELLED = "ยกเลิกแล้ว";
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -103,16 +113,21 @@ export async function runChartAgent(
   let intraday: Map<string, Candle[]>;
   try {
     intraday = await deps.fetchIntraday(tickers);
-  } catch {
+  } catch (e) {
+    console.warn("chart-agent: intraday fetch failed:", message(e));
     await dailyPromise;
     return { ok: false, error: NO_INTRADAY };
   }
   const daily = await dailyPromise;
+  if (deps.signal?.aborted) return { ok: false, error: CANCELLED };
   if (!tickers.some((t) => (intraday.get(t)?.length ?? 0) > 0)) {
     return { ok: false, error: NO_INTRADAY };
   }
 
-  // 3. Per ticker: sessions -> levels -> setup. Input order is kept.
+  // 3. Per ticker: sessions -> levels -> setup. Input order is kept. Alpaca's
+  // end is now - SIP_DELAY_MS and not bar-aligned, so its newest bar can still
+  // be forming: only bars that ended by that cutoff are read.
+  const cutoffMs = nowMs - SIP_DELAY_MS;
   const none: { ticker: string; reason: string }[] = [];
   const found: { setup: Setup; split: SessionSplit }[] = [];
   let dataAsOfMs: number | null = null;
@@ -122,9 +137,10 @@ export async function runChartAgent(
       none.push({ ticker, reason: NO_BARS_FOR_TICKER });
       continue;
     }
-    const split = splitSessions(candles, today);
+    const finished = candles.filter((c) => (c.t + CHART_BAR_SECONDS) * 1000 <= cutoffMs);
+    const split = splitSessions(finished, today);
     if (split.regular.length > 0) {
-      const endMs = (split.regular[split.regular.length - 1].t + 300) * 1000;
+      const endMs = (split.regular[split.regular.length - 1].t + CHART_BAR_SECONDS) * 1000;
       if (dataAsOfMs === null || endMs > dataAsOfMs) dataAsOfMs = endMs;
     }
     const lv = computeLevels(split);
@@ -157,6 +173,7 @@ export async function runChartAgent(
     backend = "none";
     aiNote = `AI ใช้ไม่ได้: ${message(e)}`;
   }
+  if (deps.signal?.aborted) return { ok: false, error: CANCELLED };
 
   // 5. Decide: kept/unread are eligible, the first CHART_MAX_SETUPS are shown.
   const shown: ShownSetup[] = [];

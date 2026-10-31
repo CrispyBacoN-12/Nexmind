@@ -5,6 +5,11 @@
 import type { Review } from "@/lib/chartAgent/review";
 import type { Levels, Setup } from "@/lib/chartAgent/types";
 
+/**
+ * `shown` means eligible and returned to the page: it does not mean the owner
+ * saw it (a run whose page went away before the answer still logs `shown`).
+ * `capped` setups were eligible but past the CHART_MAX_SETUPS cap.
+ */
 export type LogStatus = "shown" | "ai_rejected" | "guard_stripped" | "capped";
 
 /** The ChartSetup model's create input minus id and createdAt. */

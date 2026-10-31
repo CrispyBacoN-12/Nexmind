@@ -17,12 +17,17 @@ export const CHART_VALUE_AREA = 0.7;
 export const CHART_STOP_BUFFER_ATR = 0.1;
 /** Levels closer than this many ATRs merge into one target. */
 export const CHART_LEVEL_MERGE_ATR = 0.1;
-/** The first target must pay at least this many R or there is no setup. */
+/**
+ * A first target under this many R only TAGS the setup ("เป้าแรกไม่ถึง 1.5R");
+ * it never removes it.
+ */
 export const CHART_MIN_T1_R = 1.5;
 /** Most recent 5-minute bars handed to the AI for its reading. */
 export const CHART_AI_BARS = 24;
-/** ATR period on the 5-minute bars. */
+/** ATR period, applied to the DAILY bars (the stop buffer and merge distance are daily ATRs). */
 export const CHART_ATR_PERIOD = 14;
+/** Length of one intraday bar: a bar starting at t ends at t + CHART_BAR_SECONDS. */
+export const CHART_BAR_SECONDS = 300;
 
 /**
  * p = previous session, d = today. POC = point of control, VAH/VAL = value

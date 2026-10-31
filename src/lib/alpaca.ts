@@ -101,7 +101,7 @@ const feed = () => process.env.ALPACA_FEED ?? "sip";
  * minutes stale; a caller that needs real-time prices should set
  * ALPACA_FEED=iex and accept the gappy history that comes with it.
  */
-const SIP_DELAY_MS = 16 * 60_000;
+export const SIP_DELAY_MS = 16 * 60_000;
 const endTime = () =>
   new Date(Date.now() - (feed() === "sip" ? SIP_DELAY_MS : 0)).toISOString();
 

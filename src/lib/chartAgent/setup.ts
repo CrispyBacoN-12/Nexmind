@@ -5,6 +5,7 @@
 // the first one that fails decides the reason.
 
 import {
+  CHART_BAR_SECONDS,
   CHART_LEVEL_MERGE_ATR,
   CHART_MIN_T1_R,
   CHART_STOP_BUFFER_ATR,
@@ -118,7 +119,7 @@ export function findSetup(
   const tags = t1.r < CHART_MIN_T1_R ? ["เป้าแรกไม่ถึง 1.5R"] : [];
 
   // 8. The data is as new as the end of the last bar.
-  const dataAsOf = new Date((last.t + 300) * 1000).toISOString();
+  const dataAsOf = new Date((last.t + CHART_BAR_SECONDS) * 1000).toISOString();
 
   const setup: Setup = {
     ticker,

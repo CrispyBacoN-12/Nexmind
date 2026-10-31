@@ -63,6 +63,9 @@ export async function POST(request: Request) {
         await prisma.chartSetup.createMany({ data: rows });
       },
       runId: () => randomUUID(),
+      // Aborts when the page supersedes this run or goes away: the run then
+      // skips the AI call and the log.
+      signal: request.signal,
     });
     return Response.json(result, { status: result.ok ? 200 : 502 });
   } catch (e) {
