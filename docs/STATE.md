@@ -38,8 +38,8 @@ hold-out (§3). The repo's value now lives in four surfaces:
   - correlated holdings
 
 **The autonomous desk is paused, and its web layer is gone (2026-10-31, owner request).** It was
-SCANNER → HAWK×3 → SAGE → Iron Rules, plus `panel-v1` research. The site is now only `/advisor`
-and `/journal`; every archive page and the API routes only they used were deleted (git has them).
+SCANNER → HAWK×3 → SAGE → Iron Rules, plus `panel-v1` research. The site is now only `/scan`,
+`/advisor` and `/journal`; every archive page and the API routes only they used were deleted (git has them).
 The desk's `src/lib` code, research scripts and DB tables are **kept** as reference. Its three Task
 Scheduler jobs stay **Disabled**. Do not re-enable them or resume research rounds without a new
 owner decision. **Next, by owner request: rebuild AI agents one at a time, design to be discussed.**
@@ -55,7 +55,7 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Branch | `master` **pushed to `origin` 2026-10-30**. Every push auto-deploys Vercel production |
-| Tests | `npm test` **927 pass / 0 fail** (2026-10-31, on branch `scan-agent`) |
+| Tests | `npm test` **959 pass / 0 fail** (2026-10-31, on branch `scan-agent`) |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
@@ -76,7 +76,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-10-31: Scan agent (`/scan`, `POST /api/scan`). Branch `scan-agent`, commits `6007ba1..` through `feat(scan): /scan page, route and Advisor prefill`. Not merged.**
+- **2026-10-31: Scan agent (`/scan`, `POST /api/scan`). Branch `scan-agent`, commits `6007ba1..HEAD` of branch `scan-agent`. Not merged.**
   - `src/lib/scanAgent/`: TradingView screener client, New York session clock, base filter + triggers +
     activity score, economic calendar, AI notes, and the `runScanAgent` orchestrator (all I/O injected).
   - Only the TradingView fetch is fatal (route returns 502 with the error). Every other source
@@ -84,9 +84,16 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   - Rows beyond the AI's top 30 show "ไม่ได้สรุป (นอก 30 อันดับแรก)", which is not a failure. A row
     priced above the $500 slot carries the fractional-share tag.
   - Data is 15 minutes late and the clock does not know US market holidays. Both are on the page.
-  - Browser check is the controller's: `next build` under Turbopack fails inside a worktree
-    (the `node_modules` symlink points out of the root); `next build --webpack` is clean.
-- **2026-10-31: Web layer cut to the copilot. Uncommitted.**
+  - Final review fixes: the AI-note guard also covers the prompt's forbids (Thai predictions, entry
+    calls, rankings) and any SyntaxError is withheld; EDGAR calls are paced (125 ms shared gap,
+    Retry-After honoured); `RecentNews.failed` separates a quiet stock from a Finnhub failure; rows
+    whose 8-K check failed show "8-K ตรวจไม่ได้"; headlines render under each note.
+  - Live check, 2026-10-31 (Saturday, phase closed, session 2026-10-30): covered 473/~503, 135
+    passed. SEC 8-K failed for 33 of 135 tickers before the pacing fix (not re-run since). AI was
+    unavailable (the CLI OAuth had expired). The Advisor prefill works.
+  - `next dev` cannot run in this worktree (junctioned `node_modules`: Turbopack panics, webpack dev
+    hung). It was verified with `next build --webpack` + `next start`.
+- **2026-10-31: Web layer cut to the copilot. `3a50c1f`.**
   - Kept: `/advisor`, `/journal`, and APIs `advisor`, `advisor/critique`, `journal`, `journal/stops`,
     `portfolio/evaluate`, `cron/risk-sentry`. `/` redirects to `/advisor`.
   - Deleted: 12 pages (War Room, analyze, backtest, research, activity, reports, command, build,
