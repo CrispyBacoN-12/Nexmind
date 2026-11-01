@@ -25,7 +25,7 @@ hold-out (§3). The repo's value now lives in four surfaces:
   - **Chart setups panel (agent #2, on master):** a second button runs the chart agent
     over the top 20 scan names and opens a modal of at most 5 long-sweep setups (§3).
 - **`/advisor`**: the owner types a ticker they already chose and gets back structure and risk only:
-  - the stop, found by a chain (branch `chart-stop-agent`, not merged): a stop the owner gave, else the
+  - the stop, found by a chain (agent #3, on master): a stop the owner gave, else the
     latest 5-minute swing low, else the previous day's low, else 1.5 × ATR14; and the R ladder in prices
   - whole-share sizing at real capital
   - round-trip cost in R and overnight gap-through risk
@@ -46,7 +46,7 @@ SCANNER → HAWK×3 → SAGE → Iron Rules, plus `panel-v1` research. The site 
 The desk's `src/lib` code, research scripts and DB tables are **kept** as reference. Its three Task
 Scheduler jobs stay **Disabled**. Do not re-enable them or resume research rounds without a new
 owner decision. **Next, by owner request: rebuild AI agents one at a time. Agent #1 (`/scan`) and
-#2 (the chart agent) are built and #3 (the `/advisor` chart stop) is built on its branch, unmerged; the next agent is to be discussed.**
+#2 (the chart agent) and #3 (the `/advisor` chart stop) are built and on master; the next agent is to be discussed.**
 
 Hard context the code does not state:
 - **Orders are manual, on Webull, whole shares, $2-3k.** Webull is data-only here. Go-Live is dead,
@@ -58,8 +58,8 @@ Hard context the code does not state:
 
 | Thing | Value |
 |---|---|
-| Branch | `master` = `origin/master` at `b1c6967` (2026-11-01, `git rev-parse`), which contains the chart agent. Every push auto-deploys Vercel production. `chart-stop-agent` is a separate branch, **not merged** |
-| Tests | `npm test` **1097 pass / 0 fail** (2026-11-01, on branch `chart-stop-agent`) |
+| Branch | `master` at `22f312f` (2026-11-01) contains agents #2 and #3; `origin/master` is still `b1c6967` (agent #3 not pushed). Every push auto-deploys Vercel production |
+| Tests | `npm test` **1097 pass / 0 fail** (2026-11-01, on master after the agent #3 merge) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
@@ -68,7 +68,7 @@ Hard context the code does not state:
 | Research (archive) | newest `ResearchRun` #113 `skipped`. `panel-v1`: 3, all rejected. Legacy: 6 approved (off-universe, never desk-eligible), 37 demoted, 171 rejected, 1 proposed |
 | `Counterfactual` / `AiCall` | 123 rows, last 2026-09-14 / 90 rows |
 | `Setting` keys | `fearGreed`, `lastDeskSessionAt`, `riskSentry:holdings`, `riskSentry:lastGate`, `ai:outage`, `webull:accessToken` |
-| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`, `.worktrees/xau-vp-v1`: gold work, **finished** (§3), gitignored on master; kept until the owner says delete. `.worktrees/chart-stop-agent` is the live branch above |
+| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`, `.worktrees/xau-vp-v1`: gold work, **finished** (§3), gitignored on master; kept until the owner says delete. |
 
 To re-verify, use a throwaway script under `scripts/` and delete it afterwards. It should query:
 - `portfolio.findMany`; the field is `status`, not `active`
@@ -82,7 +82,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-11-01: Chart stop agent (agent #3) on `/advisor`. Branch `chart-stop-agent` (`git log --oneline master..chart-stop-agent`). Not merged.**
+- **2026-11-01: Chart stop agent (agent #3) on `/advisor`. Merged to master (fast-forward, commits `0066757..22f312f`), not pushed.**
   - What it does: `/advisor` finds its own stop from the Alpaca SIP 5-minute chart. Chain: **given -> swing low
     -> PDL -> 1.5 × ATR14**. A given stop is `?stop=` or the typed field, used only when 0 < stop < entry.
     A swing is the latest strict pivot low (2 bars each side) of the latest session, under the entry; the
@@ -208,7 +208,7 @@ There are no open research directions; the owner closed the search. Work items:
 2. **Check that Risk Sentry keeps running.** Read `scripts/risk-sentry.log` and the task's
    `LastTaskResult` after a few weekdays.
 3. **Chart agents, owner decisions still open** (none are built):
-   - merge `chart-stop-agent`, or keep testing it on a few live sessions first (`claude login` is needed for the AI)
+   - push agent #3 (`git push`, auto-deploys Vercel), and re-run a live check on market hours after `claude login`; the 2026-11-01 live check predates the broken-pivot fix
    - **PDL fallback after a sweep:** the chain accepts PDL even when today's bars already traded at or below it (the swing finder skips such broken lows; PDL does not). It is reached only when no unbroken swing pivot exists. Whether a swept PDL should fall through, or the stop go under the sweep low, is the owner's call
    - a **stricter sweep rule** that also rejects a retest after a gap-down reclaim, i.e. no regular close at
      or below L earlier today. It drops reclaim-retest patterns, so it is the owner's call
