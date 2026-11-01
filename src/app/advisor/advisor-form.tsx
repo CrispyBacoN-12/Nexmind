@@ -106,6 +106,18 @@ export function AdvisorForm({
   // edit unmounts a critique that was argued against numbers that no longer
   // match the card. React's onChange bubbles, so one handler covers every field.
   const [formEpoch, setFormEpoch] = useState(0);
+  // Counts edits so a card can tell whether the form changed after the request
+  // that produced it was sent. `formChanged` is what the ATR button reads: its
+  // click re-submits the FORM, so on a card the form no longer matches (a new
+  // ticker, entry or capital) it would post the old card's stop under new inputs.
+  const editCount = useRef(0);
+  const [formChanged, setFormChanged] = useState(false);
+
+  function markEdited() {
+    editCount.current += 1;
+    setFormChanged(true);
+    setFormEpoch((n) => n + 1);
+  }
 
   /**
    * A clicked candle fills the Entry field and stops there.
@@ -122,7 +134,7 @@ export function AdvisorForm({
     // fire the form's bubbled onChange for it, so formEpoch (AdvisorCritique's
     // remount key) would not otherwise bump and a stale critique — argued
     // against the OLD entry — would keep rendering under the new card.
-    setFormEpoch((n) => n + 1);
+    markEdited();
   }
 
   /**
@@ -130,11 +142,12 @@ export function AdvisorForm({
    * card reads `given`. The value is passed to submit() rather than read back
    * from state: setStop is async, and the request would otherwise carry the old
    * stop. The programmatic setStop does not fire the form's bubbled onChange, so
-   * formEpoch is bumped by hand, as pickEntry does.
+   * the edit is marked by hand, as pickEntry does. submit() snapshots the edit
+   * count AFTER this, so the card it produces starts out matching the form.
    */
   function applyAtrStop(value: string) {
     setStop(value);
-    setFormEpoch((n) => n + 1);
+    markEdited();
     void submit(value);
   }
 
@@ -151,6 +164,7 @@ export function AdvisorForm({
     setChart(null);
     setStopContext(null);
     setPickedFrom(null);
+    const editsAtSend = editCount.current;
     try {
       const res = await fetch("/api/advisor", {
         method: "POST",
@@ -173,6 +187,8 @@ export function AdvisorForm({
         setCard(json.card);
         setChart(json.chart ?? null);
         setStopContext(json.stopContext ?? null);
+        // Edited while the request was in flight: the card is already out of date.
+        setFormChanged(editCount.current !== editsAtSend);
       } else if (json && !json.ok) setError(json.error);
       else setError(`The server answered HTTP ${res.status} with a response this page could not read.`);
     } catch (err) {
@@ -187,7 +203,7 @@ export function AdvisorForm({
       <Card className="p-5">
         <form
           onSubmit={onSubmit}
-          onChange={() => setFormEpoch((n) => n + 1)}
+          onChange={markEdited}
           className="grid gap-4 sm:grid-cols-3"
         >
           {/* Changing the ticker clears the entry AND the stop.
@@ -279,6 +295,7 @@ export function AdvisorForm({
           stopContext={stopContext}
           onPickEntry={pickEntry}
           onUseAtrStop={applyAtrStop}
+          atrDisabledReason={loading ? "กำลังอ่านอยู่" : formChanged ? "ฟอร์มถูกแก้แล้ว กดอ่านโครงสร้างใหม่ก่อน" : null}
           critiqueKey={formEpoch}
         />
       ) : null}
@@ -366,11 +383,14 @@ function StopDetail({
   card,
   stopContext,
   onUseAtrStop,
+  atrDisabledReason,
   readingKey,
 }: {
   card: AdvisorCard;
   stopContext: StopContext | null;
   onUseAtrStop: (stop: string) => void;
+  /** Why the ATR button is off (loading, or the form no longer matches this card); null = enabled. */
+  atrDisabledReason: string | null;
   readingKey: number;
 }) {
   const alt = card.atrAlternative;
@@ -394,9 +414,17 @@ function StopDetail({
             เทียบ stop แบบ {alt.atrMult}×ATR: <span className="font-mono">{fmtMoney(alt.stop)}</span> · ซื้อได้{" "}
             {fmtNumber(alt.shares, 0)} หุ้น
           </span>
-          <Button type="button" size="sm" variant="outline" onClick={() => onUseAtrStop(alt.stop.toFixed(2))}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={atrDisabledReason !== null}
+            title={atrDisabledReason ?? undefined}
+            onClick={() => onUseAtrStop(alt.stop.toFixed(2))}
+          >
             ใช้ stop ATR แทน
           </Button>
+          {atrDisabledReason !== null ? <span className="text-xs">{atrDisabledReason}</span> : null}
         </div>
       ) : null}
       <AdvisorStopReading key={readingKey} card={card} context={stopContext} />
@@ -410,6 +438,7 @@ function ResultCard({
   stopContext,
   onPickEntry,
   onUseAtrStop,
+  atrDisabledReason,
   critiqueKey,
 }: {
   card: AdvisorCard;
@@ -417,6 +446,7 @@ function ResultCard({
   stopContext: StopContext | null;
   onPickEntry: (price: number, date: string) => void;
   onUseAtrStop: (stop: string) => void;
+  atrDisabledReason: string | null;
   /** Changes on any form edit; remounting AdvisorCritique and the stop reading is how they clear. */
   critiqueKey: number;
 }) {
@@ -484,7 +514,7 @@ function ResultCard({
             sub={`สมมติฐาน ${ADVISOR_COST_BPS} bps`}
           />
         </div>
-        <StopDetail card={card} stopContext={stopContext} onUseAtrStop={onUseAtrStop} readingKey={critiqueKey} />
+        <StopDetail card={card} stopContext={stopContext} onUseAtrStop={onUseAtrStop} atrDisabledReason={atrDisabledReason} readingKey={critiqueKey} />
       </section>
 
       <section className="space-y-3">
