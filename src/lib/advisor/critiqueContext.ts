@@ -59,6 +59,14 @@ const RECENT_BARS = 20;
 
 const NA = "n/a";
 
+/** How the facts sheet names each stop source (see AdvisorCard.stopSource). */
+const STOP_SOURCE_LABEL: Record<AdvisorCard["stopSource"], string> = {
+  given: "stop given (chart-agent link or typed)",
+  swing: "stop under a 5-minute swing low",
+  pdl: "stop under the previous session low",
+  atr: "ATR rule",
+};
+
 function num(v: number | null | undefined, digits = 2): string {
   return v == null || !Number.isFinite(v) ? NA : v.toFixed(digits);
 }
@@ -103,7 +111,7 @@ export function renderCritiqueContext(
     // The multiple is the card's own: 1.5 for the ATR rule, whatever the chart
     // stop works out to otherwise. Printing the constant here would tell the
     // model a structural stop was the volatility rule.
-    `stop distance: ${num(card.slDistance)} (${num(card.stopAtrMult)} x ATR, ${card.stopSource === "chart" ? "stop from the chart" : "ATR rule"})`,
+    `stop distance: ${num(card.slDistance)} (${num(card.stopAtrMult)} x ATR, ${STOP_SOURCE_LABEL[card.stopSource]})`,
     `stop: ${usd(card.stop)}`,
     `round-trip cost at ${ADVISOR_COST_BPS} bps: ${num(card.costR)} R`,
     // Printed as n/a rather than omitted, for the same reason as earnings.

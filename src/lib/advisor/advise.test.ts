@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { atr, type Candle } from "@/lib/indicators";
 import { advise } from "./advise";
+import { findChartStop } from "./chartStop";
 import { baseRate, BASE_RATE_HORIZON } from "./baseRate";
 import { fillGuard } from "./fillGuard";
 import { gapRisk } from "./gapRisk";
@@ -278,45 +279,45 @@ function walkBars(n: number, start: number): Candle[] {
   return out;
 }
 
-test("a chart stop below the entry replaces the ATR stop and drives the sizing", () => {
+test("a given stop below the entry replaces the ATR stop and drives the sizing", () => {
   const res = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, stopOverride: 95 });
   assert.ok(res.ok);
   const card = res.card;
   assert.equal(card.stop, 95);
   assert.equal(card.slDistance, 5);
-  assert.equal(card.stopSource, "chart");
+  assert.equal(card.stopSource, "given");
   assert.ok(Math.abs(card.stopAtrMult - 5 / 6) < 1e-12);
   const expected = sizeShares({ entry: 100, slDistance: 5, capital: 2500, maxSlots: 5, riskPct: 1 });
   assert.deepEqual(card.sizing, expected);
   assert.equal(card.ladder[0].price, 105);
-  assert.equal(card.warnings.some((w) => /Stop จากกราฟ/.test(w)), false);
+  assert.equal(card.warnings.some((w) => /Stop ที่ให้มา/.test(w)), false);
 });
 
-test("a chart stop is judged against the FINAL entry, the last close when no entry is given", () => {
+test("a given stop is judged against the FINAL entry, the last close when no entry is given", () => {
   const res = advise({ ...BASE, candles: bars(60, 100, 6), stopOverride: 96 });
   assert.ok(res.ok);
   assert.equal(res.card.entry, 100);
   assert.equal(res.card.stop, 96);
-  assert.equal(res.card.stopSource, "chart");
+  assert.equal(res.card.stopSource, "given");
 });
 
-test("a chart stop above the entry is ignored with a warning and the ATR stop is used", () => {
+test("a given stop above the entry is ignored with a warning and the ATR stop is used", () => {
   const res = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, stopOverride: 101 });
   assert.ok(res.ok);
   const card = res.card;
   assert.equal(card.stopSource, "atr");
   assert.equal(card.stop, 100 - ADVISOR_ATR_SL_MULT * 6);
   assert.equal(card.stopAtrMult, ADVISOR_ATR_SL_MULT);
-  assert.ok(card.warnings.includes("Stop จากกราฟ (101) ไม่ได้อยู่ใต้ราคาเข้า จึงใช้ 1.5×ATR แทน"));
+  assert.ok(card.warnings.includes("Stop ที่ให้มา (101) ไม่ได้อยู่ใต้ราคาเข้า จึงหา stop จากกราฟแทน"));
 });
 
-test("a chart stop equal to the entry, non-finite, or not positive is ignored", () => {
+test("a given stop equal to the entry, non-finite, or not positive is ignored", () => {
   for (const bad of [100, 0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
     const res = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, stopOverride: bad });
     assert.ok(res.ok);
     assert.equal(res.card.stopSource, "atr", `stop ${bad}`);
     assert.equal(res.card.stop, 91, `stop ${bad}`);
-    assert.ok(res.card.warnings.some((w) => /^Stop จากกราฟ \(/.test(w)), `stop ${bad}`);
+    assert.ok(res.card.warnings.some((w) => /^Stop ที่ให้มา \(/.test(w)), `stop ${bad}`);
   }
 });
 
@@ -325,7 +326,7 @@ test("no stop override: ATR stop, stopAtrMult is exactly 1.5, no warning", () =>
   assert.ok(res.ok);
   assert.equal(res.card.stopSource, "atr");
   assert.equal(res.card.stopAtrMult, 1.5);
-  assert.equal(res.card.warnings.some((w) => /Stop จากกราฟ/.test(w)), false);
+  assert.equal(res.card.warnings.some((w) => /Stop ที่ให้มา/.test(w)), false);
   const nul = advise({ ...BASE, candles: bars(60, 100, 6), entryOverride: 100, stopOverride: null });
   assert.ok(nul.ok);
   assert.equal(nul.card.stopSource, "atr");
@@ -354,7 +355,7 @@ test("the base-rate table replays the card's stop multiple, not the constant", (
   );
 });
 
-test("a chart stop reaches gap risk, cost in R and the fill guard, not only sizing", () => {
+test("a given stop reaches gap risk, cost in R and the fill guard, not only sizing", () => {
   const hist = walkBars(400, 100);
   const candles = bars(60, 100, 6);
   const nowSec = candles[candles.length - 1].t + 3600;
@@ -364,7 +365,7 @@ test("a chart stop reaches gap risk, cost in R and the fill guard, not only sizi
   const plain = advise(common);
   assert.ok(withChart.ok && plain.ok);
   const card = withChart.card;
-  assert.equal(card.stopSource, "chart");
+  assert.equal(card.stopSource, "given");
   assert.equal(card.stop, 98);
 
   // Gap risk is measured in the chart stop's multiple, and its dollar figure in its distance.
@@ -394,4 +395,136 @@ test("a chart stop reaches gap risk, cost in R and the fill guard, not only sizi
   assert.ok(card.fillGuard.atQuote);
   assert.equal(card.fillGuard.atQuote.plannedRiskUsd, card.sizing.shares * (100.5 - 98));
   assert.notEqual(card.fillGuard.walkAwayPrice, plain.card.fillGuard.walkAwayPrice);
+});
+
+// ---- the stop chain: given -> 5-minute swing -> PDL -> ATR ----------------
+// Real 5-minute bars, so findChartStop runs for real. 2026-10-27..29 are EDT
+// (UTC-4): 09:30 ET is 13:30Z. Only the lows matter to the pivot rule.
+const INTRADAY_CUTOFF = Date.parse("2030-01-01T00:00:00Z") / 1000;
+
+function intradaySession(date: string, lows: number[]): Candle[] {
+  return lows.map((low, i) => {
+    const mins = 9 * 60 + 30 + i * 5;
+    const hh = String(Math.floor(mins / 60) + 4).padStart(2, "0");
+    const mm = String(mins % 60).padStart(2, "0");
+    const t = Date.parse(`${date}T${hh}:${mm}:00Z`) / 1000;
+    return { t, o: low + 0.2, h: low + 0.2, l: low, c: low + 0.2, v: 1000 };
+  });
+}
+
+/** A previous session (lowest bar `prevLow`) then a session whose one pivot low is `pivot`. */
+function intradayWith(pivot: number, prevLow = 90) {
+  const prev = intradaySession("2026-10-27", [prevLow + 2, prevLow + 1, prevLow, prevLow + 1, prevLow + 2, prevLow + 3]);
+  const day = intradaySession("2026-10-28", [
+    pivot + 4, pivot + 3.5, pivot, pivot + 3, pivot + 3.5, pivot + 4, pivot + 4.5, pivot + 5, pivot + 5.5, pivot + 6,
+  ]);
+  return { candles: [...prev, ...day], cutoffSec: INTRADAY_CUTOFF };
+}
+
+const CHAIN = { ...BASE, candles: bars(60, 100, 6), entryOverride: 100 };
+
+test("a given stop wins over a swing low in the intraday bars", () => {
+  const res = advise({ ...CHAIN, stopOverride: 95, intraday: intradayWith(96) });
+  assert.ok(res.ok);
+  assert.equal(res.card.stopSource, "given");
+  assert.equal(res.card.stop, 95);
+  assert.equal(res.card.stopStructure, null);
+  assert.deepEqual(res.card.stopNotes, []);
+  assert.equal(res.card.atrAlternative?.stop, 100 - ADVISOR_ATR_SL_MULT * 6);
+});
+
+test("no given stop: the swing low drives stop, size and stopAtrMult", () => {
+  const intraday = intradayWith(96);
+  const found = findChartStop({ candles: intraday.candles, entry: 100, atr: 6, cutoffSec: intraday.cutoffSec });
+  assert.equal(found.kind, "found");
+  if (found.kind !== "found") return;
+  const res = advise({ ...CHAIN, intraday });
+  assert.ok(res.ok);
+  const card = res.card;
+  assert.equal(card.stopSource, "swing");
+  assert.equal(card.stop, found.stop);
+  assert.ok(Math.abs(card.stop - 95.4) < 1e-9);
+  assert.equal(card.slDistance, 100 - found.stop);
+  assert.equal(card.stopAtrMult, (100 - found.stop) / 6);
+  assert.deepEqual(card.stopStructure, found.structure);
+  assert.deepEqual(card.stopNotes, []);
+  assert.deepEqual(card.stopFlags, []);
+  assert.deepEqual(
+    card.sizing,
+    sizeShares({ entry: 100, slDistance: 100 - found.stop, capital: 2500, maxSlots: 5, riskPct: 1 }),
+  );
+  assert.deepEqual(card.atrAlternative, {
+    stop: 100 - ADVISOR_ATR_SL_MULT * 6,
+    atrMult: ADVISOR_ATR_SL_MULT,
+    shares: sizeShares({ entry: 100, slDistance: ADVISOR_ATR_SL_MULT * 6, capital: 2500, maxSlots: 5, riskPct: 1 }).shares,
+  });
+});
+
+test("a typed entry below every pivot falls to PDL with the swing reason", () => {
+  const res = advise({ ...CHAIN, entryOverride: 94, intraday: intradayWith(96, 88) });
+  assert.ok(res.ok);
+  const card = res.card;
+  assert.equal(card.stopSource, "pdl");
+  assert.ok(Math.abs(card.stop - 87.4) < 1e-9);
+  assert.ok(card.stopNotes[0].startsWith("ไม่มี swing low"));
+  assert.equal(card.stopStructure?.level, 88);
+  assert.equal(card.stopStructure?.sessionDate, "2026-10-27");
+  assert.notEqual(card.atrAlternative, null);
+});
+
+test("neither swing nor PDL under the entry falls to ATR with both reasons", () => {
+  const res = advise({ ...CHAIN, entryOverride: 80, intraday: intradayWith(96, 88) });
+  assert.ok(res.ok);
+  const card = res.card;
+  assert.equal(card.stopSource, "atr");
+  assert.equal(card.stop, 80 - ADVISOR_ATR_SL_MULT * 6);
+  assert.equal(card.stopStructure, null);
+  assert.equal(card.stopNotes.length, 3);
+  assert.ok(card.stopNotes[0].startsWith("ไม่มี swing low"));
+  assert.equal(card.stopNotes[2], "จึงใช้ 1.5×ATR");
+  assert.equal(card.atrAlternative, null);
+});
+
+test("an intraday fetch error falls to ATR with the reason", () => {
+  const res = advise({ ...CHAIN, intraday: { error: "timeout" } });
+  assert.ok(res.ok);
+  const card = res.card;
+  assert.equal(card.stopSource, "atr");
+  assert.deepEqual(card.stopNotes, ["ดึงกราฟ 5 นาทีไม่ได้: timeout", "จึงใช้ 1.5×ATR"]);
+  assert.equal(card.atrAlternative, null);
+});
+
+test("an invalid given stop warns and the chain continues to the swing low", () => {
+  const res = advise({ ...CHAIN, stopOverride: 101, intraday: intradayWith(96) });
+  assert.ok(res.ok);
+  assert.equal(res.card.stopSource, "swing");
+  assert.ok(res.card.warnings.includes("Stop ที่ให้มา (101) ไม่ได้อยู่ใต้ราคาเข้า จึงหา stop จากกราฟแทน"));
+  assert.deepEqual(res.card.stopNotes, []);
+});
+
+test("no intraday input keeps today's ATR card with no stop notes", () => {
+  for (const intraday of [undefined, null]) {
+    const res = advise({ ...CHAIN, intraday });
+    assert.ok(res.ok);
+    assert.equal(res.card.stopSource, "atr");
+    assert.deepEqual(res.card.stopNotes, []);
+    assert.deepEqual(res.card.stopFlags, []);
+    assert.equal(res.card.stopStructure, null);
+    assert.equal(res.card.atrAlternative, null);
+  }
+});
+
+test("a stop under 0.5 ATR is flagged tight, never moved", () => {
+  const res = advise({ ...CHAIN, intraday: intradayWith(99.5) }); // stop 98.9, distance 1.1 = 0.18 ATR
+  assert.ok(res.ok);
+  assert.equal(res.card.stopSource, "swing");
+  assert.ok(Math.abs(res.card.stop - 98.9) < 1e-9);
+  assert.deepEqual(res.card.stopFlags, ["แคบมาก โดน noise ง่าย"]);
+});
+
+test("a stop over 3 ATR is flagged wide", () => {
+  const res = advise({ ...CHAIN, intraday: intradayWith(80) }); // stop 79.4, distance 20.6 = 3.4 ATR
+  assert.ok(res.ok);
+  assert.equal(res.card.stopSource, "swing");
+  assert.deepEqual(res.card.stopFlags, ["กว้างมาก หุ้นที่ซื้อได้จะน้อย"]);
 });

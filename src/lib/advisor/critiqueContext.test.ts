@@ -28,6 +28,10 @@ function makeCard(over: Partial<AdvisorCard> = {}): AdvisorCard {
     slDistance: 6.18,
     stop: 220.22,
     stopSource: "atr",
+    stopNotes: [],
+    stopFlags: [],
+    stopStructure: null,
+    atrAlternative: null,
     stopAtrMult: 1.5,
     sizing: {
       shares: 4,
@@ -290,6 +294,12 @@ test("the stop line names the card's own ATR multiple and where the stop came fr
   const atrCard = renderCritiqueContext(makeCard(), makeBars(40));
   assert.match(atrCard, /stop distance: 6\.18 \(1\.50 x ATR, ATR rule\)/);
 
-  const chartCard = renderCritiqueContext(makeCard({ stopSource: "chart", stopAtrMult: 0.83 }), makeBars(40));
-  assert.match(chartCard, /stop distance: 6\.18 \(0\.83 x ATR, stop from the chart\)/);
+  const givenCard = renderCritiqueContext(makeCard({ stopSource: "given", stopAtrMult: 0.83 }), makeBars(40));
+  assert.match(givenCard, /stop distance: 6\.18 \(0\.83 x ATR, stop given \(chart-agent link or typed\)\)/);
+
+  const swingCard = renderCritiqueContext(makeCard({ stopSource: "swing", stopAtrMult: 0.83 }), makeBars(40));
+  assert.match(swingCard, /\(0\.83 x ATR, stop under a 5-minute swing low\)/);
+
+  const pdlCard = renderCritiqueContext(makeCard({ stopSource: "pdl", stopAtrMult: 2.1 }), makeBars(40));
+  assert.match(pdlCard, /\(2\.10 x ATR, stop under the previous session low\)/);
 });

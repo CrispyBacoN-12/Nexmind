@@ -9,6 +9,7 @@
 import type { Candle } from "@/lib/indicators";
 import type { GateDecision } from "@/lib/market/marketGate";
 
+import type { StopStructure } from "./chartStop";
 import type { FillGuard } from "./fillGuard";
 
 /** Printed on every card, verbatim. Do not soften it. */
@@ -187,10 +188,14 @@ export interface AdvisorInput {
   candles: Candle[];
   /** Blank in the form means "use the last close". */
   entryOverride?: number | null;
-  /** A structural stop (from the chart agent). Used only when finite and
-   *  0 < stop < the final entry; otherwise ignored with a card warning. Absent
-   *  or null means the 1.5 x ATR stop. */
+  /** A stop the owner gave (typed, or a chart-agent link). Used only when finite
+   *  and 0 < stop < the final entry; otherwise ignored with a card warning and
+   *  the chain goes on to the 5-minute chart. Absent or null: no given stop. */
   stopOverride?: number | null;
+  /** The 5-minute bars the route fetched for the stop chain, or the reason it
+   *  could not. Absent or null means no 5-minute read was attempted. `cutoffSec`
+   *  keeps a forming bar out. */
+  intraday?: { candles: Candle[]; cutoffSec: number } | { error: string } | null;
   capital: number;
   maxSlots: number;
   /** Percent units: 1 = 1%. */
@@ -224,8 +229,18 @@ export interface AdvisorCard {
   atr: number;
   slDistance: number;
   stop: number;
-  /** Where `stop` came from: the 1.5 x ATR rule, or a stop passed in from the chart. */
-  stopSource: "atr" | "chart";
+  /** Where `stop` came from, in chain order: a stop the owner gave, the latest
+   *  5-minute swing low, the previous-day low, or the 1.5 x ATR rule. */
+  stopSource: "given" | "swing" | "pdl" | "atr";
+  /** Why earlier sources were skipped, in chain order. Empty when none was tried. */
+  stopNotes: string[];
+  /** Tight / wide copy for a non-ATR stop. Disclosed, never moves the stop. */
+  stopFlags: string[];
+  /** The bar a swing or PDL stop sits under; null for given and ATR. */
+  stopStructure: StopStructure | null;
+  /** What the plain ATR stop would have been, so the owner can compare. null
+   *  when the ATR stop is the one in use. */
+  atrAlternative: { stop: number; atrMult: number; shares: number } | null;
   /** slDistance / atr. Always set: exactly ADVISOR_ATR_SL_MULT for an ATR stop. */
   stopAtrMult: number;
   sizing: ShareSizingResult;

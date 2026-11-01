@@ -18,6 +18,7 @@ import { dailyReturns, pearsonCorrelation } from "@/lib/trading/correlation";
 import { corrMultiplierFor } from "@/lib/trading/positionSizing";
 
 import { baseRate, BASE_RATE_HORIZON } from "./baseRate";
+import { findChartStop, type ChartStopResult, type StopStructure } from "./chartStop";
 import { fillGuard } from "./fillGuard";
 import { gapRisk } from "./gapRisk";
 import { rLadder, costInR } from "./rLadder";
@@ -33,6 +34,12 @@ import {
   type AdvisorResult,
   type CorrelationLine,
 } from "./types";
+
+/** A stop closer than this many ATRs is flagged tight; farther than the wide one, wide. Flags only: the stop never moves. */
+const TIGHT_STOP_ATR = 0.5;
+const WIDE_STOP_ATR = 3;
+const TIGHT_STOP_FLAG = "แคบมาก โดน noise ง่าย";
+const WIDE_STOP_FLAG = "กว้างมาก หุ้นที่ซื้อได้จะน้อย";
 
 /** Candle.t is epoch SECONDS, not milliseconds. */
 function barDate(t: number): string {
@@ -73,22 +80,55 @@ export function advise(input: AdvisorInput): AdvisorResult {
   const entry = useOverride ? (override as number) : lastClose;
   const entrySource: AdvisorCard["entrySource"] = useOverride ? "override" : "last close";
 
-  // A chart stop is judged against the FINAL entry (override or last close). A
-  // stop that is not strictly below it would give a zero or negative distance
-  // and so no size, or a short's geometry on a long-only card — it is ignored,
-  // loudly, and the ATR stop stands.
+  // The stop chain: given -> 5-minute swing low -> previous-day low -> 1.5 x ATR.
+  // A given stop is judged against the FINAL entry (override or last close). One
+  // that is not strictly below it would give a zero or negative distance and so
+  // no size, or a short's geometry on a long-only card — it is skipped, loudly,
+  // and the chain goes on to the chart.
   const stopGiven = input.stopOverride;
-  const useChartStop =
+  const useGivenStop =
     stopGiven != null && Number.isFinite(stopGiven) && stopGiven > 0 && stopGiven < entry;
-  if (stopGiven != null && !useChartStop) {
-    warnings.push(`Stop จากกราฟ (${stopGiven}) ไม่ได้อยู่ใต้ราคาเข้า จึงใช้ ${ADVISOR_ATR_SL_MULT}×ATR แทน`);
+  if (stopGiven != null && !useGivenStop) {
+    warnings.push(`Stop ที่ให้มา (${stopGiven}) ไม่ได้อยู่ใต้ราคาเข้า จึงหา stop จากกราฟแทน`);
   }
-  const stopSource: AdvisorCard["stopSource"] = useChartStop ? "chart" : "atr";
-  const slDistance = useChartStop ? entry - (stopGiven as number) : ADVISOR_ATR_SL_MULT * atrValue;
-  const stop = useChartStop ? (stopGiven as number) : entry - slDistance;
+
+  let stopSource: AdvisorCard["stopSource"] = "atr";
+  let stop = entry - ADVISOR_ATR_SL_MULT * atrValue;
+  let stopStructure: StopStructure | null = null;
+  const stopNotes: string[] = [];
+  if (useGivenStop) {
+    stopSource = "given";
+    stop = stopGiven as number;
+  } else {
+    // Absent or null intraday: no 5-minute read was attempted, so no note.
+    const intraday = input.intraday;
+    let chart: ChartStopResult | null = null;
+    if (intraday && "error" in intraday) {
+      stopNotes.push(`ดึงกราฟ 5 นาทีไม่ได้: ${intraday.error}`);
+    } else if (intraday) {
+      chart = findChartStop({ candles: intraday.candles, entry, atr: atrValue, cutoffSec: intraday.cutoffSec });
+      stopNotes.push(...(chart.kind === "found" ? chart.skipped : chart.reasons));
+    }
+    if (chart?.kind === "found") {
+      stopSource = chart.source;
+      stop = chart.stop;
+      stopStructure = chart.structure;
+    } else if (stopNotes.length > 0) {
+      stopNotes.push(`จึงใช้ ${ADVISOR_ATR_SL_MULT}×ATR`);
+    }
+  }
+  const slDistance = entry - stop;
   // Exactly the constant for an ATR stop (not slDistance / atr, which can drift
-  // in the last bit); the chart stop's multiple is whatever it works out to.
-  const stopAtrMult = useChartStop ? slDistance / atrValue : ADVISOR_ATR_SL_MULT;
+  // in the last bit); any other stop's multiple is whatever it works out to.
+  const stopAtrMult = stopSource === "atr" ? ADVISOR_ATR_SL_MULT : slDistance / atrValue;
+
+  // Reported, never applied: a structural stop that is very tight or very wide
+  // is the owner's call, and the plain ATR stop is shown beside it to compare.
+  const stopFlags: string[] = [];
+  if (stopSource !== "atr") {
+    if (slDistance < TIGHT_STOP_ATR * atrValue) stopFlags.push(TIGHT_STOP_FLAG);
+    if (slDistance > WIDE_STOP_ATR * atrValue) stopFlags.push(WIDE_STOP_FLAG);
+  }
 
   const sizing = sizeShares({
     entry,
@@ -97,6 +137,20 @@ export function advise(input: AdvisorInput): AdvisorResult {
     maxSlots: input.maxSlots,
     riskPct: input.riskPct,
   });
+  const atrAlternative =
+    stopSource === "atr"
+      ? null
+      : {
+          stop: entry - ADVISOR_ATR_SL_MULT * atrValue,
+          atrMult: ADVISOR_ATR_SL_MULT,
+          shares: sizeShares({
+            entry,
+            slDistance: ADVISOR_ATR_SL_MULT * atrValue,
+            capital: input.capital,
+            maxSlots: input.maxSlots,
+            riskPct: input.riskPct,
+          }).shares,
+        };
 
   const costBps = input.costBps ?? ADVISOR_COST_BPS;
   const ladder = rLadder(entry, slDistance, sizing.shares);
@@ -196,6 +250,10 @@ export function advise(input: AdvisorInput): AdvisorResult {
     slDistance,
     stop,
     stopSource,
+    stopNotes,
+    stopFlags,
+    stopStructure,
+    atrAlternative,
     stopAtrMult,
     sizing,
     deployedUsd: sizing.shares * entry,
