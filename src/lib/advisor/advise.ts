@@ -108,6 +108,7 @@ export function advise(input: AdvisorInput): AdvisorResult {
     } else if (intraday) {
       chart = findChartStop({ candles: intraday.candles, entry, atr: atrValue, cutoffSec: intraday.cutoffSec });
       stopNotes.push(...(chart.kind === "found" ? chart.skipped : chart.reasons));
+      if (chart.kind === "found" && chart.adjusted) stopNotes.push(chart.adjusted);
     }
     if (chart?.kind === "found") {
       stopSource = chart.source;

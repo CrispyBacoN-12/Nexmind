@@ -232,7 +232,8 @@ export interface AdvisorCard {
   /** Where `stop` came from, in chain order: a stop the owner gave, the latest
    *  5-minute swing low, the previous-day low, or the 1.5 x ATR rule. */
   stopSource: "given" | "swing" | "pdl" | "atr";
-  /** Why earlier sources were skipped, in chain order. Empty when none was tried. */
+  /** Why earlier sources were skipped, in chain order, then any adjustment to the
+   *  chosen stop (a swing stop moved under a nearby lower low). Empty when none. */
   stopNotes: string[];
   /** Tight / wide copy for a non-ATR stop. Disclosed, never moves the stop. */
   stopFlags: string[];

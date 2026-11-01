@@ -59,7 +59,7 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Branch | `master` at `22f312f` (2026-11-01) contains agents #2 and #3; `origin/master` = `master` (agent #3 pushed 2026-11-01, Vercel deploy ok). Every push auto-deploys Vercel production |
-| Tests | `npm test` **1097 pass / 0 fail** (2026-11-01, on master after the agent #3 merge) |
+| Tests | `npm test` **1099 pass / 0 fail** (2026-11-01, branch `stop-cluster`) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
@@ -97,7 +97,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   - Rulings: PDL qualifies only when the PDL itself is under the entry (the controller's ruling, mirroring the
     swing rule's pivot low < entry) and PDL - buffer is above 0; the two failures have their own skip copy.
     A swing pivot counts only if no later bar of the session traded at or below it; a broken pivot is skipped
-    and older ones are still tried. A forming bar is never read (`cutoffSec = now - SIP_DELAY_MS`). The
+    and older ones are still tried. A lower low within 0.25 × ATR under the chosen swing low (one pass, earlier bars only) takes the stop under it instead (`STOP_CLUSTER_ATR`, owner decision 2026-11-01 after the AI flagged NVDA's stop $0.03 above a known low). A forming bar is never read (`cutoffSec = now - SIP_DELAY_MS`). The
     5-minute fetch fails soft: a miss falls back to ATR with a note. `stopSource "chart"` was renamed `"given"` (§5).
   - Swing stops are usually tight (all live ones < 0.5 × ATR), which matters for overnight holds.
   - Live check 2026-11-01 (Sunday, bars of Fri 2026-10-30, next start of the branch build, no DB writes): AAPL

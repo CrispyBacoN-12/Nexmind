@@ -17,6 +17,12 @@ import { etClock } from "@/lib/scanAgent/session";
 export const STOP_PIVOT_SIDE_BARS = 2;
 /** Bars of the reading session handed to the AI as context. */
 export const STOP_READING_BARS = 48;
+/**
+ * A lower low this close under the chosen swing low (in daily ATRs) takes the
+ * stop under it instead: a stop a few cents above a known low is tagged by a
+ * plain retest of that low while the structure below is still intact.
+ */
+export const STOP_CLUSTER_ATR = 0.25;
 
 const OPEN_MIN = 9 * 60 + 30; // 09:30 ET
 const CLOSE_MIN = 16 * 60; // 16:00 ET
@@ -39,6 +45,8 @@ export type ChartStopResult =
       structure: StopStructure;
       /** Why a higher-priority source was passed over, in order. */
       skipped: string[];
+      /** Set when the swing stop was moved under a lower low nearby (STOP_CLUSTER_ATR). */
+      adjusted: string | null;
     }
   | { kind: "none"; reasons: string[] };
 
@@ -55,6 +63,13 @@ const swingBroken = (date: string) => `swing low ล่าสุดถูกแ�
 const pdlNotBelowEntry = (pdl: number) =>
   `PDL ${pdl.toFixed(2)} อยู่ไม่ต่ำกว่าราคาเข้า (มักเกิดจากเปิด gap ลง)`;
 const pdlNotPositive = (pdl: number) => `PDL ${pdl.toFixed(2)} ลบระยะเผื่อแล้วไม่เป็นบวก`;
+const clusterMoved = (low: number, t: number, swing: number) =>
+  `ย้าย stop ลงใต้ low ${low.toFixed(2)} (${etTime(t)} ET) ที่อยู่ใต้ swing low ${swing.toFixed(2)} ไม่เกิน ${STOP_CLUSTER_ATR}×ATR`;
+
+function etTime(t: number): string {
+  const { minutes } = etClock(t);
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
 
 /**
  * The reading session is the latest ET date with finished regular bars; the
@@ -85,7 +100,7 @@ function findSwing(
   bars: Candle[],
   entry: number,
   buffer: number,
-): { low: number; barT: number } | { broken: boolean } {
+): { low: number; barT: number; index: number } | { broken: boolean } {
   const k = STOP_PIVOT_SIDE_BARS;
   let broken = false;
   for (let i = bars.length - 1 - k; i >= k; i--) {
@@ -99,9 +114,23 @@ function findSwing(
       broken = true;
       continue;
     }
-    return { low, barT: bars[i].t };
+    return { low, barT: bars[i].t, index: i };
   }
   return { broken };
+}
+
+/**
+ * The lowest earlier bar whose low sits under the swing low by at most
+ * STOP_CLUSTER_ATR × ATR, or null. Only earlier bars can qualify: every later
+ * bar is above the swing low, or it would have been broken. One pass, anchored
+ * on the swing low, so the stop cannot walk down a staircase of lows.
+ */
+function clusterLow(bars: Candle[], index: number, low: number, reach: number): Candle | null {
+  let best: Candle | null = null;
+  for (const b of bars.slice(0, index)) {
+    if (b.l < low && b.l >= low - reach && (best === null || b.l < best.l)) best = b;
+  }
+  return best;
 }
 
 export function findChartStop(input: {
@@ -120,12 +149,15 @@ export function findChartStop(input: {
 
   const swing = findSwing(split.regular, entry, buffer);
   if ("low" in swing) {
+    const lower = clusterLow(split.regular, swing.index, swing.low, STOP_CLUSTER_ATR * atr);
+    const level = lower && lower.l - buffer > 0 ? lower : null;
     return {
       kind: "found",
       source: "swing",
-      stop: swing.low - buffer,
-      structure: { level: swing.low, barT: swing.barT, sessionDate: date },
+      stop: (level ? level.l : swing.low) - buffer,
+      structure: { level: level ? level.l : swing.low, barT: level ? level.t : swing.barT, sessionDate: date },
       skipped,
+      adjusted: level ? clusterMoved(level.l, level.t, swing.low) : null,
     };
   }
   skipped.push(swing.broken ? swingBroken(date) : noSwing(date));
@@ -146,6 +178,7 @@ export function findChartStop(input: {
     stop: low.l - buffer,
     structure: { level: low.l, barT: low.t, sessionDate: split.previousDate },
     skipped,
+    adjusted: null,
   };
 }
 
