@@ -5,7 +5,7 @@ Auto-loaded every session via `CLAUDE.md`. This file is the current bar, not the
 deep evidence is in `docs/quant/`, reasoning is in commit bodies, and the full pre-2026-10-01
 text of this file (every desk-era entry, verbatim) is `docs/quant/2026-10-01-state-archive.md`.
 
-_Last verified against the live DB, Task Scheduler and `npm test`: **2026-10-01**._
+_Last verified: `npm test` and the `ChartSetup` row count on **2026-11-01**; the Task Scheduler and the other §2 rows on **2026-10-01**._
 
 ---
 
@@ -22,8 +22,10 @@ hold-out (§3). The repo's value now lives in four surfaces:
   - It ranks activity, not odds. No rule in this repo has passed a hold-out, and the page says so.
   - It runs only when the button is pressed: no auto-run on page load, no schedule.
   - Each row links to `/advisor?ticker=` to prefill the ticker. Nothing auto-submits.
+  - **Chart setups panel (branch `chart-agent`, not merged):** a second button runs the chart agent
+    over the top 20 scan names and opens a modal of at most 5 long-sweep setups (§3).
 - **`/advisor`**: the owner types a ticker they already chose and gets back structure and risk only:
-  - the ATR stop (1.5 × ATR14) and the R ladder in prices
+  - the ATR stop (1.5 × ATR14, or the chart stop when `?stop=` is given) and the R ladder in prices
   - whole-share sizing at real capital
   - round-trip cost in R and overnight gap-through risk
   - correlation to holdings, earnings date and the portfolio gates
@@ -42,7 +44,8 @@ SCANNER → HAWK×3 → SAGE → Iron Rules, plus `panel-v1` research. The site 
 `/advisor` and `/journal`; every archive page and the API routes only they used were deleted (git has them).
 The desk's `src/lib` code, research scripts and DB tables are **kept** as reference. Its three Task
 Scheduler jobs stay **Disabled**. Do not re-enable them or resume research rounds without a new
-owner decision. **Next, by owner request: rebuild AI agents one at a time, design to be discussed.**
+owner decision. **Next, by owner request: rebuild AI agents one at a time. Agent #1 (`/scan`) and
+#2 (the chart agent) are built; the next agent is to be discussed.**
 
 Hard context the code does not state:
 - **Orders are manual, on Webull, whole shares, $2-3k.** Webull is data-only here. Go-Live is dead,
@@ -50,12 +53,13 @@ Hard context the code does not state:
 - **Dev server is port 3275.** For preview, use launch config `dev:web` (`next dev -p 3275`),
   never `nexmind` (see §5).
 
-## 2. Live state (verified by query, 2026-10-01)
+## 2. Live state (verified by query, 2026-10-01 unless a row is dated)
 
 | Thing | Value |
 |---|---|
-| Branch | `master` **pushed to `origin` 2026-10-30**. Every push auto-deploys Vercel production |
-| Tests | `npm test` **959 pass / 0 fail** (2026-10-31, on branch `scan-agent`) |
+| Branch | `master` = `origin/master` at `a2739d4` (2026-11-01). Every push auto-deploys Vercel production. `chart-agent` is a separate branch, **not merged** |
+| Tests | `npm test` **1057 pass / 0 fail** (2026-11-01, on branch `chart-agent`) |
+| `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
@@ -63,167 +67,83 @@ Hard context the code does not state:
 | Research (archive) | newest `ResearchRun` #113 `skipped`. `panel-v1`: 3, all rejected. Legacy: 6 approved (off-universe, never desk-eligible), 37 demoted, 171 rejected, 1 proposed |
 | `Counterfactual` / `AiCall` | 123 rows, last 2026-09-14 / 90 rows |
 | `Setting` keys | `fearGreed`, `lastDeskSessionAt`, `riskSentry:holdings`, `riskSentry:lastGate`, `ai:outage`, `webull:accessToken` |
-| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`: gold work, **finished** (xau-v1 REJECT, §3), gitignored on master; kept until the owner says delete |
+| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`, `.worktrees/xau-vp-v1`: gold work, **finished** (§3), gitignored on master; kept until the owner says delete. `.worktrees/chart-agent` is the live branch above |
 
 To re-verify, use a throwaway script under `scripts/` and delete it afterwards. It should query:
 - `portfolio.findMany`; the field is `status`, not `active`
 - `trade.groupBy({by:["status"]})`
 - `journalTrade.count({where:{exitDate:null}})`
 - `researchStrategy.groupBy({by:["status","validation"]})`
+- `chartSetup.count()`
 
 Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-10-31: Scan agent (`/scan`, `POST /api/scan`). Branch `scan-agent`, commits `6007ba1..HEAD` of branch `scan-agent`. Not merged.**
-  - `src/lib/scanAgent/`: TradingView screener client, New York session clock, base filter + triggers +
-    activity score, economic calendar, AI notes, and the `runScanAgent` orchestrator (all I/O injected).
-  - Only the TradingView fetch is fatal (route returns 502 with the error). Every other source
-    degrades to a named `ok: false` entry in the sources strip.
+- **2026-11-01: Chart agent (agent #2) on `/scan`. Branch `chart-agent`, commits `09a68ad..HEAD` (`git log --oneline a2739d4..HEAD`). Not merged.**
+  - What it does: reads the top 20 scan names on Alpaca SIP 5-minute bars. Per name it builds the
+    previous-session volume profile (50 bins, 70% value area), PDH/PDL, PMH/PML and dPOC.
+  - The one setup is a **long sweep** of PDL, PML or pVAL: the sweep bar opens above L, trades below
+    it, closes above it, and the latest close is above L. Stop = sweep low − 0.1 × daily ATR14.
+    T1/T2 are the next structural levels above. A setup under 1.5R carries a tag.
+  - The AI (sonnet) writes a Thai reading per setup and may veto it; a guard strips predictions,
+    entry calls and rankings. At most 5 setups show in a modal, the capped count is shown, and
+    `/scan` links each to `/advisor?ticker=&entry=&stop=`.
+  - **`ChartSetup` table logs every setup** with `ruleVersion` `"sweep-v1"` and a status (`shown`,
+    `ai_rejected`, `guard_stripped`, `capped`). It exists to be scored later (§4). A logging
+    failure shows on the panel and never blocks it.
+  - **`/advisor` takes `?entry=&stop=`.** `stopAtrMult` (the chart stop in ATR units, default 1.5)
+    flows through sizing, the R ladder, cost, gap risk, the fill guard, the base rate and the AI
+    critic's facts sheet, so a chart-stop card is measured at its own stop.
+  - Safety: bars ending after now − the 15-minute SIP delay are dropped (a forming bar is never
+    read), and a run superseded by a newer click aborts before it spends AI or logs a row.
+  - Live probe, 2026-11-01, real Alpaca bars with the clock set to Fri 2026-10-30 14:30 ET, log a
+    no-op, no DB writes: before the from-below fix a gap-down name (DVA) read as a sweep. After the
+    fix, DVA reads "no sweep yet", and two setups showed (KVUE PDL+pVAL 0.25R tagged, WDC PML 1.23R).
+    The browser check showed the modal, levels on the chart, the R table, the footer and the
+    Advisor prefill with 0 console errors (stubbed result; the live API returned "market closed").
+  - **No backtest. The sweep rule is a description, not an edge.** It was never tested on stocks;
+    its nearest relative, xau-vp-v1's gold sweep, lost money in every fold.
+  - The AI is unavailable until `claude login` (the CLI OAuth expired; setups then show as unread).
+  - Review: 16 controller rulings and a final fix wave (`896de01..91ea356`) are in the SDD ledger, `.superpowers/sdd/2026-11-01-chart-agent/progress.md` (worktree-local).
+- **2026-10-31: Scan agent (`/scan`, `POST /api/scan`). Merged to master and pushed (branch deleted).** Commits `6007ba1..b225df6`.
+  - `src/lib/scanAgent/`: TradingView screener, New York session clock, filter + triggers + activity
+    score, economic calendar, AI notes, `runScanAgent` (all I/O injected). Only the TradingView
+    fetch is fatal (502); every other source degrades to a named `ok: false` entry.
   - Rows beyond the AI's top 30 show "ไม่ได้สรุป (นอก 30 อันดับแรก)", which is not a failure. A row
-    priced above the $500 slot carries the fractional-share tag.
-  - Data is 15 minutes late and the clock does not know US market holidays. Both are on the page.
-  - Final review fixes: the AI-note guard also covers the prompt's forbids (Thai predictions, entry
-    calls, rankings) and any SyntaxError is withheld; EDGAR calls are paced (125 ms shared gap,
-    Retry-After honoured); `RecentNews.failed` separates a quiet stock from a Finnhub failure; rows
-    whose 8-K check failed show "8-K ตรวจไม่ได้"; headlines render under each note.
-  - Live check, 2026-10-31 (Saturday, phase closed, session 2026-10-30): covered 473/~503, 135
-    passed. SEC 8-K failed for 33 of 135 tickers before the pacing fix (not re-run since). AI was
-    unavailable (the CLI OAuth had expired). The Advisor prefill works.
-  - `next dev` cannot run in this worktree (junctioned `node_modules`: Turbopack panics, webpack dev
-    hung). It was verified with `next build --webpack` + `next start`.
-- **2026-10-31: Web layer cut to the copilot. `3a50c1f`.**
-  - Kept: `/advisor`, `/journal`, and APIs `advisor`, `advisor/critique`, `journal`, `journal/stops`,
-    `portfolio/evaluate`, `cron/risk-sentry`. `/` redirects to `/advisor`.
-  - Deleted: 12 pages (War Room, analyze, backtest, research, activity, reports, command, build,
-    graph, roster, scoreboard, webull, a-futuristic), `components/office`, `components/research`, 25 API
-    routes, and the `research-round` / `cleanup-signals` workflows whose only target was a deleted
-    route. The 2 `/api/gold/status` tests went with their route (880 tests now).
-  - The Risk Sentry manual-extras editor moved from `/command` to `/journal`, behind the new
-    `/api/risk-sentry/holdings`. `globalTradingHalt` and the desk's settings panel are gone.
-  - `next build` clean. `scripts/bot.ts` still calls the removed `/api/settings` and `/api/portfolios`.
-- **2026-10-30: `/advisor` base-rate columns on the R ladder (idea 3 from day-trader-skill). `0167ea0`, pushed.**
-  - `advisor/baseRate.ts` (pure) replays the card's stop (1.5×ATR) and each R rung from the close
-    of every session in the 2y history, walked forward at most 20 sessions. It reports target first,
-    stop first, neither, and the 1/(1+R) break-even line.
-  - Fill conventions never flatter the target: a session touching both counts as stop; a gap-open
-    past either side resolves at once; windows running past the last bar are dropped.
-  - It is a zero-information entry, so it shows the stock's drift. The card says so and prints the
-    buy-and-hold move beside it. Live KO (+59.7% over the sample): 1R first 53.2% vs 50.0% break-even.
-- **2026-10-30: Two ideas from day-trader-skill (MIT, read as data, nothing installed). `cf04836`, `9971cff`, pushed.**
-  - **Risk Sentry reads SEC 8-Ks.** `src/lib/market/secFilings.ts` (EDGAR submissions API, no key,
-    optional `SEC_USER_AGENT`) feeds the pure `riskSentry/filingWatch.ts`. 8-K items are tiered red
-    (1.03, 1.05, 2.04, 2.06, 3.01, 4.01, 4.02), notable (1.01, 1.02, 2.01, 2.05, 3.02, 3.03, 5.01,
-    5.02) or quiet (2.02, 7.01, 8.01, 9.01 and the rest never alert). Hits sit right after stop hits
-    in the message, in New York time with the filing link.
-    - Window: `(since, run start]`, with `since` from Setting `riskSentry:filingsCheckedTo` (first
-      run 3 days back, cap 14). It advances only when every ticker was read; an EDGAR failure is
-      named in the message as "NOT checked", never a quiet all-clear.
-    - Live dry run over 60 days on AAPL/MSFT/KO/INTC/BRK-B: one hit (AAPL 8-K/A 5.02).
-  - **`/advisor` fill guard** (`advisor/fillGuard.ts`, quote from `market/quote.ts`, Finnhub
-    `/quote`). The stop is a price, so a fill above the entry carries more risk than the card sized.
-    - Walk-away price: the highest fill where the card's shares still fit both caps. Needs no quote.
-    - A quote under 15 min old and above the entry is re-measured against the same stop and
-      re-sized. Past the walk-away it also becomes a card warning.
-    - Reported, never applied: `sizing` is unchanged. Checked live on KO (entry 90 → quote 94.37:
-      5 shares would risk $34.02, i.e. 1.36% of capital; re-sized at that quote: 3 shares).
-- **2026-10-30: xau-vp-v1, volume profile on gold. All 3 REJECT. Gold testing is now open-ended.**
-  - The owner overrode xau-v1's §0 to test volume profile as an H1 entry an AI agent could trade
-    on MT5. It was pre-registered (`7c0c7c9`) and coded (`643b6d8`) before the run.
-  - Hypotheses: prior-day value-area re-entry fade ("80% rule"), its acceptance mirror, and #137's
-    sweep + VP entry. Four 2017-04+ folds, all TEST. Same exit, costs and control as xau-v1.
-  - Results: re-entry p95 0/4; acceptance p95 1/4, only in the 2024-26 bull fold and carried by
-    longs; sweep loses money in every fold and misses the trade floors. The control itself loses
-    money on gold H1 at these costs, so "beats the median" was a low bar here.
-  - The corrected folds also re-ran xau-v1's daily-trend as an audit row. It still fails (p95 2/4),
-    so the xau-v1 REJECT was not an artifact of its broken fold table.
-  - Evidence: branch `xau-vp-v1` (worktree `.worktrees/xau-vp-v1`), `docs/quant/2026-10-30-xau-vp-v1-results.md`,
-    `scripts/xau-vp-screen.log`, commit `e854fdc`. Not merged to master.
-  - The run carried a stop rule (all REJECT closes gold). **The owner dropped it after the run** and
-    chose open-ended gold testing. The guard that replaces it is `docs/quant/xau-test-ledger.md` on
-    branch `xau-vp-v1`. Every gold rule is logged there, the bar does not loosen as the count rises,
-    and a PASS stays provisional until it also holds on bars after 2026-09-18, which no test has read.
-    Round 3 (plain 20-bar sweep, EMA 20/50 cross) is pre-registered in `5777a8f`.
-  - The AI-agent order path is not built. It waits on a rule that clears the forward check.
-- **2026-10-29: Copilot polish shipped (owner sign-off in chat).**
-  - `/journal` runs Risk Sentry's `stopWatch` on demand through the new `GET /api/journal/stops`.
-    Each open row shows a red "closed below stop" or amber "low traded through stop" badge, and
-    tickers with no candles are listed as unchecked. The same bar-still-forming caveat applies.
-  - `/advisor`'s holdings field prefills from open journal positions until the owner types or
-    submits.
-  - Checked in the browser with a stubbed `fetch` only. No test rows were written, because the dev
-    DB is the live Neon DB. `*.ex5` is now gitignored.
-- **2026-10-13: Gold strategies exported to MQL5 (owner request, committed `1010f4d`).**
-  - `mql5/`: 56 EAs cover all 60 non-mock `GC=F` research rows and the 4 xau-v1 hypotheses.
-    `mql5/Experts/NEXMIND_Gold/NexCore.mqh` (next to the EAs, quoted include) ports `indicators.ts`, `computeSnapshots` and the
-    single-target/trail exits. Install steps and every deviation are in `mql5/README.md`.
-  - All 56 compile with 0 errors and 0 warnings. Parity with the TS backtester was **not** run.
-  - This is for re-running backtests in the MT5 tester. It does not reopen gold: the xau-v1 REJECT
-    and §0 still stand.
-  - MetaEditor's `/compile:` fails silently on a path with a space (`CLAUDE WEB`). Copy the tree
-    to a path without spaces to compile from the command line.
-- **2026-10-01: xau-v1 gold validation ran. All 4 hypotheses REJECT; XAUUSD is closed.**
-  - The owner chose to validate the pre-registered xau-v1 screen (H1, Exness `XAUUSDm`, 5 folds,
-    `LADDERS.flat`, p90 cost) before any MT5 bridge or order work. No orders were placed.
-  - mr-down3, session-break and asia-fade fail on the edge lines alone. daily-trend was the
-    near-miss (p95 3/5, median 5/5) but bootstrap is 2/5, one p95 "beat" is a tie on a losing
-    fold, and its lift is long-side drift.
-  - Per pre-registration §0, failing closes gold as an instrument: **no other timeframe,
-    parameter or ladder**. Phase 2 of the unblock plan (MT5 bridge, risk gates, demo orders) is
-    dead.
-  - Disclosed, not amended (§9): the fold table was unpassable for everyone (`xtest1` is 12
-    months vs a 24-month floor; `xfit` has 613 bars vs a 200-trade floor). The first run's swap
-    column read 0.000 because `pointValuePerLot` was missing; it is fixed and the verdicts are
-    byte-identical. Swap is still reported beside avgR, not subtracted from it.
-  - Evidence lives on branch `xau-v1-phase0-1-unblock`: `docs/quant/2026-10-01-xau-v1-results.md`,
-    `scripts/xau-screen.log`, commits `08ff7b0` and `2ed722d`.
-- **2026-10-01: Risk Sentry runs locally.**
-  - Task `NEXMIND Risk Sentry` runs `scripts/risk-sentry.cmd` → `risk-sentry.mts`, with the same
-    deps as `/api/cron/risk-sentry`. The log is `scripts/risk-sentry.log` (gitignored).
-  - It runs at 19:00 ICT, which is 12:00 UTC and before the US open, so the last bar is a finished
-    session.
-  - First run returned 0 with gate `unknown→above`. The owner added the webhook the same day and a
-    test message was delivered.
-  - Commits: `8cfffa9`, `06174fd`.
-- **2026-10-01: Risk Sentry watches open journal positions** (`070382d`).
-  - It merges open `JournalTrade` tickers with the manual extras list (deduped, capped at 20,
-    manual names dropped first).
-  - The new **`stopWatch`** check (`e35cde7`) looks at the last bar of each journal position:
-    - close at or below the stop is `breached`
-    - low at or below the stop with the close above it is `touched`
-  - Stop hits lead the message. Manual names carry no stop, so they are never stop-checked.
-- **2026-09-27: Test B, residual momentum as the mr-down3 slot queue: FAIL.** This is final.
-  - Pre-registered in `df0f51a` before the simulator existed.
-  - S = +0.0125 over 2,473 trades. The random-queue walks had a median of −0.0016 and a p95 of
-    +0.0314, so S never cleared the p95.
-  - Write-up: `docs/quant/2026-09-27-test-b-results.md`. This closes the portfolio-layer plan.
-- **2026-09-27: Portfolio layer** (`63837ef`).
-  - `src/lib/portfolio/` (pure) has `evaluatePortfolio` with six gates: CAPACITY, SECTOR ≤2/GICS,
-    CORRELATION ρ>0.70, REGIME, DRAWDOWN −3%/−8%/−15%, GAP_HEAT >10% NAV.
-  - A missing input fails closed at WARN.
-  - Overrides need a written reason and are logged to `GateOverride`.
-  - Also built: `sectorMap.ts` (Finnhub industry → GICS), `/journal`, `/api/portfolio/evaluate`
-    and `dateAlignedCorrelation`.
-- **2026-09-25: Overnight gap-through risk on `/advisor`** (`gapRisk.ts`).
-  - The worst adverse gap over 2y, in stops: G = gap ÷ (1.5 × ATRₜ₋₁).
-  - It is disclosed and never applied to sizing. It is a floor on the tail, not a ceiling.
-- **2026-09-17: The 88-file backlog became 10 scoped commits; Risk Sentry merged.**
-  - Commits `b7ac7b0..0176cfd`.
-  - Risk Sentry merge: `fd2d76f`.
-  - Broken HEAD imports in `mt5.ts` were fixed in `bb70cd8`.
-- **2026-09-16: Risk Sentry v1.** It runs three read-only checks over the `Setting`-stored
-  holdings. Plan: `docs/superpowers/plans/2026-09-16-risk-sentry.md`.
-- **2026-09-15: Pivot to copilot.** The sidebar puts Trade Advisor first and labels everything
-  else "(archive)". No advisor arithmetic changed.
-- **2026-09-14: Advisor card additions and new cost accounting.**
-  - The card carries the real Finnhub earnings date. It is reported and never acted on.
-  - `AiCall` ledger: the CLI path had been undercounting tokens by about 99.9% (cache tokens were
-    dropped).
-  - `RESEARCH_COST_MODEL` went from 0.5 to **5 bps** (`EQUITY_COST_MODEL`). Never pool verdicts
-    across that date.
-- **2026-09-11: `/advisor` shipped** (`9bcae76..859331a`). The route now returns a 400 for any
-  present-but-unparseable numeric field. It used to fall back silently and fabricated a risk %.
+    above the $500 slot carries the fractional-share tag. Data is 15 minutes late and the clock
+    does not know US holidays; both are on the page. EDGAR calls are paced (125 ms shared gap).
+  - Live check 2026-10-31 (Saturday): covered 473/~503, 135 passed, AI unavailable. `next dev`
+    cannot run in a worktree with a junctioned `node_modules`; verify with `next build --webpack` + `next start`.
+- **2026-10-31: Web layer cut to the copilot (`3a50c1f`).** Kept `/advisor`, `/journal` and their APIs; deleted
+  12 pages, `components/office`, `components/research`, 25 API routes. The Risk Sentry extras editor moved to
+  `/journal`. `scripts/bot.ts` still calls the removed `/api/settings` and `/api/portfolios`.
+- **2026-10-30: `/advisor` base-rate columns on the R ladder (`0167ea0`).** `advisor/baseRate.ts` replays the
+  card's stop and each R rung from every close in 2y, 20 sessions forward; both-touched counts as stop. It is a
+  zero-information entry, so it shows drift (the card prints buy-and-hold beside it).
+- **2026-10-30: Risk Sentry reads SEC 8-Ks; `/advisor` fill guard (`cf04836`, `9971cff`).** 8-Ks are tiered
+  red/notable/quiet (`riskSentry/filingWatch.ts`); an EDGAR failure is "NOT checked", never a quiet all-clear.
+  The fill guard (`advisor/fillGuard.ts`) reports a walk-away price and a re-sized card when the quote is above the
+  entry. Reported, never applied.
+- **2026-10-30: xau-vp-v1, volume profile on gold. All 3 REJECT; gold testing is open-ended.** Branch `xau-vp-v1`,
+  `docs/quant/2026-10-30-xau-vp-v1-results.md`. Sweep + VP lost money in every fold. The owner dropped the stop rule
+  and chose open-ended testing under `docs/quant/xau-test-ledger.md` (branch `xau-vp-v1`): every rule logged, the bar
+  never loosens, a PASS stays provisional until it holds on bars after 2026-09-18. No order path is built.
+- **2026-10-29: Copilot polish.** `/journal` runs `stopWatch` on demand (`GET /api/journal/stops`); `/advisor`
+  prefills holdings from open journal positions.
+- **2026-10-13: 56 gold EAs exported to MQL5 (`1010f4d`).** `mql5/README.md`; compile from a path without spaces.
+  Parity with the TS backtester was not run.
+- **2026-10-01: xau-v1 gold validation. All 4 REJECT; XAUUSD closed** (branch `xau-v1-phase0-1-unblock`,
+  `docs/quant/2026-10-01-xau-v1-results.md`). Disclosed, not amended: the fold table was unpassable for everyone.
+- **2026-10-01: Risk Sentry runs locally** at 19:00 ICT (`scripts/risk-sentry.cmd`, log `scripts/risk-sentry.log`)
+  and watches open journal positions with `stopWatch` (`8cfffa9`, `06174fd`, `070382d`, `e35cde7`).
+- **2026-09-27: Test B, residual momentum as the mr-down3 slot queue: FAIL, final** (`docs/quant/2026-09-27-test-b-results.md`).
+  Same day: portfolio layer with six gates (`63837ef`), `/journal`, `/api/portfolio/evaluate`.
+- **2026-09-25: overnight gap-through risk on `/advisor`** (`gapRisk.ts`). **09-17:** 88-file backlog became 10 scoped
+  commits (`b7ac7b0..0176cfd`). **09-16:** Risk Sentry v1. **09-15:** pivot to copilot.
+- **2026-09-14: Finnhub earnings date on the card; `AiCall` ledger fix; `RESEARCH_COST_MODEL` 0.5 → 5 bps.** Never
+  pool verdicts across that date. **09-11:** `/advisor` shipped (`9bcae76..859331a`).
 
 **Desk era, one line each.** Full text is in the archive file; studies are in `docs/quant/`.
 - 09-15 **Exit-geometry axis closed**: every ladder, trail and `maxBars` time stop "passes" on
@@ -261,17 +181,20 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 4. Next steps
 
 There are no open research directions; the owner closed the search. Work items:
-1. **Use the journal.** Open positions through `/journal` and log NAV so that the following have
-   real input:
-   - DRAWDOWN and GAP_HEAT, which stop failing closed at WARN
-   - Risk Sentry's `stopWatch`
-   
-   This is the owner's workflow, not code.
+1. **Use the journal.** Open positions through `/journal` and log NAV so that DRAWDOWN and GAP_HEAT stop
+   failing closed at WARN and Risk Sentry's `stopWatch` has input. This is the owner's workflow, not code.
 2. **Check that Risk Sentry keeps running.** Read `scripts/risk-sentry.log` and the task's
    `LastTaskResult` after a few weekdays.
-3. **Housekeeping, the owner's call:**
-   - delete the two `xau-*` worktrees/branches and `wip/mt5-xauusd`, or keep them as the
-     evidence trail for the xau-v1 REJECT. Gold is closed either way.
+3. **Chart agent, owner decisions still open** (none are built):
+   - merge `chart-agent`, or keep testing it on a few live sessions first (`claude login` is needed for the AI)
+   - a **stricter sweep rule** that also rejects a retest after a gap-down reclaim, i.e. no regular close at
+     or below L earlier today. It drops reclaim-retest patterns, so it is the owner's call
+   - **chart label overlap** when levels sit close together (pVAL/T1, PDL/PMH on DVA)
+   - whether `ChartSetup` rows written from the **public Vercel URL** should be logged: the route is unauthenticated
+   - a **scoring spec** for the logged setups: T1-before-stop rate against a random-entry control, pre-registered
+     before any row is read, with `ruleVersion` held fixed
+4. **Housekeeping, the owner's call:**
+   - delete the `xau-*` worktrees/branches and `wip/mt5-xauusd`, or keep them as the evidence trail. Gold is closed either way.
    - decide whether `stocks-only-pivot` is deleted (fully merged into master)
 
 ## 5. Traps — read before touching these areas
@@ -298,6 +221,13 @@ There are no open research directions; the owner closed the search. Work items:
 - `Stat` renders its own `<Card>`.
 - Nothing under `src/app/` has tests, by design.
 - `npm run lint` has about 263 pre-existing problems. Judge lint only on the files you touched.
+
+**Chart agent:**
+- **`ChartSetup.ruleVersion`: bump `CHART_RULE_VERSION` whenever the sweep/setup rule changes; never
+  pool rows across versions.** It is `"sweep-v1"` today. The 2026-11-01 from-below fix shipped before any row existed.
+- **The sweep rule is a description, not an edge. It has no backtest.** Do not present a setup, its R or its
+  AI reading as odds. A bar must open above L: without that, every gap-down reclaim reads as a sweep.
+- **Never read a forming bar.** Bars ending after now − the SIP delay are dropped; keep that in any new reader.
 
 **Risk logic:**
 - **Correlation, gap risk and the earnings date are disclosed, never applied to size.** The one
@@ -347,6 +277,7 @@ There are no open research directions; the owner closed the search. Work items:
 
 ## 6. Blocked on the user (still open)
 
+- **AI features need `claude login`.** The CLI OAuth expired; `/scan` notes and the chart agent's readings show as unavailable until then.
 - **Dormant, only if a cloud schedule is ever re-enabled:**
   - Vercel has no `ANTHROPIC_API_KEY`.
   - The GH runner's CLI produced `mock`, and why is unexplained.

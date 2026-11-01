@@ -140,7 +140,8 @@ each marked "AI ไม่ได้อ่าน", and nothing is AI-rejected.
 New Prisma model `ChartSetup` (call): `id`, `createdAt`, `runId`, `ticker`, `status`
 (`shown` | `ai_rejected` | `guard_stripped` | `capped`), `dataAsOf`, `entry`, `stop`, `t1`, `t2`,
 `r1`, `r2`, `sweptLevels` (string[]), `sweepBarAt`, `levels` (Json), `aiReading`, `aiRejectReason`,
-`aiBackend`. Written with `npm run db:push`. A logging failure is reported on the panel and never
+`aiBackend`, `ruleVersion` (string, e.g. `"sweep-v1"`: rows from different rule versions must never be
+pooled when they are scored). Written with `npm run db:push`. A logging failure is reported on the panel and never
 blocks it. These rows are what a later scoring spec will grade (T1-before-stop rate vs a random-entry
 control).
 
