@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Badge, Button, Card, CardTitle, Stat } from "@/components/ui";
 import { CHART_SMA_SLOW, type ChartBar } from "@/lib/advisor/chartSeries";
+import type { StopContext } from "@/lib/advisor/chartStop";
 import { earningsPhrase } from "@/lib/advisor/earningsPhrase";
 import {
   ADVISOR_ATR_PERIOD,
@@ -13,10 +14,12 @@ import {
   type AdvisorCard,
   type AdvisorResult,
 } from "@/lib/advisor/types";
+import { etClock } from "@/lib/scanAgent/session";
 import { fmtMoney, fmtNumber, fmtPct } from "@/lib/utils";
 
 import { AdvisorChart } from "./advisor-chart";
 import { AdvisorCritique } from "./advisor-critique";
+import { AdvisorStopReading } from "./advisor-stop-reading";
 import { PortfolioGates } from "./portfolio-gates";
 
 const CAP_LABEL: Record<string, string> = {
@@ -30,8 +33,26 @@ const CAP_LABEL: Record<string, string> = {
  * `chart` sits OUTSIDE the card because `advise` is pure and knows nothing
  * about drawing. It is optional and nullable on purpose — the history pull for
  * the chart fails soft, and a card with no picture is still a whole card.
+ * `stopContext` rides the same way: the 5-minute bars the AI reading is shown,
+ * non-null only when the stop came from the chart (swing / pdl).
  */
-type AdvisorResponse = AdvisorResult & { chart?: ChartBar[] | null };
+type AdvisorResponse = AdvisorResult & { chart?: ChartBar[] | null; stopContext?: StopContext | null };
+
+/** Stop label per source, shared by the stat and its structure sub-line. */
+const STOP_LABEL: Record<AdvisorCard["stopSource"], string> = {
+  given: "จุดตัดขาดทุน (กำหนดมาเอง)",
+  swing: "จุดตัดขาดทุน (ใต้ swing low กราฟ 5 นาที)",
+  pdl: "จุดตัดขาดทุน (ใต้ low ของวันก่อน)",
+  atr: `จุดตัดขาดทุน (${ADVISOR_ATR_SL_MULT} เท่าของ ATR)`,
+};
+
+/** "2026-10-30 10:35 ET" for the bar a structural stop sits under. */
+function structureWhen(s: NonNullable<AdvisorCard["stopStructure"]>): string {
+  const { minutes } = etClock(s.barT);
+  const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const mm = String(minutes % 60).padStart(2, "0");
+  return `${s.sessionDate} ${hh}:${mm} ET`;
+}
 
 export function AdvisorForm({
   initialTicker = "",
@@ -78,6 +99,7 @@ export function AdvisorForm({
   const [error, setError] = useState<string | null>(null);
   const [card, setCard] = useState<AdvisorCard | null>(null);
   const [chart, setChart] = useState<ChartBar[] | null>(null);
+  const [stopContext, setStopContext] = useState<StopContext | null>(null);
   /** Set when the entry field was filled by clicking a candle, cleared on submit. */
   const [pickedFrom, setPickedFrom] = useState<string | null>(null);
   // Bumped by any keystroke in the form. Used as AdvisorCritique's key, so an
@@ -103,13 +125,31 @@ export function AdvisorForm({
     setFormEpoch((n) => n + 1);
   }
 
-  async function onSubmit(e: React.FormEvent) {
+  /**
+   * "ใช้ stop ATR แทน": put the ATR stop in the field and ask again, so the next
+   * card reads `given`. The value is passed to submit() rather than read back
+   * from state: setStop is async, and the request would otherwise carry the old
+   * stop. The programmatic setStop does not fire the form's bubbled onChange, so
+   * formEpoch is bumped by hand, as pickEntry does.
+   */
+  function applyAtrStop(value: string) {
+    setStop(value);
+    setFormEpoch((n) => n + 1);
+    void submit(value);
+  }
+
+  function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    void submit(stop);
+  }
+
+  async function submit(stopValue: string) {
     holdingsTouched.current = true;
     setLoading(true);
     setError(null);
     setCard(null);
     setChart(null);
+    setStopContext(null);
     setPickedFrom(null);
     try {
       const res = await fetch("/api/advisor", {
@@ -118,7 +158,7 @@ export function AdvisorForm({
         body: JSON.stringify({
           ticker,
           entry,
-          stop,
+          stop: stopValue,
           capital,
           maxSlots,
           riskPct,
@@ -132,6 +172,7 @@ export function AdvisorForm({
       if (json && json.ok) {
         setCard(json.card);
         setChart(json.chart ?? null);
+        setStopContext(json.stopContext ?? null);
       } else if (json && !json.ok) setError(json.error);
       else setError(`The server answered HTTP ${res.status} with a response this page could not read.`);
     } catch (err) {
@@ -190,16 +231,13 @@ export function AdvisorForm({
               </p>
             ) : null}
           </div>
-          {/* Shown only when a stop came in from the chart (or is typed in it):
-              everyone else sizes from the 1.5 x ATR stop and has no use for it. */}
-          {initialStop !== "" || stop !== "" ? (
-            <Field
-              label="Stop จากกราฟ (เว้นว่าง = 1.5×ATR)"
-              value={stop}
-              onChange={setStop}
-              placeholder="171.00"
-            />
-          ) : null}
+          {/* Always shown: blank now means "find it on the 5-minute chart". */}
+          <Field
+            label="Stop (เว้นว่าง = หาจากกราฟ 5 นาที)"
+            value={stop}
+            onChange={setStop}
+            placeholder="171.00"
+          />
           <Field label="เงินทุน ($)" value={capital} onChange={setCapital} />
           <Field label="จำนวนช่องสูงสุด" value={maxSlots} onChange={setMaxSlots} />
           <Field label="ความเสี่ยงต่อไม้ (%)" value={riskPct} onChange={setRiskPct} />
@@ -235,7 +273,14 @@ export function AdvisorForm({
       ) : null}
 
       {card ? (
-        <ResultCard card={card} chart={chart} onPickEntry={pickEntry} critiqueKey={formEpoch} />
+        <ResultCard
+          card={card}
+          chart={chart}
+          stopContext={stopContext}
+          onPickEntry={pickEntry}
+          onUseAtrStop={applyAtrStop}
+          critiqueKey={formEpoch}
+        />
       ) : null}
     </div>
   );
@@ -311,16 +356,68 @@ function FillGuardCard({ card }: { card: AdvisorCard }) {
   );
 }
 
+/**
+ * Everything about HOW the stop was found, under the stop line: the notes on
+ * what the chain passed over, the tight / wide flags (disclosed, never moving
+ * the stop), the plain 1.5 x ATR alternative, and the AI reading. The reading
+ * is remounted with the critique's key, so an edit clears it.
+ */
+function StopDetail({
+  card,
+  stopContext,
+  onUseAtrStop,
+  readingKey,
+}: {
+  card: AdvisorCard;
+  stopContext: StopContext | null;
+  onUseAtrStop: (stop: string) => void;
+  readingKey: number;
+}) {
+  const alt = card.atrAlternative;
+  return (
+    <div className="space-y-2">
+      {card.stopNotes.length > 0 ? (
+        <p className="text-xs text-(--color-muted)">{card.stopNotes.join(" · ")}</p>
+      ) : null}
+      {card.stopFlags.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {card.stopFlags.map((f) => (
+            <Badge key={f} tone="warning">
+              {f}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+      {alt ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-(--color-muted)">
+          <span>
+            เทียบ stop แบบ {alt.atrMult}×ATR: <span className="font-mono">{fmtMoney(alt.stop)}</span> · ซื้อได้{" "}
+            {fmtNumber(alt.shares, 0)} หุ้น
+          </span>
+          <Button type="button" size="sm" variant="outline" onClick={() => onUseAtrStop(alt.stop.toFixed(2))}>
+            ใช้ stop ATR แทน
+          </Button>
+        </div>
+      ) : null}
+      <AdvisorStopReading key={readingKey} card={card} context={stopContext} />
+    </div>
+  );
+}
+
 function ResultCard({
   card,
   chart,
+  stopContext,
   onPickEntry,
+  onUseAtrStop,
   critiqueKey,
 }: {
   card: AdvisorCard;
   chart: ChartBar[] | null;
+  stopContext: StopContext | null;
   onPickEntry: (price: number, date: string) => void;
-  /** Changes on any form edit; remounting AdvisorCritique is how it clears. */
+  onUseAtrStop: (stop: string) => void;
+  /** Changes on any form edit; remounting AdvisorCritique and the stop reading is how they clear. */
   critiqueKey: number;
 }) {
   const br = card.baseRate;
@@ -371,12 +468,13 @@ function ResultCard({
         <div className="grid gap-4 sm:grid-cols-4">
           <Stat label="ราคาเข้า" value={fmtMoney(card.entry)} sub={card.entrySource} />
           <Stat
-            label={card.stopSource === "chart" ? "จุดตัดขาดทุน" : `จุดตัดขาดทุน (${ADVISOR_ATR_SL_MULT} เท่าของ ATR)`}
+            label={STOP_LABEL[card.stopSource]}
             value={fmtMoney(card.stop)}
             sub={
-              card.stopSource === "chart"
-                ? `stop จากกราฟ (${card.stopAtrMult.toFixed(2)}×ATR) · ห่าง ${fmtMoney(card.slDistance)}`
-                : `ห่าง ${fmtMoney(card.slDistance)}`
+              card.stopSource === "atr"
+                ? `ห่าง ${fmtMoney(card.slDistance)}`
+                : `(${card.stopAtrMult.toFixed(2)}×ATR) · ห่าง ${fmtMoney(card.slDistance)}` +
+                  (card.stopStructure ? ` · ${structureWhen(card.stopStructure)}` : "")
             }
           />
           <Stat label={`ATR(${ADVISOR_ATR_PERIOD})`} value={fmtMoney(card.atr)} />
@@ -386,6 +484,7 @@ function ResultCard({
             sub={`สมมติฐาน ${ADVISOR_COST_BPS} bps`}
           />
         </div>
+        <StopDetail card={card} stopContext={stopContext} onUseAtrStop={onUseAtrStop} readingKey={critiqueKey} />
       </section>
 
       <section className="space-y-3">

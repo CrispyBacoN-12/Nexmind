@@ -22,10 +22,11 @@ hold-out (§3). The repo's value now lives in four surfaces:
   - It ranks activity, not odds. No rule in this repo has passed a hold-out, and the page says so.
   - It runs only when the button is pressed: no auto-run on page load, no schedule.
   - Each row links to `/advisor?ticker=` to prefill the ticker. Nothing auto-submits.
-  - **Chart setups panel (branch `chart-agent`, not merged):** a second button runs the chart agent
+  - **Chart setups panel (agent #2, on master):** a second button runs the chart agent
     over the top 20 scan names and opens a modal of at most 5 long-sweep setups (§3).
 - **`/advisor`**: the owner types a ticker they already chose and gets back structure and risk only:
-  - the ATR stop (1.5 × ATR14, or the chart stop when `?stop=` is given) and the R ladder in prices
+  - the stop, found by a chain (branch `chart-stop-agent`, not merged): a stop the owner gave, else the
+    latest 5-minute swing low, else the previous day's low, else 1.5 × ATR14; and the R ladder in prices
   - whole-share sizing at real capital
   - round-trip cost in R and overnight gap-through risk
   - correlation to holdings, earnings date and the portfolio gates
@@ -45,7 +46,7 @@ SCANNER → HAWK×3 → SAGE → Iron Rules, plus `panel-v1` research. The site 
 The desk's `src/lib` code, research scripts and DB tables are **kept** as reference. Its three Task
 Scheduler jobs stay **Disabled**. Do not re-enable them or resume research rounds without a new
 owner decision. **Next, by owner request: rebuild AI agents one at a time. Agent #1 (`/scan`) and
-#2 (the chart agent) are built; the next agent is to be discussed.**
+#2 (the chart agent) are built and #3 (the `/advisor` chart stop) is built on its branch, unmerged; the next agent is to be discussed.**
 
 Hard context the code does not state:
 - **Orders are manual, on Webull, whole shares, $2-3k.** Webull is data-only here. Go-Live is dead,
@@ -57,8 +58,8 @@ Hard context the code does not state:
 
 | Thing | Value |
 |---|---|
-| Branch | `master` = `origin/master` at `a2739d4` (2026-11-01). Every push auto-deploys Vercel production. `chart-agent` is a separate branch, **not merged** |
-| Tests | `npm test` **1057 pass / 0 fail** (2026-11-01, on branch `chart-agent`) |
+| Branch | `master` = `origin/master` at `b1c6967` (2026-11-01, `git rev-parse`), which contains the chart agent. Every push auto-deploys Vercel production. `chart-stop-agent` is a separate branch, **not merged** |
+| Tests | `npm test` **1093 pass / 0 fail** (2026-11-01, on branch `chart-stop-agent`) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
@@ -67,7 +68,7 @@ Hard context the code does not state:
 | Research (archive) | newest `ResearchRun` #113 `skipped`. `panel-v1`: 3, all rejected. Legacy: 6 approved (off-universe, never desk-eligible), 37 demoted, 171 rejected, 1 proposed |
 | `Counterfactual` / `AiCall` | 123 rows, last 2026-09-14 / 90 rows |
 | `Setting` keys | `fearGreed`, `lastDeskSessionAt`, `riskSentry:holdings`, `riskSentry:lastGate`, `ai:outage`, `webull:accessToken` |
-| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`, `.worktrees/xau-vp-v1`: gold work, **finished** (§3), gitignored on master; kept until the owner says delete. `.worktrees/chart-agent` is the live branch above |
+| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`, `.worktrees/xau-vp-v1`: gold work, **finished** (§3), gitignored on master; kept until the owner says delete. `.worktrees/chart-stop-agent` is the live branch above |
 
 To re-verify, use a throwaway script under `scripts/` and delete it afterwards. It should query:
 - `portfolio.findMany`; the field is `status`, not `active`
@@ -81,44 +82,42 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-11-01: Chart agent (agent #2) on `/scan`. Branch `chart-agent`, commits `a2739d4..HEAD` (`git log --oneline a2739d4..HEAD`, the first is `09a68ad`). Not merged.**
-  - What it does: reads the top 20 scan names on Alpaca SIP 5-minute bars. Per name it builds the
-    previous-session volume profile (50 bins, 70% value area), PDH/PDL, PMH/PML and dPOC.
-  - The one setup is a **long sweep** of PDL, PML or pVAL: the sweep bar opens above L, trades below
-    it, closes above it, and the latest close is above L. Stop = sweep low − 0.1 × daily ATR14.
-    T1/T2 are the next structural levels above. A setup under 1.5R carries a tag.
-  - The AI (sonnet) writes a Thai reading per setup and may veto it; a guard strips predictions,
-    entry calls and rankings. At most 5 setups show in a modal, the capped count is shown, and
-    `/scan` links each to `/advisor?ticker=&entry=&stop=`.
-  - **`ChartSetup` table logs every setup** with `ruleVersion` `"sweep-v1"` and a status (`shown`,
-    `ai_rejected`, `guard_stripped`, `capped`). It exists to be scored later (§4). A logging
-    failure shows on the panel and never blocks it.
-  - **`/advisor` takes `?entry=&stop=`.** `stopAtrMult` (the chart stop in ATR units, default 1.5)
-    flows through sizing, the R ladder, cost, gap risk, the fill guard, the base rate and the AI
-    critic's facts sheet, so a chart-stop card is measured at its own stop.
-  - Safety: bars ending after now − the 16-minute SIP delay (`SIP_DELAY_MS`, `src/lib/alpaca.ts`) are
-    dropped (a forming bar is never read). A run superseded by a newer click skips the AI call and
-    the log only if the abort arrives before the AI call; an abort during the call still pays for it
-    and skips the log. Whether Next 16 fires `request.signal` on client disconnect is unverified live.
-  - Live probe, 2026-11-01, real Alpaca bars with the clock set to Fri 2026-10-30 14:30 ET, log a
-    no-op, no DB writes: before the from-below fix a gap-down name (DVA) read as a sweep. After the
-    fix, DVA reads "no sweep yet", and two setups showed (KVUE PDL+pVAL 0.25R tagged, WDC PML 1.23R).
-    The first browser check (before the fix wave, stubbed result; the live API said "market closed")
-    showed the modal, levels, R table, footer and Advisor prefill with 0 console errors.
-  - Re-check on the final build, 2026-11-01, controller, stubbed response: "→ Advisor" opens a new
-    tab (`target=_blank`, `rel=noopener noreferrer`); the footer shows "มี setup อีก 2 ตัวที่เกินเพดาน 5 ตัว
-    (บันทึกไว้แล้ว)" and the outage note "AI ใช้ไม่ได้: ไม่มี AI backend"; `/advisor` shows
-    "stop จากกราฟ (0.15×ATR) · ห่าง $3.80" (2 decimals). 0 console errors.
-  - **No backtest. The sweep rule is a description, not an edge.** It was never tested on stocks;
-    its nearest relative, xau-vp-v1's gold sweep, lost money in every fold.
-  - The AI is unavailable until `claude login` (the CLI OAuth expired; setups then show as unread).
-  - Rulings a future reader needs (review fix wave `896de01..91ea356`):
-    - A sweep bar must also **open above L**; otherwise every gap-down reclaim reads as a sweep.
-    - Bars ending after now − the SIP delay are dropped, so a forming bar is never read.
-    - The sweep bar's own high does not count toward "ถึงเป้าแรกไปแล้ว"; only later bars do, because the order of low and high inside one 5-minute bar is unknowable.
-    - A guard-stripped reading hides the whole setup, like an AI rejection, and `keep:false` always wins over the guard.
-    - Daily ATR excludes today's forming daily bar, so it can differ slightly from the advisor's ATR.
-    - `ChartSetup` status `shown` means eligible and returned to the page, not that the owner saw it.
+- **2026-11-01: Chart stop agent (agent #3) on `/advisor`. Branch `chart-stop-agent` (`git log --oneline master..chart-stop-agent`). Not merged.**
+  - What it does: `/advisor` finds its own stop from the Alpaca SIP 5-minute chart. Chain: **given -> swing low
+    -> PDL -> 1.5 × ATR14**. A given stop is `?stop=` or the typed field, used only when 0 < stop < entry.
+    A swing is the latest strict pivot low (2 bars each side) of the latest session, under the entry; the
+    PDL is the previous session's low. Both sit 0.1 × daily ATR14 below their structure
+    (`CHART_STOP_BUFFER_ATR`). A stop under 0.5 × ATR or over 3 × ATR gets a flag, which never moves it.
+  - The card shows the source, the notes on what the chain passed over, the structure's date and ET time,
+    and the plain-ATR alternative (a button re-runs the card with it as a given stop).
+  - The AI (sonnet) writes a 2-4 sentence Thai reading of the structure under a swing/PDL stop
+    (`POST /api/advisor/stop-reading`); the same prediction guard as the chart agent drops it whole.
+    It never changes a number and the card is complete without it. A given or ATR stop is not read.
+  - **No DB rows. No edge claim** (`ADVISOR_NO_EDGE_CLAIM` stands): the stop is a description of structure, not a backtested rule.
+  - Rulings: PDL qualifies only when PDL - buffer is under the entry and above 0 (mirrors the swing rule).
+    A forming bar is never read (`cutoffSec = now - SIP_DELAY_MS`). The 5-minute fetch fails soft: a miss
+    falls back to ATR with a note. `stopSource "chart"` was renamed `"given"` (§5).
+  - Verified so far: `npm test`, `tsc --noEmit` and `next build --webpack` only. The live POST and browser check are the controller's.
+- **2026-11-01: Chart agent (agent #2) on `/scan`, merged to master.** Commits `a2739d4..91ea356`.
+  - Reads the top 20 scan names on Alpaca SIP 5-minute bars. Per name: previous-session volume profile
+    (50 bins, 70% value area), PDH/PDL, PMH/PML, dPOC. The one setup is a **long sweep** of PDL, PML or pVAL
+    (sweep bar opens above L, trades below, closes above, latest close above L). Stop = sweep low - 0.1 × daily
+    ATR14; T1/T2 are the next levels up; under 1.5R carries a tag.
+  - The AI writes a Thai reading per setup and may veto it; a guard strips predictions and rankings. At most 5
+    setups show in a modal; `/scan` links each to `/advisor?ticker=&entry=&stop=`.
+  - **`ChartSetup` logs every setup** (`ruleVersion` `"sweep-v1"`; status `shown`, `ai_rejected`,
+    `guard_stripped`, `capped`) to be scored later (§4). A logging failure never blocks the panel.
+  - **`/advisor` takes `?entry=&stop=`**; `stopAtrMult` flows through sizing, ladder, cost, gap risk, fill
+    guard, base rate and the critic's facts sheet.
+  - **No backtest. The sweep rule is a description, not an edge**; its nearest relative (xau-vp-v1's gold
+    sweep) lost money in every fold. The AI is unavailable until `claude login`.
+  - Rulings (fix wave `896de01..91ea356`): a sweep bar must **open above L** (else every gap-down reclaim
+    reads as a sweep); bars after now - 16 min are dropped; the sweep bar's own high does not count toward
+    "ถึงเป้าแรกไปแล้ว"; a guard-stripped reading hides the setup and `keep:false` always wins; daily ATR
+    excludes today's forming bar; status `shown` means eligible, not seen.
+  - Live probe 2026-11-01 (real bars, clock set to Fri 10-30 14:30 ET, no-op log, no DB writes): after the
+    from-below fix a gap-down name (DVA) read "no sweep yet" and two setups showed. Whether Next 16 fires
+    `request.signal` on client disconnect is unverified live.
 - **2026-10-31: Scan agent (`/scan`, `POST /api/scan`). Merged to master and pushed (branch deleted).** Commits `6007ba1..b225df6`.
   - `src/lib/scanAgent/`: TradingView screener, New York session clock, filter + triggers + activity
     score, economic calendar, AI notes, `runScanAgent` (all I/O injected). Only the TradingView
@@ -201,8 +200,8 @@ There are no open research directions; the owner closed the search. Work items:
    failing closed at WARN and Risk Sentry's `stopWatch` has input. This is the owner's workflow, not code.
 2. **Check that Risk Sentry keeps running.** Read `scripts/risk-sentry.log` and the task's
    `LastTaskResult` after a few weekdays.
-3. **Chart agent, owner decisions still open** (none are built):
-   - merge `chart-agent`, or keep testing it on a few live sessions first (`claude login` is needed for the AI)
+3. **Chart agents, owner decisions still open** (none are built):
+   - merge `chart-stop-agent`, or keep testing it on a few live sessions first (`claude login` is needed for the AI)
    - a **stricter sweep rule** that also rejects a retest after a gap-down reclaim, i.e. no regular close at
      or below L earlier today. It drops reclaim-retest patterns, so it is the owner's call
    - **chart label overlap** when levels sit close together (pVAL/T1, PDL/PMH on DVA)
@@ -238,7 +237,9 @@ There are no open research directions; the owner closed the search. Work items:
 - Nothing under `src/app/` has tests, by design.
 - `npm run lint` has about 263 pre-existing problems. Judge lint only on the files you touched.
 
-**Chart agent:**
+**Chart agents:**
+- **`AdvisorCard.stopSource "chart"` was renamed `"given"`** (the chain is given / swing / pdl / atr). Any code, test or note that still compares to `"chart"` is stale and tsc flags it.
+- **Client components cannot import `src/lib/advisor/stopReading.ts` as a value:** it reaches `@/lib/anthropic` (child_process). The skip notes live in `stopReadingNotes.ts` for that reason.
 - **`ChartSetup.ruleVersion`: bump `CHART_RULE_VERSION` whenever the sweep/setup rule changes; never
   pool rows across versions.** It is `"sweep-v1"` today. The 2026-11-01 from-below fix shipped before any row existed.
 - **The sweep rule is a description, not an edge. It has no backtest.** Do not present a setup, its R or its

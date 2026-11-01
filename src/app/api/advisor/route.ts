@@ -7,8 +7,10 @@
 // the wiser.
 
 import { advise } from "@/lib/advisor/advise";
+import { buildStopContext } from "@/lib/advisor/chartStop";
 import { chartSeries, CHART_MIN_SESSIONS } from "@/lib/advisor/chartSeries";
-import type { HoldingInput } from "@/lib/advisor/types";
+import type { AdvisorInput, HoldingInput } from "@/lib/advisor/types";
+import { fetchAlpacaCandlesBatch, SIP_DELAY_MS } from "@/lib/alpaca";
 import { fetchNextEarnings } from "@/lib/market/earnings";
 import { fetchLiveQuote } from "@/lib/market/quote";
 import { BENCHMARK } from "@/lib/market/regime";
@@ -205,7 +207,10 @@ export async function POST(req: Request) {
   // than silently omitting the line.
   // The live quote joins on the same terms as earnings: it never rejects, and a
   // miss carries its reason to the card's fill-guard line.
-  const [benchmark, chartCandles, earnings, quote] = await Promise.all([
+  // The 5-minute bars for the stop chain fail soft too, and for the same reason:
+  // without them the stop falls back to 1.5 x ATR with a note saying why, so a
+  // data hiccup must never turn into a failed card.
+  const [benchmark, chartCandles, earnings, quote, intradayRaw] = await Promise.all([
     // 2y at 1d with a 300-day floor, so SMA200 has the 200 sessions it needs.
     fetchCandles(BENCHMARK, "2y", "1d", 300)
       .then((r) => (r.candles.length > 0 ? r.candles : null))
@@ -215,7 +220,19 @@ export async function POST(req: Request) {
       .catch(() => null),
     fetchNextEarnings(ticker),
     fetchLiveQuote(ticker),
+    fetchAlpacaCandlesBatch([ticker], "5d", "5m").then(
+      (m) => m.get(ticker)?.candles ?? [],
+      (e: unknown) => ({ error: e instanceof Error ? e.message : String(e) }),
+    ),
   ]);
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  // Bars that end after this are still forming or inside the SIP delay.
+  const cutoffSec = nowSec - SIP_DELAY_MS / 1000;
+  // An empty array is not an error: the chain itself reports "no closed bars".
+  const intraday: AdvisorInput["intraday"] = Array.isArray(intradayRaw)
+    ? { candles: intradayRaw, cutoffSec }
+    : intradayRaw;
 
   const chart = chartCandles ? chartSeries(chartCandles) : null;
 
@@ -235,14 +252,21 @@ export async function POST(req: Request) {
     // hold about two earnings reports, which is too few nights to find a tail.
     gapHistory: chartCandles,
     quote,
+    intraday,
     // The route owns the clock; advise() only uses it to age the quote.
-    nowSec: Math.floor(Date.now() / 1000),
+    nowSec,
   });
 
   // `chart` rides alongside the card rather than inside it: `advise` is pure and
   // knows nothing about drawing, and an AdviceResult must keep meaning exactly
-  // what it meant before the chart existed.
+  // what it meant before the chart existed. `stopContext` travels the same way:
+  // the AI reading block posts it back with the card, and only a structural
+  // (swing / pdl) stop has anything to read.
+  const stopContext =
+    result.ok && intraday && "candles" in intraday && (result.card.stopSource === "swing" || result.card.stopSource === "pdl")
+      ? buildStopContext(intraday.candles, intraday.cutoffSec)
+      : null;
   return result.ok
-    ? Response.json({ ...result, chart }, { status: 200 })
+    ? Response.json({ ...result, chart, stopContext }, { status: 200 })
     : Response.json(result, { status: 400 });
 }

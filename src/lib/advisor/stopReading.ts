@@ -15,6 +15,7 @@ import type { AdvisorCard } from "@/lib/advisor/types";
 import { isChartPrediction } from "@/lib/chartAgent/review";
 import type { LevelName } from "@/lib/chartAgent/types";
 import { etClock } from "@/lib/scanAgent/session";
+import { SKIP_NOTE_ATR, SKIP_NOTE_GIVEN, skipNoteFor } from "@/lib/advisor/stopReadingNotes";
 
 export type StopReadingStatus = "read" | "stripped" | "unread" | "skipped";
 
@@ -28,17 +29,11 @@ export interface StopReading {
   backend: string;
 }
 
-export const SKIP_NOTE_ATR = "stop นี้ไม่ได้มาจากโครงกราฟ จึงไม่มีอะไรให้อ่าน";
-export const SKIP_NOTE_GIVEN = "stop นี้กำหนดมาเอง (จากป๊อปอัป agent กราฟหรือพิมพ์เอง) จึงไม่ได้ให้ AI อ่านซ้ำ";
+// Re-exported so existing importers keep working; the client imports the pure file.
+export { SKIP_NOTE_ATR, SKIP_NOTE_GIVEN, skipNoteFor };
+
 export const STRIPPED_NOTE = "คำอ่านของ AI ถูกตัดออก เพราะมีคำทำนายหรือคำแนะนำซื้อขาย";
 export const UNREADABLE_NOTE = "AI ตอบกลับในรูปแบบที่อ่านไม่ได้";
-
-/** Only structural stops (swing, PDL) are read; the ATR rule and a given stop are not. */
-export function skipNoteFor(source: AdvisorCard["stopSource"]): string | null {
-  if (source === "atr") return SKIP_NOTE_ATR;
-  if (source === "given") return SKIP_NOTE_GIVEN;
-  return null;
-}
 
 export const STOP_READING_SYSTEM =
   "คุณเป็นเทรดเดอร์ที่อ่านกราฟ 5 นาทีของหุ้นสหรัฐ ระบบโค้ดหาจุด stop ฝั่งซื้อจากโครงกราฟให้แล้ว " +
