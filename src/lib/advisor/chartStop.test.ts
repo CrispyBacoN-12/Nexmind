@@ -135,8 +135,16 @@ test("PDL above the entry gives none with both reasons", () => {
   if (r.kind !== "none") return;
   assert.deepEqual(r.reasons, [
     SWING_REASON,
-    "PDL 9.00 ลบระยะเผื่อแล้วไม่อยู่ใต้ราคาเข้า (มักเกิดจากเปิด gap ลง)",
+    "PDL 9.00 อยู่ไม่ต่ำกว่าราคาเข้า (มักเกิดจากเปิด gap ลง)",
   ]);
+});
+
+test("a PDL equal to the entry is not below it and keeps the gap copy", () => {
+  const falling = session("2026-10-28", [10.0, 9.9, 9.8, 9.7, 9.6, 9.5, 9.4, 9.3]);
+  const r = findChartStop({ candles: [...PREV_DAY, ...falling], entry: 9.0, atr: 1, cutoffSec: FAR });
+  assert.equal(r.kind, "none");
+  if (r.kind !== "none") return;
+  assert.equal(r.reasons[1], "PDL 9.00 อยู่ไม่ต่ำกว่าราคาเข้า (มักเกิดจากเปิด gap ลง)");
 });
 
 test("a PDL stop that would not be positive is refused", () => {
@@ -158,7 +166,43 @@ test("a PDL stop that would not be positive is refused", () => {
   assert.equal(big.kind, "none");
   if (big.kind !== "none") return;
   assert.equal(big.reasons.length, 2);
-  assert.match(big.reasons[1], /^PDL 0\.20 /);
+  assert.equal(big.reasons[1], "PDL 0.20 ลบระยะเผื่อแล้วไม่เป็นบวก");
+});
+
+test("a pivot broken by a later non-pivot low is not the stop", () => {
+  // 9.5 is the only pivot, but bar 7 printed 9.3 (one of the last bars, never a pivot itself).
+  const day = session("2026-10-28", [10.0, 9.9, 9.5, 9.8, 9.9, 9.7, 9.8, 9.3, 9.8]);
+  const r = findChartStop({ candles: [...PREV_DAY, ...day], entry: 10.0, atr: 1, cutoffSec: FAR });
+  assert.equal(r.kind, "found");
+  if (r.kind !== "found") return;
+  assert.equal(r.source, "pdl");
+  assert.equal(r.structure.level, 9.0);
+  assert.deepEqual(r.skipped, ["swing low ล่าสุดถูกแท่งหลังทะลุแล้ว (วันที่ 2026-10-28)"]);
+
+  // Without a previous session there is nothing to fall back to: both reasons stay.
+  const alone = findChartStop({ candles: day, entry: 10.0, atr: 1, cutoffSec: FAR });
+  assert.equal(alone.kind, "none");
+  if (alone.kind !== "none") return;
+  assert.equal(alone.reasons[0], "swing low ล่าสุดถูกแท่งหลังทะลุแล้ว (วันที่ 2026-10-28)");
+});
+
+test("a later bar tied with the pivot low also breaks it", () => {
+  const day = session("2026-10-28", [10.0, 9.9, 9.5, 9.8, 9.9, 9.7, 9.8, 9.5, 9.8]);
+  const r = findChartStop({ candles: [...PREV_DAY, ...day], entry: 10.0, atr: 1, cutoffSec: FAR });
+  assert.equal(r.kind === "found" && r.source, "pdl");
+});
+
+test("a broken newer pivot is skipped and an older, lower, unbroken one is taken", () => {
+  // 9.6 (index 6) is broken by the 9.5 that follows; 9.0 (index 2) is lower and untouched.
+  const day = session("2026-10-28", [10.0, 9.4, 9.0, 9.4, 10.0, 9.9, 9.6, 9.8, 9.9, 9.5, 9.7]);
+  const r = findChartStop({ candles: [...PREV_DAY, ...day], entry: 10.2, atr: 1, cutoffSec: FAR });
+  assert.equal(r.kind, "found");
+  if (r.kind !== "found") return;
+  assert.equal(r.source, "swing");
+  assert.equal(r.structure.level, 9.0);
+  assert.equal(r.structure.barT, day[2].t);
+  assert.ok(Math.abs(r.stop - 8.9) < 1e-9);
+  assert.deepEqual(r.skipped, []);
 });
 
 test("pre-market bars do not make a reading session", () => {

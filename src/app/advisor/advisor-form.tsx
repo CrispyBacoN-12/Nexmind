@@ -42,16 +42,21 @@ type AdvisorResponse = AdvisorResult & { chart?: ChartBar[] | null; stopContext?
 const STOP_LABEL: Record<AdvisorCard["stopSource"], string> = {
   given: "จุดตัดขาดทุน (กำหนดมาเอง)",
   swing: "จุดตัดขาดทุน (ใต้ swing low กราฟ 5 นาที)",
-  pdl: "จุดตัดขาดทุน (ใต้ low ของวันก่อน)",
+  pdl: "จุดตัดขาดทุน (ใต้ low ของวันทำการก่อนหน้า)",
   atr: `จุดตัดขาดทุน (${ADVISOR_ATR_SL_MULT} เท่าของ ATR)`,
 };
 
-/** "2026-10-30 10:35 ET" for the bar a structural stop sits under. */
-function structureWhen(s: NonNullable<AdvisorCard["stopStructure"]>): string {
+/**
+ * The structure's own date and time. For a PDL, `sessionDate` is the PDL
+ * session's date, which before the US open is NOT yesterday, so the date is
+ * spelled out instead of leaving "วันก่อน" to be read as yesterday.
+ */
+function structureWhen(source: AdvisorCard["stopSource"], s: NonNullable<AdvisorCard["stopStructure"]>): string {
   const { minutes } = etClock(s.barT);
   const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
   const mm = String(minutes % 60).padStart(2, "0");
-  return `${s.sessionDate} ${hh}:${mm} ET`;
+  const what = source === "pdl" ? "low ของวันที่" : "swing low วันที่";
+  return `${what} ${s.sessionDate} ${hh}:${mm} ET`;
 }
 
 export function AdvisorForm({
@@ -248,12 +253,21 @@ export function AdvisorForm({
             ) : null}
           </div>
           {/* Always shown: blank now means "find it on the 5-minute chart". */}
-          <Field
-            label="Stop (เว้นว่าง = หาจากกราฟ 5 นาที)"
-            value={stop}
-            onChange={setStop}
-            placeholder="171.00"
-          />
+          <div>
+            <Field
+              label="Stop (เว้นว่าง = หาจากกราฟ 5 นาที)"
+              value={stop}
+              onChange={setStop}
+              placeholder="171.00"
+            />
+            {/* A stop left here (ATR button, ?stop= link) is a "given" stop on the
+                next submit even after the entry is edited, so say so. */}
+            {stop.trim() !== "" ? (
+              <p className="mt-1 text-xs text-(--color-muted)">
+                มีค่า stop อยู่ จะใช้ค่านี้แทนการหาจากกราฟ — ลบออกถ้าอยากให้หาใหม่
+              </p>
+            ) : null}
+          </div>
           <Field label="เงินทุน ($)" value={capital} onChange={setCapital} />
           <Field label="จำนวนช่องสูงสุด" value={maxSlots} onChange={setMaxSlots} />
           <Field label="ความเสี่ยงต่อไม้ (%)" value={riskPct} onChange={setRiskPct} />
@@ -408,7 +422,9 @@ function StopDetail({
           ))}
         </div>
       ) : null}
-      {alt ? (
+      {/* Hidden when the card's stop already is the ATR stop (the ATR button
+          produced it): the same price with a live button is noise. */}
+      {alt && Math.abs(card.stop - alt.stop) >= 0.005 ? (
         <div className="flex flex-wrap items-center gap-3 text-sm text-(--color-muted)">
           <span>
             เทียบ stop แบบ {alt.atrMult}×ATR: <span className="font-mono">{fmtMoney(alt.stop)}</span> · ซื้อได้{" "}
@@ -504,7 +520,7 @@ function ResultCard({
               card.stopSource === "atr"
                 ? `ห่าง ${fmtMoney(card.slDistance)}`
                 : `(${card.stopAtrMult.toFixed(2)}×ATR) · ห่าง ${fmtMoney(card.slDistance)}` +
-                  (card.stopStructure ? ` · ${structureWhen(card.stopStructure)}` : "")
+                  (card.stopStructure ? ` · ${structureWhen(card.stopSource, card.stopStructure)}` : "")
             }
           />
           <Stat label={`ATR(${ADVISOR_ATR_PERIOD})`} value={fmtMoney(card.atr)} />

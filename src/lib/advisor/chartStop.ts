@@ -51,8 +51,10 @@ export interface StopContext {
 const NO_BARS = "ไม่มีแท่ง 5 นาทีที่ปิดแล้ว";
 const NO_PREVIOUS = "ไม่มีวันทำการก่อนหน้าในกราฟ 5 นาที จึงไม่มี PDL";
 const noSwing = (date: string) => `ไม่มี swing low ใต้ราคาเข้าในกราฟ 5 นาทีวันที่ ${date}`;
-const pdlAboveEntry = (pdl: number) =>
-  `PDL ${pdl.toFixed(2)} ลบระยะเผื่อแล้วไม่อยู่ใต้ราคาเข้า (มักเกิดจากเปิด gap ลง)`;
+const swingBroken = (date: string) => `swing low ล่าสุดถูกแท่งหลังทะลุแล้ว (วันที่ ${date})`;
+const pdlNotBelowEntry = (pdl: number) =>
+  `PDL ${pdl.toFixed(2)} อยู่ไม่ต่ำกว่าราคาเข้า (มักเกิดจากเปิด gap ลง)`;
+const pdlNotPositive = (pdl: number) => `PDL ${pdl.toFixed(2)} ลบระยะเผื่อแล้วไม่เป็นบวก`;
 
 /**
  * The reading session is the latest ET date with finished regular bars; the
@@ -72,22 +74,34 @@ function readingSplit(
   return date ? { date, split: splitSessions(finished, date) } : null;
 }
 
-/** Newest-first scan for a strict pivot low under the entry with a positive stop. */
+/**
+ * Newest-first scan for a strict pivot low under the entry with a positive stop.
+ * A pivot only counts while no later bar of the session printed at or below it:
+ * the last bars cannot be pivots themselves, so a lower low there would
+ * otherwise leave a broken level as the stop. A broken pivot is skipped and
+ * older ones are still tried; `broken` reports that one was skipped.
+ */
 function findSwing(
   bars: Candle[],
   entry: number,
   buffer: number,
-): { low: number; barT: number } | null {
+): { low: number; barT: number } | { broken: boolean } {
   const k = STOP_PIVOT_SIDE_BARS;
+  let broken = false;
   for (let i = bars.length - 1 - k; i >= k; i--) {
     const low = bars[i].l;
     let pivot = true;
     for (let j = 1; j <= k && pivot; j++) {
       pivot = low < bars[i - j].l && low < bars[i + j].l;
     }
-    if (pivot && low < entry && low - buffer > 0) return { low, barT: bars[i].t };
+    if (!(pivot && low < entry && low - buffer > 0)) continue;
+    if (bars.slice(i + 1).some((b) => b.l <= low)) {
+      broken = true;
+      continue;
+    }
+    return { low, barT: bars[i].t };
   }
-  return null;
+  return { broken };
 }
 
 export function findChartStop(input: {
@@ -105,7 +119,7 @@ export function findChartStop(input: {
   const skipped: string[] = [];
 
   const swing = findSwing(split.regular, entry, buffer);
-  if (swing) {
+  if ("low" in swing) {
     return {
       kind: "found",
       source: "swing",
@@ -114,14 +128,17 @@ export function findChartStop(input: {
       skipped,
     };
   }
-  skipped.push(noSwing(date));
+  skipped.push(swing.broken ? swingBroken(date) : noSwing(date));
 
   if (split.previous.length === 0 || split.previousDate === null) {
     return { kind: "none", reasons: [...skipped, NO_PREVIOUS] };
   }
   const low = split.previous.reduce((m, c) => (c.l < m.l ? c : m));
-  if (!(low.l < entry && low.l - buffer > 0)) {
-    return { kind: "none", reasons: [...skipped, pdlAboveEntry(low.l)] };
+  if (!(low.l < entry)) {
+    return { kind: "none", reasons: [...skipped, pdlNotBelowEntry(low.l)] };
+  }
+  if (!(low.l - buffer > 0)) {
+    return { kind: "none", reasons: [...skipped, pdlNotPositive(low.l)] };
   }
   return {
     kind: "found",

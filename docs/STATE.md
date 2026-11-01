@@ -94,10 +94,17 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
     (`POST /api/advisor/stop-reading`); the same prediction guard as the chart agent drops it whole.
     It never changes a number and the card is complete without it. A given or ATR stop is not read.
   - **No DB rows. No edge claim** (`ADVISOR_NO_EDGE_CLAIM` stands): the stop is a description of structure, not a backtested rule.
-  - Rulings: PDL qualifies only when PDL - buffer is under the entry and above 0 (mirrors the swing rule).
-    A forming bar is never read (`cutoffSec = now - SIP_DELAY_MS`). The 5-minute fetch fails soft: a miss
-    falls back to ATR with a note. `stopSource "chart"` was renamed `"given"` (§5).
-  - Verified so far: `npm test`, `tsc --noEmit` and `next build --webpack` only. The live POST and browser check are the controller's.
+  - Rulings: PDL qualifies only when the PDL itself is under the entry (the controller's ruling, mirroring the
+    swing rule's pivot low < entry) and PDL - buffer is above 0; the two failures have their own skip copy.
+    A swing pivot counts only if no later bar of the session traded at or below it; a broken pivot is skipped
+    and older ones are still tried. A forming bar is never read (`cutoffSec = now - SIP_DELAY_MS`). The
+    5-minute fetch fails soft: a miss falls back to ATR with a note. `stopSource "chart"` was renamed `"given"` (§5).
+  - Swing stops are usually tight (all live ones < 0.5 × ATR), which matters for overnight holds.
+  - Live check 2026-11-01 (Sunday, bars of Fri 2026-10-30, next start of the branch build, no DB writes): AAPL
+    swing stop 341.66 (0.43 × ATR, tight flag, structure 14:50 ET), WDC swing 0.26 × ATR, DVA swing 0.45 × ATR,
+    all three flagged tight. KVUE fell to ATR with both skip reasons. The "ใช้ stop ATR แทน" button produced a
+    "กำหนดมาเอง" card with the given-stop skip note. The AI reading showed the CLI auth-expired note (needs
+    `claude login`). This check ran BEFORE the final-review fix for broken swing pivots.
 - **2026-11-01: Chart agent (agent #2) on `/scan`, merged to master.** Commits `a2739d4..91ea356`.
   - Reads the top 20 scan names on Alpaca SIP 5-minute bars. Per name: previous-session volume profile
     (50 bins, 70% value area), PDH/PDL, PMH/PML, dPOC. The one setup is a **long sweep** of PDL, PML or pVAL
