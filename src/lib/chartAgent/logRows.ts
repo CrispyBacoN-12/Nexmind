@@ -3,7 +3,7 @@
 // stop" against a random-entry control. Pure: the route does the DB write.
 
 import type { Review } from "@/lib/chartAgent/review";
-import type { Levels, Setup } from "@/lib/chartAgent/types";
+import { CHART_RULE_VERSION, type Levels, type Setup } from "@/lib/chartAgent/types";
 
 /**
  * `shown` means eligible and returned to the page: it does not mean the owner
@@ -15,6 +15,8 @@ export type LogStatus = "shown" | "ai_rejected" | "guard_stripped" | "capped";
 /** The ChartSetup model's create input minus id and createdAt. */
 export interface ChartSetupRow {
   runId: string;
+  /** CHART_RULE_VERSION at the time of the run. */
+  ruleVersion: string;
   ticker: string;
   status: LogStatus;
   dataAsOf: string;
@@ -39,6 +41,7 @@ export function toLogRows(
 ): ChartSetupRow[] {
   return decided.map(({ setup, review, status }) => ({
     runId,
+    ruleVersion: CHART_RULE_VERSION,
     ticker: setup.ticker,
     status,
     dataAsOf: setup.dataAsOf,

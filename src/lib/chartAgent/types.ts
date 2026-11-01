@@ -28,6 +28,11 @@ export const CHART_AI_BARS = 24;
 export const CHART_ATR_PERIOD = 14;
 /** Length of one intraday bar: a bar starting at t ends at t + CHART_BAR_SECONDS. */
 export const CHART_BAR_SECONDS = 300;
+/**
+ * Stamped on every ChartSetup row. Bump it whenever the sweep or setup rule
+ * changes, and never pool rows across versions when grading them.
+ */
+export const CHART_RULE_VERSION = "sweep-v1";
 
 /**
  * p = previous session, d = today. POC = point of control, VAH/VAL = value

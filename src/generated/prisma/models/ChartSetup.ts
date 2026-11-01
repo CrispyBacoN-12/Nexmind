@@ -52,6 +52,7 @@ export type ChartSetupMinAggregateOutputType = {
   id: number | null
   createdAt: Date | null
   runId: string | null
+  ruleVersion: string | null
   ticker: string | null
   status: string | null
   dataAsOf: string | null
@@ -71,6 +72,7 @@ export type ChartSetupMaxAggregateOutputType = {
   id: number | null
   createdAt: Date | null
   runId: string | null
+  ruleVersion: string | null
   ticker: string | null
   status: string | null
   dataAsOf: string | null
@@ -90,6 +92,7 @@ export type ChartSetupCountAggregateOutputType = {
   id: number
   createdAt: number
   runId: number
+  ruleVersion: number
   ticker: number
   status: number
   dataAsOf: number
@@ -133,6 +136,7 @@ export type ChartSetupMinAggregateInputType = {
   id?: true
   createdAt?: true
   runId?: true
+  ruleVersion?: true
   ticker?: true
   status?: true
   dataAsOf?: true
@@ -152,6 +156,7 @@ export type ChartSetupMaxAggregateInputType = {
   id?: true
   createdAt?: true
   runId?: true
+  ruleVersion?: true
   ticker?: true
   status?: true
   dataAsOf?: true
@@ -171,6 +176,7 @@ export type ChartSetupCountAggregateInputType = {
   id?: true
   createdAt?: true
   runId?: true
+  ruleVersion?: true
   ticker?: true
   status?: true
   dataAsOf?: true
@@ -279,6 +285,7 @@ export type ChartSetupGroupByOutputType = {
   id: number
   createdAt: Date
   runId: string
+  ruleVersion: string
   ticker: string
   status: string
   dataAsOf: string
@@ -323,6 +330,7 @@ export type ChartSetupWhereInput = {
   id?: Prisma.IntFilter<"ChartSetup"> | number
   createdAt?: Prisma.DateTimeFilter<"ChartSetup"> | Date | string
   runId?: Prisma.StringFilter<"ChartSetup"> | string
+  ruleVersion?: Prisma.StringFilter<"ChartSetup"> | string
   ticker?: Prisma.StringFilter<"ChartSetup"> | string
   status?: Prisma.StringFilter<"ChartSetup"> | string
   dataAsOf?: Prisma.StringFilter<"ChartSetup"> | string
@@ -344,6 +352,7 @@ export type ChartSetupOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   runId?: Prisma.SortOrder
+  ruleVersion?: Prisma.SortOrder
   ticker?: Prisma.SortOrder
   status?: Prisma.SortOrder
   dataAsOf?: Prisma.SortOrder
@@ -368,6 +377,7 @@ export type ChartSetupWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.ChartSetupWhereInput | Prisma.ChartSetupWhereInput[]
   createdAt?: Prisma.DateTimeFilter<"ChartSetup"> | Date | string
   runId?: Prisma.StringFilter<"ChartSetup"> | string
+  ruleVersion?: Prisma.StringFilter<"ChartSetup"> | string
   ticker?: Prisma.StringFilter<"ChartSetup"> | string
   status?: Prisma.StringFilter<"ChartSetup"> | string
   dataAsOf?: Prisma.StringFilter<"ChartSetup"> | string
@@ -389,6 +399,7 @@ export type ChartSetupOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   runId?: Prisma.SortOrder
+  ruleVersion?: Prisma.SortOrder
   ticker?: Prisma.SortOrder
   status?: Prisma.SortOrder
   dataAsOf?: Prisma.SortOrder
@@ -418,6 +429,7 @@ export type ChartSetupScalarWhereWithAggregatesInput = {
   id?: Prisma.IntWithAggregatesFilter<"ChartSetup"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ChartSetup"> | Date | string
   runId?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
+  ruleVersion?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
   ticker?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
   status?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
   dataAsOf?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
@@ -438,6 +450,7 @@ export type ChartSetupScalarWhereWithAggregatesInput = {
 export type ChartSetupCreateInput = {
   createdAt?: Date | string
   runId: string
+  ruleVersion: string
   ticker: string
   status: string
   dataAsOf: string
@@ -459,6 +472,7 @@ export type ChartSetupUncheckedCreateInput = {
   id?: number
   createdAt?: Date | string
   runId: string
+  ruleVersion: string
   ticker: string
   status: string
   dataAsOf: string
@@ -479,6 +493,7 @@ export type ChartSetupUncheckedCreateInput = {
 export type ChartSetupUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   runId?: Prisma.StringFieldUpdateOperationsInput | string
+  ruleVersion?: Prisma.StringFieldUpdateOperationsInput | string
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
   dataAsOf?: Prisma.StringFieldUpdateOperationsInput | string
@@ -500,6 +515,7 @@ export type ChartSetupUncheckedUpdateInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   runId?: Prisma.StringFieldUpdateOperationsInput | string
+  ruleVersion?: Prisma.StringFieldUpdateOperationsInput | string
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
   dataAsOf?: Prisma.StringFieldUpdateOperationsInput | string
@@ -521,6 +537,7 @@ export type ChartSetupCreateManyInput = {
   id?: number
   createdAt?: Date | string
   runId: string
+  ruleVersion: string
   ticker: string
   status: string
   dataAsOf: string
@@ -541,6 +558,7 @@ export type ChartSetupCreateManyInput = {
 export type ChartSetupUpdateManyMutationInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   runId?: Prisma.StringFieldUpdateOperationsInput | string
+  ruleVersion?: Prisma.StringFieldUpdateOperationsInput | string
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
   dataAsOf?: Prisma.StringFieldUpdateOperationsInput | string
@@ -562,6 +580,7 @@ export type ChartSetupUncheckedUpdateManyInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   runId?: Prisma.StringFieldUpdateOperationsInput | string
+  ruleVersion?: Prisma.StringFieldUpdateOperationsInput | string
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
   dataAsOf?: Prisma.StringFieldUpdateOperationsInput | string
@@ -591,6 +610,7 @@ export type ChartSetupCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   runId?: Prisma.SortOrder
+  ruleVersion?: Prisma.SortOrder
   ticker?: Prisma.SortOrder
   status?: Prisma.SortOrder
   dataAsOf?: Prisma.SortOrder
@@ -622,6 +642,7 @@ export type ChartSetupMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   runId?: Prisma.SortOrder
+  ruleVersion?: Prisma.SortOrder
   ticker?: Prisma.SortOrder
   status?: Prisma.SortOrder
   dataAsOf?: Prisma.SortOrder
@@ -641,6 +662,7 @@ export type ChartSetupMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   runId?: Prisma.SortOrder
+  ruleVersion?: Prisma.SortOrder
   ticker?: Prisma.SortOrder
   status?: Prisma.SortOrder
   dataAsOf?: Prisma.SortOrder
@@ -681,6 +703,7 @@ export type ChartSetupSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   id?: boolean
   createdAt?: boolean
   runId?: boolean
+  ruleVersion?: boolean
   ticker?: boolean
   status?: boolean
   dataAsOf?: boolean
@@ -702,6 +725,7 @@ export type ChartSetupSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   id?: boolean
   createdAt?: boolean
   runId?: boolean
+  ruleVersion?: boolean
   ticker?: boolean
   status?: boolean
   dataAsOf?: boolean
@@ -723,6 +747,7 @@ export type ChartSetupSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   id?: boolean
   createdAt?: boolean
   runId?: boolean
+  ruleVersion?: boolean
   ticker?: boolean
   status?: boolean
   dataAsOf?: boolean
@@ -744,6 +769,7 @@ export type ChartSetupSelectScalar = {
   id?: boolean
   createdAt?: boolean
   runId?: boolean
+  ruleVersion?: boolean
   ticker?: boolean
   status?: boolean
   dataAsOf?: boolean
@@ -761,7 +787,7 @@ export type ChartSetupSelectScalar = {
   aiBackend?: boolean
 }
 
-export type ChartSetupOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "runId" | "ticker" | "status" | "dataAsOf" | "entry" | "stop" | "t1" | "t2" | "r1" | "r2" | "sweptLevels" | "sweepBarAt" | "levels" | "aiReading" | "aiRejectReason" | "aiBackend", ExtArgs["result"]["chartSetup"]>
+export type ChartSetupOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "runId" | "ruleVersion" | "ticker" | "status" | "dataAsOf" | "entry" | "stop" | "t1" | "t2" | "r1" | "r2" | "sweptLevels" | "sweepBarAt" | "levels" | "aiReading" | "aiRejectReason" | "aiBackend", ExtArgs["result"]["chartSetup"]>
 
 export type $ChartSetupPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ChartSetup"
@@ -770,7 +796,15 @@ export type $ChartSetupPayload<ExtArgs extends runtime.Types.Extensions.Internal
     id: number
     createdAt: Date
     runId: string
+    /**
+     * CHART_RULE_VERSION (chartAgent/types.ts). Never pool rows across versions.
+     */
+    ruleVersion: string
     ticker: string
+    /**
+     * shown | ai_rejected | guard_stripped | capped. `shown` = eligible and
+     * returned to the page (not proof the owner saw it).
+     */
     status: string
     /**
      * ISO time the newest bar used ended.
@@ -1220,6 +1254,7 @@ export interface ChartSetupFieldRefs {
   readonly id: Prisma.FieldRef<"ChartSetup", 'Int'>
   readonly createdAt: Prisma.FieldRef<"ChartSetup", 'DateTime'>
   readonly runId: Prisma.FieldRef<"ChartSetup", 'String'>
+  readonly ruleVersion: Prisma.FieldRef<"ChartSetup", 'String'>
   readonly ticker: Prisma.FieldRef<"ChartSetup", 'String'>
   readonly status: Prisma.FieldRef<"ChartSetup", 'String'>
   readonly dataAsOf: Prisma.FieldRef<"ChartSetup", 'String'>

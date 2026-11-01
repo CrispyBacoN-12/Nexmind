@@ -402,7 +402,11 @@ model ChartSetup {
   id             Int      @id @default(autoincrement())
   createdAt      DateTime @default(now())
   runId          String
+  /// CHART_RULE_VERSION (chartAgent/types.ts). Never pool rows across versions.
+  ruleVersion    String
   ticker         String
+  /// shown | ai_rejected | guard_stripped | capped. `shown` = eligible and
+  /// returned to the page (not proof the owner saw it).
   status         String
   /// ISO time the newest bar used ended.
   dataAsOf       String

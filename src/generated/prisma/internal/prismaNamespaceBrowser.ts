@@ -436,6 +436,7 @@ export const ChartSetupScalarFieldEnum = {
   id: 'id',
   createdAt: 'createdAt',
   runId: 'runId',
+  ruleVersion: 'ruleVersion',
   ticker: 'ticker',
   status: 'status',
   dataAsOf: 'dataAsOf',

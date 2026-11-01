@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Review } from "@/lib/chartAgent/review";
-import type { Levels, Setup } from "@/lib/chartAgent/types";
+import { CHART_RULE_VERSION, type Levels, type Setup } from "@/lib/chartAgent/types";
 import { toLogRows, type LogStatus } from "@/lib/chartAgent/logRows";
 
 const LEVELS: Levels = {
@@ -95,6 +95,12 @@ test("price fields, levels, sweptLevels and times carry over", () => {
   assert.deepEqual(r.levels, LEVELS);
   assert.equal(r.dataAsOf, "2026-10-31T14:35:00.000Z");
   assert.equal(r.sweepBarAt, new Date(1_761_920_400 * 1000).toISOString());
+});
+
+test("every row carries the rule version, so rows are never pooled across rule changes", () => {
+  const rows = toLogRows("r", [d("AAA", true, KEPT, "shown"), d("BBB", true, REJECTED, "ai_rejected")], "cli");
+  assert.equal(CHART_RULE_VERSION, "sweep-v1");
+  for (const r of rows) assert.equal(r.ruleVersion, "sweep-v1");
 });
 
 test("no decided setups give no rows", () => {
