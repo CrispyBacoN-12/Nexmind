@@ -106,7 +106,13 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   - **No backtest. The sweep rule is a description, not an edge.** It was never tested on stocks;
     its nearest relative, xau-vp-v1's gold sweep, lost money in every fold.
   - The AI is unavailable until `claude login` (the CLI OAuth expired; setups then show as unread).
-  - Review: 16 controller rulings and a final fix wave (`896de01..91ea356`) are in the SDD ledger, `.superpowers/sdd/2026-11-01-chart-agent/progress.md` (worktree-local).
+  - Rulings a future reader needs (review fix wave `896de01..91ea356`):
+    - A sweep bar must also **open above L**; otherwise every gap-down reclaim reads as a sweep.
+    - Bars ending after now − the SIP delay are dropped, so a forming bar is never read.
+    - The sweep bar's own high does not count toward "ถึงเป้าแรกไปแล้ว"; only later bars do, because the order of low and high inside one 5-minute bar is unknowable.
+    - A guard-stripped reading hides the whole setup, like an AI rejection, and `keep:false` always wins over the guard.
+    - Daily ATR excludes today's forming daily bar, so it can differ slightly from the advisor's ATR.
+    - `ChartSetup` status `shown` means eligible and returned to the page, not that the owner saw it.
 - **2026-10-31: Scan agent (`/scan`, `POST /api/scan`). Merged to master and pushed (branch deleted).** Commits `6007ba1..b225df6`.
   - `src/lib/scanAgent/`: TradingView screener, New York session clock, filter + triggers + activity
     score, economic calendar, AI notes, `runScanAgent` (all I/O injected). Only the TradingView
