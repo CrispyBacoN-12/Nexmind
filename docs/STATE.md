@@ -59,7 +59,7 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Branch | `master` = `origin/master` at `b1c6967` (2026-11-01, `git rev-parse`), which contains the chart agent. Every push auto-deploys Vercel production. `chart-stop-agent` is a separate branch, **not merged** |
-| Tests | `npm test` **1093 pass / 0 fail** (2026-11-01, on branch `chart-stop-agent`) |
+| Tests | `npm test` **1097 pass / 0 fail** (2026-11-01, on branch `chart-stop-agent`) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
@@ -209,6 +209,7 @@ There are no open research directions; the owner closed the search. Work items:
    `LastTaskResult` after a few weekdays.
 3. **Chart agents, owner decisions still open** (none are built):
    - merge `chart-stop-agent`, or keep testing it on a few live sessions first (`claude login` is needed for the AI)
+   - **PDL fallback after a sweep:** the chain accepts PDL even when today's bars already traded at or below it (the swing finder skips such broken lows; PDL does not). It is reached only when no unbroken swing pivot exists. Whether a swept PDL should fall through, or the stop go under the sweep low, is the owner's call
    - a **stricter sweep rule** that also rejects a retest after a gap-down reclaim, i.e. no regular close at
      or below L earlier today. It drops reclaim-retest patterns, so it is the owner's call
    - **chart label overlap** when levels sit close together (pVAL/T1, PDL/PMH on DVA)
