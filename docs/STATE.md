@@ -58,7 +58,7 @@ Hard context the code does not state:
 
 | Thing | Value |
 |---|---|
-| Branch | `master` at `22f312f` (2026-11-01) contains agents #2 and #3; `origin/master` is still `b1c6967` (agent #3 not pushed). Every push auto-deploys Vercel production |
+| Branch | `master` at `22f312f` (2026-11-01) contains agents #2 and #3; `origin/master` = `master` (agent #3 pushed 2026-11-01, Vercel deploy ok). Every push auto-deploys Vercel production |
 | Tests | `npm test` **1097 pass / 0 fail** (2026-11-01, on master after the agent #3 merge) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
@@ -82,7 +82,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-11-01: Chart stop agent (agent #3) on `/advisor`. Merged to master (fast-forward, commits `0066757..22f312f`), not pushed.**
+- **2026-11-01: Chart stop agent (agent #3) on `/advisor`. Merged to master (fast-forward, commits `0066757..22f312f`) and pushed.**
   - What it does: `/advisor` finds its own stop from the Alpaca SIP 5-minute chart. Chain: **given -> swing low
     -> PDL -> 1.5 × ATR14**. A given stop is `?stop=` or the typed field, used only when 0 < stop < entry.
     A swing is the latest strict pivot low (2 bars each side) of the latest session, under the entry; the
@@ -208,7 +208,7 @@ There are no open research directions; the owner closed the search. Work items:
 2. **Check that Risk Sentry keeps running.** Read `scripts/risk-sentry.log` and the task's
    `LastTaskResult` after a few weekdays.
 3. **Chart agents, owner decisions still open** (none are built):
-   - push agent #3 (`git push`, auto-deploys Vercel), and re-run a live check on market hours after `claude login`; the 2026-11-01 live check predates the broken-pivot fix
+   - re-run a live check on market hours after `claude login`; the 2026-11-01 live check predates the broken-pivot fix
    - **PDL fallback after a sweep:** the chain accepts PDL even when today's bars already traded at or below it (the swing finder skips such broken lows; PDL does not). It is reached only when no unbroken swing pivot exists. Whether a swept PDL should fall through, or the stop go under the sweep low, is the owner's call
    - a **stricter sweep rule** that also rejects a retest after a gap-down reclaim, i.e. no regular close at
      or below L earlier today. It drops reclaim-retest patterns, so it is the owner's call
