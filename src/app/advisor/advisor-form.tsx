@@ -375,7 +375,7 @@ function ResultCard({
             value={fmtMoney(card.stop)}
             sub={
               card.stopSource === "chart"
-                ? `stop จากกราฟ (${fmtNumber(card.stopAtrMult, 2)}×ATR) · ห่าง ${fmtMoney(card.slDistance)}`
+                ? `stop จากกราฟ (${card.stopAtrMult.toFixed(2)}×ATR) · ห่าง ${fmtMoney(card.slDistance)}`
                 : `ห่าง ${fmtMoney(card.slDistance)}`
             }
           />

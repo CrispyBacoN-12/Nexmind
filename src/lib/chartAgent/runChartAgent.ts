@@ -58,6 +58,8 @@ export type ChartAgentResult =
       dataAsOf: string | null;
       shown: ShownSetup[];
       rejected: { ticker: string; review: Review }[];
+      /** Setups that passed the AI but were cut by the CHART_MAX_SETUPS cap (logged as `capped`). */
+      cappedCount: number;
       none: { ticker: string; reason: string }[];
       aiNote: string | null;
       logNote: string | null;
@@ -96,7 +98,7 @@ export async function runChartAgent(
   const phase = marketPhase(nowMs);
   const tickers = [...new Set(rawTickers)];
 
-  const base = { ok: true as const, ranAt, phase, dataAsOf: null, shown: [], rejected: [], aiNote: null, logNote: null, backend: "none" };
+  const base = { ok: true as const, ranAt, phase, dataAsOf: null, shown: [], rejected: [], cappedCount: 0, aiNote: null, logNote: null, backend: "none" };
 
   // 1. Outside the regular session there is nothing to read.
   if (phase !== "open") {
@@ -201,5 +203,6 @@ export async function runChartAgent(
     logNote = `บันทึกลงฐานข้อมูลไม่ได้: ${message(e)}`;
   }
 
-  return { ok: true, ranAt, phase, dataAsOf, shown, rejected, none, aiNote, logNote, backend };
+  const cappedCount = decided.filter((d) => d.status === "capped").length;
+  return { ok: true, ranAt, phase, dataAsOf, shown, rejected, cappedCount, none, aiNote, logNote, backend };
 }

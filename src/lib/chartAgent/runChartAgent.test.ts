@@ -257,6 +257,7 @@ test("7 eligible setups: 5 shown, 2 logged as capped", async () => {
   const rows = calls.logged[0];
   assert.equal(rows.length, 7);
   assert.deepEqual(rows.map((x) => x.status), ["shown", "shown", "shown", "shown", "shown", "capped", "capped"]);
+  assert.equal(r.cappedCount, 2);
 });
 
 test("a rejected and a stripped setup go to rejected and are logged with their status; they do not take a slot", async () => {
@@ -272,6 +273,7 @@ test("a rejected and a stripped setup go to rejected and are logged with their s
   const r = await runChartAgent(names, deps);
   assert.ok(r.ok);
   assert.deepEqual(r.shown.map((s) => s.setup.ticker), ["A3"]);
+  assert.equal(r.cappedCount, 0);
   assert.deepEqual(
     r.rejected.map((x) => [x.ticker, x.review.status]),
     [["A1", "rejected"], ["A2", "stripped"]],

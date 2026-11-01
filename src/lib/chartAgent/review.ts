@@ -64,7 +64,7 @@ export const REVIEW_SYSTEM =
   "งานของคุณ: อธิบายโครงสร้างของแต่ละตัวแบบเทรดเดอร์ 2-3 บรรทัดเป็นภาษาไทย เช่น แท่งที่กวาดปิดกลับมาอย่างไร แรงซื้อหลังกวาดเป็นอย่างไร ราคาอยู่ตรงไหนเทียบกับระดับสำคัญ " +
   "คุณปฏิเสธ setup ที่โครงสร้างอ่านแล้วไม่ดีได้ (keep เป็น false) และต้องให้เหตุผลเป็นภาษาไทยใน rejectReason ถ้าเก็บไว้ให้ rejectReason เป็นสตริงว่าง " +
   "ห้ามทำนายทิศทางราคา ห้ามบอกโอกาสหรือความแน่นอน ห้ามแนะนำซื้อ ขาย หรือถือ ห้ามเปลี่ยนตัวเลขใดๆ และห้ามเสนอระดับราคาใหม่ " +
-  "เขียนเป็นภาษาไทยล้วน ห้ามใช้คำอังกฤษ long, short, enter, avoid, suggest, should และห้ามใช้คำว่า ไม่ควร หรือ แนะนำ " +
+  "เขียนเป็นภาษาไทยล้วน ห้ามใช้คำอังกฤษ buy, buying, sell, selling, long, short, enter, entering, avoid, recommend, recommendation, suggest, should, worth it, take this trade และห้ามใช้คำว่า ไม่ควร หรือ แนะนำ " +
   "เพราะระบบจะลบคำอ่านทั้งก้อนที่มีคำเหล่านี้ทิ้ง (ชื่อระดับราคาอย่าง PDL, VAL และคำว่า sweep ใช้ได้) " +
   'ตอบเป็น JSON เท่านั้น: {"reviews":[{"ticker","keep","reading","rejectReason"}]} ให้ครบทุกตัวที่ส่งไป';
 
@@ -180,6 +180,11 @@ export function normalizeReviews(raw: unknown, tickers: string[]): Map<string, R
   return out;
 }
 
+/** The panel's Thai note when there is no AI backend. Exported for the tests. */
+export function mockBackendNote(outageReason: string | null): string {
+  return `AI ใช้ไม่ได้: ${outageReason ?? "ไม่มี AI backend"}`;
+}
+
 export async function reviewSetups(
   items: ReviewItem[],
 ): Promise<{ reviews: Map<string, Review>; backend: string; note: string | null }> {
@@ -187,7 +192,7 @@ export async function reviewSetups(
   const backend = aiBackend();
   if (items.length === 0) return { reviews: new Map(), backend, note: null };
   if (backend === "mock") {
-    return { reviews: unread(tickers), backend, note: aiOutageReason() ?? "no AI backend" };
+    return { reviews: unread(tickers), backend, note: mockBackendNote(aiOutageReason()) };
   }
   try {
     const r = await callAgentJSON<unknown>({

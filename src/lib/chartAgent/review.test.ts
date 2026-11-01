@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { isDirectional } from "@/lib/advisor/critiqueContext";
 import type { Candle } from "@/lib/indicators";
 import type { Setup } from "@/lib/chartAgent/types";
 import {
@@ -7,8 +8,14 @@ import {
   REVIEW_SYSTEM,
   buildReviewPrompt,
   isChartPrediction,
+  mockBackendNote,
   normalizeReviews,
 } from "@/lib/chartAgent/review";
+
+test("the no-backend note is Thai, with the outage reason or a Thai fallback", () => {
+  assert.equal(mockBackendNote("CLI OAuth expired"), "AI ใช้ไม่ได้: CLI OAuth expired");
+  assert.equal(mockBackendNote(null), "AI ใช้ไม่ได้: ไม่มี AI backend");
+});
 
 const PLAIN = "sweep PDL แล้วกลับขึ้นมายืนเหนือ VAL";
 const STRIPPED = "ตัดออก: มีคำทำนาย";
@@ -86,6 +93,25 @@ test("a rejection whose reason predicts gets the fixed text", () => {
   assert.deepEqual(out.get("KO"), { status: "rejected", reading: null, reason: NO_REASON });
 });
 
+/** Every English entry of GUARD_WORDS_EN in advisor/critiqueContext.ts (copied: it is not exported). */
+const ADVISOR_GUARD_WORDS_EN = [
+  "buy",
+  "buying",
+  "sell",
+  "selling",
+  "long",
+  "short",
+  "enter",
+  "entering",
+  "avoid",
+  "recommend",
+  "recommendation",
+  "suggest",
+  "should",
+  "worth it",
+  "take this trade",
+];
+
 // Why REVIEW_SYSTEM tells the model to write Thai only: the advisor's guard
 // matches these English words anywhere in a reading and strips all of it.
 test("a reading containing an advisor-guard word is stripped, so the prompt forbids them", () => {
@@ -96,7 +122,11 @@ test("a reading containing an advisor-guard word is stripped, so the prompt forb
     );
     assert.deepEqual(out.get("KO"), { status: "stripped", reading: null, reason: STRIPPED }, word);
   }
-  for (const word of ["long", "short", "enter", "avoid", "suggest", "should", "ไม่ควร", "แนะนำ"]) {
+  for (const word of ADVISOR_GUARD_WORDS_EN) {
+    assert.ok(isDirectional(`a ${word} here`), `the advisor guard strips ${word}`);
+    assert.ok(REVIEW_SYSTEM.includes(word), `REVIEW_SYSTEM names ${word}`);
+  }
+  for (const word of ["ไม่ควร", "แนะนำ"]) {
     assert.ok(REVIEW_SYSTEM.includes(word), `REVIEW_SYSTEM names ${word}`);
   }
 });

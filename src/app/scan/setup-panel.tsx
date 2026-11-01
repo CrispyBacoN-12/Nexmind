@@ -14,7 +14,7 @@ import { useEffect, useRef } from "react";
 import { Badge, Button, Card } from "@/components/ui";
 import type { ChartAgentResult, ShownSetup } from "@/lib/chartAgent/runChartAgent";
 import type { Review } from "@/lib/chartAgent/review";
-import type { Setup } from "@/lib/chartAgent/types";
+import { CHART_MAX_SETUPS, type Setup } from "@/lib/chartAgent/types";
 import { fmtMoney, fmtNumber } from "@/lib/utils";
 
 import { PHASE_LABEL, bangkokTime } from "./format";
@@ -147,7 +147,13 @@ function SetupCard({ shown }: { shown: ShownSetup }) {
           <span className="font-mono text-base font-semibold">{setup.ticker}</span>
           <span className="text-xs text-(--color-muted)">กวาด {setup.sweptLevels.join(", ")}</span>
         </div>
-        <Link href={advisorHref(setup)} className="text-xs text-(--color-accent) hover:underline">
+        {/* A new tab, so this panel (and the reading it took a minute to get) survives. */}
+        <Link
+          href={advisorHref(setup)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-(--color-accent) hover:underline"
+        >
           → Advisor
         </Link>
       </div>
@@ -214,7 +220,11 @@ function Reading({ review }: { review: Review }) {
 
 function Footer({ result }: { result: Extract<ChartAgentResult, { ok: true }> }) {
   const hasContent =
-    result.rejected.length > 0 || result.none.length > 0 || result.aiNote !== null || result.logNote !== null;
+    result.rejected.length > 0 ||
+    result.none.length > 0 ||
+    result.cappedCount > 0 ||
+    result.aiNote !== null ||
+    result.logNote !== null;
   if (!hasContent) return null;
   return (
     <details className="border-t border-(--color-border) p-4 text-xs text-(--color-muted)">
@@ -222,6 +232,11 @@ function Footer({ result }: { result: Extract<ChartAgentResult, { ok: true }> })
         รายละเอียดที่ไม่ได้แสดง (ตัดออก {result.rejected.length} · ไม่มี setup {result.none.length})
       </summary>
       <div className="mt-3 space-y-3">
+        {result.cappedCount > 0 && (
+          <p>
+            มี setup อีก {result.cappedCount} ตัวที่เกินเพดาน {CHART_MAX_SETUPS} ตัว (บันทึกไว้แล้ว)
+          </p>
+        )}
         {result.rejected.length > 0 && (
           <div className="space-y-1">
             <p className="font-medium">ตัดออก</p>
