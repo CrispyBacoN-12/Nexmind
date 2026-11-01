@@ -81,7 +81,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-11-01: Chart agent (agent #2) on `/scan`. Branch `chart-agent`, commits `09a68ad..HEAD` (`git log --oneline a2739d4..HEAD`). Not merged.**
+- **2026-11-01: Chart agent (agent #2) on `/scan`. Branch `chart-agent`, commits `a2739d4..HEAD` (`git log --oneline a2739d4..HEAD`, the first is `09a68ad`). Not merged.**
   - What it does: reads the top 20 scan names on Alpaca SIP 5-minute bars. Per name it builds the
     previous-session volume profile (50 bins, 70% value area), PDH/PDL, PMH/PML and dPOC.
   - The one setup is a **long sweep** of PDL, PML or pVAL: the sweep bar opens above L, trades below
@@ -96,13 +96,19 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   - **`/advisor` takes `?entry=&stop=`.** `stopAtrMult` (the chart stop in ATR units, default 1.5)
     flows through sizing, the R ladder, cost, gap risk, the fill guard, the base rate and the AI
     critic's facts sheet, so a chart-stop card is measured at its own stop.
-  - Safety: bars ending after now − the 15-minute SIP delay are dropped (a forming bar is never
-    read), and a run superseded by a newer click aborts before it spends AI or logs a row.
+  - Safety: bars ending after now − the 16-minute SIP delay (`SIP_DELAY_MS`, `src/lib/alpaca.ts`) are
+    dropped (a forming bar is never read). A run superseded by a newer click skips the AI call and
+    the log only if the abort arrives before the AI call; an abort during the call still pays for it
+    and skips the log. Whether Next 16 fires `request.signal` on client disconnect is unverified live.
   - Live probe, 2026-11-01, real Alpaca bars with the clock set to Fri 2026-10-30 14:30 ET, log a
     no-op, no DB writes: before the from-below fix a gap-down name (DVA) read as a sweep. After the
     fix, DVA reads "no sweep yet", and two setups showed (KVUE PDL+pVAL 0.25R tagged, WDC PML 1.23R).
-    The browser check showed the modal, levels on the chart, the R table, the footer and the
-    Advisor prefill with 0 console errors (stubbed result; the live API returned "market closed").
+    The first browser check (before the fix wave, stubbed result; the live API said "market closed")
+    showed the modal, levels, R table, footer and Advisor prefill with 0 console errors.
+  - Re-check on the final build, 2026-11-01, controller, stubbed response: "→ Advisor" opens a new
+    tab (`target=_blank`, `rel=noopener noreferrer`); the footer shows "มี setup อีก 2 ตัวที่เกินเพดาน 5 ตัว
+    (บันทึกไว้แล้ว)" and the outage note "AI ใช้ไม่ได้: ไม่มี AI backend"; `/advisor` shows
+    "stop จากกราฟ (0.15×ATR) · ห่าง $3.80" (2 decimals). 0 console errors.
   - **No backtest. The sweep rule is a description, not an edge.** It was never tested on stocks;
     its nearest relative, xau-vp-v1's gold sweep, lost money in every fold.
   - The AI is unavailable until `claude login` (the CLI OAuth expired; setups then show as unread).
@@ -120,7 +126,8 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   - Rows beyond the AI's top 30 show "ไม่ได้สรุป (นอก 30 อันดับแรก)", which is not a failure. A row
     above the $500 slot carries the fractional-share tag. Data is 15 minutes late and the clock
     does not know US holidays; both are on the page. EDGAR calls are paced (125 ms shared gap).
-  - Live check 2026-10-31 (Saturday): covered 473/~503, 135 passed, AI unavailable. `next dev`
+  - Live check 2026-10-31 (Saturday): covered 473/~503, 135 passed, AI unavailable. SEC 8-K failed for
+    33 of 135 tickers before the pacing fix; re-verified live 2026-10-31: SEC check passed for all 135 tickers. `next dev`
     cannot run in a worktree with a junctioned `node_modules`; verify with `next build --webpack` + `next start`.
 - **2026-10-31: Web layer cut to the copilot (`3a50c1f`).** Kept `/advisor`, `/journal` and their APIs; deleted
   12 pages, `components/office`, `components/research`, 25 API routes. The Risk Sentry extras editor moved to
@@ -135,7 +142,8 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 - **2026-10-30: xau-vp-v1, volume profile on gold. All 3 REJECT; gold testing is open-ended.** Branch `xau-vp-v1`,
   `docs/quant/2026-10-30-xau-vp-v1-results.md`. Sweep + VP lost money in every fold. The owner dropped the stop rule
   and chose open-ended testing under `docs/quant/xau-test-ledger.md` (branch `xau-vp-v1`): every rule logged, the bar
-  never loosens, a PASS stays provisional until it holds on bars after 2026-09-18. No order path is built.
+  never loosens, a PASS stays provisional until it holds on bars after 2026-09-18. Round 3 (plain 20-bar
+  sweep, EMA 20/50 cross) is pre-registered in `5777a8f`. The AI-agent order path is not built.
 - **2026-10-29: Copilot polish.** `/journal` runs `stopWatch` on demand (`GET /api/journal/stops`); `/advisor`
   prefills holdings from open journal positions.
 - **2026-10-13: 56 gold EAs exported to MQL5 (`1010f4d`).** `mql5/README.md`; compile from a path without spaces.
@@ -143,13 +151,15 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 - **2026-10-01: xau-v1 gold validation. All 4 REJECT; XAUUSD closed** (branch `xau-v1-phase0-1-unblock`,
   `docs/quant/2026-10-01-xau-v1-results.md`). Disclosed, not amended: the fold table was unpassable for everyone.
 - **2026-10-01: Risk Sentry runs locally** at 19:00 ICT (`scripts/risk-sentry.cmd`, log `scripts/risk-sentry.log`)
-  and watches open journal positions with `stopWatch` (`8cfffa9`, `06174fd`, `070382d`, `e35cde7`).
+  and watches open journal positions (`8cfffa9`, `06174fd`, `070382d`, `e35cde7`). `stopWatch`: `breached` =
+  close ≤ stop, `touched` = low ≤ stop with the close above. Journal tickers merge with manual extras, cap 20,
+  manual names dropped first and never stop-checked.
 - **2026-09-27: Test B, residual momentum as the mr-down3 slot queue: FAIL, final** (`docs/quant/2026-09-27-test-b-results.md`).
   Same day: portfolio layer with six gates (`63837ef`), `/journal`, `/api/portfolio/evaluate`.
 - **2026-09-25: overnight gap-through risk on `/advisor`** (`gapRisk.ts`). **09-17:** 88-file backlog became 10 scoped
   commits (`b7ac7b0..0176cfd`). **09-16:** Risk Sentry v1. **09-15:** pivot to copilot.
 - **2026-09-14: Finnhub earnings date on the card; `AiCall` ledger fix; `RESEARCH_COST_MODEL` 0.5 → 5 bps.** Never
-  pool verdicts across that date. **09-11:** `/advisor` shipped (`9bcae76..859331a`).
+  pool verdicts across that date. **09-11:** `/advisor` shipped (`9bcae76..859331a`); its route returns 400 on any present-but-unparseable numeric field (it used to fall back silently and fabricate a risk %).
 
 **Desk era, one line each.** Full text is in the archive file; studies are in `docs/quant/`.
 - 09-15 **Exit-geometry axis closed**: every ladder, trail and `maxBars` time stop "passes" on
@@ -233,7 +243,10 @@ There are no open research directions; the owner closed the search. Work items:
   pool rows across versions.** It is `"sweep-v1"` today. The 2026-11-01 from-below fix shipped before any row existed.
 - **The sweep rule is a description, not an edge. It has no backtest.** Do not present a setup, its R or its
   AI reading as odds. A bar must open above L: without that, every gap-down reclaim reads as a sweep.
-- **Never read a forming bar.** Bars ending after now − the SIP delay are dropped; keep that in any new reader.
+- **Never read a forming bar.** Bars ending after now − the SIP delay (16 min) are dropped; keep that in any new reader.
+- **The dev DB is the live Neon DB.** Previewing or running the chart agent during market hours writes real
+  `ChartSetup` rows. The 2026-10-29 polish wrote no test rows for this reason, and the controller's live
+  probes used a no-op log.
 
 **Risk logic:**
 - **Correlation, gap risk and the earnings date are disclosed, never applied to size.** The one
