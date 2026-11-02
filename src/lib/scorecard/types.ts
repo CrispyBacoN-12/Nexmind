@@ -21,6 +21,13 @@ export const SCORECARD_VERDICT_N = 300;
 export const SCORECARD_MIN_N = 30;
 /** The random control enters no later than 15:30 ET (minutes since 00:00 ET). */
 export const SCORECARD_CONTROL_LAST_ENTRY_ET_MINUTES = 930;
+/**
+ * Random-control runs and seed. Copies of `CONTROL_RUNS` / `PANEL_SEED`: panelRun.ts
+ * reaches prisma through the backtest engine, so it is not imported here.
+ * `constants.test.ts` fails if either differs.
+ */
+export const SCORECARD_CONTROL_RUNS = 200;
+export const SCORECARD_SEED = 20260825;
 /** A setup with no bars at all this many days after its run is `no_data`. */
 export const SCORECARD_NO_DATA_DAYS = 15;
 
