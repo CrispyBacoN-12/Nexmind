@@ -246,3 +246,31 @@ test("record throwing is reported as failed, not thrown", async () => {
   assert.match(r.note ?? "", /db down/);
   assert.equal(n, 1);
 });
+
+test("a chart log failure records failed so the next firing can retry", async () => {
+  const { deps, calls } = harness({ chart: async () => chartOk({ logNote: "บันทึกลงฐานข้อมูลไม่ได้: db down" }) });
+  const r = await runScorecardDaily(deps);
+  assert.equal(r.action, "failed");
+  assert.match(r.note ?? "", /db down/);
+  assert.equal(calls.record.length, 1);
+  assert.equal(calls.record[0].status, "failed");
+  assert.match(calls.record[0].error ?? "", /db down/);
+});
+
+test("a log failure on a holiday-shaped result is still failed", async () => {
+  const { deps, calls } = harness({ chart: async () => chartOk({ dataAsOf: null, logNote: "x" }) });
+  assert.equal((await runScorecardDaily(deps)).action, "failed");
+  assert.equal(calls.record[0].status, "failed");
+});
+
+test("the scan receives the run's clock", async () => {
+  let got = 0;
+  const { deps } = harness({
+    scan: async (n) => {
+      got = n;
+      return scanOk();
+    },
+  });
+  await runScorecardDaily(deps);
+  assert.equal(got, IN_WINDOW);
+});

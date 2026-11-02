@@ -4,8 +4,7 @@
 // Spec: docs/superpowers/specs/2026-11-03-scorecard-agent-design.md section 8.
 //
 // Read-only toward the market: it never places or sizes an order. The only writes are
-// the ChartSetup log rows and one ScorecardRun row. The task fires more than once an
-// hour; runScorecardDaily returns without doing anything outside 10:30-11:30 ET, on a
+// the ChartSetup log rows and one ScorecardRun row. The task fires twice a day; runScorecardDaily returns without doing anything outside 10:30-11:30 ET, on a
 // weekend, or once the day already has a ran / no_session row.
 //
 //   node --env-file=.env --import tsx scripts/scorecard-run.mts
@@ -21,6 +20,7 @@ import { sendDiscordNotification } from "@/lib/notify/discord";
 import { fetchEconEvents } from "@/lib/scanAgent/econ";
 import { runScanAgent } from "@/lib/scanAgent/runScanAgent";
 import { fetchTradingViewRows } from "@/lib/scanAgent/tradingview";
+import { etDayBoundsMs } from "@/lib/scorecard/etDay";
 import { runScorecardDaily } from "@/lib/scorecard/runDaily";
 import { SCORECARD_SOURCE } from "@/lib/scorecard/types";
 import type { Interval, Range } from "@/lib/yahoo";
@@ -36,21 +36,33 @@ async function main() {
   try {
     const result = await runScorecardDaily({
       now: () => Date.now(),
-      alreadyRan: async (sessionDate) =>
-        (await prisma.scorecardRun.count({ where: { sessionDate, status: { in: ["ran", "no_session"] } } })) > 0,
+      alreadyRan: async (sessionDate) => {
+        if ((await prisma.scorecardRun.count({ where: { sessionDate, status: { in: ["ran", "no_session"] } } })) > 0) return true;
+        // A scheduled run can log its setups and then fail to write its run row. Re-running
+        // would log the same session twice under a new runId, so those rows count as done.
+        const { startMs, endMs } = etDayBoundsMs(sessionDate);
+        const orphaned = await prisma.chartSetup.count({
+          where: { source: SCORECARD_SOURCE, createdAt: { gte: new Date(startMs), lt: new Date(endMs) } },
+        });
+        if (orphaned > 0) log(`scorecard-run: ${sessionDate} already has ${orphaned} scheduled ChartSetup rows but no run row; not re-running, no run row written`);
+        return orphaned > 0;
+      },
       // The same deps as POST /api/scan, except the AI notes: the scheduled run needs
       // only the ranking, so it skips them (and their CLI spend).
-      scan: () =>
-        runScanAgent({
-          fetchTradingViewRows,
-          fetchRecentFilings,
-          fetchRecentNews,
-          fetchEconEvents,
-          annotateRows: async () => ({
-            notes: new Map(),
-            status: { name: "AI", ok: true, note: "ข้ามโน้ต AI (รอบอัตโนมัติ)" },
-          }),
-        }),
+      scan: (nowMs) =>
+        runScanAgent(
+          {
+            fetchTradingViewRows,
+            fetchRecentFilings,
+            fetchRecentNews,
+            fetchEconEvents,
+            annotateRows: async () => ({
+              notes: new Map(),
+              status: { name: "AI", ok: true, note: "ข้ามโน้ต AI (รอบอัตโนมัติ)" },
+            }),
+          },
+          nowMs,
+        ),
       // The same deps as POST /api/chart-agent, with this run's id, rows tagged as
       // scheduled, and no abort signal (nobody is waiting on a page).
       chart: (tickers, runId) =>

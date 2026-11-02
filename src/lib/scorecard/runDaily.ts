@@ -98,6 +98,10 @@ export async function runScorecardDaily(deps: DailyDeps): Promise<DailyResult> {
   }
   if (!chart.ok) return fail(chart.error, runId);
 
+  // runChartAgent swallows a failed setup log into logNote and still answers ok. A day whose
+  // rows were not written must not count as done, or alreadyRan would block the retry.
+  if (chart.logNote !== null) return fail(chart.logNote, runId);
+
   // No regular bars today: a holiday. Nothing was logged and nothing is owed a retry.
   const action: DailyAction = chart.dataAsOf === null ? "no_session" : "ran";
   const run: ScorecardRunInput =
