@@ -24,6 +24,8 @@ const OPEN_MIN = 570; // 09:30 ET
 
 /** One per filled setup. `fill` is the setup's raw fill price (the bar open). */
 export interface ControlTrade {
+  /** Stable key (`ChartSetup.id`, or a deterministic sequence index). Fixes the draw order. */
+  id: number;
   runAtSec: number;
   fill: number;
   stop: number;
@@ -50,6 +52,9 @@ function eligibleBars(trade: ControlTrade): Candle[] {
  * with no eligible bar, or whose control result is not `closed`, sits that run out; a
  * run with no closed trade is dropped. Null when no run produced a value.
  *
+ * Order-independent: trades are drawn in ascending `id` order (on a sorted copy), so
+ * the same trades in any input order give the same distribution.
+ *
  * Same ticker and day means the same ATR, so keeping the price distance `fill - stop`
  * and the multiple `(t1 - fill) / (fill - stop)` is "the same ATR multiple" (spec §5).
  */
@@ -60,6 +65,7 @@ export function controlDistribution(
   seed: number = SCORECARD_SEED,
 ): ControlDistribution | null {
   const rng = mulberry32(seed);
+  trades = [...trades].sort((a, b) => a.id - b.id);
   const eligible = trades.map(eligibleBars);
   const avgRs: number[] = [];
 

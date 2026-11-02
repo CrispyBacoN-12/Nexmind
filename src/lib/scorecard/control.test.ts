@@ -32,8 +32,9 @@ function flatDay(): Candle[] {
   return bars;
 }
 
-const trade = (runAtSec: number, bars: Candle[]): ControlTrade => ({
-  runAtSec, fill: 100, stop: 99, t1: 102, bars, cutoffSec: AFTER,
+let nextId = 0;
+const trade = (runAtSec: number, bars: Candle[], id = nextId++): ControlTrade => ({
+  id, runAtSec, fill: 100, stop: 99, t1: 102, bars, cutoffSec: AFTER,
 });
 
 test("controlDistribution is deterministic for a seed", () => {
@@ -70,4 +71,17 @@ test("controlDistribution skips trades with no eligible bar", () => {
 
 test("controlDistribution returns null for no trades", () => {
   assert.equal(controlDistribution([], "hold", 20, 1), null);
+});
+
+test("controlDistribution does not depend on the input order of the trades", () => {
+  // Bars that vary, so different draws give different R.
+  const bars = flatDay().map((b, i) => (i % 7 === 0 ? { ...b, l: 98.5 } : i % 5 === 0 ? { ...b, h: 102.5 } : b));
+  const times = ["09:30", "10:30", "11:00", "12:15", "13:40", "14:05"];
+  const trades = times.map((t, i) => trade(etEpoch(DAY, t), bars, 100 + i));
+  const shuffled = [trades[3], trades[0], trades[5], trades[2], trades[4], trades[1]];
+  const a = controlDistribution(trades, "sameDay", 60, 11);
+  const b = controlDistribution(shuffled, "sameDay", 60, 11);
+  assert.ok(a);
+  assert.ok(a.avgRs.length > 1 && a.avgRs[0] !== a.avgRs[a.avgRs.length - 1], "fixture should vary");
+  assert.deepEqual(a, b);
 });

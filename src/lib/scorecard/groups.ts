@@ -41,13 +41,17 @@ export function summarize(outcomes: Outcome[]): GroupStats {
  * The frozen sample the AI verdict is read on: the earliest SCORECARD_VERDICT_N kept
  * setups that filled. `ready` only when it is full, every one is closed, and every
  * one's 10-session window has passed (so no control trade can still be open).
+ *
+ * Order-independent: rows are sorted by (createdAt, id) ascending, so the sample is the
+ * same whatever order the caller passes them in. The id tiebreak matters because one
+ * createMany per run gives every setup of that run the same createdAt.
  */
-export function aiVerdictSample<T extends { createdAt: Date; group: Group; hold: Outcome; windowElapsed: boolean }>(
+export function aiVerdictSample<T extends { id: number; createdAt: Date; group: Group; hold: Outcome; windowElapsed: boolean }>(
   rows: T[],
 ): { sample: T[]; ready: boolean } {
   const sample = rows
     .filter((r) => r.group === "kept" && r.hold.status !== "not_filled" && r.hold.status !== "no_data")
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id)
     .slice(0, SCORECARD_VERDICT_N);
   const ready =
     sample.length === SCORECARD_VERDICT_N &&

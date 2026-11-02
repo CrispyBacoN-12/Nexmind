@@ -94,3 +94,16 @@ test("beatsControl is strict", () => {
   assert.equal(beatsControl(0.1, c), false);
   assert.equal(beatsControl(0.1000001, c), true);
 });
+
+test("aiVerdictSample is order-independent when createdAt ties straddle the boundary", () => {
+  const tie = new Date(2026, 0, 2);
+  const base = rows(301).map((r, i) => (i < 290 ? r : { ...r, createdAt: tie })); // ids 290..300 share a createdAt
+  const orderA = [...base].reverse();
+  const orderB = [...base].sort((x, y) => ((x.id * 7919) % 301) - ((y.id * 7919) % 301));
+  const a = aiVerdictSample(orderA);
+  const b = aiVerdictSample(orderB);
+  assert.equal(a.sample.length, 300);
+  assert.deepEqual(a.sample.map((r) => r.id), Array.from({ length: 300 }, (_, i) => i));
+  assert.deepEqual(a.sample.map((r) => r.id), b.sample.map((r) => r.id));
+  assert.ok(!a.sample.some((r) => r.id === 300)); // highest id among the ties is cut
+});
