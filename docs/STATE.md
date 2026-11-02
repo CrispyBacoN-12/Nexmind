@@ -58,8 +58,8 @@ Hard context the code does not state:
 
 | Thing | Value |
 |---|---|
-| Branch | `master` at `22f312f` (2026-11-01) contains agents #2 and #3; `origin/master` = `master` (agent #3 pushed 2026-11-01, Vercel deploy ok). Every push auto-deploys Vercel production |
-| Tests | `npm test` **1099 pass / 0 fail** (2026-11-01, branch `stop-cluster`) |
+| Branch | `master` contains agents #2 and #3 plus the stop cluster rule (`8f625be`, fast-forwarded from `stop-cluster` and pushed 2026-11-03; branch deleted). Every push auto-deploys Vercel production |
+| Tests | `npm test` **1099 pass / 0 fail** (2026-11-03, master) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
