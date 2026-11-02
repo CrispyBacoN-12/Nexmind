@@ -64,6 +64,8 @@ export type ChartAgentResult =
       aiNote: string | null;
       logNote: string | null;
       backend: string;
+      /** The review's resolved model id; null when no AI call happened. */
+      model: string | null;
     }
   | { ok: false; error: string };
 
@@ -76,7 +78,7 @@ const CANCELLED = "ยกเลิกแล้ว";
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** Daily ATR from finished days only: today's forming bar is dropped. NaN when it cannot be computed. */
-function dailyAtr(daily: Candle[] | undefined, today: string): number {
+export function dailyAtr(daily: Candle[] | undefined, today: string): number {
   if (!daily) return NaN;
   const values = atr(
     daily.filter((c) => etDate(c.t) !== today),
@@ -98,7 +100,7 @@ export async function runChartAgent(
   const phase = marketPhase(nowMs);
   const tickers = [...new Set(rawTickers)];
 
-  const base = { ok: true as const, ranAt, phase, dataAsOf: null, shown: [], rejected: [], cappedCount: 0, aiNote: null, logNote: null, backend: "none" };
+  const base = { ok: true as const, ranAt, phase, dataAsOf: null, shown: [], rejected: [], cappedCount: 0, aiNote: null, logNote: null, backend: "none", model: null };
 
   // 1. Outside the regular session there is nothing to read.
   if (phase !== "open") {
@@ -163,6 +165,7 @@ export async function runChartAgent(
   let reviews: Map<string, Review>;
   let backend: string;
   let aiNote: string | null;
+  let model: string | null = null;
   try {
     const r = await deps.review(
       found.map(({ setup, split }) => ({ setup, recent: split.regular.slice(-CHART_AI_BARS) })),
@@ -170,6 +173,7 @@ export async function runChartAgent(
     reviews = r.reviews;
     backend = r.backend;
     aiNote = r.note;
+    model = r.model;
   } catch (e) {
     reviews = new Map();
     backend = "none";
@@ -198,11 +202,11 @@ export async function runChartAgent(
   // 6. Log every setup found. A failure here is a note, never a failed run.
   let logNote: string | null = null;
   try {
-    await deps.log(toLogRows(deps.runId(), decided, backend));
+    await deps.log(toLogRows(deps.runId(), decided, backend, model));
   } catch (e) {
     logNote = `บันทึกลงฐานข้อมูลไม่ได้: ${message(e)}`;
   }
 
   const cappedCount = decided.filter((d) => d.status === "capped").length;
-  return { ok: true, ranAt, phase, dataAsOf, shown, rejected, cappedCount, none, aiNote, logNote, backend };
+  return { ok: true, ranAt, phase, dataAsOf, shown, rejected, cappedCount, none, aiNote, logNote, backend, model };
 }

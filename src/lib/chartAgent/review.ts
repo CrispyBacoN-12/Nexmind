@@ -187,12 +187,12 @@ export function mockBackendNote(outageReason: string | null): string {
 
 export async function reviewSetups(
   items: ReviewItem[],
-): Promise<{ reviews: Map<string, Review>; backend: string; note: string | null }> {
+): Promise<{ reviews: Map<string, Review>; backend: string; note: string | null; model: string | null }> {
   const tickers = items.map((i) => i.setup.ticker);
   const backend = aiBackend();
-  if (items.length === 0) return { reviews: new Map(), backend, note: null };
+  if (items.length === 0) return { reviews: new Map(), backend, note: null, model: null };
   if (backend === "mock") {
-    return { reviews: unread(tickers), backend, note: mockBackendNote(aiOutageReason()) };
+    return { reviews: unread(tickers), backend, note: mockBackendNote(aiOutageReason()), model: null };
   }
   try {
     const r = await callAgentJSON<unknown>({
@@ -203,12 +203,12 @@ export async function reviewSetups(
       maxTokens: 6000,
       jsonSchema: REVIEW_SCHEMA,
     });
-    return { reviews: normalizeReviews(r.data, tickers), backend, note: null };
+    return { reviews: normalizeReviews(r.data, tickers), backend, note: null, model: r.resolvedModel ?? null };
   } catch (err) {
     const safe = safeFailureReason(err);
     if (safe === RAW_WITHHELD_REASON) {
       console.error("chart-agent: withholding raw model text from the page:", err instanceof Error ? err.message : String(err));
     }
-    return { reviews: unread(tickers), backend, note: safe };
+    return { reviews: unread(tickers), backend, note: safe, model: null };
   }
 }

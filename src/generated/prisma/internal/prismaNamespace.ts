@@ -404,7 +404,10 @@ export const ModelName = {
   JournalTrade: 'JournalTrade',
   NavSnapshot: 'NavSnapshot',
   GateOverride: 'GateOverride',
-  ChartSetup: 'ChartSetup'
+  ChartSetup: 'ChartSetup',
+  ScorecardRun: 'ScorecardRun',
+  ScorecardOutcome: 'ScorecardOutcome',
+  ScorecardSnapshot: 'ScorecardSnapshot'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -420,7 +423,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "aiCall" | "journalTrade" | "navSnapshot" | "gateOverride" | "chartSetup"
+    modelProps: "agent" | "pipeline" | "pipelineStep" | "signal" | "portfolio" | "counterfactual" | "trade" | "newsItem" | "lesson" | "watchlist" | "buildJob" | "researchRun" | "researchStrategy" | "report" | "setting" | "scanLog" | "aiCall" | "journalTrade" | "navSnapshot" | "gateOverride" | "chartSetup" | "scorecardRun" | "scorecardOutcome" | "scorecardSnapshot"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1978,6 +1981,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ScorecardRun: {
+      payload: Prisma.$ScorecardRunPayload<ExtArgs>
+      fields: Prisma.ScorecardRunFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ScorecardRunFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ScorecardRunFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>
+        }
+        findFirst: {
+          args: Prisma.ScorecardRunFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ScorecardRunFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>
+        }
+        findMany: {
+          args: Prisma.ScorecardRunFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>[]
+        }
+        create: {
+          args: Prisma.ScorecardRunCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>
+        }
+        createMany: {
+          args: Prisma.ScorecardRunCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ScorecardRunCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>[]
+        }
+        delete: {
+          args: Prisma.ScorecardRunDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>
+        }
+        update: {
+          args: Prisma.ScorecardRunUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>
+        }
+        deleteMany: {
+          args: Prisma.ScorecardRunDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ScorecardRunUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ScorecardRunUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>[]
+        }
+        upsert: {
+          args: Prisma.ScorecardRunUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardRunPayload>
+        }
+        aggregate: {
+          args: Prisma.ScorecardRunAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateScorecardRun>
+        }
+        groupBy: {
+          args: Prisma.ScorecardRunGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScorecardRunGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ScorecardRunCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScorecardRunCountAggregateOutputType> | number
+        }
+      }
+    }
+    ScorecardOutcome: {
+      payload: Prisma.$ScorecardOutcomePayload<ExtArgs>
+      fields: Prisma.ScorecardOutcomeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ScorecardOutcomeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ScorecardOutcomeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>
+        }
+        findFirst: {
+          args: Prisma.ScorecardOutcomeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ScorecardOutcomeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>
+        }
+        findMany: {
+          args: Prisma.ScorecardOutcomeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>[]
+        }
+        create: {
+          args: Prisma.ScorecardOutcomeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>
+        }
+        createMany: {
+          args: Prisma.ScorecardOutcomeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ScorecardOutcomeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>[]
+        }
+        delete: {
+          args: Prisma.ScorecardOutcomeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>
+        }
+        update: {
+          args: Prisma.ScorecardOutcomeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>
+        }
+        deleteMany: {
+          args: Prisma.ScorecardOutcomeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ScorecardOutcomeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ScorecardOutcomeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>[]
+        }
+        upsert: {
+          args: Prisma.ScorecardOutcomeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardOutcomePayload>
+        }
+        aggregate: {
+          args: Prisma.ScorecardOutcomeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateScorecardOutcome>
+        }
+        groupBy: {
+          args: Prisma.ScorecardOutcomeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScorecardOutcomeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ScorecardOutcomeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScorecardOutcomeCountAggregateOutputType> | number
+        }
+      }
+    }
+    ScorecardSnapshot: {
+      payload: Prisma.$ScorecardSnapshotPayload<ExtArgs>
+      fields: Prisma.ScorecardSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ScorecardSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ScorecardSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.ScorecardSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ScorecardSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.ScorecardSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.ScorecardSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.ScorecardSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ScorecardSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.ScorecardSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>
+        }
+        update: {
+          args: Prisma.ScorecardSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.ScorecardSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ScorecardSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ScorecardSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.ScorecardSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ScorecardSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.ScorecardSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateScorecardSnapshot>
+        }
+        groupBy: {
+          args: Prisma.ScorecardSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScorecardSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ScorecardSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ScorecardSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2378,10 +2603,60 @@ export const ChartSetupScalarFieldEnum = {
   levels: 'levels',
   aiReading: 'aiReading',
   aiRejectReason: 'aiRejectReason',
-  aiBackend: 'aiBackend'
+  aiBackend: 'aiBackend',
+  source: 'source',
+  aiModel: 'aiModel'
 } as const
 
 export type ChartSetupScalarFieldEnum = (typeof ChartSetupScalarFieldEnum)[keyof typeof ChartSetupScalarFieldEnum]
+
+
+export const ScorecardRunScalarFieldEnum = {
+  id: 'id',
+  sessionDate: 'sessionDate',
+  runId: 'runId',
+  ranAt: 'ranAt',
+  status: 'status',
+  setups: 'setups',
+  kept: 'kept',
+  vetoed: 'vetoed',
+  stripped: 'stripped',
+  unread: 'unread',
+  aiBackend: 'aiBackend',
+  aiModel: 'aiModel',
+  error: 'error'
+} as const
+
+export type ScorecardRunScalarFieldEnum = (typeof ScorecardRunScalarFieldEnum)[keyof typeof ScorecardRunScalarFieldEnum]
+
+
+export const ScorecardOutcomeScalarFieldEnum = {
+  id: 'id',
+  chartSetupId: 'chartSetupId',
+  variant: 'variant',
+  status: 'status',
+  fillAt: 'fillAt',
+  fill: 'fill',
+  exitAt: 'exitAt',
+  exitPrice: 'exitPrice',
+  exitReason: 'exitReason',
+  r: 'r',
+  sessionsHeld: 'sessionsHeld',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ScorecardOutcomeScalarFieldEnum = (typeof ScorecardOutcomeScalarFieldEnum)[keyof typeof ScorecardOutcomeScalarFieldEnum]
+
+
+export const ScorecardSnapshotScalarFieldEnum = {
+  id: 'id',
+  kind: 'kind',
+  ruleVersion: 'ruleVersion',
+  computedAt: 'computedAt',
+  data: 'data'
+} as const
+
+export type ScorecardSnapshotScalarFieldEnum = (typeof ScorecardSnapshotScalarFieldEnum)[keyof typeof ScorecardSnapshotScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2637,6 +2912,9 @@ export type GlobalOmitConfig = {
   navSnapshot?: Prisma.NavSnapshotOmit
   gateOverride?: Prisma.GateOverrideOmit
   chartSetup?: Prisma.ChartSetupOmit
+  scorecardRun?: Prisma.ScorecardRunOmit
+  scorecardOutcome?: Prisma.ScorecardOutcomeOmit
+  scorecardSnapshot?: Prisma.ScorecardSnapshotOmit
 }
 
 /* Types for Logging */

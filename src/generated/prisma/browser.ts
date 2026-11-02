@@ -155,3 +155,18 @@ export type GateOverride = Prisma.GateOverrideModel
  * them yet. `status` is shown | ai_rejected | guard_stripped | capped.
  */
 export type ChartSetup = Prisma.ChartSetupModel
+/**
+ * Model ScorecardRun
+ * 
+ */
+export type ScorecardRun = Prisma.ScorecardRunModel
+/**
+ * Model ScorecardOutcome
+ * 
+ */
+export type ScorecardOutcome = Prisma.ScorecardOutcomeModel
+/**
+ * Model ScorecardSnapshot
+ * 
+ */
+export type ScorecardSnapshot = Prisma.ScorecardSnapshotModel

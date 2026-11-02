@@ -424,7 +424,57 @@ model ChartSetup {
   aiReading      String?
   aiRejectReason String?
   aiBackend      String
+  /// "button" (POST /api/chart-agent) or "scheduled" (scripts/scorecard-run.mts). Only scheduled rows are scored.
+  source         String   @default("button")
+  /// Resolved model id behind the review call (e.g. claude-sonnet-…); null when unknown or no AI call.
+  aiModel        String?
 
   @@index([createdAt])
   @@index([ticker])
+  @@index([source, ruleVersion])
+}
+
+model ScorecardRun {
+  id          Int      @id @default(autoincrement())
+  sessionDate String /// ET date the run was for
+  runId       String? /// ChartSetup.runId of this run's rows
+  ranAt       DateTime @default(now())
+  status      String /// ran | no_session | failed
+  setups      Int      @default(0)
+  kept        Int      @default(0)
+  vetoed      Int      @default(0)
+  stripped    Int      @default(0)
+  unread      Int      @default(0)
+  aiBackend   String?
+  aiModel     String?
+  error       String?
+
+  @@index([sessionDate])
+}
+
+model ScorecardOutcome {
+  id           Int       @id @default(autoincrement())
+  chartSetupId Int
+  variant      String /// hold | sameDay
+  status       String /// open | closed | not_filled | no_data
+  fillAt       DateTime?
+  fill         Float?
+  exitAt       DateTime?
+  exitPrice    Float?
+  exitReason   String? /// stop | t1 | time
+  r            Float?
+  sessionsHeld Int       @default(0)
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([chartSetupId, variant])
+}
+
+model ScorecardSnapshot {
+  id          Int      @id @default(autoincrement())
+  kind        String /// replay | live | ai-verdict
+  ruleVersion String
+  computedAt  DateTime @default(now())
+  data        Json
+
+  @@unique([kind, ruleVersion])
 }

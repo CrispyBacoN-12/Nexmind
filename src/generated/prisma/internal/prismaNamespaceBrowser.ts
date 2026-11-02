@@ -71,7 +71,10 @@ export const ModelName = {
   JournalTrade: 'JournalTrade',
   NavSnapshot: 'NavSnapshot',
   GateOverride: 'GateOverride',
-  ChartSetup: 'ChartSetup'
+  ChartSetup: 'ChartSetup',
+  ScorecardRun: 'ScorecardRun',
+  ScorecardOutcome: 'ScorecardOutcome',
+  ScorecardSnapshot: 'ScorecardSnapshot'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -451,10 +454,60 @@ export const ChartSetupScalarFieldEnum = {
   levels: 'levels',
   aiReading: 'aiReading',
   aiRejectReason: 'aiRejectReason',
-  aiBackend: 'aiBackend'
+  aiBackend: 'aiBackend',
+  source: 'source',
+  aiModel: 'aiModel'
 } as const
 
 export type ChartSetupScalarFieldEnum = (typeof ChartSetupScalarFieldEnum)[keyof typeof ChartSetupScalarFieldEnum]
+
+
+export const ScorecardRunScalarFieldEnum = {
+  id: 'id',
+  sessionDate: 'sessionDate',
+  runId: 'runId',
+  ranAt: 'ranAt',
+  status: 'status',
+  setups: 'setups',
+  kept: 'kept',
+  vetoed: 'vetoed',
+  stripped: 'stripped',
+  unread: 'unread',
+  aiBackend: 'aiBackend',
+  aiModel: 'aiModel',
+  error: 'error'
+} as const
+
+export type ScorecardRunScalarFieldEnum = (typeof ScorecardRunScalarFieldEnum)[keyof typeof ScorecardRunScalarFieldEnum]
+
+
+export const ScorecardOutcomeScalarFieldEnum = {
+  id: 'id',
+  chartSetupId: 'chartSetupId',
+  variant: 'variant',
+  status: 'status',
+  fillAt: 'fillAt',
+  fill: 'fill',
+  exitAt: 'exitAt',
+  exitPrice: 'exitPrice',
+  exitReason: 'exitReason',
+  r: 'r',
+  sessionsHeld: 'sessionsHeld',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ScorecardOutcomeScalarFieldEnum = (typeof ScorecardOutcomeScalarFieldEnum)[keyof typeof ScorecardOutcomeScalarFieldEnum]
+
+
+export const ScorecardSnapshotScalarFieldEnum = {
+  id: 'id',
+  kind: 'kind',
+  ruleVersion: 'ruleVersion',
+  computedAt: 'computedAt',
+  data: 'data'
+} as const
+
+export type ScorecardSnapshotScalarFieldEnum = (typeof ScorecardSnapshotScalarFieldEnum)[keyof typeof ScorecardSnapshotScalarFieldEnum]
 
 
 export const SortOrder = {

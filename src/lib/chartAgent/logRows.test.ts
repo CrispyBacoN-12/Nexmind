@@ -45,6 +45,7 @@ test("one shown, one rejected, one capped become three rows", () => {
     "run-1",
     [d("AAA", true, KEPT, "shown"), d("BBB", false, REJECTED, "ai_rejected"), d("CCC", true, KEPT, "capped")],
     "cli",
+    null,
   );
   assert.deepEqual(
     rows.map((r) => [r.ticker, r.status]),
@@ -61,7 +62,7 @@ test("one shown, one rejected, one capped become three rows", () => {
 });
 
 test("t2 and r2 are null when the setup has no second target", () => {
-  const [a, b] = toLogRows("r", [d("AAA", true, KEPT, "shown"), d("BBB", false, KEPT, "shown")], "cli");
+  const [a, b] = toLogRows("r", [d("AAA", true, KEPT, "shown"), d("BBB", false, KEPT, "shown")], "cli", null);
   assert.equal(a.t2, 105.3);
   assert.equal(a.r2, 3);
   assert.equal(b.t2, null);
@@ -75,6 +76,7 @@ test("aiRejectReason is set only on the ai_rejected row", () => {
     "r",
     [d("AAA", true, KEPT, "shown"), d("BBB", true, REJECTED, "ai_rejected"), d("CCC", true, STRIPPED, "guard_stripped")],
     "cli",
+    null,
   );
   assert.equal(rows[0].aiRejectReason, null);
   assert.equal(rows[1].aiRejectReason, "โครงสร้างอ่อน");
@@ -82,13 +84,13 @@ test("aiRejectReason is set only on the ai_rejected row", () => {
 });
 
 test("aiReading copies review.reading for every status", () => {
-  const rows = toLogRows("r", [d("AAA", true, KEPT, "shown"), d("BBB", true, REJECTED, "ai_rejected")], "cli");
+  const rows = toLogRows("r", [d("AAA", true, KEPT, "shown"), d("BBB", true, REJECTED, "ai_rejected")], "cli", null);
   assert.equal(rows[0].aiReading, "อ่านดี");
   assert.equal(rows[1].aiReading, null);
 });
 
 test("price fields, levels, sweptLevels and times carry over", () => {
-  const [r] = toLogRows("r", [d("AAA", true, KEPT, "shown")], "cli");
+  const [r] = toLogRows("r", [d("AAA", true, KEPT, "shown")], "cli", null);
   assert.equal(r.entry, 99);
   assert.equal(r.stop, 96.9);
   assert.deepEqual(r.sweptLevels, ["PDL", "pVAL"]);
@@ -98,11 +100,18 @@ test("price fields, levels, sweptLevels and times carry over", () => {
 });
 
 test("every row carries the rule version, so rows are never pooled across rule changes", () => {
-  const rows = toLogRows("r", [d("AAA", true, KEPT, "shown"), d("BBB", true, REJECTED, "ai_rejected")], "cli");
+  const rows = toLogRows("r", [d("AAA", true, KEPT, "shown"), d("BBB", true, REJECTED, "ai_rejected")], "cli", null);
   assert.equal(CHART_RULE_VERSION, "sweep-v1");
   for (const r of rows) assert.equal(r.ruleVersion, "sweep-v1");
 });
 
 test("no decided setups give no rows", () => {
-  assert.deepEqual(toLogRows("r", [], "cli"), []);
+  assert.deepEqual(toLogRows("r", [], "cli", null), []);
+});
+
+test("carries the review model into aiModel", () => {
+  const [a] = toLogRows("r1", [d("AAA", true, KEPT, "shown")], "cli", "claude-sonnet-x");
+  assert.equal(a.aiModel, "claude-sonnet-x");
+  const [b] = toLogRows("r1", [d("AAA", true, KEPT, "shown")], "cli", null);
+  assert.equal(b.aiModel, null);
 });

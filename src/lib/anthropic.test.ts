@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isFatalBackendReason } from "./anthropic";
+import { cliResolvedModel, isFatalBackendReason } from "./anthropic";
 
 test("a monthly spend limit is a fatal backend failure", () => {
   // The exact string the CLI printed on 2026-08-30, which killed the research
@@ -48,4 +48,14 @@ test("a blip is not fatal, so the desk retries instead of latching down", () => 
   ]) {
     assert.equal(isFatalBackendReason(reason), false, `should retry: ${reason}`);
   }
+});
+
+test("resolvedModel reads the first key of the CLI result's modelUsage", () => {
+  assert.equal(
+    cliResolvedModel({ result: "x", is_error: false, modelUsage: { "claude-sonnet-4-x": { inputTokens: 1 } } }),
+    "claude-sonnet-4-x",
+  );
+  assert.equal(cliResolvedModel({ result: "x", is_error: false }), null);
+  assert.equal(cliResolvedModel({ result: "x", modelUsage: {} }), null);
+  assert.equal(cliResolvedModel(null), null);
 });

@@ -142,7 +142,7 @@ function recordAiCall(
   backend: AiBackend,
   label: string | undefined,
   durationMs: number,
-  r: Omit<AgentResult, "text" | "model">,
+  r: Omit<AgentResult, "text" | "model" | "resolvedModel">,
 ): void {
   void (async () => {
     const { prisma } = await import("@/lib/db");
@@ -223,10 +223,20 @@ function cliRelease(): void {
   cliWaiters.shift()?.();
 }
 
+/** The resolved model id of a CLI result: the first key of `modelUsage`, or null. */
+export function cliResolvedModel(parsed: unknown): string | null {
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const usage = (parsed as { modelUsage?: unknown }).modelUsage;
+  if (typeof usage !== "object" || usage === null) return null;
+  return Object.keys(usage)[0] ?? null;
+}
+
 interface CliResult {
   result?: string;
   is_error?: boolean;
   total_cost_usd?: number;
+  /** Keyed by the resolved model id the call actually ran on. */
+  modelUsage?: Record<string, unknown>;
   // The two cache fields carry ~99.9% of the real input on this path — a probe
   // measuring 8,029 total input tokens reports input_tokens: 2. Leaving them
   // off the type meant every CLI call was recorded as costing nothing.
@@ -333,7 +343,7 @@ async function callAgentCli(opts: CallOptions): Promise<AgentResult> {
       reportedCostUsd: parsed.total_cost_usd ?? 0,
     };
     recordAiCall("cli", opts.label, Date.now() - startedAt, accounting);
-    return { text: parsed.result, model: `cli:${tier}`, ...accounting };
+    return { text: parsed.result, model: `cli:${tier}`, resolvedModel: cliResolvedModel(parsed), ...accounting };
   } finally {
     cliRelease();
   }
@@ -367,6 +377,9 @@ export function aiOutageReason(): string | null {
 export interface AgentResult {
   text: string;
   model: string;
+  /** The model id the backend says actually served the call (the CLI's
+   *  `modelUsage` key, the API response's `model`); null when it did not say. */
+  resolvedModel: string | null;
   tier: ModelTier;
   /** Money actually billed. Always 0 on the CLI path — subscription auth draws
    *  on the plan quota, not a card. Use `reportedCostUsd` for quota burn. */
@@ -448,7 +461,7 @@ export async function callAgent(opts: CallOptions): Promise<AgentResult> {
   };
   recordAiCall("api", opts.label, Date.now() - startedAt, accounting);
 
-  return { text, model, ...accounting };
+  return { text, model, resolvedModel: res.model ?? null, ...accounting };
 }
 
 /** Call an agent and parse its JSON response. Tolerates stray prose/code fences. */

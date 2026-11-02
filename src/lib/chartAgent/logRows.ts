@@ -32,12 +32,15 @@ export interface ChartSetupRow {
   aiReading: string | null;
   aiRejectReason: string | null;
   aiBackend: string;
+  /** Resolved model id behind the review call; null when unknown or no AI call. */
+  aiModel: string | null;
 }
 
 export function toLogRows(
   runId: string,
   decided: { setup: Setup; review: Review; status: LogStatus }[],
   backend: string,
+  model: string | null,
 ): ChartSetupRow[] {
   return decided.map(({ setup, review, status }) => ({
     runId,
@@ -58,5 +61,6 @@ export function toLogRows(
     // Only a rejection stores its reason; a stripped reading's text is not kept.
     aiRejectReason: status === "ai_rejected" ? review.reason : null,
     aiBackend: backend,
+    aiModel: model,
   }));
 }

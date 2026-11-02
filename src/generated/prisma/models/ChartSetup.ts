@@ -66,6 +66,8 @@ export type ChartSetupMinAggregateOutputType = {
   aiReading: string | null
   aiRejectReason: string | null
   aiBackend: string | null
+  source: string | null
+  aiModel: string | null
 }
 
 export type ChartSetupMaxAggregateOutputType = {
@@ -86,6 +88,8 @@ export type ChartSetupMaxAggregateOutputType = {
   aiReading: string | null
   aiRejectReason: string | null
   aiBackend: string | null
+  source: string | null
+  aiModel: string | null
 }
 
 export type ChartSetupCountAggregateOutputType = {
@@ -108,6 +112,8 @@ export type ChartSetupCountAggregateOutputType = {
   aiReading: number
   aiRejectReason: number
   aiBackend: number
+  source: number
+  aiModel: number
   _all: number
 }
 
@@ -150,6 +156,8 @@ export type ChartSetupMinAggregateInputType = {
   aiReading?: true
   aiRejectReason?: true
   aiBackend?: true
+  source?: true
+  aiModel?: true
 }
 
 export type ChartSetupMaxAggregateInputType = {
@@ -170,6 +178,8 @@ export type ChartSetupMaxAggregateInputType = {
   aiReading?: true
   aiRejectReason?: true
   aiBackend?: true
+  source?: true
+  aiModel?: true
 }
 
 export type ChartSetupCountAggregateInputType = {
@@ -192,6 +202,8 @@ export type ChartSetupCountAggregateInputType = {
   aiReading?: true
   aiRejectReason?: true
   aiBackend?: true
+  source?: true
+  aiModel?: true
   _all?: true
 }
 
@@ -301,6 +313,8 @@ export type ChartSetupGroupByOutputType = {
   aiReading: string | null
   aiRejectReason: string | null
   aiBackend: string
+  source: string
+  aiModel: string | null
   _count: ChartSetupCountAggregateOutputType | null
   _avg: ChartSetupAvgAggregateOutputType | null
   _sum: ChartSetupSumAggregateOutputType | null
@@ -346,6 +360,8 @@ export type ChartSetupWhereInput = {
   aiReading?: Prisma.StringNullableFilter<"ChartSetup"> | string | null
   aiRejectReason?: Prisma.StringNullableFilter<"ChartSetup"> | string | null
   aiBackend?: Prisma.StringFilter<"ChartSetup"> | string
+  source?: Prisma.StringFilter<"ChartSetup"> | string
+  aiModel?: Prisma.StringNullableFilter<"ChartSetup"> | string | null
 }
 
 export type ChartSetupOrderByWithRelationInput = {
@@ -368,6 +384,8 @@ export type ChartSetupOrderByWithRelationInput = {
   aiReading?: Prisma.SortOrderInput | Prisma.SortOrder
   aiRejectReason?: Prisma.SortOrderInput | Prisma.SortOrder
   aiBackend?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  aiModel?: Prisma.SortOrderInput | Prisma.SortOrder
 }
 
 export type ChartSetupWhereUniqueInput = Prisma.AtLeast<{
@@ -393,6 +411,8 @@ export type ChartSetupWhereUniqueInput = Prisma.AtLeast<{
   aiReading?: Prisma.StringNullableFilter<"ChartSetup"> | string | null
   aiRejectReason?: Prisma.StringNullableFilter<"ChartSetup"> | string | null
   aiBackend?: Prisma.StringFilter<"ChartSetup"> | string
+  source?: Prisma.StringFilter<"ChartSetup"> | string
+  aiModel?: Prisma.StringNullableFilter<"ChartSetup"> | string | null
 }, "id">
 
 export type ChartSetupOrderByWithAggregationInput = {
@@ -415,6 +435,8 @@ export type ChartSetupOrderByWithAggregationInput = {
   aiReading?: Prisma.SortOrderInput | Prisma.SortOrder
   aiRejectReason?: Prisma.SortOrderInput | Prisma.SortOrder
   aiBackend?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  aiModel?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.ChartSetupCountOrderByAggregateInput
   _avg?: Prisma.ChartSetupAvgOrderByAggregateInput
   _max?: Prisma.ChartSetupMaxOrderByAggregateInput
@@ -445,6 +467,8 @@ export type ChartSetupScalarWhereWithAggregatesInput = {
   aiReading?: Prisma.StringNullableWithAggregatesFilter<"ChartSetup"> | string | null
   aiRejectReason?: Prisma.StringNullableWithAggregatesFilter<"ChartSetup"> | string | null
   aiBackend?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
+  source?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
+  aiModel?: Prisma.StringNullableWithAggregatesFilter<"ChartSetup"> | string | null
 }
 
 export type ChartSetupCreateInput = {
@@ -466,6 +490,8 @@ export type ChartSetupCreateInput = {
   aiReading?: string | null
   aiRejectReason?: string | null
   aiBackend: string
+  source?: string
+  aiModel?: string | null
 }
 
 export type ChartSetupUncheckedCreateInput = {
@@ -488,6 +514,8 @@ export type ChartSetupUncheckedCreateInput = {
   aiReading?: string | null
   aiRejectReason?: string | null
   aiBackend: string
+  source?: string
+  aiModel?: string | null
 }
 
 export type ChartSetupUpdateInput = {
@@ -509,6 +537,8 @@ export type ChartSetupUpdateInput = {
   aiReading?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   aiRejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   aiBackend?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  aiModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ChartSetupUncheckedUpdateInput = {
@@ -531,6 +561,8 @@ export type ChartSetupUncheckedUpdateInput = {
   aiReading?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   aiRejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   aiBackend?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  aiModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ChartSetupCreateManyInput = {
@@ -553,6 +585,8 @@ export type ChartSetupCreateManyInput = {
   aiReading?: string | null
   aiRejectReason?: string | null
   aiBackend: string
+  source?: string
+  aiModel?: string | null
 }
 
 export type ChartSetupUpdateManyMutationInput = {
@@ -574,6 +608,8 @@ export type ChartSetupUpdateManyMutationInput = {
   aiReading?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   aiRejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   aiBackend?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  aiModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ChartSetupUncheckedUpdateManyInput = {
@@ -596,6 +632,8 @@ export type ChartSetupUncheckedUpdateManyInput = {
   aiReading?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   aiRejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   aiBackend?: Prisma.StringFieldUpdateOperationsInput | string
+  source?: Prisma.StringFieldUpdateOperationsInput | string
+  aiModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type StringNullableListFilter<$PrismaModel = never> = {
@@ -626,6 +664,8 @@ export type ChartSetupCountOrderByAggregateInput = {
   aiReading?: Prisma.SortOrder
   aiRejectReason?: Prisma.SortOrder
   aiBackend?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  aiModel?: Prisma.SortOrder
 }
 
 export type ChartSetupAvgOrderByAggregateInput = {
@@ -656,6 +696,8 @@ export type ChartSetupMaxOrderByAggregateInput = {
   aiReading?: Prisma.SortOrder
   aiRejectReason?: Prisma.SortOrder
   aiBackend?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  aiModel?: Prisma.SortOrder
 }
 
 export type ChartSetupMinOrderByAggregateInput = {
@@ -676,6 +718,8 @@ export type ChartSetupMinOrderByAggregateInput = {
   aiReading?: Prisma.SortOrder
   aiRejectReason?: Prisma.SortOrder
   aiBackend?: Prisma.SortOrder
+  source?: Prisma.SortOrder
+  aiModel?: Prisma.SortOrder
 }
 
 export type ChartSetupSumOrderByAggregateInput = {
@@ -719,6 +763,8 @@ export type ChartSetupSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   aiReading?: boolean
   aiRejectReason?: boolean
   aiBackend?: boolean
+  source?: boolean
+  aiModel?: boolean
 }, ExtArgs["result"]["chartSetup"]>
 
 export type ChartSetupSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -741,6 +787,8 @@ export type ChartSetupSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   aiReading?: boolean
   aiRejectReason?: boolean
   aiBackend?: boolean
+  source?: boolean
+  aiModel?: boolean
 }, ExtArgs["result"]["chartSetup"]>
 
 export type ChartSetupSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -763,6 +811,8 @@ export type ChartSetupSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   aiReading?: boolean
   aiRejectReason?: boolean
   aiBackend?: boolean
+  source?: boolean
+  aiModel?: boolean
 }, ExtArgs["result"]["chartSetup"]>
 
 export type ChartSetupSelectScalar = {
@@ -785,9 +835,11 @@ export type ChartSetupSelectScalar = {
   aiReading?: boolean
   aiRejectReason?: boolean
   aiBackend?: boolean
+  source?: boolean
+  aiModel?: boolean
 }
 
-export type ChartSetupOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "runId" | "ruleVersion" | "ticker" | "status" | "dataAsOf" | "entry" | "stop" | "t1" | "t2" | "r1" | "r2" | "sweptLevels" | "sweepBarAt" | "levels" | "aiReading" | "aiRejectReason" | "aiBackend", ExtArgs["result"]["chartSetup"]>
+export type ChartSetupOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "runId" | "ruleVersion" | "ticker" | "status" | "dataAsOf" | "entry" | "stop" | "t1" | "t2" | "r1" | "r2" | "sweptLevels" | "sweepBarAt" | "levels" | "aiReading" | "aiRejectReason" | "aiBackend" | "source" | "aiModel", ExtArgs["result"]["chartSetup"]>
 
 export type $ChartSetupPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ChartSetup"
@@ -828,6 +880,14 @@ export type $ChartSetupPayload<ExtArgs extends runtime.Types.Extensions.Internal
     aiReading: string | null
     aiRejectReason: string | null
     aiBackend: string
+    /**
+     * "button" (POST /api/chart-agent) or "scheduled" (scripts/scorecard-run.mts). Only scheduled rows are scored.
+     */
+    source: string
+    /**
+     * Resolved model id behind the review call (e.g. claude-sonnet-…); null when unknown or no AI call.
+     */
+    aiModel: string | null
   }, ExtArgs["result"]["chartSetup"]>
   composites: {}
 }
@@ -1270,6 +1330,8 @@ export interface ChartSetupFieldRefs {
   readonly aiReading: Prisma.FieldRef<"ChartSetup", 'String'>
   readonly aiRejectReason: Prisma.FieldRef<"ChartSetup", 'String'>
   readonly aiBackend: Prisma.FieldRef<"ChartSetup", 'String'>
+  readonly source: Prisma.FieldRef<"ChartSetup", 'String'>
+  readonly aiModel: Prisma.FieldRef<"ChartSetup", 'String'>
 }
     
 

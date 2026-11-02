@@ -101,6 +101,7 @@ function makeDeps(
         reviews: new Map(items.map((i) => [i.setup.ticker, statuses.get(i.setup.ticker) ?? kept])),
         backend: "cli",
         note: null,
+        model: null,
       };
     },
     log: async (rows) => {
@@ -296,6 +297,7 @@ test("AI unavailable (unread everywhere): every setup is eligible and the note i
       reviews: new Map(items.map((i) => [i.setup.ticker, unread])),
       backend: "mock",
       note: "no AI backend",
+      model: null,
     }),
   });
   const r = await runChartAgent(names, deps);
@@ -304,6 +306,25 @@ test("AI unavailable (unread everywhere): every setup is eligible and the note i
   assert.ok(r.shown.every((s) => s.review.status === "unread"));
   assert.equal(r.aiNote, "no AI backend");
   assert.equal(r.backend, "mock");
+});
+
+test("logs the review's model on every row", async () => {
+  const names = ["A1", "A2"];
+  const { deps, calls } = makeDeps({
+    bars: new Map(names.map((n) => [n, setupBars()])),
+    review: async (items) => ({
+      reviews: new Map(items.map((i) => [i.setup.ticker, kept])),
+      backend: "cli",
+      note: null,
+      model: "m-1",
+    }),
+  });
+  const r = await runChartAgent(names, deps);
+  assert.ok(r.ok);
+  assert.equal(calls.logged.length, 1);
+  assert.equal(calls.logged[0].length, 2);
+  assert.ok(calls.logged[0].every((row) => row.aiModel === "m-1"));
+  assert.equal(r.model, "m-1");
 });
 
 // --- still-forming bars ------------------------------------------------------
