@@ -242,3 +242,84 @@ export async function fetchAlpacaCandlesBatch(
 
   return parseAlpacaBatch({ bars: merged }, range, interval);
 }
+
+/** Backoff for an HTTP 429: Retry-After when Alpaca sends one, else 2s doubling to 60s. */
+const RATE_LIMIT_RETRIES = 8;
+function rateLimitDelayMs(attempt: number, retryAfter: string | null): number {
+  const s = retryAfter === null ? NaN : Number(retryAfter);
+  if (Number.isFinite(s) && s > 0) return Math.min(s * 1000, 60_000);
+  return Math.min(2_000 * 2 ** attempt, 60_000);
+}
+
+/**
+ * `fetchAlpacaCandlesBatch` with an explicit `[startIso, endIso]` window instead of a
+ * Range ending now: same headers, feed, adjustment, pagination, chunking and retry.
+ * For long one-off history pulls (the scorecard replay), so one more rule applies:
+ * an HTTP 429 (Alpaca's free tier allows ~200 requests a minute) is waited out and
+ * the same page retried, never treated as a bad symbol. The caller keeps `endIso`
+ * older than SIP_DELAY_MS on the SIP feed. Returns raw candles; symbols with no
+ * bars, or whose chunk failed, are absent.
+ */
+export async function fetchAlpacaRange(
+  symbols: string[],
+  startIso: string,
+  endIso: string,
+  interval: Interval,
+  opts: { sleep?: (ms: number) => Promise<void> } = {},
+): Promise<Map<string, Candle[]>> {
+  const key = process.env.ALPACA_KEY;
+  const secret = process.env.ALPACA_SECRET;
+  if (!key || !secret) throw new Error("alpaca: missing ALPACA_KEY / ALPACA_SECRET");
+  if (symbols.length === 0) return new Map();
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+
+  const headers = { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret, Accept: "application/json" };
+  const CHUNK = 100; // Alpaca rejects very long symbol lists — chunk the request.
+
+  const merged: Record<string, AlpacaBar[]> = {};
+  for (let i = 0; i < symbols.length; i += CHUNK) {
+    const chunk = symbols.slice(i, i + CHUNK);
+    // Retry once on a transient failure (network/5xx/429s that outlast the backoff);
+    // a 4xx other than 429 is a bad symbol, so retrying won't help — skip it.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const chunkBars: Record<string, AlpacaBar[]> = {};
+      try {
+        let pageToken: string | undefined;
+        do {
+          const params = new URLSearchParams({
+            symbols: chunk.join(","),
+            timeframe: intervalToTimeframe(interval),
+            start: startIso, end: endIso, feed: feed(), limit: "10000", sort: "asc",
+            adjustment: ADJUSTMENT,
+          });
+          if (pageToken) params.set("page_token", pageToken);
+          const url = `${ALPACA_DATA_BASE}/bars?${params}`;
+          let res = await fetch(url, { headers, next: { revalidate: 30 } });
+          for (let k = 0; res.status === 429; k++) {
+            if (k >= RATE_LIMIT_RETRIES) throw new Error(`alpaca range rate-limited after ${k + 1} tries`);
+            await res.text().catch(() => undefined); // release the connection
+            await sleep(rateLimitDelayMs(k, res.headers.get("retry-after")));
+            res = await fetch(url, { headers, next: { revalidate: 30 } });
+          }
+          if (!res.ok) throw new Error(`alpaca range upstream ${res.status}`);
+          const json = (await res.json()) as { bars?: Record<string, AlpacaBar[]>; next_page_token?: string | null };
+          for (const [sym, bars] of Object.entries(json.bars ?? {})) (chunkBars[sym] ??= []).push(...(bars ?? []));
+          pageToken = json.next_page_token ?? undefined;
+        } while (pageToken);
+        for (const [sym, bars] of Object.entries(chunkBars)) (merged[sym] ??= []).push(...bars);
+        break; // chunk done
+      } catch (e) {
+        const is4xx = e instanceof Error && /upstream 4\d\d/.test(e.message);
+        if (attempt === 2 || is4xx) {
+          console.warn(`alpaca range: chunk ${i / CHUNK} failed (${e instanceof Error ? e.message : e}); those symbols are skipped`);
+          break;
+        }
+        await sleep(500); // brief pause before retry
+      }
+    }
+  }
+
+  const out = new Map<string, Candle[]>();
+  for (const [sym, bars] of Object.entries(merged)) if (bars.length) out.set(sym, bars.map(toCandle));
+  return out;
+}

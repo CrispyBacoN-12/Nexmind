@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { intervalToTimeframe, rangeToLookbackMs, parseAlpacaBars, parseAlpacaBatch, fetchAlpacaCandles, fetchAlpacaCandlesBatch } from "./alpaca";
+import { intervalToTimeframe, rangeToLookbackMs, parseAlpacaBars, parseAlpacaBatch, fetchAlpacaCandles, fetchAlpacaCandlesBatch, fetchAlpacaRange } from "./alpaca";
 
 test("intervalToTimeframe maps every supported interval", () => {
   assert.equal(intervalToTimeframe("5m"), "5Min");
@@ -165,4 +165,81 @@ test("IEX requests are not held back, since the delay is a SIP restriction", asy
   const urls = await captureUrls(() => fetchAlpacaCandlesBatch(["AAPL"], "max", "1d"), "iex");
   const end = Date.parse(new URL(urls[0]).searchParams.get("end")!);
   assert.ok(end >= before - 5_000, `IEX end should be ~now, was ${before - end}ms old`);
+});
+
+/** Stub fetch with a scripted list of responses; restores env and fetch afterwards. */
+async function withScriptedFetch(
+  responses: { status: number; body?: unknown }[],
+  run: () => Promise<unknown>,
+): Promise<{ urls: string[]; result: unknown }> {
+  const urls: string[] = [];
+  const realFetch = globalThis.fetch;
+  const prev = { k: process.env.ALPACA_KEY, s: process.env.ALPACA_SECRET, f: process.env.ALPACA_FEED };
+  process.env.ALPACA_KEY = "k";
+  process.env.ALPACA_SECRET = "s";
+  delete process.env.ALPACA_FEED;
+  let i = 0;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    urls.push(String(input));
+    const r = responses[Math.min(i++, responses.length - 1)];
+    return {
+      ok: r.status >= 200 && r.status < 300,
+      status: r.status,
+      headers: new Headers(),
+      json: async () => r.body,
+      text: async () => "",
+    } as Response;
+  }) as typeof fetch;
+  try {
+    return { urls, result: await run() };
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const [name, v] of [["ALPACA_KEY", prev.k], ["ALPACA_SECRET", prev.s], ["ALPACA_FEED", prev.f]] as const) {
+      if (v === undefined) delete process.env[name];
+      else process.env[name] = v;
+    }
+  }
+}
+
+const noSleep = { sleep: async () => {} };
+
+test("fetchAlpacaRange uses the explicit start/end, SIP, adjusted bars, and follows pages", async () => {
+  const start = "2023-10-01T00:00:00.000Z";
+  const end = "2026-10-30T20:00:00.000Z";
+  const { urls, result } = await withScriptedFetch(
+    [
+      { status: 200, body: { bars: { AAPL: [{ t: "2024-01-02T14:30:00Z", o: 1, h: 2, l: 0.5, c: 1.5, v: 10 }] }, next_page_token: "p2" } },
+      { status: 200, body: { bars: { AAPL: [{ t: "2024-01-02T14:35:00Z", o: 1.5, h: 2, l: 1, c: 1.8, v: 20 }] }, next_page_token: null } },
+    ],
+    () => fetchAlpacaRange(["AAPL"], start, end, "5m", noSleep),
+  );
+  assert.equal(urls.length, 2);
+  const p = new URL(urls[0]).searchParams;
+  assert.equal(p.get("start"), start);
+  assert.equal(p.get("end"), end);
+  assert.equal(p.get("feed"), "sip");
+  assert.equal(p.get("adjustment"), "all");
+  assert.equal(p.get("timeframe"), "5Min");
+  assert.equal(new URL(urls[1]).searchParams.get("page_token"), "p2");
+  const map = result as Map<string, { t: number; c: number }[]>;
+  assert.deepEqual(map.get("AAPL")?.map((c) => c.c), [1.5, 1.8]);
+});
+
+test("fetchAlpacaRange retries a 429 instead of skipping the symbols", async () => {
+  const ok = { status: 200, body: { bars: { AAPL: [{ t: "2024-01-02T14:30:00Z", o: 1, h: 2, l: 0.5, c: 1.5, v: 10 }] }, next_page_token: null } };
+  const { urls, result } = await withScriptedFetch(
+    [{ status: 429 }, { status: 429 }, { status: 429 }, ok],
+    () => fetchAlpacaRange(["AAPL"], "2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "5m", noSleep),
+  );
+  assert.equal(urls.length, 4);
+  assert.equal((result as Map<string, unknown[]>).get("AAPL")?.length, 1);
+});
+
+test("fetchAlpacaRange still skips a chunk on a plain 4xx", async () => {
+  const { urls, result } = await withScriptedFetch(
+    [{ status: 422 }],
+    () => fetchAlpacaRange(["BAD"], "2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "1d", noSleep),
+  );
+  assert.equal(urls.length, 1);
+  assert.equal((result as Map<string, unknown[]>).size, 0);
 });
