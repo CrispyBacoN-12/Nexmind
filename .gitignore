@@ -111,3 +111,4 @@ mt5-bridge/bridge.err.log
 
 # daily Risk Sentry log (scripts/risk-sentry.cmd)
 scripts/risk-sentry.log
+scripts/scorecard-run.log
