@@ -257,14 +257,19 @@ function rateLimitDelayMs(attempt: number, retryAfter: string | null): number {
  * For long one-off history pulls (the scorecard replay), so one more rule applies:
  * an HTTP 429 (Alpaca's free tier allows ~200 requests a minute) is waited out and
  * the same page retried, never treated as a bad symbol. The caller keeps `endIso`
- * older than SIP_DELAY_MS on the SIP feed. Returns raw candles; symbols with no
+ * older than SIP_DELAY_MS on the SIP feed. Returns plain candles; symbols with no
  * bars, or whose chunk failed, are absent.
+ *
+ * `adjustment` defaults to the same `all` as every other fetcher here. Pass `raw`
+ * only for as-traded prices and volume (the replay's scan floors): adjusted volume
+ * before a split is multiplied by a ratio that was not known yet.
  */
 export async function fetchAlpacaRange(
   symbols: string[],
   startIso: string,
   endIso: string,
   interval: Interval,
+  adjustment: "all" | "raw" = ADJUSTMENT,
   opts: { sleep?: (ms: number) => Promise<void> } = {},
 ): Promise<Map<string, Candle[]>> {
   const key = process.env.ALPACA_KEY;
@@ -290,7 +295,7 @@ export async function fetchAlpacaRange(
             symbols: chunk.join(","),
             timeframe: intervalToTimeframe(interval),
             start: startIso, end: endIso, feed: feed(), limit: "10000", sort: "asc",
-            adjustment: ADJUSTMENT,
+            adjustment,
           });
           if (pageToken) params.set("page_token", pageToken);
           const url = `${ALPACA_DATA_BASE}/bars?${params}`;

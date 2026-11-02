@@ -76,7 +76,7 @@ function dailyFixture(): Candle[] {
 }
 
 test("gap and rvol from bars", () => {
-  const row = replayRow("AAA", dailyFixture(), intradayFixture(), TODAY, CUTOFF);
+  const row = replayRow("AAA", dailyFixture(), dailyFixture(), intradayFixture(), TODAY, CUTOFF);
   assert.ok(row, "expected a row");
   assert.equal(row.ticker, "AAA");
   assert.equal(row.type, "stock");
@@ -93,13 +93,58 @@ test("gap and rvol from bars", () => {
   assert.equal(row.earningsLastAt, null);
 });
 
+// A 10:1 split AFTER the replay session (between TODAY and the end of the data).
+// The adjusted series divides old prices by 10 and multiplies old volume by 10, so
+// it shows ~100 and 3M shares a day; as traded, TODAY's stock was ~1,000 with only
+// 300k shares a day, under the scan's 1M floor. The replay must rank on the raw
+// basis, or it admits names on volume they only had after a split that had not
+// happened yet.
+const SPLIT_DAY = weekdays("2026-11-03", 1)[0]; // after TODAY
+function splitDaily(raw: boolean): Candle[] {
+  const out: Candle[] = [];
+  for (const d of weekdays(TODAY, 31).slice(0, -1)) {
+    const k = raw ? 10 : 1;
+    out.push({ t: etEpoch(d, "00:00"), o: 100 * k, h: 102 * k, l: 98 * k, c: 100 * k, v: 3_000_000 / k });
+  }
+  for (const d of [TODAY, "2026-10-29", "2026-10-30", "2026-11-02", SPLIT_DAY]) {
+    const k = raw && d < SPLIT_DAY ? 10 : 1;
+    out.push({ t: etEpoch(d, "00:00"), o: 100 * k, h: 102 * k, l: 98 * k, c: 100 * k, v: 3_000_000 / k });
+  }
+  return out;
+}
+
+test("ranking reads as-traded volume and price: a later split leaks nothing", () => {
+  const row = replayRow("SPLT", splitDaily(false), splitDaily(true), intradayFixture(), TODAY, CUTOFF);
+  assert.ok(row, "expected a row");
+  assert.equal(row.avgVolume10d, 300_000); // raw, not the adjusted 3M
+  assert.equal(passesBase(row), false);
+  assert.ok(Math.abs(row.close - 1030) < 1e-9, `close ${row.close}`); // 103 adjusted x 10
+  assert.ok(Math.abs((row.atr ?? NaN) - 40) < 1e-9, `atr ${row.atr}`); // 4 adjusted x 10
+  const atrPctRaw = ((row.atr as number) / row.close) * 100;
+  assert.ok(Math.abs(atrPctRaw - (4 / 103) * 100) < 1e-9, "ATR % is unchanged by the basis");
+  // Ratios do not move with the basis.
+  assert.ok(Math.abs((row.gapPct ?? NaN) - 3) < 1e-9);
+  assert.ok(Math.abs((row.rvolIntraday ?? NaN) - 2.5) < 1e-9);
+});
+
+test("the same split-adjusted bars without the raw series would have passed", () => {
+  const row = replayRow("SPLT", splitDaily(false), splitDaily(false), intradayFixture(), TODAY, CUTOFF);
+  assert.ok(row);
+  assert.equal(passesBase(row), true);
+});
+
+test("null when the raw daily bar of the previous session is missing", () => {
+  const raw = splitDaily(true).filter((b) => etClock(b.t).date !== weekdays(TODAY, 2)[0]);
+  assert.equal(replayRow("SPLT", splitDaily(false), raw, intradayFixture(), TODAY, CUTOFF), null);
+});
+
 test("null with under 10 prior sessions", () => {
-  assert.equal(replayRow("AAA", dailyFixture(), intradayFixture(9), TODAY, CUTOFF), null);
+  assert.equal(replayRow("AAA", dailyFixture(), dailyFixture(), intradayFixture(9), TODAY, CUTOFF), null);
 });
 
 test("null when no regular bar finished before the cutoff", () => {
   const early = etEpoch(TODAY, "09:33");
-  assert.equal(replayRow("AAA", dailyFixture(), intradayFixture(), TODAY, early), null);
+  assert.equal(replayRow("AAA", dailyFixture(), dailyFixture(), intradayFixture(), TODAY, early), null);
 });
 
 function row(ticker: string, over: Partial<TvRow>): TvRow {

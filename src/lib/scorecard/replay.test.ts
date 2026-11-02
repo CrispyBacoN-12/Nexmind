@@ -85,12 +85,14 @@ function daily(): Candle[] {
   return weekdays(TODAY, 30).map((d) => ({ t: etEpoch(d, "00:00"), o: 100, h: 101, l: 99, c: 100, v: 2_000_000 }));
 }
 
-function deps(bars: Record<string, Candle[]>): ReplayDeps {
+function deps(bars: Record<string, Candle[]>, noRawDaily: string[] = []): ReplayDeps {
   return {
     sessions: SESSIONS,
     universe: Object.keys(bars),
     loadIntraday: async (t) => bars[t] ?? [],
     loadDaily: async () => daily(),
+    // No corporate action in the fixture: as traded = adjusted.
+    loadRawDaily: async (t) => (noRawDaily.includes(t) ? [] : daily()),
   };
 }
 
@@ -105,6 +107,8 @@ test("end to end on a stub universe", async () => {
   assert.equal(s.period.to, TODAY);
   assert.equal(s.sessions, 12);
   assert.equal(s.universe, 2);
+  assert.equal(s.tickersWithData, 2);
+  assert.deepEqual(s.missingTickers, []);
   assert.equal(s.picks, 2); // both picked on TODAY only (rvol 3); nothing triggers earlier
   assert.equal(s.setupsFound, 1);
   assert.equal(s.filled, 1);
@@ -143,4 +147,22 @@ test("reads no bar after the cutoff when finding setups", async () => {
   assert.equal(s.filled, 0);
   assert.equal(s.stats.hold.n, 0);
   assert.equal(s.pass, false);
+});
+
+test("a ticker missing any of its bar series is never ranked and is listed", async () => {
+  const s = await runReplay(
+    deps(
+      {
+        SWP: intraday(today({ sweepAt: 575, spikeAt: 660 })),
+        NOINTRA: [],
+        NORAW: intraday(today({ sweepAt: 575, spikeAt: 660 })),
+      },
+      ["NORAW"],
+    ),
+  );
+  assert.equal(s.universe, 3);
+  assert.equal(s.tickersWithData, 1);
+  assert.deepEqual(s.missingTickers, ["NOINTRA", "NORAW"]);
+  assert.equal(s.picks, 1);
+  assert.equal(s.setupsFound, 1);
 });

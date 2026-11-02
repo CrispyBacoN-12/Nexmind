@@ -4,6 +4,9 @@
 // CHART_TOP_N, and score every setup as if it had been bought, against the random
 // control. No AI, no cap: every setup counts.
 //
+// Setups and scoring read adjusted bars; the ranking reads the as-traded basis too
+// (see replayRank.ts), so a later split cannot lift a name over the volume floor.
+//
 // All I/O is injected (bars come from the caller's loaders) and only one ticker's
 // bars are in memory at a time. Imports control.ts, which reaches prisma through
 // research/control.ts, so a test of this module loads dotenv first.
@@ -53,10 +56,12 @@ export interface ReplayDeps {
   /** ET dates (YYYY-MM-DD) of the period's sessions. */
   sessions: string[];
   universe: string[];
-  /** All of a ticker's 5-minute bars (the period plus enough before it); [] when none. */
+  /** All of a ticker's adjusted 5-minute bars (the period plus enough before it); [] when none. */
   loadIntraday(ticker: string): Promise<Candle[]>;
-  /** All of a ticker's daily bars (the period plus enough before it); [] when none. */
+  /** All of a ticker's split/dividend-adjusted daily bars (the period plus enough before it); [] when none. */
   loadDaily(ticker: string): Promise<Candle[]>;
+  /** The same daily bars unadjusted (as traded), for the scan's floors; [] when none. */
+  loadRawDaily(ticker: string): Promise<Candle[]>;
   /** Progress lines; optional. */
   log?: (msg: string) => void;
 }
@@ -65,9 +70,10 @@ export interface ReplaySummary {
   ruleVersion: string;
   period: { from: string; to: string };
   sessions: number;
-  /** Tickers asked for, and how many of them had any 5-minute bars. */
+  /** Tickers asked for; how many had all three bar series; the ones that did not (never ranked). */
   universe: number;
   tickersWithData: number;
+  missingTickers: string[];
   /** (ticker, session) pairs picked into the top CHART_TOP_N. */
   picks: number;
   setupsFound: number;
@@ -129,16 +135,20 @@ export async function runReplay(deps: ReplayDeps): Promise<ReplaySummary> {
 
   // Pass 1: one small scan row per (ticker, session).
   const rowsBySession = new Map<string, TvRow[]>(sessions.map((s) => [s, []]));
-  let tickersWithData = 0;
+  const missingTickers: string[] = [];
   for (let k = 0; k < universe.length; k++) {
     const ticker = universe[k];
     const intraday = await deps.loadIntraday(ticker);
-    if (intraday.length > 0) {
-      tickersWithData++;
+    const daily = await deps.loadDaily(ticker);
+    const rawDaily = await deps.loadRawDaily(ticker);
+    if (intraday.length === 0 || daily.length === 0 || rawDaily.length === 0) {
+      missingTickers.push(ticker);
+    } else {
       const ii = indexIntraday(intraday);
-      const di = indexDaily(await deps.loadDaily(ticker));
+      const di = indexDaily(daily);
+      const ri = indexDaily(rawDaily);
       for (const s of sessions) {
-        const row = replayRowFromIndex(ticker, di, ii, s, findCutoff(s));
+        const row = replayRowFromIndex(ticker, di, ri, ii, s, findCutoff(s));
         if (row) rowsBySession.get(s)!.push(row);
       }
     }
@@ -220,7 +230,8 @@ export async function runReplay(deps: ReplayDeps): Promise<ReplaySummary> {
     period: { from, to },
     sessions: sessions.length,
     universe: universe.length,
-    tickersWithData,
+    tickersWithData: universe.length - missingTickers.length,
+    missingTickers,
     picks,
     setupsFound: scored.length,
     filled: filled.length,

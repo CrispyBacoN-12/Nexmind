@@ -211,7 +211,7 @@ test("fetchAlpacaRange uses the explicit start/end, SIP, adjusted bars, and foll
       { status: 200, body: { bars: { AAPL: [{ t: "2024-01-02T14:30:00Z", o: 1, h: 2, l: 0.5, c: 1.5, v: 10 }] }, next_page_token: "p2" } },
       { status: 200, body: { bars: { AAPL: [{ t: "2024-01-02T14:35:00Z", o: 1.5, h: 2, l: 1, c: 1.8, v: 20 }] }, next_page_token: null } },
     ],
-    () => fetchAlpacaRange(["AAPL"], start, end, "5m", noSleep),
+    () => fetchAlpacaRange(["AAPL"], start, end, "5m", "all", noSleep),
   );
   assert.equal(urls.length, 2);
   const p = new URL(urls[0]).searchParams;
@@ -229,16 +229,28 @@ test("fetchAlpacaRange retries a 429 instead of skipping the symbols", async () 
   const ok = { status: 200, body: { bars: { AAPL: [{ t: "2024-01-02T14:30:00Z", o: 1, h: 2, l: 0.5, c: 1.5, v: 10 }] }, next_page_token: null } };
   const { urls, result } = await withScriptedFetch(
     [{ status: 429 }, { status: 429 }, { status: 429 }, ok],
-    () => fetchAlpacaRange(["AAPL"], "2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "5m", noSleep),
+    () => fetchAlpacaRange(["AAPL"], "2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "5m", "all", noSleep),
   );
   assert.equal(urls.length, 4);
   assert.equal((result as Map<string, unknown[]>).get("AAPL")?.length, 1);
 });
 
+test("fetchAlpacaRange can ask for raw (as-traded) bars; the default stays adjusted", async () => {
+  const ok = { status: 200, body: { bars: {}, next_page_token: null } };
+  const raw = await withScriptedFetch([ok], () =>
+    fetchAlpacaRange(["AAPL"], "2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "1d", "raw", noSleep),
+  );
+  assert.equal(new URL(raw.urls[0]).searchParams.get("adjustment"), "raw");
+  const dflt = await withScriptedFetch([ok], () =>
+    fetchAlpacaRange(["AAPL"], "2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "1d"),
+  );
+  assert.equal(new URL(dflt.urls[0]).searchParams.get("adjustment"), "all");
+});
+
 test("fetchAlpacaRange still skips a chunk on a plain 4xx", async () => {
   const { urls, result } = await withScriptedFetch(
     [{ status: 422 }],
-    () => fetchAlpacaRange(["BAD"], "2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "1d", noSleep),
+    () => fetchAlpacaRange(["BAD"], "2024-01-01T00:00:00Z", "2024-01-03T00:00:00Z", "1d", "all", noSleep),
   );
   assert.equal(urls.length, 1);
   assert.equal((result as Map<string, unknown[]>).size, 0);

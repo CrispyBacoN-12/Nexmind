@@ -5,6 +5,14 @@
 // Pure: no I/O, no clock. Nothing after the cutoff is read: today's bars must
 // have ENDED by it, and every daily input comes from earlier dates.
 //
+// Two bar bases. The intraday and daily bars are split- and dividend-ADJUSTED (the
+// setup pipeline needs that), but adjusted volume before a split is multiplied by a
+// ratio nobody knew yet, and adjusted prices are divided by it. The scan's floors
+// (price, 10-day volume, ATR %) read as-traded numbers, so the row is put on the RAW
+// basis: k = raw / adjusted close of the previous session; close and ATR are scaled
+// by k (ATR % unchanged), the 10-day volume is the raw daily volume. Gap and rvol are
+// ratios on one basis and stay as they are.
+//
 // The earnings and 8-K inputs do not exist historically, so they count 0
 // (`earningsTag` null, no filings). The replay summary states this.
 
@@ -102,6 +110,7 @@ const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
 export function replayRowFromIndex(
   ticker: string,
   daily: DailyIndex,
+  rawDaily: DailyIndex,
   intraday: IntradayIndex,
   sessionDate: string,
   cutoffSec: number,
@@ -112,7 +121,14 @@ export function replayRowFromIndex(
 
   const priorDates = intraday.dates.slice(0, lowerBound(intraday.dates, sessionDate));
   const di = lowerBound(daily.dates, sessionDate);
-  if (priorDates.length < LOOKBACK_SESSIONS || di < LOOKBACK_SESSIONS) return null;
+  const ri = lowerBound(rawDaily.dates, sessionDate);
+  if (priorDates.length < LOOKBACK_SESSIONS || di < LOOKBACK_SESSIONS || ri < LOOKBACK_SESSIONS) return null;
+
+  // As-traded basis from the previous session's two closes.
+  const prevAdj = daily.bars[di - 1];
+  const prevRaw = rawDaily.bars[ri - 1];
+  if (rawDaily.dates[ri - 1] !== daily.dates[di - 1] || !(prevAdj.c > 0) || !(prevRaw.c > 0)) return null;
+  const k = prevRaw.c / prevAdj.c;
 
   // Relative volume: volume so far today against the mean of the same window
   // (bars that ended by the cutoff's ET minute) over the previous 10 sessions.
@@ -127,22 +143,21 @@ export function replayRowFromIndex(
     }),
   );
 
-  const priorDaily = daily.bars.slice(di - LOOKBACK_SESSIONS, di);
-  const prevClose = priorDaily[priorDaily.length - 1].c;
-  const atr = replayDailyAtr(daily, sessionDate);
+  const prevClose = prevAdj.c;
+  const atr = replayDailyAtr(daily, sessionDate) * k;
 
   return {
     ticker,
     exchange: "",
     type: "stock",
-    close: finished[finished.length - 1].c,
+    close: finished[finished.length - 1].c * k,
     changePct: null,
-    gapPct: prevClose > 0 ? ((finished[0].o - prevClose) / prevClose) * 100 : null,
+    gapPct: ((finished[0].o - prevClose) / prevClose) * 100,
     premarketChangePct: null,
     premarketVolume: null,
     rvolIntraday: baseline > 0 ? volumeToday / baseline : null,
     rvol10d: null,
-    avgVolume10d: mean(priorDaily.map((b) => b.v)),
+    avgVolume10d: mean(rawDaily.bars.slice(ri - LOOKBACK_SESSIONS, ri).map((b) => b.v)),
     atr: Number.isFinite(atr) ? atr : null,
     earningsLastAt: null,
     earningsLastTime: null,
@@ -152,18 +167,28 @@ export function replayRowFromIndex(
 }
 
 /**
- * The scan row `ticker` would have had on `sessionDate` at `cutoffSec`. Null when no
- * regular bar of that session ended by the cutoff, or fewer than 10 prior sessions
- * (intraday or daily) exist.
+ * The scan row `ticker` would have had on `sessionDate` at `cutoffSec`, on the
+ * as-traded basis. `daily` and `intraday` are adjusted bars, `rawDaily` the same
+ * daily bars unadjusted. Null when no regular bar of that session ended by the
+ * cutoff, when fewer than 10 prior sessions (intraday, daily or raw daily) exist, or
+ * when the raw bar of the previous session is missing (no basis to convert with).
  */
 export function replayRow(
   ticker: string,
   daily: Candle[],
+  rawDaily: Candle[],
   intraday: Candle[],
   sessionDate: string,
   cutoffSec: number,
 ): TvRow | null {
-  return replayRowFromIndex(ticker, indexDaily(daily), indexIntraday(intraday), sessionDate, cutoffSec);
+  return replayRowFromIndex(
+    ticker,
+    indexDaily(daily),
+    indexDaily(rawDaily),
+    indexIntraday(intraday),
+    sessionDate,
+    cutoffSec,
+  );
 }
 
 /**
