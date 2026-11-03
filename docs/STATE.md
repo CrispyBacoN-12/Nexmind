@@ -24,7 +24,7 @@ hold-out (§3). The repo's value now lives in four surfaces:
   - Each row links to `/advisor?ticker=` to prefill the ticker. Nothing auto-submits.
   - **Chart setups panel (agent #2, on master):** a second button runs the chart agent
     over the top 20 scan names and opens a modal of at most 5 long-sweep setups (§3).
-- **`/scorecard`** (agent #4, branch `scorecard`): what the chart agent's setups would have done if bought,
+- **`/scorecard`** (agent #4, on master): what the chart agent's setups would have done if bought,
   against random entries. It shows a 3-year replay of the code rule (**REJECT**, §3) and a forward record that
   a scheduled job builds every trading night. The AI verdict freezes once at 300 kept setups. Read-only page.
 - **`/advisor`**: the owner types a ticker they already chose and gets back structure and risk only:
@@ -49,8 +49,8 @@ SCANNER → HAWK×3 → SAGE → Iron Rules, plus `panel-v1` research. The site 
 The desk's `src/lib` code, research scripts and DB tables are **kept** as reference. Its three Task
 Scheduler jobs stay **Disabled**. Do not re-enable them or resume research rounds without a new
 owner decision. **Next, by owner request: rebuild AI agents one at a time. Agent #1 (`/scan`) and
-#2 (the chart agent) and #3 (the `/advisor` chart stop) are built and on master; #4 (the scorecard) is built on
-branch `scorecard` and its nightly jobs are registered; the next agent is to be discussed.**
+#2 (the chart agent) and #3 (the `/advisor` chart stop) are built and on master; #4 (the scorecard) is on master
+and its nightly jobs are registered; the next agent is to be discussed.**
 
 Hard context the code does not state:
 - **Orders are manual, on Webull, whole shares, $2-3k.** Webull is data-only here. Go-Live is dead,
@@ -62,8 +62,8 @@ Hard context the code does not state:
 
 | Thing | Value |
 |---|---|
-| Branch | `master` contains agents #2 and #3 plus the stop cluster rule (`8f625be`, fast-forwarded from `stop-cluster` and pushed 2026-11-03; branch deleted). Every push auto-deploys Vercel production |
-| Tests | `npm test` **1216 pass / 0 fail** (2026-11-03, branch `scorecard`) |
+| Branch | `master` at `d0323ee` contains agents #2, #3 (with the stop cluster rule) and #4 (the scorecard). It was fast-forwarded from `scorecard` and pushed 2026-11-03, the Vercel deploy succeeded, and the branch was deleted. Every push auto-deploys Vercel production |
+| Tests | `npm test` **1216 pass / 0 fail** (2026-11-03, master) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB. Columns `source` (default `"button"`) and `aiModel` were added 2026-11-03 |
 | Scorecard tables | `ScorecardRun`, `ScorecardOutcome`, `ScorecardSnapshot` were created 2026-11-03 on Neon with additive SQL over HTTPS. Port 5432 is blocked on this network, so `prisma db push` cannot connect (§5). One snapshot exists: `replay` / `sweep-v1` |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). **`NEXMIND Scorecard Score` Ready** (Tue-Sat 07:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03) |
@@ -87,7 +87,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-11-03: Scorecard (agent #4), branch `scorecard` (`08205f3..a0eea87`), not merged yet.** Spec
+- **2026-11-03: Scorecard (agent #4), merged to master and pushed (`08205f3..d0323ee`).** Spec
   `docs/superpowers/specs/2026-11-03-scorecard-agent-design.md`.
   - **Replay of the code rule `sweep-v1`: REJECT.** Over 3 years and 1,201 filled setups, hold-to-stop/T1 averaged
     **−0.085 R**, against a random-entry control at median −0.055 and p95 +0.001. That is below the random
@@ -244,7 +244,6 @@ There are no open research directions; the owner closed the search. Work items:
    - The stricter sweep rule (reject a retest after a gap-down reclaim) was **closed 2026-11-03: not built**.
      `sweep-v1` stays as is so the scorecard measures the rule in use.
 4. **Scorecard (agent #4).**
-   - Merge and push branch `scorecard` when the owner says so.
    - After the first nights, check `scripts/scorecard-run.log`, `scripts/scorecard-score.log` and the 07:00 Discord
      message.
    - Owner questions:
