@@ -223,12 +223,31 @@ function cliRelease(): void {
   cliWaiters.shift()?.();
 }
 
-/** The resolved model id of a CLI result: the first key of `modelUsage`, or null. */
+/**
+ * The resolved model id of a CLI result, or null. `modelUsage` can also list an
+ * auxiliary model the CLI called on the side, sometimes first, so the key with the most
+ * `outputTokens` wins; then the highest `costUSD`; then the first key.
+ */
 export function cliResolvedModel(parsed: unknown): string | null {
   if (typeof parsed !== "object" || parsed === null) return null;
   const usage = (parsed as { modelUsage?: unknown }).modelUsage;
   if (typeof usage !== "object" || usage === null) return null;
-  return Object.keys(usage)[0] ?? null;
+  const entries = Object.entries(usage as Record<string, unknown>);
+  if (entries.length === 0) return null;
+  const num = (v: unknown, field: string): number => {
+    const x = typeof v === "object" && v !== null ? (v as Record<string, unknown>)[field] : undefined;
+    return typeof x === "number" && Number.isFinite(x) ? x : 0;
+  };
+  const best = (field: string): string | null => {
+    let key: string | null = null;
+    let max = 0;
+    for (const [k, v] of entries) {
+      const x = num(v, field);
+      if (x > max) [key, max] = [k, x];
+    }
+    return key;
+  };
+  return best("outputTokens") ?? best("costUSD") ?? entries[0][0];
 }
 
 interface CliResult {

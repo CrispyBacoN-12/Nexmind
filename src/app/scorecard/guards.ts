@@ -105,5 +105,7 @@ export function isLiveSnapshot(v: unknown): v is LiveSnapshot {
   if (!isModelMix(v.modelMix) || !isLastRun(v.lastRun)) return false;
   if (!isArrayOf(v.missed, (m): m is { date: string; failed: string | null } => isObj(m) && isStr(m.date) && isStrOrNull(m.failed))) return false;
   if (!isArrayOf(v.recentTrades, isRecentTrade)) return false;
+  // Added after the first live shape; optional so an older snapshot still renders.
+  if (!(v.verdictPending === undefined || isStrOrNull(v.verdictPending))) return false;
   return v.verdict == null || isAiVerdict(v.verdict);
 }

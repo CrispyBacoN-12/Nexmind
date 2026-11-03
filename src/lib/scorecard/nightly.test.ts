@@ -232,10 +232,12 @@ test("freezes the AI verdict exactly once", async () => {
   assert.ok(v.controlP95 < 0, `flat control loses its costs, p95 ${v.controlP95}`);
   assert.equal(v.pass, true);
   // First the SPY calendar (from the sample's last run − 1 day), then the sample's own
-  // tickers in one call per run date.
+  // tickers plus SPY (to check each row's 10 sessions) in one call per run date.
   assert.deepEqual(rec.fetches[0], { tickers: ["SPY"], fromSec: etEpoch(V_DAY, "15:20") - 86_400, toSec: Math.floor((V_NOW - 16 * 60_000) / 1000) });
   assert.equal(rec.fetches.length, 2);
-  assert.equal(rec.fetches[1].tickers.length, 300);
+  assert.equal(rec.fetches[1].tickers.length, 301);
+  assert.ok(rec.fetches[1].tickers.includes("SPY"));
+  assert.equal(snap.verdictPending, null);
   assert.ok(!rec.fetches[1].tickers.includes("LATE"));
   assert.equal(snap.verdict?.n, 300);
   assert.deepEqual(snap.keptControl, { median: v.controlMedian, p95: v.controlP95, runs: v.runs });
@@ -457,4 +459,97 @@ test("afterVerdict is anchored on the stored verdict's lastId; kept's cumulative
   assert.equal(snap.cumulativeR.afterVerdict.at(-1)!.n, 150);
   assert.deepEqual(snap.keptControl, { median: -0.1, p95: -0.05, runs: 200 });
   assert.match(rec.sent[0], /ซื้อสุ่ม p95: -0\.05R → ชนะ/);
+});
+
+// --- Final-review fixes (F6-F8) ----------------------------------------------
+
+const storedOpen = (over: Partial<Outcome> = {}): Outcome => ({
+  status: "open", fillAt: etEpoch(V_DAY, "15:20"), fill: 100, exitAt: null, exitPrice: null, exitReason: null, r: null, sessionsHeld: 1, ...over,
+});
+
+test("F6: a filled open row whose ticker returns no bars becomes no_data once the SPY window elapses, and stops pinning the fetch", async () => {
+  const r = row({ id: 8, ticker: "GONE", createdAt: new Date(etEpoch(V_DAY, "15:20") * 1000), outcomes: { hold: storedOpen(), sameDay: storedOpen() } });
+  const bars = (t: string) => (t === "SPY" ? verdictBars() : undefined);
+
+  // Window not yet elapsed (10-14 12:00 ET): left as stored.
+  const before = deps({ nowMs: etEpoch("2026-10-14", "12:00") * 1000, rows: [r], bars });
+  await runScorecardNightly(before.deps);
+  assert.equal(before.rec.saved.length, 0);
+
+  // Elapsed: both variants no_data, fill fields kept.
+  const after = deps({ nowMs: V_NOW, rows: [r], bars });
+  const snap = await runScorecardNightly(after.deps);
+  assert.deepEqual(after.rec.saved.map((s) => `${s.variant}:${s.outcome.status}`).sort(), ["hold:no_data", "sameDay:no_data"]);
+  for (const s of after.rec.saved) {
+    assert.equal(s.outcome.fill, 100);
+    assert.equal(s.outcome.fillAt, etEpoch(V_DAY, "15:20"));
+    assert.equal(s.outcome.sessionsHeld, 1);
+    assert.equal(s.outcome.r, null);
+  }
+  assert.equal(snap.counts.kept.noData, 1);
+  assert.equal(snap.keptProgress.n, 0); // out of the verdict sample
+
+  // The next night it is terminal: nothing to score, no fetch.
+  const stored = Object.fromEntries(after.rec.saved.map((s) => [s.variant, s.outcome]));
+  const next = deps({ nowMs: V_NOW + 86_400_000, rows: [{ ...r, outcomes: stored }], bars });
+  await runScorecardNightly(next.deps);
+  assert.equal(next.rec.fetches.length, 0);
+  assert.equal(next.rec.saved.length, 0);
+});
+
+test("F6: a no_data row leaves the verdict sample and the next kept row moves in", async () => {
+  const gone = row({ id: 1, ticker: "GONE", createdAt: new Date(etEpoch(V_DAY, "15:20") * 1000), outcomes: { hold: storedOpen(), sameDay: closedOutcome() } });
+  const rest = keptSample(300).map((r) => ({ ...r, id: r.id + 1 })); // ids 2..301
+  const { deps: d, rec } = deps({ nowMs: V_NOW, rows: [gone, ...rest], bars: (t) => (t === "GONE" ? undefined : verdictBars()) });
+  const snap = await runScorecardNightly(d);
+  assert.equal(rec.saved.find((s) => s.chartSetupId === 1)?.outcome.status, "no_data");
+  assert.equal(rec.verdicts.length, 1);
+  assert.equal(rec.verdicts[0].firstId, 2);
+  assert.equal(rec.verdicts[0].lastId, 301);
+  assert.equal(snap.verdict?.n, 300);
+});
+
+test("F7: with no run-date bar tonight a stored fill is left as stored, never closed on later bars", async () => {
+  // Own bars only on later sessions (none on the run date); SPY's window has elapsed.
+  const later: Candle[] = V_LATER.slice(0, 3).map((d) => ({ t: etEpoch(d, "15:55"), o: 100, h: 100.2, l: 99.8, c: 101, v: 1000 }));
+  const r = row({ id: 8, ticker: "PART", createdAt: new Date(etEpoch(V_DAY, "15:20") * 1000), outcomes: { hold: storedOpen(), sameDay: closedOutcome() } });
+  const { deps: d, rec } = deps({ nowMs: V_NOW, rows: [r], bars: (t) => (t === "SPY" ? verdictBars() : later) });
+  const snap = await runScorecardNightly(d);
+  assert.equal(rec.saved.length, 0);
+  assert.equal(snap.recentTrades[0].hold.status, "open");
+});
+
+test("F8: one sample ticker missing from the ready-night fetch → no freeze tonight, retried the next night", async () => {
+  const rows = keptSample(300);
+  const { deps: d, rec } = deps({ nowMs: V_NOW, rows, bars: (t) => (t === "K7" ? undefined : verdictBars()) });
+  const snap = await runScorecardNightly(d);
+  assert.equal(rec.verdicts.length, 0);
+  assert.equal(snap.verdict, null);
+  assert.match(snap.verdictPending ?? "", /#8 K7/);
+  // The sample's fetch carries SPY, so its windows are checked on bars of the same fetch.
+  assert.ok(rec.fetches[1].tickers.includes("SPY"));
+
+  const next = deps({ nowMs: V_NOW + 86_400_000, rows, bars: () => verdictBars() });
+  const snap2 = await runScorecardNightly(next.deps);
+  assert.equal(next.rec.verdicts.length, 1);
+  assert.equal(snap2.verdictPending, null);
+});
+
+test("F8: no freeze when a sample row has no eligible control bar", async () => {
+  // K3's run-date bars start at 15:30 ET: it has run-date bars, but the control may not enter at or after 15:30.
+  const late = (): Candle[] => [...flatBars(V_DAY, 930), ...verdictBars().slice(8)];
+  const { deps: d, rec } = deps({ nowMs: V_NOW, rows: keptSample(300), bars: (t) => (t === "K3" ? late() : verdictBars()) });
+  const snap = await runScorecardNightly(d);
+  assert.equal(rec.verdicts.length, 0);
+  assert.match(snap.verdictPending ?? "", /#4 K3/);
+});
+
+test("F8: no freeze when the sample fetch's SPY bars do not cover ten sessions", async () => {
+  // The first fetch (the calendar) has full SPY; the sample's own fetch is missing SPY's 10th session.
+  let spyCalls = 0;
+  const bars = (t: string) => (t === "SPY" && ++spyCalls > 1 ? verdictBars().slice(0, -1) : verdictBars());
+  const { deps: d, rec } = deps({ nowMs: V_NOW, rows: keptSample(300), bars });
+  const snap = await runScorecardNightly(d);
+  assert.equal(rec.verdicts.length, 0);
+  assert.match(snap.verdictPending ?? "", /SPY/);
 });

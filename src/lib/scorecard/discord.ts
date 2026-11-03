@@ -4,7 +4,7 @@
 
 import type { Group } from "./groups";
 import type { LastRunSummary, LiveSnapshot } from "./nightly";
-import type { ExitReason } from "./types";
+import { SCORECARD_MIN_N, type ExitReason } from "./types";
 
 export interface ClosedLine {
   ticker: string;
@@ -52,8 +52,12 @@ export function buildDiscordMessage(input: DiscordInput): string {
 
   const v = snapshot.verdict;
   const p = snapshot.keptProgress;
+  // The mean is over closed rows only, so that count is stated; under SCORECARD_MIN_N
+  // closed it is not printed (the page does the same). The frozen sample is all closed.
   const mean = v ? v.meanR : p.meanR;
-  lines.push(`สะสม AI เก็บ: ${v ? v.n : p.n}/${p.target} · เฉลี่ย ${mean === null ? "—" : r2(mean)}`);
+  const closedN = v ? v.n : p.closed;
+  const meanText = closedN < SCORECARD_MIN_N || mean === null ? "ยังน้อยเกินไป" : r2(mean);
+  lines.push(`สะสม AI เก็บ: ${v ? v.n : p.n}/${p.target} · ปิดแล้ว ${closedN} · เฉลี่ย ${meanText}`);
 
   // The random control exists only frozen with the verdict; before it there is no number
   // to compare against, and no win/lose word is printed.

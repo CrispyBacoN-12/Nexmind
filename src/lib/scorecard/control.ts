@@ -37,8 +37,9 @@ export interface ControlTrade {
 /**
  * Finished regular bars on the trade's run date, at or after the run, that open before
  * 15:30 ET. The control may enter at any of them; the real setup used the first.
+ * Exported so the nightly job can refuse to freeze a verdict on a trade with none.
  */
-function eligibleBars(trade: ControlTrade): Candle[] {
+export function eligibleBars(trade: ControlTrade): Candle[] {
   const runDate = etClockMemo(trade.runAtSec).date;
   return trade.bars.filter((b) => {
     if (b.t < trade.runAtSec || b.t + CHART_BAR_SECONDS > trade.cutoffSec) return false;

@@ -197,6 +197,14 @@ function AiCard({ live, verdict: verdictSnap, startDate }: { live: Snap<LiveSnap
   );
 }
 
+/**
+ * A fixed category for a failed run; the raw error text stays in logs and Discord. A failed
+ * run with setups logged got through the scan and chart agent, so its write failed.
+ */
+function failureCategory(r: LiveSnapshot["lastRun"]): string {
+  return r.setups > 0 ? "บันทึกไม่สำเร็จ" : "รอบล้มเหลว";
+}
+
 function RunStatus({ live }: { live: LiveSnapshot }) {
   const r = live.lastRun;
   return (
@@ -206,7 +214,7 @@ function RunStatus({ live }: { live: LiveSnapshot }) {
         {r.status === "ran" ? ` · ${r.setups} setup (เก็บ ${r.kept} ทิ้ง ${r.vetoed} ตัด ${r.stripped} ยังไม่อ่าน ${r.unread})` : ""}
       </span>
       {r.aiDown && <Badge tone="warning">AI ไม่ตอบ: ทุก setup ในรอบนี้ยังไม่ได้อ่าน</Badge>}
-      {r.error && <Badge tone="negative" title={r.error}>มีข้อผิดพลาด</Badge>}
+      {r.error && <Badge tone="negative">{failureCategory(r)}</Badge>}
       <span>· คำนวณเมื่อ {live.computedAt.slice(0, 16).replace("T", " ")} UTC</span>
     </div>
   );
@@ -380,7 +388,7 @@ export default async function ScorecardPage() {
             {live.missed.map((m) => (
               <li key={m.date} className="tabular-nums">
                 <span className="font-medium">{m.date}</span>{" "}
-                <span className="text-(--color-muted)">{m.failed ? `รอบล้มเหลว: ${m.failed}` : "ไม่มีบันทึกการรัน (เครื่องปิดหรือไม่ได้รัน)"}</span>
+                <span className="text-(--color-muted)">{m.failed ? "รอบล้มเหลว" : "ไม่มีบันทึกการรัน (เครื่องปิดหรือไม่ได้รัน)"}</span>
               </li>
             ))}
           </ul>
@@ -396,6 +404,7 @@ export default async function ScorecardPage() {
         <p>ผลย้อนหลังไม่มีข้อมูลงบ (earnings) และ 8-K ที่ใช้จัดอันดับหุ้นในรอบจริง — คะแนนส่วนนั้นนับเป็น 0</p>
         <p>
           เฉลี่ย R ทุกตัวหักต้นทุนแล้ว: slippage {costs.slippageBps} bps ทุกครั้งที่เข้า/ออก และคอมมิชชัน {costs.commissionBps} bp ต่อมูลค่าที่เข้า
+          ตัวเทียบซื้อสุ่มหักต้นทุนเท่ากัน ต้นทุนจึงหักล้างกันเกือบหมดในส่วนต่าง
         </p>
         <p>
           model ที่อ่าน setup ของคำตัดสิน: {modelMixText(modelMix)}

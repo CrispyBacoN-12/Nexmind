@@ -13,7 +13,10 @@
 //    regular sessions from its fill date (fill date = 1), never on the row's own bars, so a
 //    halted or renamed ticker cannot hold the verdict back.
 //  - A filled row still `open` once that window has elapsed is closed on time at its last
-//    finished regular close (its own bars stopped). It stays in every sample.
+//    finished regular close (its own bars stopped). It stays in every sample. Only on a
+//    night that has its run-date bars: without them the row is left as stored, except that
+//    a ticker returning no bar at all after the window becomes no_data (fill kept) and
+//    leaves the verdict sample.
 //  - There is no live random control. The control is computed once, on exactly the
 //    300-row verdict sample, the night it is ready (one bounded bar fetch per run date),
 //    and frozen with the verdict.
@@ -23,7 +26,7 @@ import { CHART_BAR_SECONDS, CHART_RULE_VERSION } from "@/lib/chartAgent/types";
 import { SIP_DELAY_MS } from "@/lib/alpaca";
 import { etClock, etSessionCloseMs } from "@/lib/scanAgent/session";
 import { buildDiscordMessage, type ClosedLine, type OpenLine } from "./discord";
-import { controlDistribution, type ControlTrade } from "./control";
+import { controlDistribution, eligibleBars, type ControlTrade } from "./control";
 import { etDayBoundsMs } from "./etDay";
 import { aiVerdictSample, beatsControl, groupOf, summarize, type Group, type GroupStats } from "./groups";
 import type { ScorecardRunInput } from "./runDaily";
@@ -169,6 +172,12 @@ export interface LiveSnapshot {
   /** Newest 30 rows first. */
   recentTrades: RecentTrade[];
   verdict: AiVerdict | null;
+  /**
+   * Why a ready sample was not frozen tonight (a sample row without run-date bars or an
+   * eligible control bar, or SPY not covering its 10 sessions); retried the next night.
+   * Null when no verdict was due or it was frozen.
+   */
+  verdictPending: string | null;
 }
 
 const NO_OUTCOME: Outcome = {
@@ -396,14 +405,18 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
       let next: Outcome;
       if (noBars && prev?.fill != null) {
         // A fill already seen is kept: missing run-date bars tonight are a feed gap, not news.
-        next = prev;
+        // Never closed on time from tonight's partial bars. But a ticker that returns no bar
+        // at all once its SPY window has elapsed (delisted, renamed) can never be priced:
+        // it becomes no_data, fill kept, so it leaves the verdict sample and stops pinning
+        // the nightly fetch to its run date.
+        next = rowBars.length === 0 && elapsedOn(calendar, prev.fillAt, cutoffSec) ? { ...prev, status: "no_data" } : prev;
       } else if (noBars) {
         const stale = nowMs - r.createdAt.getTime() >= SCORECARD_NO_DATA_DAYS * DAY_SEC * 1000;
         next = { ...NO_OUTCOME, status: stale ? "no_data" : "open" };
       } else {
         next = scoreSetup({ runAtSec: runAtSec(r), stop: r.stop, t1: r.t1, bars: rowBars, cutoffSec, variant: v });
+        next = closeAfterWindow(next, rowBars, v, r.stop, elapsedOn(calendar, next.fillAt, cutoffSec), cutoffSec);
       }
-      next = closeAfterWindow(next, rowBars, v, r.stop, elapsedOn(calendar, next.fillAt, cutoffSec), cutoffSec);
       if (next === prev) continue;
       current[v] = next;
       updates.push({ chartSetupId: r.id, variant: v, outcome: next });
@@ -431,24 +444,49 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   );
 
   let verdict: AiVerdict | null = isAiVerdict(stored) ? stored : null;
+  let verdictPending: string | null = null;
   if (stored === null && sample.ready) {
-    // The sample's own bars, for the control only: one bounded fetch per run date, once.
+    // The sample's own bars, for the control only: one bounded fetch per run date, with
+    // SPY in it so each row's 10 sessions are checked on the same fetch.
     const sampleBars = new Map<number, Candle[]>();
+    const covered = new Map<number, boolean>();
     const byDate = new Map<string, NightlyRow[]>();
     for (const s of sample.sample) {
       const d = runDateOf(s.row);
       byDate.set(d, [...(byDate.get(d) ?? []), s.row]);
     }
+    const holdById = new Map(sample.sample.map((s) => [s.id, s.hold]));
     for (const [, dateRows] of [...byDate].sort(([a], [b]) => a.localeCompare(b))) {
       const from = Math.min(...dateRows.map(runAtSec)) - DAY_SEC;
       const to = Math.min(cutoffSec, from + VERDICT_WINDOW_DAYS * DAY_SEC);
-      const got = await deps.fetchBars([...new Set(dateRows.map((r) => r.ticker))], from, to);
-      for (const r of dateRows) sampleBars.set(r.id, got.get(r.ticker) ?? []);
+      const got = await deps.fetchBars([...new Set([...dateRows.map((r) => r.ticker), CALENDAR_TICKER])], from, to);
+      const spyDates = sessionDates(got.get(CALENDAR_TICKER) ?? [], to);
+      for (const r of dateRows) {
+        sampleBars.set(r.id, got.get(r.ticker) ?? []);
+        covered.set(r.id, elapsedOn(spyDates, holdById.get(r.id)!.fillAt, to));
+      }
     }
     const trades = sample.sample.map((s) => toTrade(s.row, s.hold, sampleBars.get(s.id)!, cutoffSec));
-    const control = controlDistribution(trades, "hold");
+
+    // Freeze only on a complete sample: a missing fetch would otherwise just shrink the
+    // control (a trade with no pool sits every run out) and the verdict is written once.
+    const problems: string[] = [];
+    sample.sample.forEach((s, i) => {
+      const why: string[] = [];
+      if (!hasRunDateBar(sampleBars.get(s.id)!, runAtSec(s.row), cutoffSec)) why.push("no bars on its run date");
+      else if (eligibleBars(trades[i]).length === 0) why.push("no eligible control bar");
+      if (!covered.get(s.id)) why.push(`fetched ${CALENDAR_TICKER} bars do not cover its ${SCORECARD_MAX_HOLD_SESSIONS} sessions`);
+      if (why.length) problems.push(`#${s.id} ${s.row.ticker} (${why.join("; ")})`);
+    });
+
+    const control = problems.length ? null : controlDistribution(trades, "hold");
     const meanR = summarize(sample.sample.map((s) => s.hold)).meanR;
-    if (control && meanR !== null) {
+    if (problems.length) {
+      const shown = problems.slice(0, 10).join(", ");
+      verdictPending = `${problems.length} of ${sample.sample.length} sample rows not ready: ${shown}${problems.length > 10 ? ", ..." : ""}`;
+    } else if (!control || meanR === null) {
+      verdictPending = "the random control produced no value";
+    } else {
       verdict = {
         ruleVersion: CHART_RULE_VERSION,
         n: sample.sample.length,
@@ -583,6 +621,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     lastRun,
     recentTrades,
     verdict,
+    verdictPending,
   };
   await deps.saveLive(snapshot);
 

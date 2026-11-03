@@ -59,3 +59,24 @@ test("resolvedModel reads the first key of the CLI result's modelUsage", () => {
   assert.equal(cliResolvedModel({ result: "x", modelUsage: {} }), null);
   assert.equal(cliResolvedModel(null), null);
 });
+
+test("resolvedModel picks the modelUsage key with the most output tokens, not the first", () => {
+  // The CLI lists an auxiliary model (e.g. a haiku helper call) before the main one.
+  assert.equal(
+    cliResolvedModel({
+      result: "x",
+      modelUsage: {
+        "claude-haiku-aux": { inputTokens: 900, outputTokens: 12, costUSD: 0.001 },
+        "claude-sonnet-main": { inputTokens: 300, outputTokens: 640, costUSD: 0.02 },
+      },
+    }),
+    "claude-sonnet-main",
+  );
+  // No output tokens anywhere: highest cost.
+  assert.equal(
+    cliResolvedModel({ modelUsage: { "aux": { costUSD: 0.001 }, "main": { costUSD: 0.02 } } }),
+    "main",
+  );
+  // Neither field: the first key.
+  assert.equal(cliResolvedModel({ modelUsage: { "first": {}, "second": {} } }), "first");
+});

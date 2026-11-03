@@ -38,6 +38,7 @@ function snapshot(over: Partial<LiveSnapshot> = {}): LiveSnapshot {
     lastRun: lastRun(),
     recentTrades: [],
     verdict: null,
+    verdictPending: null,
     ...over,
   };
 }
@@ -66,11 +67,19 @@ test("the lines come in the fixed order", () => {
   assert.match(lines[2], /^ปิดแล้ว: AAPL \+1\.20R/);
   assert.match(lines[2], /MSFT -1\.00R/);
   assert.match(lines[3], /^ยังถือ: NVDA 3\/10/);
-  assert.equal(lines[4], "สะสม AI เก็บ: 12/300 · เฉลี่ย 0.15R");
+  // 8 closed < SCORECARD_MIN_N: no mean is printed.
+  assert.equal(lines[4], "สะสม AI เก็บ: 12/300 · ปิดแล้ว 8 · เฉลี่ย ยังน้อยเกินไป");
   assert.equal(lines[5], "ซื้อสุ่ม: คำนวณตอนครบ 300"); // no live control before the verdict
   assert.equal(lines[6], "สถานะ: ยังตัดสินไม่ได้");
   assert.equal(lines[7], "รอบอัตโนมัติเมื่อคืน: รันแล้ว 22:31");
   assert.equal(lines.length, 8);
+});
+
+test("the kept line prints the mean of closed rows only once SCORECARD_MIN_N have closed", () => {
+  const line = (closed: number) =>
+    buildDiscordMessage(input({ snapshot: snapshot({ keptProgress: { n: 40, closed, meanR: 0.153, target: 300 } }) })).split("\n")[4];
+  assert.equal(line(29), "สะสม AI เก็บ: 40/300 · ปิดแล้ว 29 · เฉลี่ย ยังน้อยเกินไป");
+  assert.equal(line(30), "สะสม AI เก็บ: 40/300 · ปิดแล้ว 30 · เฉลี่ย 0.15R");
 });
 
 test("says the AI was down", () => {
@@ -106,6 +115,8 @@ test("a frozen verdict decides the status line", () => {
   const pass = buildDiscordMessage(input({ snapshot: snapshot({ verdict }) }));
   assert.ok(pass.includes("ซื้อสุ่ม p95: 0.10R → ชนะ"));
   assert.ok(pass.includes("สถานะ: เชื่อได้"));
+  // The frozen sample is all closed: n closed = the verdict's n.
+  assert.ok(pass.includes("สะสม AI เก็บ: 300/300 · ปิดแล้ว 300 · เฉลี่ย 0.30R"));
   const fail = buildDiscordMessage(input({ snapshot: snapshot({ verdict: { ...verdict, pass: false } }) }));
   assert.ok(fail.includes("สถานะ: เชื่อไม่ได้"));
   assert.ok(fail.includes("ซื้อสุ่ม p95: 0.10R → ไม่ชนะ"));
@@ -121,10 +132,16 @@ test("contains no prediction phrase", () => {
     input({ lastRun: lastRun({ kept: 0, unread: 2, aiDown: true }) }),
     input({ lastRun: lastRun({ status: "none", ranAt: null }), closedOvernight: [], openNow: [] }),
     input({ snapshot: snapshot({ keptProgress: { n: 0, closed: 0, meanR: null, target: 300 } }) }),
+    input({ snapshot: snapshot({ keptProgress: { n: 40, closed: 35, meanR: 0.2, target: 300 } }) }),
     input({ snapshot: snapshot({ verdict, keptControl: { median: 0, p95: 0.1, runs: 200 } }) }),
   ];
   for (const v of variants) {
     const msg = buildDiscordMessage(v);
     assert.equal(isChartPrediction(msg), false, msg);
   }
+});
+
+test("the page's pass caveat is not in the message: its wording trips the prediction guard", () => {
+  // Ruled copy for F11; "รับประกัน" is a CHART_PREDICTION_PHRASES_TH phrase, so it cannot be sent.
+  assert.equal(isChartPrediction("ชนะ p95 ของการซื้อสุ่ม ไม่ใช่การรับประกันว่ามี edge"), true);
 });
