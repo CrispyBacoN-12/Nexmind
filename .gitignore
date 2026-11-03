@@ -113,3 +113,4 @@ mt5-bridge/bridge.err.log
 scripts/risk-sentry.log
 scripts/scorecard-run.log
 scripts/scorecard-score.log
+scripts/scorecard-replay.log
