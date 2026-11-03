@@ -255,3 +255,33 @@ test("fetchAlpacaRange still skips a chunk on a plain 4xx", async () => {
   assert.equal(urls.length, 1);
   assert.equal((result as Map<string, unknown[]>).size, 0);
 });
+
+test("fetchAlpacaRange keeps a symbol whose paged history is far past the spread-argument limit", async () => {
+  // 30 pages x 10,000 bars = 300,000 bars for one symbol: merging them with push(...bars)
+  // throws "Maximum call stack size exceeded" and the whole chunk used to be skipped.
+  const PAGES = 30;
+  const PER_PAGE = 10_000;
+  const base = Date.parse("2024-01-02T14:30:00Z");
+  const responses = Array.from({ length: PAGES }, (_, p) => ({
+    status: 200,
+    body: {
+      bars: {
+        BIG: Array.from({ length: PER_PAGE }, (_, j) => {
+          const n = p * PER_PAGE + j;
+          return { t: new Date(base + n * 300_000).toISOString(), o: n, h: n, l: n, c: n, v: 1 };
+        }),
+      },
+      next_page_token: p < PAGES - 1 ? `p${p + 2}` : null,
+    },
+  }));
+  const { urls, result } = await withScriptedFetch(responses, () =>
+    fetchAlpacaRange(["BIG"], "2023-10-01T00:00:00Z", "2026-10-30T20:00:00Z", "5m", "all", noSleep),
+  );
+  assert.equal(urls.length, PAGES);
+  const candles = (result as Map<string, { c: number }[]>).get("BIG");
+  assert.ok(candles, "BIG must not be skipped");
+  assert.equal(candles.length, PAGES * PER_PAGE);
+  for (let n = 0; n < candles.length; n++) {
+    if (candles[n].c !== n) assert.fail(`bar ${n} out of order: c=${candles[n].c}`);
+  }
+});

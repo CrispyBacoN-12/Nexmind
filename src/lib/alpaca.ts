@@ -177,7 +177,7 @@ export async function fetchAlpacaCandles(
       throw new Error(`alpaca upstream ${res.status}`);
     }
     const json = (await res.json()) as { bars?: AlpacaBar[]; next_page_token?: string | null };
-    if (json.bars) allBars.push(...json.bars);
+    if (json.bars) appendAll(allBars, json.bars);
     pageToken = json.next_page_token ?? undefined;
   } while (pageToken);
 
@@ -224,10 +224,10 @@ export async function fetchAlpacaCandlesBatch(
           const res = await fetch(`${ALPACA_DATA_BASE}/bars?${params}`, { headers, next: { revalidate: 30 } });
           if (!res.ok) throw new Error(`alpaca batch upstream ${res.status}`);
           const json = (await res.json()) as { bars?: Record<string, AlpacaBar[]>; next_page_token?: string | null };
-          for (const [sym, bars] of Object.entries(json.bars ?? {})) (chunkBars[sym] ??= []).push(...(bars ?? []));
+          for (const [sym, bars] of Object.entries(json.bars ?? {})) appendAll((chunkBars[sym] ??= []), bars ?? []);
           pageToken = json.next_page_token ?? undefined;
         } while (pageToken);
-        for (const [sym, bars] of Object.entries(chunkBars)) (merged[sym] ??= []).push(...bars);
+        for (const [sym, bars] of Object.entries(chunkBars)) appendAll((merged[sym] ??= []), bars);
         break; // chunk done
       } catch (e) {
         const is4xx = e instanceof Error && /upstream 4\d\d/.test(e.message);
@@ -241,6 +241,15 @@ export async function fetchAlpacaCandlesBatch(
   }
 
   return parseAlpacaBatch({ bars: merged }, range, interval);
+}
+
+/**
+ * Append `source` to `target` in order. Not `target.push(...source)`: spreading puts every
+ * element on the call stack, and a multi-year 5-minute history (150k+ bars) throws
+ * "Maximum call stack size exceeded".
+ */
+function appendAll<T>(target: T[], source: readonly T[]): void {
+  for (let i = 0; i < source.length; i++) target.push(source[i]);
 }
 
 /** Backoff for an HTTP 429: Retry-After when Alpaca sends one, else 2s doubling to 60s. */
@@ -308,10 +317,10 @@ export async function fetchAlpacaRange(
           }
           if (!res.ok) throw new Error(`alpaca range upstream ${res.status}`);
           const json = (await res.json()) as { bars?: Record<string, AlpacaBar[]>; next_page_token?: string | null };
-          for (const [sym, bars] of Object.entries(json.bars ?? {})) (chunkBars[sym] ??= []).push(...(bars ?? []));
+          for (const [sym, bars] of Object.entries(json.bars ?? {})) appendAll((chunkBars[sym] ??= []), bars ?? []);
           pageToken = json.next_page_token ?? undefined;
         } while (pageToken);
-        for (const [sym, bars] of Object.entries(chunkBars)) (merged[sym] ??= []).push(...bars);
+        for (const [sym, bars] of Object.entries(chunkBars)) appendAll((merged[sym] ??= []), bars);
         break; // chunk done
       } catch (e) {
         const is4xx = e instanceof Error && /upstream 4\d\d/.test(e.message);
