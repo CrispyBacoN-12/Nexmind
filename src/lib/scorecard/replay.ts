@@ -40,7 +40,7 @@ import {
 
 /** Stated with every replay result; the page and the results doc show them. */
 export const REPLAY_BIASES: string[] = [
-  "รายชื่อหุ้นเป็น S&P 500 ปัจจุบัน — หุ้นที่เคยหลุดออกจากดัชนีไม่อยู่ในผล (survivorship bias)",
+  "รายชื่อหุ้นเป็นรายชื่อ S&P 500 แบบคงที่ชุดเดียวกับที่ /scan ใช้ (ประมาณ 490 ตัว) — มีบางตัวที่หลุดดัชนีไปแล้ว และขาดตัวที่เพิ่งเข้าใหม่ หุ้นที่เลิกซื้อขายไปแล้วไม่อยู่ในผล (survivorship bias)",
   "ไม่มีข้อมูลงบและ 8-K ย้อนหลัง — คะแนนส่วนนั้นนับเป็น 0",
 ];
 
@@ -74,8 +74,13 @@ export interface ReplaySummary {
   universe: number;
   tickersWithData: number;
   missingTickers: string[];
-  /** (ticker, session) pairs picked into the top CHART_TOP_N. */
+  /** (ticker, session) pairs picked into the top CHART_TOP_N (every session, the tail included). */
   picks: number;
+  /**
+   * The period's last sessions whose 10-session hold window would run past its end
+   * (index > sessions - SCORECARD_MAX_HOLD_SESSIONS): ranked, but no setup is scored on them.
+   */
+  tailSessionsExcluded: number;
   setupsFound: number;
   /** Primary-exit fill status: filled = got a fill (closed or still open at the end). */
   filled: number;
@@ -132,6 +137,11 @@ export async function runReplay(deps: ReplayDeps): Promise<ReplaySummary> {
   const to = sessions[sessions.length - 1];
   const endCutoffSec = etSessionCloseMs(to) / 1000;
   const findCutoff = (s: string) => replayRunAtSec(s) - SIP_DELAY_MS / 1000;
+  // Only sessions whose whole hold window fits inside the period are scored, so a setup
+  // near the end is never cut short and closed on time early.
+  const lastScoredIdx = sessions.length - SCORECARD_MAX_HOLD_SESSIONS;
+  const scoredSessions = new Set(sessions.filter((_, i) => i <= lastScoredIdx));
+  const tailSessionsExcluded = sessions.length - scoredSessions.size;
 
   // Pass 1: one small scan row per (ticker, session).
   const rowsBySession = new Map<string, TvRow[]>(sessions.map((s) => [s, []]));
@@ -168,7 +178,7 @@ export async function runReplay(deps: ReplayDeps): Promise<ReplaySummary> {
   }
   rowsBySession.clear();
 
-  // Pass 3: the live setup pipeline on each pick, then score both exits.
+  // Pass 3: the live setup pipeline on each pick outside the tail, then score both exits.
   const scored: Scored[] = [];
   const pickedTickers = universe.filter((t) => picked.has(t));
   for (let k = 0; k < pickedTickers.length; k++) {
@@ -176,6 +186,7 @@ export async function runReplay(deps: ReplayDeps): Promise<ReplaySummary> {
     const ii = indexIntraday(await deps.loadIntraday(ticker));
     const di = indexDaily(await deps.loadDaily(ticker));
     for (const s of picked.get(ticker)!) {
+      if (!scoredSessions.has(s)) continue;
       const runAtSec = replayRunAtSec(s);
       const split = splitSessions(barsAtCutoff(ii, s, findCutoff(s)), s);
       const lv = computeLevels(split);
@@ -233,6 +244,7 @@ export async function runReplay(deps: ReplayDeps): Promise<ReplaySummary> {
     tickersWithData: universe.length - missingTickers.length,
     missingTickers,
     picks,
+    tailSessionsExcluded,
     setupsFound: scored.length,
     filled: filled.length,
     notFilled: scored.filter((x) => x.hold.status === "not_filled").length,

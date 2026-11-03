@@ -34,9 +34,25 @@ function weekdays(end: string, count: number): string[] {
 const hhmm = (m: number) =>
   `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
+function weekdaysAfter(start: string, count: number): string[] {
+  const out: string[] = [];
+  const d = new Date(`${start}T12:00:00Z`);
+  while (out.length < count) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const dow = d.getUTCDay();
+    if (dow !== 0 && dow !== 6) out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
 const SESSIONS = weekdays("2026-10-28", 12); // all EDT
 const PREV = SESSIONS[10];
 const TODAY = SESSIONS[11];
+/**
+ * Nine later sessions with no bars, so TODAY (index 11 of 21) sits at len - 10 and its
+ * hold window fits inside the period. They have no bars, so the EST switch is moot.
+ */
+const TAIL = weekdaysAfter(TODAY, 9);
 
 function bar(date: string, m: number, o: number, h: number, l: number, c: number, v: number): Candle {
   return { t: etEpoch(date, hhmm(m)), o, h, l, c, v };
@@ -85,9 +101,9 @@ function daily(): Candle[] {
   return weekdays(TODAY, 30).map((d) => ({ t: etEpoch(d, "00:00"), o: 100, h: 101, l: 99, c: 100, v: 2_000_000 }));
 }
 
-function deps(bars: Record<string, Candle[]>, noRawDaily: string[] = []): ReplayDeps {
+function deps(bars: Record<string, Candle[]>, noRawDaily: string[] = [], sessions: string[] = [...SESSIONS, ...TAIL]): ReplayDeps {
   return {
-    sessions: SESSIONS,
+    sessions,
     universe: Object.keys(bars),
     loadIntraday: async (t) => bars[t] ?? [],
     loadDaily: async () => daily(),
@@ -104,8 +120,9 @@ test("end to end on a stub universe", async () => {
     }),
   );
   assert.equal(s.period.from, SESSIONS[0]);
-  assert.equal(s.period.to, TODAY);
-  assert.equal(s.sessions, 12);
+  assert.equal(s.period.to, TAIL[8]);
+  assert.equal(s.sessions, 21);
+  assert.equal(s.tailSessionsExcluded, 9);
   assert.equal(s.universe, 2);
   assert.equal(s.tickersWithData, 2);
   assert.deepEqual(s.missingTickers, []);
@@ -121,13 +138,36 @@ test("end to end on a stub universe", async () => {
   assert.equal(typeof s.pass, "boolean");
   assert.deepEqual(s.biases, REPLAY_BIASES);
   assert.deepEqual(s.biases, [
-    "รายชื่อหุ้นเป็น S&P 500 ปัจจุบัน — หุ้นที่เคยหลุดออกจากดัชนีไม่อยู่ในผล (survivorship bias)",
+    "รายชื่อหุ้นเป็นรายชื่อ S&P 500 แบบคงที่ชุดเดียวกับที่ /scan ใช้ (ประมาณ 490 ตัว) — มีบางตัวที่หลุดดัชนีไปแล้ว และขาดตัวที่เพิ่งเข้าใหม่ หุ้นที่เลิกซื้อขายไปแล้วไม่อยู่ในผล (survivorship bias)",
     "ไม่มีข้อมูลงบและ 8-K ย้อนหลัง — คะแนนส่วนนั้นนับเป็น 0",
   ]);
-  assert.equal(s.cumulativeR.length, 12);
-  assert.equal(s.cumulativeR.at(-1)?.date, TODAY);
+  assert.equal(s.cumulativeR.length, 21);
+  assert.equal(s.cumulativeR[11].date, TODAY);
+  assert.equal(s.cumulativeR[11].cumR, s.stats.hold.meanR);
+  assert.equal(s.cumulativeR[10].cumR, 0);
   assert.equal(s.cumulativeR.at(-1)?.cumR, s.stats.hold.meanR);
-  assert.equal(s.cumulativeR.at(-2)?.cumR, 0);
+});
+
+test("a setup in the last 9 sessions is not scored: its hold window would run past the period", async () => {
+  const bars = { SWP: intraday(today({ sweepAt: 575, spikeAt: 660 })), FLAT: intraday(today({ sweepAt: null, spikeAt: null })) };
+
+  // TODAY is the period's last session (index 11 of 12 > 12 - 10): ranked, never scored.
+  const s = await runReplay(deps(bars, [], SESSIONS));
+  assert.equal(s.picks, 2);
+  assert.equal(s.tailSessionsExcluded, 9);
+  assert.equal(s.setupsFound, 0);
+  assert.equal(s.filled, 0);
+  assert.equal(s.stats.hold.n, 0);
+
+  // One more session after TODAY is still not enough (index 11 of 13 > 3).
+  assert.equal((await runReplay(deps(bars, [], [...SESSIONS, ...TAIL.slice(0, 1)]))).setupsFound, 0);
+  // Nine are: index 11 of 21 = 21 - 10.
+  assert.equal((await runReplay(deps(bars, [], [...SESSIONS, ...TAIL]))).setupsFound, 1);
+
+  // A period shorter than the hold cap excludes every session.
+  const short = await runReplay(deps(bars, [], SESSIONS.slice(5)));
+  assert.equal(short.tailSessionsExcluded, 7);
+  assert.equal(short.setupsFound, 0);
 });
 
 test("reads no bar after the cutoff when finding setups", async () => {

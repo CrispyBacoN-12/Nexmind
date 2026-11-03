@@ -13,8 +13,9 @@
 
 import type { Candle } from "@/lib/indicators";
 import type { CostModel } from "@/lib/backtest/engine";
-import { etClock, etSessionCloseMs } from "@/lib/scanAgent/session";
+import { etSessionCloseMs } from "@/lib/scanAgent/session";
 import { CHART_BAR_SECONDS } from "@/lib/chartAgent/types";
+import { etClockMemo } from "./etClockMemo";
 import {
   SCORECARD_COST_MODEL,
   SCORECARD_MAX_HOLD_SESSIONS,
@@ -71,7 +72,7 @@ export function scoreSetup(input: ScoreInput): Outcome {
     .filter((b) => b.t + CHART_BAR_SECONDS <= cutoffSec)
     .sort((a, b) => a.t - b.t);
   for (const b of finished) {
-    const { date, minutes } = etClock(b.t);
+    const { date, minutes } = etClockMemo(b.t);
     if (minutes < OPEN_MIN || minutes >= CLOSE_MIN) continue;
     const day = sessions.get(date);
     if (day) day.push(b);
@@ -80,7 +81,7 @@ export function scoreSetup(input: ScoreInput): Outcome {
 
   const complete = (date: string) => cutoffSec * 1000 >= etSessionCloseMs(date);
 
-  const runDate = etClock(runAtSec).date;
+  const runDate = etClockMemo(runAtSec).date;
   const fillIdx = (sessions.get(runDate) ?? []).findIndex((b) => b.t >= runAtSec);
   if (fillIdx < 0) {
     return complete(runDate) ? { ...NO_FILL, status: "not_filled" } : { ...NO_FILL };

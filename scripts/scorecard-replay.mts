@@ -34,11 +34,12 @@ import { runReplay } from "@/lib/scorecard/replay";
 
 const CACHE_DIR = ".cache/scorecard";
 const YEARS = 3;
-const INTRADAY_PAD_DAYS = 15; // prior sessions + rvol baseline
+const INTRADAY_PAD_DAYS = 25; // prior sessions + rvol baseline
 const DAILY_PAD_DAYS = 60; // ATR14 window + 10-day averages
 const FETCH_WORKERS = 3;
 const KEEP_FROM_MIN = 4 * 60; // 04:00 ET
 const KEEP_TO_MIN = 16 * 60; // 16:00 ET
+const REGULAR_FROM_MIN = 9 * 60 + 30; // 09:30 ET
 
 const force = process.argv.includes("--force");
 const allowMissing = process.argv.includes("--allow-missing");
@@ -144,6 +145,23 @@ const need: Record<Kind, Range> = {
 };
 const isCovered = async (t: string, kind: Kind) => covers(await cachedRange(pathFor(t, kind)), need[kind]);
 
+const hasRegularBar = (rows: Row[]): boolean =>
+  rows.some((r) => {
+    const m = etClock(r[0]).minutes;
+    return m >= REGULAR_FROM_MIN && m < KEEP_TO_MIN;
+  });
+
+/**
+ * A 5-minute file counts only if it covers the period AND holds at least one
+ * regular-session bar: a covered file with no bars (or only pre-market ones) would
+ * otherwise pass the refuse-partial check and silently drop the ticker.
+ */
+async function intradayUsable(t: string): Promise<boolean> {
+  if (!(await isCovered(t, "5m"))) return false;
+  const file = await readCache(pathFor(t, "5m"));
+  return file !== null && hasRegularBar(file.bars);
+}
+
 /** Bars of a file that covers the period; [] otherwise, so a stale file is never read. */
 async function loadBars(ticker: string, kind: Kind): Promise<Candle[]> {
   const file = await readCache(pathFor(ticker, kind));
@@ -169,7 +187,7 @@ for (const [kind, adjustment] of [["1d", "all"], ["1d.raw", "raw"]] as const) {
 }
 
 const needIntraday: string[] = [];
-for (const t of universe) if (!(await isCovered(t, "5m"))) needIntraday.push(t);
+for (const t of universe) if (!(await intradayUsable(t))) needIntraday.push(t);
 console.log(`5-minute bars: ${universe.length - needIntraday.length} cached, ${needIntraday.length} to fetch`);
 let done = 0;
 let next = 0;
@@ -178,11 +196,16 @@ async function worker(): Promise<void> {
     const t = needIntraday[next++];
     const bars = (await fetchAlpacaRange([t], need["5m"].start, need["5m"].end, "5m")).get(t);
     if (bars?.length) {
-      const kept = bars.filter((b) => {
-        const m = etClock(b.t).minutes;
-        return m >= KEEP_FROM_MIN && m < KEEP_TO_MIN;
-      });
-      await writeCache(pathFor(t, "5m"), { ...need["5m"], fetchedAt: new Date().toISOString(), bars: kept.map(toRow) });
+      const kept = bars
+        .filter((b) => {
+          const m = etClock(b.t).minutes;
+          return m >= KEEP_FROM_MIN && m < KEEP_TO_MIN;
+        })
+        .map(toRow);
+      // Not written without a regular bar, so a rerun fetches it again.
+      if (hasRegularBar(kept)) {
+        await writeCache(pathFor(t, "5m"), { ...need["5m"], fetchedAt: new Date().toISOString(), bars: kept });
+      }
     }
     if (++done % 25 === 0 || done === needIntraday.length) {
       console.log(`fetched ${done}/${needIntraday.length} tickers (${elapsed()})`);
@@ -191,11 +214,13 @@ async function worker(): Promise<void> {
 }
 await Promise.all(Array.from({ length: FETCH_WORKERS }, worker));
 
-// 3. Every ticker must have all three files covering the period, unless allowed.
+// 3. Every ticker must have all three files covering the period (the 5-minute one with
+// at least one regular-session bar), unless allowed.
 const missing: string[] = [];
 for (const t of universe) {
   const kinds: Kind[] = [];
-  for (const kind of ["5m", "1d", "1d.raw"] as const) if (!(await isCovered(t, kind))) kinds.push(kind);
+  if (!(await intradayUsable(t))) kinds.push("5m");
+  for (const kind of ["1d", "1d.raw"] as const) if (!(await isCovered(t, kind))) kinds.push(kind);
   if (kinds.length) missing.push(t);
   if (kinds.length) console.log(`  missing ${t}: ${kinds.join(", ")}`);
 }

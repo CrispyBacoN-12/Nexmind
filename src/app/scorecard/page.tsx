@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 // Types only: nightly.ts / replay.ts / control.ts reach prisma and the backtest engine.
 import type { AiVerdict, LiveSnapshot, RecentTrade } from "@/lib/scorecard/nightly";
 import type { ReplaySummary } from "@/lib/scorecard/replay";
-import { SCORECARD_COST_MODEL, SCORECARD_MIN_N, SCORECARD_VERDICT_N } from "@/lib/scorecard/types";
+import { SCORECARD_COST_MODEL, SCORECARD_MAX_HOLD_SESSIONS, SCORECARD_MIN_N, SCORECARD_VERDICT_N } from "@/lib/scorecard/types";
 import { cn, fmtMoney } from "@/lib/utils";
 
 import { CumulativeChart } from "./cumulative-chart";
@@ -112,6 +112,9 @@ function ReplayCard({ snap }: { snap: Snap<ReplaySummary> }) {
         {replay.sessions} วันทำการ · หุ้น {replay.tickersWithData}/{replay.universe} ตัวมีข้อมูลครบ · เจอ setup {replay.setupsFound} ·
         เข้าได้ {replay.filled} ไม่ได้เข้า {replay.notFilled}
         {replay.open > 0 ? ` ถืออยู่ ${replay.open}` : ""} · ขายตอนปิดวันนั้น {fmtR(sameDay.meanR)} (n {sameDay.n})
+        {replay.tailSessionsExcluded
+          ? ` · ไม่นับ setup ใน ${replay.tailSessionsExcluded} วันทำการสุดท้าย (ถือไม่ครบ ${SCORECARD_MAX_HOLD_SESSIONS} วันในช่วง)`
+          : ""}
       </div>
       <p className="text-xs text-(--color-muted) mt-2">
         &quot;ผ่าน&quot; แปลว่าเฉลี่ย R สูงกว่า p95 ของซื้อสุ่มเท่านั้น ไม่ใช่การรับรองว่ามี edge
@@ -388,7 +391,7 @@ export default async function ScorecardPage() {
         <CardTitle>ข้อควรรู้</CardTitle>
         <p>ไม่ใช่คำแนะนำซื้อ ไม่มี rule ไหนผ่าน hold-out หน้านี้วัดว่า setup ที่เสนอจะเป็นอย่างไรถ้าซื้อ ไม่ได้บอกว่ามี edge</p>
         <p>
-          ผลย้อนหลังใช้รายชื่อ S&amp;P 500 ปัจจุบัน หุ้นที่หลุดดัชนีหรือเลิกซื้อขายไปแล้วไม่อยู่ในตัวอย่าง (survivorship bias) ทำให้ผลดูดีกว่าจริงได้
+          ผลย้อนหลังใช้รายชื่อ S&amp;P 500 แบบคงที่ชุดเดียวกับที่ /scan ใช้ (ประมาณ 490 ตัว) มีบางตัวที่หลุดดัชนีไปแล้ว และขาดตัวที่เพิ่งเข้าใหม่ หุ้นที่เลิกซื้อขายไปแล้วไม่อยู่ในตัวอย่าง (survivorship bias) ทำให้ผลดูดีกว่าจริงได้
         </p>
         <p>ผลย้อนหลังไม่มีข้อมูลงบ (earnings) และ 8-K ที่ใช้จัดอันดับหุ้นในรอบจริง — คะแนนส่วนนั้นนับเป็น 0</p>
         <p>

@@ -10,8 +10,8 @@
 
 import type { Candle } from "@/lib/indicators";
 import { mulberry32, summarizeControl, type ControlDistribution } from "@/lib/research/control";
-import { etClock } from "@/lib/scanAgent/session";
 import { CHART_BAR_SECONDS } from "@/lib/chartAgent/types";
+import { etClockMemo } from "./etClockMemo";
 import { scoreSetup } from "./score";
 import {
   SCORECARD_CONTROL_LAST_ENTRY_ET_MINUTES,
@@ -39,10 +39,10 @@ export interface ControlTrade {
  * 15:30 ET. The control may enter at any of them; the real setup used the first.
  */
 function eligibleBars(trade: ControlTrade): Candle[] {
-  const runDate = etClock(trade.runAtSec).date;
+  const runDate = etClockMemo(trade.runAtSec).date;
   return trade.bars.filter((b) => {
     if (b.t < trade.runAtSec || b.t + CHART_BAR_SECONDS > trade.cutoffSec) return false;
-    const { date, minutes } = etClock(b.t);
+    const { date, minutes } = etClockMemo(b.t);
     return date === runDate && minutes >= OPEN_MIN && minutes < SCORECARD_CONTROL_LAST_ENTRY_ET_MINUTES;
   });
 }

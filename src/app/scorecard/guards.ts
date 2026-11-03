@@ -83,6 +83,8 @@ export function isReplaySummary(v: unknown): v is ReplaySummary {
     isStr(v.period.from) &&
     isStr(v.period.to) &&
     hasNums(v, ["sessions", "universe", "tickersWithData", "setupsFound", "filled", "notFilled", "open"]) &&
+    // Added after the first replay shape; optional so an older snapshot still renders.
+    (v.tailSessionsExcluded === undefined || isNum(v.tailSessionsExcluded)) &&
     Array.isArray(v.missingTickers) &&
     isVariantStats(v.stats) &&
     (v.control === null || isControl(v.control)) &&
