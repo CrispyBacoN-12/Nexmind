@@ -249,8 +249,9 @@ There are no open research directions; the owner closed the search. Work items:
      message.
    - Owner questions:
      - Spec §2 wants each group compared against its own control, but the vetoed group never gets one.
-     - Should the `/scan` universe list be refreshed? It is ~490 names, includes some former members and misses
-       recent additions. A refresh would also change `/scan`.
+   - **Universe refreshed 2026-11-03 (owner):** `/scan`, and therefore the nightly scorecard run, now read
+     `UNIVERSES.sp500Current`. That is 501 names from Wikipedia's S&P 500 list on 2026-11-03, with BRK.B/BF.B
+     omitted. The old `sp500` (~490) is kept unchanged for archived research and the frozen replay.
    - Follow-up offered as a separate task: a grace backstop before `no_data`, and showing `verdictPending`.
 5. **Housekeeping, the owner's call:**
    - delete the `xau-*` worktrees/branches and `wip/mt5-xauusd`, or keep them as the evidence trail. Gold is closed either way.

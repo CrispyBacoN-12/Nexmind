@@ -138,7 +138,7 @@ test("end to end on a stub universe", async () => {
   assert.equal(typeof s.pass, "boolean");
   assert.deepEqual(s.biases, REPLAY_BIASES);
   assert.deepEqual(s.biases, [
-    "รายชื่อหุ้นเป็นรายชื่อ S&P 500 แบบคงที่ชุดเดียวกับที่ /scan ใช้ (ประมาณ 490 ตัว) — มีบางตัวที่หลุดดัชนีไปแล้ว และขาดตัวที่เพิ่งเข้าใหม่ หุ้นที่เลิกซื้อขายไปแล้วไม่อยู่ในผล (survivorship bias)",
+    "รายชื่อหุ้นเป็นรายชื่อ S&P 500 แบบคงที่ชุดเดิม (ประมาณ 490 ตัว) ที่ /scan ใช้ก่อน 2026-11-03 — มีบางตัวที่หลุดดัชนีไปแล้ว และขาดตัวที่เพิ่งเข้าใหม่ หุ้นที่เลิกซื้อขายไปแล้วไม่อยู่ในผล (survivorship bias)",
     "ไม่มีข้อมูลงบและ 8-K ย้อนหลัง — คะแนนส่วนนั้นนับเป็น 0",
   ]);
   assert.equal(s.cumulativeR.length, 21);

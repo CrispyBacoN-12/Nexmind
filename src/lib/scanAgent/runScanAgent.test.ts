@@ -10,7 +10,7 @@ import { runScanAgent, type ScanDeps } from "./runScanAgent";
 
 // 2026-10-30 12:00Z = 08:00 New York (EDT): phase "pre", session 2026-10-30.
 const NOW = Date.UTC(2026, 9, 30, 12, 0);
-const SYMBOLS = UNIVERSES.sp500.symbols;
+const SYMBOLS = UNIVERSES.sp500Current.symbols;
 
 function tv(ticker: string, over: Partial<TvRow> = {}): TvRow {
   return {

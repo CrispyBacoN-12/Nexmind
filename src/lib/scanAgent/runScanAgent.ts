@@ -105,7 +105,7 @@ export async function runScanAgent(
 ): Promise<ScanResult> {
   const phase = marketPhase(nowMs);
   const { session, previous } = sessionDates(nowMs);
-  const universe = UNIVERSES.sp500.symbols;
+  const universe = UNIVERSES.sp500Current.symbols;
 
   // 1. The screen. The only fatal source.
   let fetched: TvRow[];

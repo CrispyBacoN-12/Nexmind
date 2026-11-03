@@ -69,6 +69,10 @@ buying the sweep.
 
 Neither bias is likely to flip a result that sits below the random median.
 
+Later the same day, at the owner's request, `/scan` and the nightly run moved to the current S&P 500 list
+(`UNIVERSES.sp500Current`, 501 names). The forward AI record therefore uses a different universe from this replay.
+The replay itself was not re-run.
+
 ## What this does and does not say
 
 - It says the **code rule**, traded mechanically, has no edge over random entries on these names. That holds for
