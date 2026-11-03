@@ -39,7 +39,16 @@ function countsNote(c: NonNullable<TableRow["counts"]>): string {
 }
 
 /** `controlMedian`: the frozen verdict's random-control median R (hold), or null until it exists. */
-export function GroupTable({ rows, controlMedian }: { rows: TableRow[]; controlMedian: number | null }) {
+export function GroupTable({
+  rows,
+  controlMedian,
+  showTone,
+}: {
+  rows: TableRow[];
+  controlMedian: number | null;
+  /** Green/red R colours only once a verdict (and so a control) exists. */
+  showTone: boolean;
+}) {
   const [variant, setVariant] = useState<ExitVariant>("hold");
 
   return (
@@ -99,7 +108,7 @@ export function GroupTable({ rows, controlMedian }: { rows: TableRow[]; controlM
                     </td>
                   ) : (
                     <>
-                      <td className={cn(td, rTone(s.meanR))}>{fmtR(s.meanR)}</td>
+                      <td className={cn(td, showTone && rTone(s.meanR))}>{fmtR(s.meanR)}</td>
                       <td className={td}>{fmtFraction(s.winPct)}</td>
                       <td className={td}>{fmtFraction(s.t1Pct)}</td>
                     </>
@@ -114,7 +123,7 @@ export function GroupTable({ rows, controlMedian }: { rows: TableRow[]; controlM
               </td>
               <td className={cn(td, "text-(--color-muted)")}>{"—"}</td>
               {variant === "hold" && controlMedian !== null ? (
-                <td className={cn(td, rTone(controlMedian))}>{fmtR(controlMedian)}</td>
+                <td className={td}>{fmtR(controlMedian)}</td>
               ) : (
                 <td className={cn(td, "text-(--color-muted) text-xs")}>
                   {variant === "hold" ? "ตัวเทียบซื้อสุ่มคำนวณตอนครบ 300" : "—"}

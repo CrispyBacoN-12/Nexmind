@@ -12,6 +12,7 @@ import { cn, fmtMoney } from "@/lib/utils";
 import { CumulativeChart } from "./cumulative-chart";
 import { fmtR, rTone } from "./format";
 import { GroupTable, type TableRow } from "./group-table";
+import { isAiVerdict, isLiveSnapshot, isReplaySummary } from "./guards";
 
 export const metadata = { title: "Scorecard — NEXMIND" };
 
@@ -33,10 +34,20 @@ const RUN_STATUS_LABEL: Record<string, string> = {
   none: "ไม่มีบันทึกการรัน",
 };
 
+/** A stored snapshot: not there, there but failing its shape guard (older/partial), or usable. */
+type Snap<T> = { kind: "absent" } | { kind: "old" } | { kind: "ok"; value: T };
+
+const OLD_SHAPE = "รูปแบบข้อมูลเก่า — รอรอบถัดไป";
+
+function classify<T>(data: unknown, guard: (v: unknown) => v is T): Snap<T> {
+  if (data === null || data === undefined) return { kind: "absent" };
+  return guard(data) ? { kind: "ok", value: data } : { kind: "old" };
+}
+
 interface PageData {
-  replay: ReplaySummary | null;
-  live: LiveSnapshot | null;
-  verdict: AiVerdict | null;
+  replay: Snap<ReplaySummary>;
+  live: Snap<LiveSnapshot>;
+  verdict: Snap<AiVerdict>;
   startDate: string | null;
 }
 
@@ -49,27 +60,35 @@ async function loadData(): Promise<PageData> {
     snap("ai-verdict"),
     prisma.scorecardRun.findFirst({ orderBy: { sessionDate: "asc" }, select: { sessionDate: true } }),
   ]);
-  const liveData = (live?.data ?? null) as LiveSnapshot | null;
+  const liveSnap = classify(live?.data, isLiveSnapshot);
+  let verdictSnap = classify(verdict?.data, isAiVerdict);
+  // No stored verdict row: fall back to the one embedded in a usable live snapshot.
+  if (verdictSnap.kind === "absent" && liveSnap.kind === "ok" && liveSnap.value.verdict) {
+    verdictSnap = { kind: "ok", value: liveSnap.value.verdict };
+  }
   return {
-    replay: (replay?.data ?? null) as ReplaySummary | null,
-    live: liveData,
-    verdict: ((verdict?.data ?? null) as AiVerdict | null) ?? liveData?.verdict ?? null,
+    replay: classify(replay?.data, isReplaySummary),
+    live: liveSnap,
+    verdict: verdictSnap,
     startDate: firstRun?.sessionDate ?? null,
   };
 }
 
-function ReplayCard({ replay }: { replay: ReplaySummary | null }) {
-  if (!replay) {
+function ReplayCard({ snap }: { snap: Snap<ReplaySummary> }) {
+  if (snap.kind !== "ok") {
     return (
       <Card>
         <CardTitle>ผลย้อนหลัง กฎในโค้ด</CardTitle>
-        <div className="text-2xl font-semibold tracking-tight text-(--color-muted)">ยังไม่ได้รันผลย้อนหลัง</div>
-        <p className="text-sm text-(--color-muted) mt-2">
-          ยังไม่มีผลย้อนหลังของกฎ {CHART_RULE_VERSION} ให้แสดง
-        </p>
+        <div className="text-2xl font-semibold tracking-tight text-(--color-muted)">
+          {snap.kind === "old" ? OLD_SHAPE : "ยังไม่ได้รันผลย้อนหลัง"}
+        </div>
+        {snap.kind === "absent" && (
+          <p className="text-sm text-(--color-muted) mt-2">ยังไม่มีผลย้อนหลังของกฎ {CHART_RULE_VERSION} ให้แสดง</p>
+        )}
       </Card>
     );
   }
+  const replay = snap.value;
   const hold = replay.stats.hold;
   const sameDay = replay.stats.sameDay;
   return (
@@ -101,9 +120,18 @@ function ReplayCard({ replay }: { replay: ReplaySummary | null }) {
   );
 }
 
-function AiCard({ live, verdict, startDate }: { live: LiveSnapshot | null; verdict: AiVerdict | null; startDate: string | null }) {
+function AiCard({ live, verdict: verdictSnap, startDate }: { live: Snap<LiveSnapshot>; verdict: Snap<AiVerdict>; startDate: string | null }) {
   const title = `ผลจริง AI${startDate ? ` (เริ่ม ${startDate})` : ""}`;
-  if (verdict) {
+  if (verdictSnap.kind === "old" || (verdictSnap.kind === "absent" && live.kind === "old")) {
+    return (
+      <Card>
+        <CardTitle>{title}</CardTitle>
+        <div className="text-2xl font-semibold tracking-tight text-(--color-muted)">{OLD_SHAPE}</div>
+      </Card>
+    );
+  }
+  if (verdictSnap.kind === "ok") {
+    const verdict = verdictSnap.value;
     return (
       <Card>
         <CardTitle>{title}</CardTitle>
@@ -111,18 +139,23 @@ function AiCard({ live, verdict, startDate }: { live: LiveSnapshot | null; verdi
           {verdict.pass ? "เชื่อได้" : "เชื่อไม่ได้"}
         </div>
         <div className="text-sm mt-2 tabular-nums">
-          {verdict.n} setup ที่ AI เก็บ · เฉลี่ย <span className={rTone(verdict.meanR)}>{fmtR(verdict.meanR)}</span>
+          n = {verdict.n} setup ที่ AI เก็บ · เฉลี่ย R <span className={rTone(verdict.meanR)}>{fmtR(verdict.meanR)}</span>
         </div>
         <div className="text-sm text-(--color-muted) mt-1 tabular-nums">
-          ซื้อสุ่ม: มัธยฐาน {fmtR(verdict.controlMedian)} (p95 {fmtR(verdict.controlP95)}, {verdict.runs} รอบ)
+          ซื้อสุ่ม: p95 {fmtR(verdict.controlP95)} · มัธยฐาน {fmtR(verdict.controlMedian)} ({verdict.runs} รอบ)
         </div>
+        <p className="text-xs mt-2">
+          {verdict.pass
+            ? "หมายถึงเฉลี่ย R ของ 300 setup แรกที่ AI เก็บ สูงกว่า p95 ของการซื้อสุ่ม — ไม่ใช่การรับประกันว่ามี edge"
+            : "เฉลี่ย R ของ 300 setup แรกที่ AI เก็บ ไม่ชนะ p95 ของการซื้อสุ่ม"}
+        </p>
         <p className="text-xs text-(--color-muted) mt-2">
           คำตัดสินตรึงแล้วเมื่อ {verdict.computedAt.slice(0, 10)} (setup #{verdict.firstId} ถึง #{verdict.lastId}) จะไม่ถูกคำนวณใหม่
         </p>
       </Card>
     );
   }
-  if (!live) {
+  if (live.kind !== "ok") {
     return (
       <Card>
         <CardTitle>{title}</CardTitle>
@@ -131,7 +164,7 @@ function AiCard({ live, verdict, startDate }: { live: LiveSnapshot | null; verdi
       </Card>
     );
   }
-  const { n, closed, target } = live.keptProgress;
+  const { n, closed, target } = live.value.keptProgress;
   const pct = Math.min(100, (n / target) * 100);
   return (
     <Card>
@@ -150,7 +183,7 @@ function AiCard({ live, verdict, startDate }: { live: LiveSnapshot | null; verdi
       </div>
       <div className="text-sm mt-2 tabular-nums">
         {n} / {SCORECARD_VERDICT_N} setup ที่ AI เก็บและเข้าได้ · ปิดแล้ว {closed} · เฉลี่ย{" "}
-        <span className={rTone(live.keptProgress.meanR)}>{closed >= SCORECARD_MIN_N ? fmtR(live.keptProgress.meanR) : "ยังน้อยเกินไป"}</span>
+        <span>{closed >= SCORECARD_MIN_N ? fmtR(live.value.keptProgress.meanR) : "ยังน้อยเกินไป"}</span>
       </div>
       <p className="text-xs text-(--color-muted) mt-2">
         {n < target
@@ -214,11 +247,11 @@ export default async function ScorecardPage() {
   await connection();
 
   let data: PageData | null = null;
-  let loadError: string | null = null;
   try {
     data = await loadData();
   } catch (e) {
-    loadError = e instanceof Error ? e.message : String(e);
+    // The raw message can carry the DB host; keep it server-side.
+    console.error("[scorecard] load failed", e);
   }
 
   const header = (
@@ -232,15 +265,20 @@ export default async function ScorecardPage() {
     return (
       <div className="space-y-6">
         {header}
-        <Empty title="อ่านข้อมูล scorecard จากฐานข้อมูลไม่ได้" hint={loadError} />
+        <Empty title="โหลดข้อมูลไม่สำเร็จ" hint="ลองรีเฟรชอีกครั้ง" />
       </div>
     );
   }
 
-  const { replay, live, verdict, startDate } = data;
+  const { startDate } = data;
+  const replay = data.replay.kind === "ok" ? data.replay.value : null;
+  const live = data.live.kind === "ok" ? data.live.value : null;
+  const verdict = data.verdict.kind === "ok" ? data.verdict.value : null;
   const frozen = verdict !== null;
-  const controlMedian = live?.keptControl?.median ?? verdict?.controlMedian ?? null;
+  // No control exists before the verdict is frozen.
+  const controlMedian = verdict ? (live?.keptControl?.median ?? verdict.controlMedian) : null;
   const modelMix = verdict?.modelMix ?? live?.modelMix;
+  const liveFallback = data.live.kind === "old" ? OLD_SHAPE : null;
   const costs = SCORECARD_COST_MODEL;
 
   return (
@@ -248,15 +286,17 @@ export default async function ScorecardPage() {
       {header}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <ReplayCard replay={replay} />
-        <AiCard live={live} verdict={verdict} startDate={startDate} />
+        <ReplayCard snap={data.replay} />
+        <AiCard live={data.live} verdict={data.verdict} startDate={startDate} />
       </div>
       {live && <RunStatus live={live} />}
 
       <Card>
         <CardTitle>AI เก็บ vs AI ทิ้ง (ผลจริง)</CardTitle>
         {live ? (
-          <GroupTable rows={tableRows(live, frozen)} controlMedian={controlMedian} />
+          <GroupTable rows={tableRows(live, frozen)} controlMedian={controlMedian} showTone={frozen} />
+        ) : liveFallback ? (
+          <Empty title={liveFallback} />
         ) : (
           <Empty title="ยังไม่มีข้อมูลจากรอบอัตโนมัติ" hint="ตารางจะขึ้นเมื่อรอบอัตโนมัติให้คะแนนเทรดชุดแรก" />
         )}
@@ -277,6 +317,8 @@ export default async function ScorecardPage() {
               {controlMedian === null ? " · เส้นซื้อสุ่มจะขึ้นเมื่อมีคำตัดสิน" : " · เส้นซื้อสุ่ม = มัธยฐานต่อเทรด × จำนวนเทรดที่ AI เก็บ"}
             </p>
           </>
+        ) : liveFallback ? (
+          <Empty title={liveFallback} />
         ) : (
           <Empty title="ยังไม่มีเทรดที่ปิดแล้ว" hint="เส้นจะขึ้นเมื่อมีเทรดแรกที่ปิด" />
         )}
@@ -314,6 +356,8 @@ export default async function ScorecardPage() {
               </tbody>
             </table>
           </div>
+        ) : liveFallback ? (
+          <Empty title={liveFallback} />
         ) : (
           <Empty title="ยังไม่มีเทรด" hint="รอบอัตโนมัติยังไม่ได้บันทึก setup ใดเลย" />
         )}
@@ -325,7 +369,7 @@ export default async function ScorecardPage() {
       <Card>
         <CardTitle>วันที่ไม่มีข้อมูล</CardTitle>
         {!live ? (
-          <p className="text-sm text-(--color-muted)">ยังไม่มีข้อมูลจากรอบอัตโนมัติ</p>
+          <p className="text-sm text-(--color-muted)">{liveFallback ?? "ยังไม่มีข้อมูลจากรอบอัตโนมัติ"}</p>
         ) : live.missed.length === 0 ? (
           <p className="text-sm text-(--color-muted)">ไม่มีวันที่ขาดในช่วง 30 วันทำการที่ผ่านมา</p>
         ) : (
@@ -346,7 +390,7 @@ export default async function ScorecardPage() {
         <p>
           ผลย้อนหลังใช้รายชื่อ S&amp;P 500 ปัจจุบัน หุ้นที่หลุดดัชนีหรือเลิกซื้อขายไปแล้วไม่อยู่ในตัวอย่าง (survivorship bias) ทำให้ผลดูดีกว่าจริงได้
         </p>
-        <p>ผลย้อนหลังไม่มีข้อมูลงบ (earnings) และ 8-K ที่ AI เห็นในรอบจริง จึงเทียบกับผลจริงของ AI ตรง ๆ ไม่ได้</p>
+        <p>ผลย้อนหลังไม่มีข้อมูลงบ (earnings) และ 8-K ที่ใช้จัดอันดับหุ้นในรอบจริง — คะแนนส่วนนั้นนับเป็น 0</p>
         <p>
           เฉลี่ย R ทุกตัวหักต้นทุนแล้ว: slippage {costs.slippageBps} bps ทุกครั้งที่เข้า/ออก และคอมมิชชัน {costs.commissionBps} bp ต่อมูลค่าที่เข้า
         </p>
