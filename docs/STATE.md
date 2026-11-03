@@ -1,11 +1,11 @@
-﻿# NEXMIND â€” Session State
+# NEXMIND — Session State
 
 **Living handoff. Read this first; update it before you finish.**
 Auto-loaded every session via `CLAUDE.md`. This file is the current bar, not the archive:
 deep evidence is in `docs/quant/`, reasoning is in commit bodies, and the full pre-2026-10-01
 text of this file (every desk-era entry, verbatim) is `docs/quant/2026-10-01-state-archive.md`.
 
-_Last verified: `npm test` and the `ChartSetup` row count on **2026-11-01**; the Task Scheduler and the other Â§2 rows on **2026-10-01**._
+_Last verified: `npm test`, the Task Scheduler and the scorecard tables on **2026-11-03**; the `ChartSetup` row count on **2026-11-01**; the other §2 rows on **2026-10-01**._
 
 ---
 
@@ -15,7 +15,7 @@ _Last verified: `npm test` and the `ChartSetup` row count on **2026-11-01**; the
 decided this explicitly. Finding fully automated alpha on the S&P 500 with $2-3k of capital, whole
 shares, about 5 slots and free data conflicts with how the market works. Every price entry rule,
 every exit geometry and three non-price data classes were screened, and none survived a deep
-hold-out (Â§3). The repo's value now lives in four surfaces:
+hold-out (§3). The repo's value now lives in four surfaces:
 
 - **`/scan`** (first in the sidebar): a button-only scan of the S&P 500 that lists what is moving today,
   with 8-K tags, headlines, the economic calendar and a one-line AI note per row.
@@ -23,13 +23,13 @@ hold-out (Â§3). The repo's value now lives in four surfaces:
   - It runs only when the button is pressed: no auto-run on page load, no schedule.
   - Each row links to `/advisor?ticker=` to prefill the ticker. Nothing auto-submits.
   - **Chart setups panel (agent #2, on master):** a second button runs the chart agent
-    over the top 20 scan names and opens a modal of at most 5 long-sweep setups (Â§3).
+    over the top 20 scan names and opens a modal of at most 5 long-sweep setups (§3).
 - **`/scorecard`** (agent #4, branch `scorecard`): what the chart agent's setups would have done if bought,
-  against random entries. It shows a 3-year replay of the code rule (**REJECT**, Â§3) and a forward record that
+  against random entries. It shows a 3-year replay of the code rule (**REJECT**, §3) and a forward record that
   a scheduled job builds every trading night. The AI verdict freezes once at 300 kept setups. Read-only page.
 - **`/advisor`**: the owner types a ticker they already chose and gets back structure and risk only:
   - the stop, found by a chain (agent #3, on master): a stop the owner gave, else the
-    latest 5-minute swing low, else the previous day's low, else 1.5 Ã— ATR14; and the R ladder in prices
+    latest 5-minute swing low, else the previous day's low, else 1.5 × ATR14; and the R ladder in prices
   - whole-share sizing at real capital
   - round-trip cost in R and overnight gap-through risk
   - correlation to holdings, earnings date and the portfolio gates
@@ -44,7 +44,7 @@ hold-out (Â§3). The repo's value now lives in four surfaces:
   - correlated holdings
 
 **The autonomous desk is paused, and its web layer is gone (2026-10-31, owner request).** It was
-SCANNER â†’ HAWKÃ—3 â†’ SAGE â†’ Iron Rules, plus `panel-v1` research. The site is now only `/scan`,
+SCANNER → HAWK×3 → SAGE → Iron Rules, plus `panel-v1` research. The site is now only `/scan`,
 `/advisor` and `/journal`; every archive page and the API routes only they used were deleted (git has them).
 The desk's `src/lib` code, research scripts and DB tables are **kept** as reference. Its three Task
 Scheduler jobs stay **Disabled**. Do not re-enable them or resume research rounds without a new
@@ -56,7 +56,7 @@ Hard context the code does not state:
 - **Orders are manual, on Webull, whole shares, $2-3k.** Webull is data-only here. Go-Live is dead,
   not deferred.
 - **Dev server is port 3275.** For preview, use launch config `dev:web` (`next dev -p 3275`),
-  never `nexmind` (see Â§5).
+  never `nexmind` (see §5).
 
 ## 2. Live state (verified by query, 2026-10-01 unless a row is dated)
 
@@ -65,15 +65,15 @@ Hard context the code does not state:
 | Branch | `master` contains agents #2 and #3 plus the stop cluster rule (`8f625be`, fast-forwarded from `stop-cluster` and pushed 2026-11-03; branch deleted). Every push auto-deploys Vercel production |
 | Tests | `npm test` **1216 pass / 0 fail** (2026-11-03, branch `scorecard`) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB. Columns `source` (default `"button"`) and `aiModel` were added 2026-11-03 |
-| Scorecard tables | `ScorecardRun`, `ScorecardOutcome`, `ScorecardSnapshot` were created 2026-11-03 on Neon with additive SQL over HTTPS. Port 5432 is blocked on this network, so `prisma db push` cannot connect (Â§5). One snapshot exists: `replay` / `sweep-v1` |
+| Scorecard tables | `ScorecardRun`, `ScorecardOutcome`, `ScorecardSnapshot` were created 2026-11-03 on Neon with additive SQL over HTTPS. Port 5432 is blocked on this network, so `prisma db push` cannot connect (§5). One snapshot exists: `replay` / `sweep-v1` |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). **`NEXMIND Scorecard Score` Ready** (Tue-Sat 07:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03) |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
-| Desk #11 (archive) | `trend-pullback`, status `active` but unscheduled. 3 legacy open paper trades (KO, AZO, XOM); 45 closed, cumulative **âˆ’$358.98** |
+| Desk #11 (archive) | `trend-pullback`, status `active` but unscheduled. 3 legacy open paper trades (KO, AZO, XOM); 45 closed, cumulative **−$358.98** |
 | Research (archive) | newest `ResearchRun` #113 `skipped`. `panel-v1`: 3, all rejected. Legacy: 6 approved (off-universe, never desk-eligible), 37 demoted, 171 rejected, 1 proposed |
 | `Counterfactual` / `AiCall` | 123 rows, last 2026-09-14 / 90 rows |
 | `Setting` keys | `fearGreed`, `lastDeskSessionAt`, `riskSentry:holdings`, `riskSentry:lastGate`, `ai:outage`, `webull:accessToken` |
-| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`, `.worktrees/xau-vp-v1`: gold work, **finished** (Â§3), gitignored on master; kept until the owner says delete. |
+| Worktrees | `.worktrees/xau-v1-phase-0-1`, `.worktrees/xau-v1-phase0-1-unblock`, `.worktrees/xau-vp-v1`: gold work, **finished** (§3), gitignored on master; kept until the owner says delete. |
 
 To re-verify, use a throwaway script under `scripts/` and delete it afterwards. It should query:
 - `portfolio.findMany`; the field is `status`, not `active`
@@ -90,8 +90,8 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 - **2026-11-03: Scorecard (agent #4), branch `scorecard` (`08205f3..a0eea87`), not merged yet.** Spec
   `docs/superpowers/specs/2026-11-03-scorecard-agent-design.md`.
   - **Replay of the code rule `sweep-v1`: REJECT.** Over 3 years and 1,201 filled setups, hold-to-stop/T1 averaged
-    **âˆ’0.085 R**, against a random-entry control at median âˆ’0.055 and p95 +0.001. That is below the random
-    median. The same-day close averaged âˆ’0.093. Full write-up: `docs/quant/2026-11-03-sweep-v1-replay.md`. Stored
+    **−0.085 R**, against a random-entry control at median −0.055 and p95 +0.001. That is below the random
+    median. The same-day close averaged −0.093. Full write-up: `docs/quant/2026-11-03-sweep-v1-replay.md`. Stored
     once; never re-cut.
   - **Forward record.**
     - `scripts/scorecard-run.mts` runs at 10:30 ET: the scan without AI notes, then the chart agent. Its rows
@@ -111,13 +111,12 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
     - A filled row whose bars stop is force-closed at its last close once its SPY window has elapsed.
     - There is no live control before the verdict.
     - Rows are counted from `ChartSetup` via `groupOf`.
-    - The full list is in the branch's review ledger, which is summarised in the merge commit.
 - **2026-11-01: Chart stop agent (agent #3) on `/advisor`. Merged to master (fast-forward, commits `0066757..22f312f`) and pushed.**
   - What it does: `/advisor` finds its own stop from the Alpaca SIP 5-minute chart. Chain: **given -> swing low
-    -> PDL -> 1.5 Ã— ATR14**. A given stop is `?stop=` or the typed field, used only when 0 < stop < entry.
+    -> PDL -> 1.5 × ATR14**. A given stop is `?stop=` or the typed field, used only when 0 < stop < entry.
     A swing is the latest strict pivot low (2 bars each side) of the latest session, under the entry; the
-    PDL is the previous session's low. Both sit 0.1 Ã— daily ATR14 below their structure
-    (`CHART_STOP_BUFFER_ATR`). A stop under 0.5 Ã— ATR or over 3 Ã— ATR gets a flag, which never moves it.
+    PDL is the previous session's low. Both sit 0.1 × daily ATR14 below their structure
+    (`CHART_STOP_BUFFER_ATR`). A stop under 0.5 × ATR or over 3 × ATR gets a flag, which never moves it.
   - The card shows the source, the notes on what the chain passed over, the structure's date and ET time,
     and the plain-ATR alternative (a button re-runs the card with it as a given stop).
   - The AI (sonnet) writes a 2-4 sentence Thai reading of the structure under a swing/PDL stop
@@ -127,30 +126,30 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   - Rulings: PDL qualifies only when the PDL itself is under the entry (the controller's ruling, mirroring the
     swing rule's pivot low < entry) and PDL - buffer is above 0; the two failures have their own skip copy.
     A swing pivot counts only if no later bar of the session traded at or below it; a broken pivot is skipped
-    and older ones are still tried. A lower low within 0.25 Ã— ATR under the chosen swing low (one pass, earlier bars only) takes the stop under it instead (`STOP_CLUSTER_ATR`, owner decision 2026-11-01 after the AI flagged NVDA's stop $0.03 above a known low). A forming bar is never read (`cutoffSec = now - SIP_DELAY_MS`). The
-    5-minute fetch fails soft: a miss falls back to ATR with a note. `stopSource "chart"` was renamed `"given"` (Â§5).
-  - Swing stops are usually tight (all live ones < 0.5 Ã— ATR), which matters for overnight holds.
+    and older ones are still tried. A lower low within 0.25 × ATR under the chosen swing low (one pass, earlier bars only) takes the stop under it instead (`STOP_CLUSTER_ATR`, owner decision 2026-11-01 after the AI flagged NVDA's stop $0.03 above a known low). A forming bar is never read (`cutoffSec = now - SIP_DELAY_MS`). The
+    5-minute fetch fails soft: a miss falls back to ATR with a note. `stopSource "chart"` was renamed `"given"` (§5).
+  - Swing stops are usually tight (all live ones < 0.5 × ATR), which matters for overnight holds.
   - Live check 2026-11-01 (Sunday, bars of Fri 2026-10-30, next start of the branch build, no DB writes): AAPL
-    swing stop 341.66 (0.43 Ã— ATR, tight flag, structure 14:50 ET), WDC swing 0.26 Ã— ATR, DVA swing 0.45 Ã— ATR,
-    all three flagged tight. KVUE fell to ATR with both skip reasons. The "à¹ƒà¸Šà¹‰ stop ATR à¹à¸—à¸™" button produced a
-    "à¸à¸³à¸«à¸™à¸”à¸¡à¸²à¹€à¸­à¸‡" card with the given-stop skip note. The AI reading showed the CLI auth-expired note (needs
+    swing stop 341.66 (0.43 × ATR, tight flag, structure 14:50 ET), WDC swing 0.26 × ATR, DVA swing 0.45 × ATR,
+    all three flagged tight. KVUE fell to ATR with both skip reasons. The "ใช้ stop ATR แทน" button produced a
+    "กำหนดมาเอง" card with the given-stop skip note. The AI reading showed the CLI auth-expired note (needs
     `claude login`). This check ran BEFORE the final-review fix for broken swing pivots.
 - **2026-11-01: Chart agent (agent #2) on `/scan`, merged to master.** Commits `a2739d4..91ea356`.
   - Reads the top 20 scan names on Alpaca SIP 5-minute bars. Per name: previous-session volume profile
     (50 bins, 70% value area), PDH/PDL, PMH/PML, dPOC. The one setup is a **long sweep** of PDL, PML or pVAL
-    (sweep bar opens above L, trades below, closes above, latest close above L). Stop = sweep low - 0.1 Ã— daily
+    (sweep bar opens above L, trades below, closes above, latest close above L). Stop = sweep low - 0.1 × daily
     ATR14; T1/T2 are the next levels up; under 1.5R carries a tag.
   - The AI writes a Thai reading per setup and may veto it; a guard strips predictions and rankings. At most 5
     setups show in a modal; `/scan` links each to `/advisor?ticker=&entry=&stop=`.
   - **`ChartSetup` logs every setup** (`ruleVersion` `"sweep-v1"`; status `shown`, `ai_rejected`,
-    `guard_stripped`, `capped`) to be scored later (Â§4). A logging failure never blocks the panel.
+    `guard_stripped`, `capped`) to be scored later (§4). A logging failure never blocks the panel.
   - **`/advisor` takes `?entry=&stop=`**; `stopAtrMult` flows through sizing, ladder, cost, gap risk, fill
     guard, base rate and the critic's facts sheet.
   - **No backtest. The sweep rule is a description, not an edge**; its nearest relative (xau-vp-v1's gold
     sweep) lost money in every fold. The AI is unavailable until `claude login`.
   - Rulings (fix wave `896de01..91ea356`): a sweep bar must **open above L** (else every gap-down reclaim
     reads as a sweep); bars after now - 16 min are dropped; the sweep bar's own high does not count toward
-    "à¸–à¸¶à¸‡à¹€à¸›à¹‰à¸²à¹à¸£à¸à¹„à¸›à¹à¸¥à¹‰à¸§"; a guard-stripped reading hides the setup and `keep:false` always wins; daily ATR
+    "ถึงเป้าแรกไปแล้ว"; a guard-stripped reading hides the setup and `keep:false` always wins; daily ATR
     excludes today's forming bar; status `shown` means eligible, not seen.
   - Live probe 2026-11-01 (real bars, clock set to Fri 10-30 14:30 ET, no-op log, no DB writes): after the
     from-below fix a gap-down name (DVA) read "no sweep yet" and two setups showed. Whether Next 16 fires
@@ -159,7 +158,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   - `src/lib/scanAgent/`: TradingView screener, New York session clock, filter + triggers + activity
     score, economic calendar, AI notes, `runScanAgent` (all I/O injected). Only the TradingView
     fetch is fatal (502); every other source degrades to a named `ok: false` entry.
-  - Rows beyond the AI's top 30 show "à¹„à¸¡à¹ˆà¹„à¸”à¹‰à¸ªà¸£à¸¸à¸› (à¸™à¸­à¸ 30 à¸­à¸±à¸™à¸”à¸±à¸šà¹à¸£à¸)", which is not a failure. A row
+  - Rows beyond the AI's top 30 show "ไม่ได้สรุป (นอก 30 อันดับแรก)", which is not a failure. A row
     above the $500 slot carries the fractional-share tag. Data is 15 minutes late and the clock
     does not know US holidays; both are on the page. EDGAR calls are paced (125 ms shared gap).
   - Live check 2026-10-31 (Saturday): covered 473/~503, 135 passed, AI unavailable. SEC 8-K failed for
@@ -188,13 +187,13 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   `docs/quant/2026-10-01-xau-v1-results.md`). Disclosed, not amended: the fold table was unpassable for everyone.
 - **2026-10-01: Risk Sentry runs locally** at 19:00 ICT (`scripts/risk-sentry.cmd`, log `scripts/risk-sentry.log`)
   and watches open journal positions (`8cfffa9`, `06174fd`, `070382d`, `e35cde7`). `stopWatch`: `breached` =
-  close â‰¤ stop, `touched` = low â‰¤ stop with the close above. Journal tickers merge with manual extras, cap 20,
+  close ≤ stop, `touched` = low ≤ stop with the close above. Journal tickers merge with manual extras, cap 20,
   manual names dropped first and never stop-checked.
 - **2026-09-27: Test B, residual momentum as the mr-down3 slot queue: FAIL, final** (`docs/quant/2026-09-27-test-b-results.md`).
   Same day: portfolio layer with six gates (`63837ef`), `/journal`, `/api/portfolio/evaluate`.
 - **2026-09-25: overnight gap-through risk on `/advisor`** (`gapRisk.ts`). **09-17:** 88-file backlog became 10 scoped
   commits (`b7ac7b0..0176cfd`). **09-16:** Risk Sentry v1. **09-15:** pivot to copilot.
-- **2026-09-14: Finnhub earnings date on the card; `AiCall` ledger fix; `RESEARCH_COST_MODEL` 0.5 â†’ 5 bps.** Never
+- **2026-09-14: Finnhub earnings date on the card; `AiCall` ledger fix; `RESEARCH_COST_MODEL` 0.5 → 5 bps.** Never
   pool verdicts across that date. **09-11:** `/advisor` shipped (`9bcae76..859331a`); its route returns 400 on any present-but-unparseable numeric field (it used to fall back silently and fabricate a risk %).
 
 **Desk era, one line each.** Full text is in the archive file; studies are in `docs/quant/`.
@@ -225,7 +224,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   latches.
 - 08-26 Baseline `decideSetup()` loses to random in 10/10 cells across two disjoint universes.
   Six mechanisms screened; gap-fade died at the open fill.
-- 08-25 Walk-forward panel validation (`70fcec6`): FIT 2016-18, SELECT 2019, TEST Ã—3. Survivors
+- 08-25 Walk-forward panel validation (`70fcec6`): FIT 2016-18, SELECT 2019, TEST ×3. Survivors
   must be `approved` + `panel-v1`. Mock fallbacks were cut.
 - 08-23/24 All 13 confluence filters rejected. The ATR trail 1.5/1.5 passed IS/OOS but was never
   shipped. Stocks-only pivot.
@@ -249,7 +248,7 @@ There are no open research directions; the owner closed the search. Work items:
    - After the first nights, check `scripts/scorecard-run.log`, `scripts/scorecard-score.log` and the 07:00 Discord
      message.
    - Owner questions:
-     - Spec Â§2 wants each group compared against its own control, but the vetoed group never gets one.
+     - Spec §2 wants each group compared against its own control, but the vetoed group never gets one.
      - Should the `/scan` universe list be refreshed? It is ~490 names, includes some former members and misses
        recent additions. A refresh would also change `/scan`.
    - Follow-up offered as a separate task: a grace backstop before `no_data`, and showing `verdictPending`.
@@ -257,7 +256,7 @@ There are no open research directions; the owner closed the search. Work items:
    - delete the `xau-*` worktrees/branches and `wip/mt5-xauusd`, or keep them as the evidence trail. Gold is closed either way.
    - decide whether `stocks-only-pivot` is deleted (fully merged into master)
 
-## 5. Traps â€” read before touching these areas
+## 5. Traps — read before touching these areas
 
 **Process:**
 - **Preview with `dev:web`, never `nexmind`.** `nexmind` runs `scripts/dev.mts`, which
@@ -294,9 +293,11 @@ There are no open research directions; the owner closed the search. Work items:
 - **Port 5432 is blocked on this network.** `prisma db push` fails with P1001. Generate the SQL with
   `prisma migrate diff --from-schema <old> --to-schema prisma/schema.prisma --script`, then apply it through the
   Neon HTTPS driver.
+- **Never rewrite a UTF-8 doc with PowerShell `Get-Content`/`Set-Content`.** Without `-Encoding utf8` it decodes
+  in the ANSI codepage and mangles every `—`, `§`, `×` and `−`. This happened to this file on 2026-11-03.
 - **The sweep rule is a description, not an edge. Its 3-year replay REJECTED it** (below the random median,
   `docs/quant/2026-11-03-sweep-v1-replay.md`). Do not present a setup, its R or its AI reading as odds. A bar must open above L: without that, every gap-down reclaim reads as a sweep.
-- **Never read a forming bar.** Bars ending after now âˆ’ the SIP delay (16 min) are dropped; keep that in any new reader.
+- **Never read a forming bar.** Bars ending after now − the SIP delay (16 min) are dropped; keep that in any new reader.
 - **The dev DB is the live Neon DB.** Previewing or running the chart agent during market hours writes real
   `ChartSetup` rows. The 2026-10-29 polish wrote no test rows for this reason, and the controller's live
   probes used a no-op log.
@@ -310,7 +311,7 @@ There are no open research directions; the owner closed the search. Work items:
   and the last bar is still forming. It checks journal positions only and assumes long-only
   (stop below entry).
 - **Under `strictMode: true`, DRAWDOWN safe mode never releases.** A flat book's NAV cannot recover
-  past âˆ’15%. Read the per-fold trade counts of any simulator run with that in mind.
+  past −15%. Read the per-fold trade counts of any simulator run with that in mind.
 - **A failure classifier is only as good as the strings it was tested against.** `FATAL_BACKEND`
   missed "spend limit". Never match bare `limit`, because a rate limit should be retried.
 
@@ -325,7 +326,7 @@ There are no open research directions; the owner closed the search. Work items:
   - the 13 confluence filters
   - cross-sectional mean reversion and cross-sectional momentum
   - breadth and realized-vol regime features
-  - regime Ã— side
+  - regime × side
   - entry relaxation and anticipation
   - all `LADDER_OPTIONS`, trails and `maxBars`
   - the six screened mechanisms
@@ -335,14 +336,14 @@ There are no open research directions; the owner closed the search. Work items:
     open-ended by owner decision, but a rejected row is never re-tuned, and a new rule gets a new
     ledger row and its own pre-registration first
 - **"Add one more confirmation" is predicted to fail**, because the entry rule is already late.
-  Lateness numbers past tâˆ’3 are lookahead, not edge.
+  Lateness numbers past t−3 are lookahead, not edge.
 - **Pre-registered constants:**
   - `PANEL_SEED`
   - `MIN_HOLDOUT_RETENTION = 0.5`
   - the TEST folds, which must be ANDed
   - `MIN_RISK_FRACTION` (it exists because a 1e-14 risk passed `risk > 0`)
 - **Never restore a mock fallback that can decide anything.**
-- **Live trading cannot measure an edge:** SE Â±0.31R against effects of about 0.04R.
+- **Live trading cannot measure an edge:** SE ±0.31R against effects of about 0.04R.
 - **Yahoo `range=max` silently returns weekly or monthly bars.** Use `period1`/`period2` and
   check `isDailySeries`.
 - **The 2016 floor is an Alpaca inception artifact.** Yahoo has data back to 1998.
@@ -357,8 +358,8 @@ There are no open research directions; the owner closed the search. Work items:
 
 ## 7. Housekeeping for whoever writes here next
 
-1. Update Â§2 only from a **real query**, never from what this file used to say.
-2. Move anything finished out of Â§4 into Â§3 with its commit hash.
-3. A rejected mechanism goes in Â§5 so it is never re-tuned; link its `docs/quant/` file.
-4. Keep this file under ~150 lines. When Â§3 grows, compress its oldest entries to one line each.
+1. Update §2 only from a **real query**, never from what this file used to say.
+2. Move anything finished out of §4 into §3 with its commit hash.
+3. A rejected mechanism goes in §5 so it is never re-tuned; link its `docs/quant/` file.
+4. Keep this file under ~150 lines. When §3 grows, compress its oldest entries to one line each.
    Never paste a study into this file.
