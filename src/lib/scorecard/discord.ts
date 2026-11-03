@@ -64,6 +64,8 @@ export function buildDiscordMessage(input: DiscordInput): string {
   lines.push(v ? `ซื้อสุ่ม p95: ${r2(v.controlP95)} → ${v.pass ? "ชนะ" : "ไม่ชนะ"}` : `ซื้อสุ่ม: คำนวณตอนครบ ${p.target}`);
 
   lines.push(`สถานะ: ${v ? (v.pass ? "เชื่อได้" : "เชื่อไม่ได้") : "ยังตัดสินไม่ได้"}`);
+  // The page's caveat, worded to pass the prediction guard ("รับประกัน" is a guarded phrase).
+  if (v) lines.push(v.pass ? "ชนะ p95 ของการซื้อสุ่ม — ไม่ได้พิสูจน์ว่ามี edge" : "ไม่ชนะ p95 ของการซื้อสุ่ม");
 
   const run =
     lastRun.status === "ran"

@@ -141,7 +141,24 @@ test("contains no prediction phrase", () => {
   }
 });
 
-test("the page's pass caveat is not in the message: its wording trips the prediction guard", () => {
-  // Ruled copy for F11; "รับประกัน" is a CHART_PREDICTION_PHRASES_TH phrase, so it cannot be sent.
+test("after the verdict a caveat line follows the status line, and the message still passes the prediction guard", () => {
+  const verdict = { ruleVersion: "v", n: 300, meanR: 0.3, controlMedian: 0, controlP95: 0.1, runs: 200, pass: true, computedAt: "x", firstId: 1, lastId: 2, modelMix: {} };
+  const lineAfterStatus = (msg: string) => {
+    const lines = msg.split("\n");
+    return lines[lines.findIndex((l) => l.startsWith("สถานะ: ")) + 1];
+  };
+
+  const pass = buildDiscordMessage(input({ snapshot: snapshot({ verdict }) }));
+  assert.equal(lineAfterStatus(pass), "ชนะ p95 ของการซื้อสุ่ม — ไม่ได้พิสูจน์ว่ามี edge");
+  assert.equal(isChartPrediction(pass), false, pass);
+
+  const fail = buildDiscordMessage(input({ snapshot: snapshot({ verdict: { ...verdict, pass: false } }) }));
+  assert.equal(lineAfterStatus(fail), "ไม่ชนะ p95 ของการซื้อสุ่ม");
+  assert.ok(!fail.includes("ไม่ได้พิสูจน์"));
+  assert.equal(isChartPrediction(fail), false, fail);
+
+  // Before the verdict there is no caveat line.
+  assert.ok(!buildDiscordMessage(input()).includes("p95 ของการซื้อสุ่ม"));
+  // The page's wording could not be used: "รับประกัน" is a CHART_PREDICTION_PHRASES_TH phrase.
   assert.equal(isChartPrediction("ชนะ p95 ของการซื้อสุ่ม ไม่ใช่การรับประกันว่ามี edge"), true);
 });
