@@ -3,7 +3,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
 import { etClock } from "@/lib/scanAgent/session";
-import { runScorecardNightly, windowElapsed, type AiVerdict, type LiveSnapshot, type NightlyDeps, type NightlyRow, type NightlyRun } from "./nightly";
+import { controlWindow, runScorecardNightly, windowElapsed, type AiVerdict, type LiveSnapshot, type NightlyDeps, type NightlyRow, type NightlyRun } from "./nightly";
+import { controlDistribution, type ControlTrade } from "./control";
+import { rMultiple } from "./score";
 import type { ExitVariant, Outcome } from "./types";
 
 function etEpoch(date: string, hhmm: string): number {
@@ -124,7 +126,8 @@ test("scores open rows and never rescans closed ones", async () => {
   await runScorecardNightly(d);
 
   assert.equal(rec.fetches.length, 1);
-  assert.deepEqual(rec.fetches[0].tickers, ["HALF", "NEW"]);
+  // SPY rides along as the market calendar.
+  assert.deepEqual(rec.fetches[0].tickers, ["HALF", "NEW", "SPY"]);
   assert.equal(rec.fetches[0].fromSec, etEpoch("2026-11-02", "10:30") - 86_400);
   assert.equal(rec.fetches[0].toSec, Math.floor((NOV3 - 16 * 60_000) / 1000));
 
@@ -228,10 +231,14 @@ test("freezes the AI verdict exactly once", async () => {
   assert.equal(v.runs, 200);
   assert.ok(v.controlP95 < 0, `flat control loses its costs, p95 ${v.controlP95}`);
   assert.equal(v.pass, true);
-  // The sample's bars were fetched for the sample's own tickers only.
-  assert.ok(rec.fetches.length >= 1);
-  assert.ok(!rec.fetches.some((f) => f.tickers.includes("LATE")));
+  // First the SPY calendar (from the sample's last run − 1 day), then the sample's own
+  // tickers in one call per run date.
+  assert.deepEqual(rec.fetches[0], { tickers: ["SPY"], fromSec: etEpoch(V_DAY, "15:20") - 86_400, toSec: Math.floor((V_NOW - 16 * 60_000) / 1000) });
+  assert.equal(rec.fetches.length, 2);
+  assert.equal(rec.fetches[1].tickers.length, 300);
+  assert.ok(!rec.fetches[1].tickers.includes("LATE"));
   assert.equal(snap.verdict?.n, 300);
+  assert.deepEqual(snap.keptControl, { median: v.controlMedian, p95: v.controlP95, runs: v.runs });
   assert.equal(snap.stats.afterVerdict.hold.n, 1);
   assert.equal(snap.stats.kept.hold.n, 300);
 
@@ -247,8 +254,11 @@ test("no freeze while a sample window is still open", async () => {
   // 10-14 is the 10th session; at 10-14 12:00 ET it is not complete.
   const nowMs = etEpoch("2026-10-14", "12:00") * 1000;
   const { deps: d, rec } = deps({ nowMs, rows: keptSample(300), bars: () => verdictBars() });
-  await runScorecardNightly(d);
+  const snap = await runScorecardNightly(d);
   assert.equal(rec.verdicts.length, 0);
+  // Only the SPY calendar is read; the sample's bars wait for the night it is ready.
+  assert.deepEqual(rec.fetches.map((f) => f.tickers), [["SPY"]]);
+  assert.equal(snap.keptControl, null);
 });
 
 test("unread rows never count toward 300", async () => {
@@ -261,6 +271,7 @@ test("unread rows never count toward 300", async () => {
   assert.equal(snap.stats.unread.hold.n, 300);
   assert.equal(snap.stats.kept.hold.n, 2);
   assert.deepEqual(snap.modelMix, { "claude-sonnet-a": 2 });
+  assert.equal(snap.keptControl, null); // no live control before the verdict
 });
 
 test("missed weekday shows in the snapshot", async () => {
@@ -307,7 +318,7 @@ test("last night's counts come from the setup rows; AI down when only unread", a
   assert.match(rec.sent[0], /AI ไม่ทำงานเมื่อคืน/);
 });
 
-test("windowElapsed counts ten complete sessions from the fill date on the row's own bars", () => {
+test("windowElapsed counts ten complete sessions from the fill date on the calendar bars (SPY)", () => {
   const bars = verdictBars();
   const fillAt = etEpoch(V_DAY, "15:20");
   assert.equal(windowElapsed(bars, fillAt, etEpoch("2026-10-14", "16:00")), true);
@@ -329,19 +340,121 @@ test("cumulative R is credited on the exit date", async () => {
   assert.deepEqual(snap.cumulativeR.vetoed, []);
 });
 
-test("the live control ignores bars it can never read (extended hours, sessions past the tenth)", async () => {
-  const open = (id: number): NightlyRow =>
-    row({ id, ticker: `L${id}`, createdAt: new Date(etEpoch(V_DAY, "15:20") * 1000), outcomes: { hold: { ...NO_FILL_OPEN(), fill: 100, fillAt: etEpoch(V_DAY, "15:20") } } });
-  const rows = [open(1), open(2), open(3)];
+test("controlWindow drops bars the control can never read (extended hours, sessions past the tenth)", () => {
   const pre = [480, 485].map((m) => ({ t: etEpoch(V_DAY, hhmm(m)), o: 100, h: 100, l: 100, c: 100, v: 1 }));
   const past = ["2026-10-15", "2026-10-16"].map((d) => ({ t: etEpoch(d, "15:55"), o: 50, h: 50, l: 50, c: 50, v: 1 }));
-  const plain = await runScorecardNightly(deps({ nowMs: V_NOW, rows, bars: () => verdictBars() }).deps);
-  const noisy = await runScorecardNightly(deps({ nowMs: V_NOW, rows, bars: () => [...pre, ...verdictBars(), ...past] }).deps);
-  assert.ok(plain.keptControl);
-  assert.equal(plain.keptControl.trades, 3);
-  assert.deepEqual(noisy.keptControl, plain.keptControl);
+  const noisy = [...pre, ...verdictBars(), ...past];
+  const runAt = etEpoch(V_DAY, "15:20");
+  assert.deepEqual(controlWindow(noisy, runAt), verdictBars());
+  const trade = (id: number, bars: Candle[]): ControlTrade => ({ id, runAtSec: runAt, fill: 100, stop: 99, t1: 102, bars, cutoffSec: V_NOW / 1000 });
+  const full = controlDistribution([1, 2, 3].map((id) => trade(id, noisy)), "hold");
+  const trimmed = controlDistribution([1, 2, 3].map((id) => trade(id, controlWindow(noisy, runAt))), "hold");
+  assert.ok(full);
+  assert.deepEqual(trimmed, full);
 });
 
-function NO_FILL_OPEN(): Outcome {
-  return { status: "open", fillAt: null, fill: null, exitAt: null, exitPrice: null, exitReason: null, r: null, sessionsHeld: 1 };
-}
+// --- Fix round 1 -------------------------------------------------------------
+
+test("a filled row whose bars stop after 3 sessions closes at its last close when SPY completes session 10", async () => {
+  // Own bars: the run day from 15:20 and two more sessions; the last close is 101.
+  const own: Candle[] = [
+    ...flatBars(V_DAY, 920),
+    { t: etEpoch("2026-10-02", "15:55"), o: 100, h: 100.2, l: 99.8, c: 100, v: 1000 },
+    { t: etEpoch("2026-10-05", "15:50"), o: 100, h: 100.2, l: 99.8, c: 100.5, v: 1000 },
+    { t: etEpoch("2026-10-05", "15:55"), o: 100, h: 100.2, l: 99.8, c: 101, v: 1000 },
+  ];
+  const r = row({ id: 7, ticker: "HALT", createdAt: new Date(etEpoch(V_DAY, "15:20") * 1000) });
+  const bars = (t: string) => (t === "SPY" ? verdictBars() : own);
+
+  // 10-14 12:00 ET: SPY's 10th session has not completed. Still open.
+  const before = deps({ nowMs: etEpoch("2026-10-14", "12:00") * 1000, rows: [r], bars });
+  await runScorecardNightly(before.deps);
+  const holdBefore = before.rec.saved.find((s) => s.variant === "hold")!.outcome;
+  assert.equal(holdBefore.status, "open");
+  assert.equal(holdBefore.fill, 100);
+
+  // After 10-14 16:00 ET it has: close at the last finished regular close.
+  const after = deps({ nowMs: V_NOW, rows: [r], bars });
+  const snap = await runScorecardNightly(after.deps);
+  const hold = after.rec.saved.find((s) => s.variant === "hold")!.outcome;
+  assert.equal(hold.status, "closed");
+  assert.equal(hold.exitReason, "time");
+  assert.equal(hold.exitPrice, 101);
+  assert.equal(hold.exitAt, etEpoch("2026-10-05", "15:55") + 300);
+  assert.equal(hold.sessionsHeld, 3);
+  assert.ok(Math.abs((hold.r as number) - rMultiple(100, 101, 99)) < 1e-12);
+  // sameDay closed normally at the run day's close.
+  const sameDay = after.rec.saved.find((s) => s.variant === "sameDay")!.outcome;
+  assert.equal(sameDay.status, "closed");
+  assert.equal(sameDay.sessionsHeld, 1);
+  assert.equal(snap.recentTrades[0].hold.status, "closed");
+});
+
+test("a stored open fill whose own bars end on the fill day closes once the SPY window has elapsed", async () => {
+  // Stored hold open with a fill; tonight's own bars still show the fill day only.
+  const stored: Outcome = { status: "open", fillAt: etEpoch(V_DAY, "15:20"), fill: 100, exitAt: null, exitPrice: null, exitReason: null, r: null, sessionsHeld: 1 };
+  const r = row({ id: 8, ticker: "GONE", createdAt: new Date(etEpoch(V_DAY, "15:20") * 1000), outcomes: { hold: stored, sameDay: closedOutcome() } });
+  const { deps: d, rec } = deps({ nowMs: V_NOW, rows: [r], bars: (t) => (t === "SPY" ? verdictBars() : flatBars(V_DAY, 920)) });
+  await runScorecardNightly(d);
+  assert.equal(rec.saved.length, 1);
+  assert.equal(rec.saved[0].outcome.status, "closed");
+  assert.equal(rec.saved[0].outcome.exitAt, etEpoch(V_DAY, "15:55") + 300);
+  assert.equal(rec.saved[0].outcome.sessionsHeld, 1);
+});
+
+test("AI down only when every setup was unread: a veto proves the AI answered", async () => {
+  const nowMs = Date.parse("2026-11-04T00:00:00Z"); // Tue 11-03 19:00 ET
+  const at = new Date(etEpoch("2026-11-03", "10:31") * 1000);
+  const runs: NightlyRun[] = [{ sessionDate: "2026-11-03", status: "ran", runId: "r", ranAt: at }];
+  const mixed = [
+    row({ id: 1, createdAt: at, aiReading: null, ticker: "V1", status: "ai_rejected" }),
+    row({ id: 2, createdAt: at, aiReading: null, ticker: "U1" }),
+    row({ id: 3, createdAt: at, aiReading: null, ticker: "U2" }),
+  ];
+  const m = deps({ nowMs, rows: mixed, runs, bars: () => flatBars("2026-11-03") });
+  const snap = await runScorecardNightly(m.deps);
+  assert.equal(snap.lastRun.vetoed, 1);
+  assert.equal(snap.lastRun.unread, 2);
+  assert.equal(snap.lastRun.aiDown, false);
+  assert.doesNotMatch(m.rec.sent[0], /AI ไม่ทำงาน/);
+
+  const allUnread = deps({ nowMs, rows: mixed.slice(1), runs, bars: () => flatBars("2026-11-03") });
+  assert.equal((await runScorecardNightly(allUnread.deps)).lastRun.aiDown, true);
+});
+
+test("a failed run row outranks orphan rows on the run line", async () => {
+  const nowMs = Date.parse("2026-11-04T00:00:00Z");
+  const at = new Date(etEpoch("2026-11-03", "10:31") * 1000);
+  const runs: NightlyRun[] = [{ sessionDate: "2026-11-03", status: "failed", runId: "r", error: "บันทึก setup ไม่ได้", ranAt: at }];
+  const rows = [row({ id: 1, createdAt: at, ticker: "P1" })];
+  const { deps: d, rec } = deps({ nowMs, rows, runs, bars: () => flatBars("2026-11-03") });
+  const snap = await runScorecardNightly(d);
+  assert.equal(snap.lastRun.status, "failed");
+  assert.equal(snap.lastRun.error, "บันทึก setup ไม่ได้");
+  assert.equal(snap.lastRun.setups, 1);
+  assert.match(rec.sent[0], /รอบอัตโนมัติเมื่อคืน: ล้มเหลว: บันทึก setup ไม่ได้/);
+  // The day still is not "missed": its setups were logged.
+  assert.ok(!snap.missed.some((m) => m.date === "2026-11-03"));
+});
+
+test("afterVerdict is anchored on the stored verdict's lastId; kept's cumulative line excludes it", async () => {
+  // 300 closed kept rows on 10-01, ids 1..300, exits a minute apart; the stored verdict ends at id 150.
+  const rows = keptSample(300).map((r, i) => ({
+    ...r,
+    outcomes: { hold: closedOutcome({ r: 1, exitAt: etEpoch("2026-10-01", "15:40") + i }), sameDay: closedOutcome() },
+  }));
+  const stored: AiVerdict = {
+    ruleVersion: "sweep-v1", n: 150, meanR: 1, controlMedian: -0.1, controlP95: -0.05, runs: 200, pass: true,
+    computedAt: "2026-10-20T00:00:00.000Z", firstId: 1, lastId: 150, modelMix: {},
+  };
+  const { deps: d, rec } = deps({ nowMs: V_NOW, rows, verdict: stored });
+  const snap = await runScorecardNightly(d);
+  assert.equal(rec.fetches.length, 0);
+  assert.equal(snap.stats.kept.hold.n, 150);
+  assert.equal(snap.stats.afterVerdict.hold.n, 150);
+  assert.equal(snap.counts.afterVerdict.total, 150);
+  assert.equal(snap.cumulativeR.kept.at(-1)!.n, 150);
+  assert.equal(snap.cumulativeR.afterVerdict.at(-1)!.n, 150);
+  assert.deepEqual(snap.keptControl, { median: -0.1, p95: -0.05, runs: 200 });
+  assert.match(rec.sent[0], /ซื้อสุ่ม p95: -0\.05R → ชนะ/);
+});

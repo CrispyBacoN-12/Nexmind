@@ -49,11 +49,21 @@ const NO_FILL: Outcome = {
   sessionsHeld: 0,
 };
 
+/**
+ * R of a long bought at `fill` and sold at `exit` (raw prices) against `stop`: slippage
+ * on both fills and the round-turn commission on entry notional.
+ */
+export function rMultiple(fill: number, exit: number, stop: number, costs: CostModel = SCORECARD_COST_MODEL): number {
+  const s = (costs.slippageBps ?? 0) / 1e4;
+  const c = (costs.commissionBps ?? 0) / 1e4;
+  const entryPx = fill * (1 + s);
+  const exitPx = exit * (1 - s);
+  return (exitPx - entryPx - c * entryPx) / (entryPx - stop);
+}
+
 export function scoreSetup(input: ScoreInput): Outcome {
   const { runAtSec, stop, t1, cutoffSec, variant } = input;
   const costs = input.costs ?? SCORECARD_COST_MODEL;
-  const s = (costs.slippageBps ?? 0) / 1e4;
-  const c = (costs.commissionBps ?? 0) / 1e4;
 
   // Finished regular-session bars only, in time order, grouped by ET date.
   const sessions = new Map<string, Candle[]>();
@@ -79,22 +89,17 @@ export function scoreSetup(input: ScoreInput): Outcome {
   if (fillBar.o <= stop || fillBar.o >= t1) return { ...NO_FILL, status: "not_filled" };
 
   const fill = fillBar.o;
-  const entryPx = fill * (1 + s);
-  const risk = entryPx - stop;
 
-  const closed = (exitAt: number, exit: number, reason: ExitReason, held: number): Outcome => {
-    const exitPx = exit * (1 - s);
-    return {
-      status: "closed",
-      fillAt: fillBar.t,
-      fill,
-      exitAt,
-      exitPrice: exit,
-      exitReason: reason,
-      r: (exitPx - entryPx - c * entryPx) / risk,
-      sessionsHeld: held,
-    };
-  };
+  const closed = (exitAt: number, exit: number, reason: ExitReason, held: number): Outcome => ({
+    status: "closed",
+    fillAt: fillBar.t,
+    fill,
+    exitAt,
+    exitPrice: exit,
+    exitReason: reason,
+    r: rMultiple(fill, exit, stop, costs),
+    sessionsHeld: held,
+  });
 
   const dates = [...sessions.keys()].filter((d) => d >= runDate).sort();
   const maxSessions = variant === "sameDay" ? 1 : SCORECARD_MAX_HOLD_SESSIONS;

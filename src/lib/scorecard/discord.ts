@@ -55,9 +55,9 @@ export function buildDiscordMessage(input: DiscordInput): string {
   const mean = v ? v.meanR : p.meanR;
   lines.push(`สะสม AI เก็บ: ${v ? v.n : p.n}/${p.target} · เฉลี่ย ${mean === null ? "—" : r2(mean)}`);
 
-  const p95 = v ? v.controlP95 : (snapshot.keptControl?.p95 ?? null);
-  const beats = v ? v.pass : p95 !== null && mean !== null && mean > p95;
-  lines.push(`ซื้อสุ่ม p95: ${p95 === null ? "—" : r2(p95)} → ${beats ? "ชนะ" : "ยังไม่ชนะ"}`);
+  // The random control exists only frozen with the verdict; before it there is no number
+  // to compare against, and no win/lose word is printed.
+  lines.push(v ? `ซื้อสุ่ม p95: ${r2(v.controlP95)} → ${v.pass ? "ชนะ" : "ไม่ชนะ"}` : `ซื้อสุ่ม: คำนวณตอนครบ ${p.target}`);
 
   lines.push(`สถานะ: ${v ? (v.pass ? "เชื่อได้" : "เชื่อไม่ได้") : "ยังตัดสินไม่ได้"}`);
 

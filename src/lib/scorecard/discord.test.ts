@@ -30,10 +30,10 @@ function snapshot(over: Partial<LiveSnapshot> = {}): LiveSnapshot {
     sessionDate: "2026-11-03",
     stats: { kept: variants, vetoed: variants, stripped: variants, unread: variants, afterVerdict: variants },
     counts: {} as LiveSnapshot["counts"],
-    keptControl: { median: -0.05, p95: 0.2, runs: 200, trades: 10 },
+    keptControl: null,
     keptProgress: { n: 12, closed: 8, meanR: 0.153, target: 300 },
     modelMix: { "claude-sonnet-a": 12 },
-    cumulativeR: { kept: [], vetoed: [], stripped: [], unread: [] },
+    cumulativeR: { kept: [], vetoed: [], stripped: [], unread: [], afterVerdict: [] },
     missed: [],
     lastRun: lastRun(),
     recentTrades: [],
@@ -67,7 +67,7 @@ test("the lines come in the fixed order", () => {
   assert.match(lines[2], /MSFT -1\.00R/);
   assert.match(lines[3], /^ยังถือ: NVDA 3\/10/);
   assert.equal(lines[4], "สะสม AI เก็บ: 12/300 · เฉลี่ย 0.15R");
-  assert.equal(lines[5], "ซื้อสุ่ม p95: 0.20R → ยังไม่ชนะ");
+  assert.equal(lines[5], "ซื้อสุ่ม: คำนวณตอนครบ 300"); // no live control before the verdict
   assert.equal(lines[6], "สถานะ: ยังตัดสินไม่ได้");
   assert.equal(lines[7], "รอบอัตโนมัติเมื่อคืน: รันแล้ว 22:31");
   assert.equal(lines.length, 8);
@@ -108,6 +108,8 @@ test("a frozen verdict decides the status line", () => {
   assert.ok(pass.includes("สถานะ: เชื่อได้"));
   const fail = buildDiscordMessage(input({ snapshot: snapshot({ verdict: { ...verdict, pass: false } }) }));
   assert.ok(fail.includes("สถานะ: เชื่อไม่ได้"));
+  assert.ok(fail.includes("ซื้อสุ่ม p95: 0.10R → ไม่ชนะ"));
+  assert.ok(!fail.includes("ยังไม่ชนะ"));
 });
 
 test("contains no prediction phrase", () => {
@@ -118,7 +120,8 @@ test("contains no prediction phrase", () => {
     input({ snapshot: snapshot({ verdict: { ...verdict, pass: false } }) }),
     input({ lastRun: lastRun({ kept: 0, unread: 2, aiDown: true }) }),
     input({ lastRun: lastRun({ status: "none", ranAt: null }), closedOvernight: [], openNow: [] }),
-    input({ snapshot: snapshot({ keptControl: null, keptProgress: { n: 0, closed: 0, meanR: null, target: 300 } }) }),
+    input({ snapshot: snapshot({ keptProgress: { n: 0, closed: 0, meanR: null, target: 300 } }) }),
+    input({ snapshot: snapshot({ verdict, keptControl: { median: 0, p95: 0.1, runs: 200 } }) }),
   ];
   for (const v of variants) {
     const msg = buildDiscordMessage(v);

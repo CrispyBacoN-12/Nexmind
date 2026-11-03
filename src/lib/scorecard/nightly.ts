@@ -6,16 +6,17 @@
 // Pure orchestration: every I/O dependency is injected (scripts/scorecard-score.mts
 // wires the real ones). Read-only toward the market: it never places or sizes an order.
 //
-// Bars. One fetch per night covers the rows still being scored (from the earliest one's
-// createdAt − 1 day to now − SIP delay). Rows that are already terminal and older than
-// that window are not re-fetched, so:
-//  - `windowElapsed` is known only for rows inside tonight's bars;
-//  - the LIVE kept control covers only the filled kept rows inside tonight's bars. It is
-//    informational, and may be survivor-biased while windows are open (a control trade
-//    that has not closed yet sits its run out). It is never the verdict.
-//  - The frozen verdict fetches its own sample's bars (one call per run date, a bounded
-//    window each), only on nights when all 300 sample rows have closed, and computes the
-//    control on exactly that sample.
+// Bars. One fetch per night: the tickers of the rows still being scored plus SPY, from
+// the earliest such createdAt − 1 day (or, while the verdict waits, the 300th sample
+// row's) to now − SIP delay.
+//  - SPY is the market calendar. A row's 10-session window is counted on SPY's completed
+//    regular sessions from its fill date (fill date = 1), never on the row's own bars, so a
+//    halted or renamed ticker cannot hold the verdict back.
+//  - A filled row still `open` once that window has elapsed is closed on time at its last
+//    finished regular close (its own bars stopped). It stays in every sample.
+//  - There is no live random control. The control is computed once, on exactly the
+//    300-row verdict sample, the night it is ready (one bounded bar fetch per run date),
+//    and frozen with the verdict.
 
 import type { Candle } from "@/lib/indicators";
 import { CHART_BAR_SECONDS, CHART_RULE_VERSION } from "@/lib/chartAgent/types";
@@ -26,7 +27,7 @@ import { controlDistribution, type ControlTrade } from "./control";
 import { etDayBoundsMs } from "./etDay";
 import { aiVerdictSample, beatsControl, groupOf, summarize, type Group, type GroupStats } from "./groups";
 import type { ScorecardRunInput } from "./runDaily";
-import { scoreSetup } from "./score";
+import { rMultiple, scoreSetup } from "./score";
 import {
   SCORECARD_MAX_HOLD_SESSIONS,
   SCORECARD_NO_DATA_DAYS,
@@ -42,6 +43,8 @@ const GROUPS: readonly Group[] = ["kept", "vetoed", "stripped", "unread"];
 const OPEN_MIN = 570; // 09:30 ET
 const CLOSE_MIN = 960; // 16:00 ET
 const DAY_SEC = 86_400;
+/** The market calendar: its completed regular sessions count every row's window. */
+const CALENDAR_TICKER = "SPY";
 /** Calendar days of bars fetched per run date for the verdict sample; holds 10 sessions with room for holidays. */
 const VERDICT_WINDOW_DAYS = 30;
 const MISSED_LOOKBACK_WEEKDAYS = 30;
@@ -107,7 +110,7 @@ export interface LastRunSummary {
   vetoed: number;
   stripped: number;
   unread: number;
-  /** Setups were unread and none was kept: the AI did not answer. */
+  /** The run logged setups and every one was unread: the AI did not answer. A veto or a strip proves it did. */
   aiDown: boolean;
 }
 
@@ -147,19 +150,19 @@ export interface LiveSnapshot {
   sessionDate: string;
   /**
    * Closed outcomes only. Before the verdict is frozen `kept` is every kept row; after,
-   * `kept` is the rows up to the sample's last one and `afterVerdict` the rest (info only).
+   * `kept` is the rows up to the stored verdict's lastId and `afterVerdict` the rest (info only).
    */
   stats: Record<StatsGroup, Record<ExitVariant, GroupStats>>;
   /** Primary (hold) outcome status counts. */
   counts: Record<StatsGroup, GroupCounts>;
-  /** Live random control for kept (hold), informational: see the file header. */
-  keptControl: { median: number; p95: number; runs: number; trades: number } | null;
+  /** The FROZEN verdict's random control (hold); null until the verdict exists. No live control is computed. */
+  keptControl: { median: number; p95: number; runs: number } | null;
   /** The verdict sample so far: kept, filled, earliest first, at most 300. */
   keptProgress: { n: number; closed: number; meanR: number | null; target: number };
   /** aiModel counts over the verdict sample so far ("unknown" when null). */
   modelMix: Record<string, number>;
-  /** Primary exit, closed rows, credited on the ET exit date. */
-  cumulativeR: Record<Group, { date: string; cumR: number; n: number }[]>;
+  /** Primary exit, closed rows, credited on the ET exit date; split like `stats` (kept excludes afterVerdict). */
+  cumulativeR: Record<StatsGroup, { date: string; cumR: number; n: number }[]>;
   /** Weekdays of the last 30 with no ran/no_session row and no logged setup. */
   missed: { date: string; failed: string | null }[];
   lastRun: LastRunSummary;
@@ -191,23 +194,57 @@ function hasRunDateBar(bars: Candle[], runAtSec: number, cutoffSec: number): boo
   return bars.some((b) => isRegular(b, cutoffSec) && etClock(b.t).date === runDate);
 }
 
-/**
- * True once SCORECARD_MAX_HOLD_SESSIONS complete sessions, counting the fill date as the
- * first, appear in the row's own finished regular bars: by then every control trade of
- * that row (entered the same day, held at most as long) has closed. No fill: false.
- */
-export function windowElapsed(bars: Candle[], fillAt: number | null, cutoffSec: number): boolean {
+/** Sorted distinct ET dates that have a finished regular bar. */
+function sessionDates(bars: Candle[], cutoffSec: number): string[] {
+  const dates = new Set<string>();
+  for (const b of bars) if (isRegular(b, cutoffSec)) dates.add(etClock(b.t).date);
+  return [...dates].sort();
+}
+
+/** `windowElapsed` on precomputed calendar dates (one pass over SPY per night, not per row). */
+function elapsedOn(calendar: string[], fillAt: number | null, cutoffSec: number): boolean {
   if (fillAt === null) return false;
   const fillDate = etClock(fillAt).date;
-  const dates = new Set<string>();
-  for (const b of bars) {
-    if (!isRegular(b, cutoffSec)) continue;
-    const d = etClock(b.t).date;
-    if (d >= fillDate) dates.add(d);
-  }
-  const sorted = [...dates].sort();
-  if (sorted.length < SCORECARD_MAX_HOLD_SESSIONS) return false;
-  return cutoffSec * 1000 >= etSessionCloseMs(sorted[SCORECARD_MAX_HOLD_SESSIONS - 1]);
+  const i = calendar.findIndex((d) => d >= fillDate);
+  if (i < 0) return false;
+  const last = calendar[i + SCORECARD_MAX_HOLD_SESSIONS - 1];
+  return last !== undefined && cutoffSec * 1000 >= etSessionCloseMs(last);
+}
+
+/**
+ * True once SCORECARD_MAX_HOLD_SESSIONS complete sessions, counting the fill date as the
+ * first, appear in the CALENDAR bars (SPY): by then every control trade of that row
+ * (entered the same day, held at most as long) has run its course. No fill: false.
+ */
+export function windowElapsed(calendarBars: Candle[], fillAt: number | null, cutoffSec: number): boolean {
+  return elapsedOn(sessionDates(calendarBars, cutoffSec), fillAt, cutoffSec);
+}
+
+/**
+ * An outcome still `open` with a fill whose SPY-counted window has elapsed: the row's own
+ * bars stopped (halt, rename, delisting). Close it on time at its last finished regular
+ * close inside the variant's sessions; sessionsHeld = its own sessions walked. With no own
+ * bar tonight it stays open (nothing to price it at).
+ */
+function closeAfterWindow(o: Outcome, own: Candle[], variant: ExitVariant, stop: number, elapsed: boolean, cutoffSec: number): Outcome {
+  if (o.status !== "open" || o.fill === null || o.fillAt === null || !elapsed) return o;
+  const fillAt = o.fillAt;
+  const walked = own.filter((b) => b.t >= fillAt && isRegular(b, cutoffSec)).sort((a, b) => a.t - b.t);
+  const maxSessions = variant === "sameDay" ? 1 : SCORECARD_MAX_HOLD_SESSIONS;
+  const dates = [...new Set(walked.map((b) => etClock(b.t).date))].slice(0, maxSessions);
+  const inside = walked.filter((b) => dates.includes(etClock(b.t).date));
+  const last = inside[inside.length - 1];
+  if (!last) return o;
+  return {
+    status: "closed",
+    fillAt,
+    fill: o.fill,
+    exitAt: last.t + CHART_BAR_SECONDS,
+    exitPrice: last.c,
+    exitReason: "time",
+    r: rMultiple(o.fill, last.c, stop),
+    sessionsHeld: dates.length,
+  };
 }
 
 const isWeekday = (date: string) => {
@@ -235,7 +272,14 @@ const runDateOf = (r: NightlyRow) => etClock(runAtSec(r)).date;
 function isAiVerdict(x: unknown): x is AiVerdict {
   if (typeof x !== "object" || x === null) return false;
   const v = x as Record<string, unknown>;
-  return typeof v.n === "number" && typeof v.pass === "boolean" && typeof v.controlP95 === "number" && typeof v.meanR === "number";
+  return (
+    typeof v.n === "number" &&
+    typeof v.pass === "boolean" &&
+    typeof v.controlP95 === "number" &&
+    typeof v.controlMedian === "number" &&
+    typeof v.meanR === "number" &&
+    typeof v.lastId === "number"
+  );
 }
 
 function countsOf(outcomes: Outcome[]): GroupCounts {
@@ -284,7 +328,7 @@ function cumulative(rows: { id: number; hold: Outcome }[]): { date: string; cumR
  * all scoreSetup can read for a control trade entered that day. The control scores every
  * trade 200 times, so passing weeks of extended-hours bars would only cost time.
  */
-function controlWindow(bars: Candle[], runAt: number): Candle[] {
+export function controlWindow(bars: Candle[], runAt: number): Candle[] {
   const runDate = etClock(runAt).date;
   const kept: { b: Candle; date: string }[] = [];
   for (const b of bars) {
@@ -316,14 +360,28 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     return !o || o.status === "open";
   };
   const toScore = rows.filter((r) => VARIANTS.some((v) => needs(r, v)));
+  const groupMap = new Map(rows.map((r) => [r.id, groupOf(r)]));
+  const groupOfRow = (r: NightlyRow) => groupMap.get(r.id)!;
+
+  // While no verdict is stored and the sample is already full, SPY must also reach back to
+  // the sample's last run, so its readiness can be read even on a night with nothing to score.
+  const stored = await deps.loadVerdict();
+  const pre = aiVerdictSample(
+    rows.map((r) => ({ id: r.id, createdAt: r.createdAt, group: groupOfRow(r), hold: r.outcomes.hold ?? NO_OUTCOME, windowElapsed: false, row: r })),
+  );
+  const sampleAnchor = stored === null && pre.sample.length === SCORECARD_VERDICT_N ? runAtSec(pre.sample[SCORECARD_VERDICT_N - 1].row) : Infinity;
+  const fetchFrom = Math.min(toScore.length ? Math.min(...toScore.map(runAtSec)) : Infinity, sampleAnchor);
+
   let bars = new Map<string, Candle[]>();
   let barsFromSec = Infinity;
-  if (toScore.length) {
-    barsFromSec = Math.min(...toScore.map(runAtSec)) - DAY_SEC;
-    bars = await deps.fetchBars([...new Set(toScore.map((r) => r.ticker))], barsFromSec, cutoffSec);
+  if (Number.isFinite(fetchFrom)) {
+    barsFromSec = fetchFrom - DAY_SEC;
+    bars = await deps.fetchBars([...new Set([...toScore.map((r) => r.ticker), CALENDAR_TICKER])], barsFromSec, cutoffSec);
   }
   /** Tonight's bars for a row, or null when its run is before the fetch or its ticker got none. */
   const barsFor = (r: NightlyRow): Candle[] | null => (runAtSec(r) >= barsFromSec ? (bars.get(r.ticker) ?? null) : null);
+  // No SPY bars: nothing elapses tonight (no forced close, no freeze). Safe, never early.
+  const calendar = sessionDates(bars.get(CALENDAR_TICKER) ?? [], cutoffSec);
 
   const outcomes = new Map<number, Partial<Record<ExitVariant, Outcome>>>(rows.map((r) => [r.id, { ...r.outcomes }]));
   const updates: { chartSetupId: number; variant: ExitVariant; outcome: Outcome }[] = [];
@@ -334,15 +392,19 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     const noBars = !hasRunDateBar(rowBars, runAtSec(r), cutoffSec);
     for (const v of VARIANTS) {
       if (!needs(r, v)) continue;
+      const prev = current[v];
       let next: Outcome;
-      if (noBars) {
-        // A fill already seen is kept as it is: missing bars tonight are a feed gap, not news.
-        if (current[v]?.fill != null) continue;
+      if (noBars && prev?.fill != null) {
+        // A fill already seen is kept: missing run-date bars tonight are a feed gap, not news.
+        next = prev;
+      } else if (noBars) {
         const stale = nowMs - r.createdAt.getTime() >= SCORECARD_NO_DATA_DAYS * DAY_SEC * 1000;
         next = { ...NO_OUTCOME, status: stale ? "no_data" : "open" };
       } else {
         next = scoreSetup({ runAtSec: runAtSec(r), stop: r.stop, t1: r.t1, bars: rowBars, cutoffSec, variant: v });
       }
+      next = closeAfterWindow(next, rowBars, v, r.stop, elapsedOn(calendar, next.fillAt, cutoffSec), cutoffSec);
+      if (next === prev) continue;
       current[v] = next;
       updates.push({ chartSetupId: r.id, variant: v, outcome: next });
       if (v === "hold" && next.status === "closed") closedTonight.add(r.id);
@@ -352,23 +414,25 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
 
   const holdOf = (r: NightlyRow): Outcome => outcomes.get(r.id)!.hold ?? NO_OUTCOME;
   const sameDayOf = (r: NightlyRow): Outcome => outcomes.get(r.id)!.sameDay ?? NO_OUTCOME;
-  const groupMap = new Map(rows.map((r) => [r.id, groupOf(r)]));
-  const groupOfRow = (r: NightlyRow) => groupMap.get(r.id)!;
 
-  // 2. The verdict sample and, when it is ready and none is stored, the frozen verdict.
-  const elapsed = new Map<number, boolean>();
-  for (const r of rows) {
-    const b = barsFor(r);
-    elapsed.set(r.id, b !== null && windowElapsed(b, holdOf(r).fillAt, cutoffSec));
-  }
-  const candidates = () =>
-    rows.map((r) => ({ id: r.id, createdAt: r.createdAt, group: groupOfRow(r), hold: holdOf(r), windowElapsed: elapsed.get(r.id)!, row: r }));
-  let sample = aiVerdictSample(candidates());
+  // 2. The verdict sample, its windows on the SPY calendar, and when it is ready and none
+  //    is stored, the frozen verdict. The calendar counts from each row's own fill date;
+  //    SPY may start after an early row's fill, which can only under-count (never early),
+  //    and the sample's last row (fetched from) bounds every earlier one.
+  const sample = aiVerdictSample(
+    rows.map((r) => ({
+      id: r.id,
+      createdAt: r.createdAt,
+      group: groupOfRow(r),
+      hold: holdOf(r),
+      windowElapsed: elapsedOn(calendar, holdOf(r).fillAt, cutoffSec),
+      row: r,
+    })),
+  );
 
-  const stored = await deps.loadVerdict();
   let verdict: AiVerdict | null = isAiVerdict(stored) ? stored : null;
-  if (stored === null && sample.sample.length === SCORECARD_VERDICT_N && sample.sample.every((s) => s.hold.status === "closed")) {
-    // The sample's own bars: one bounded fetch per run date.
+  if (stored === null && sample.ready) {
+    // The sample's own bars, for the control only: one bounded fetch per run date, once.
     const sampleBars = new Map<number, Candle[]>();
     const byDate = new Map<string, NightlyRow[]>();
     for (const s of sample.sample) {
@@ -381,33 +445,31 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
       const got = await deps.fetchBars([...new Set(dateRows.map((r) => r.ticker))], from, to);
       for (const r of dateRows) sampleBars.set(r.id, got.get(r.ticker) ?? []);
     }
-    for (const s of sample.sample) elapsed.set(s.id, windowElapsed(sampleBars.get(s.id)!, s.hold.fillAt, cutoffSec));
-    sample = aiVerdictSample(candidates());
-    if (sample.ready) {
-      const trades = sample.sample.map((s) => toTrade(s.row, s.hold, sampleBars.get(s.id)!, cutoffSec));
-      const control = controlDistribution(trades, "hold");
-      const meanR = summarize(sample.sample.map((s) => s.hold)).meanR;
-      if (control && meanR !== null) {
-        verdict = {
-          ruleVersion: CHART_RULE_VERSION,
-          n: sample.sample.length,
-          meanR,
-          controlMedian: control.median,
-          controlP95: control.p95,
-          runs: control.runs,
-          pass: beatsControl(meanR, control),
-          computedAt: new Date(nowMs).toISOString(),
-          firstId: sample.sample[0].id,
-          lastId: sample.sample[sample.sample.length - 1].id,
-          modelMix: modelMixOf(sample.sample.map((s) => s.row)),
-        };
-        await deps.saveVerdict(verdict);
-      }
+    const trades = sample.sample.map((s) => toTrade(s.row, s.hold, sampleBars.get(s.id)!, cutoffSec));
+    const control = controlDistribution(trades, "hold");
+    const meanR = summarize(sample.sample.map((s) => s.hold)).meanR;
+    if (control && meanR !== null) {
+      verdict = {
+        ruleVersion: CHART_RULE_VERSION,
+        n: sample.sample.length,
+        meanR,
+        controlMedian: control.median,
+        controlP95: control.p95,
+        runs: control.runs,
+        pass: beatsControl(meanR, control),
+        computedAt: new Date(nowMs).toISOString(),
+        firstId: sample.sample[0].id,
+        lastId: sample.sample[sample.sample.length - 1].id,
+        modelMix: modelMixOf(sample.sample.map((s) => s.row)),
+      };
+      await deps.saveVerdict(verdict);
     }
   }
 
-  // 3. Groups. Once frozen, kept rows after the sample's last one are "afterVerdict".
-  const boundary = verdict && sample.sample.length ? sample.sample[sample.sample.length - 1].row : null;
+  // 3. Groups. Once frozen, kept rows after the stored verdict's last row are "afterVerdict".
+  const boundary = verdict
+    ? (rows.find((r) => r.id === verdict!.lastId) ?? (sample.sample.length ? sample.sample[sample.sample.length - 1].row : null))
+    : null;
   const statsGroupOf = (r: NightlyRow): StatsGroup => {
     const g = groupOfRow(r);
     return g === "kept" && boundary && order(r, boundary) > 0 ? "afterVerdict" : g;
@@ -421,14 +483,8 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     counts[g] = countsOf(members.map(holdOf));
   }
 
-  // Live kept control: filled kept rows inside tonight's bars (informational).
-  const liveTrades = rows
-    .filter((r) => groupOfRow(r) === "kept" && holdOf(r).fill !== null && barsFor(r) !== null)
-    .map((r) => toTrade(r, holdOf(r), barsFor(r)!, cutoffSec));
-  const liveControl = liveTrades.length ? controlDistribution(liveTrades, "hold") : null;
-  const keptControl = liveControl
-    ? { median: liveControl.median, p95: liveControl.p95, runs: liveControl.runs, trades: liveTrades.length }
-    : null;
+  // Only the frozen control is ever shown: a nightly one would compare other populations.
+  const keptControl = verdict ? { median: verdict.controlMedian, p95: verdict.controlP95, runs: verdict.runs } : null;
 
   const sampleHolds = sample.sample.map((s) => s.hold);
   const keptProgress = {
@@ -439,7 +495,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   };
 
   const cumulativeR = {} as LiveSnapshot["cumulativeR"];
-  for (const g of GROUPS) cumulativeR[g] = cumulative(rows.filter((r) => groupOfRow(r) === g).map((r) => ({ id: r.id, hold: holdOf(r) })));
+  for (const g of statsGroups) cumulativeR[g] = cumulative(rows.filter((r) => statsGroupOf(r) === g).map((r) => ({ id: r.id, hold: holdOf(r) })));
 
   // 4. Last night's run and the missed weekdays.
   const sessionDate = lastRunSession(nowMs);
@@ -472,16 +528,18 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   let status: LastRunSummary["status"] = "none";
   let ranAt: string | null = null;
   let error: string | null = null;
+  // A ran/no_session row, else a failed row (even with partly logged setups), else orphan
+  // rows (the setups were logged, only the run row is missing), else nothing ran.
   if (okRun) {
     status = okRun.status as "ran" | "no_session";
     ranAt = okRun.ranAt.toISOString();
-  } else if (lastRows.length) {
-    status = "ran"; // orphan rows: the setups were logged, only the run row is missing
-    ranAt = lastRows[0].createdAt.toISOString();
   } else if (failedRun) {
     status = "failed";
     ranAt = failedRun.ranAt.toISOString();
     error = failedRun.error ?? null;
+  } else if (lastRows.length) {
+    status = "ran";
+    ranAt = lastRows[0].createdAt.toISOString();
   }
   const lastRun: LastRunSummary = {
     sessionDate,
@@ -490,7 +548,8 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     error,
     setups: lastRows.length,
     ...lastCounts,
-    aiDown: lastCounts.unread > 0 && lastCounts.kept === 0,
+    // Vetoed rows also carry a null aiReading, so "no reading" alone would call a veto an outage.
+    aiDown: lastRows.length > 0 && lastCounts.unread === lastRows.length,
   };
 
   const recentTrades: RecentTrade[] = [...rows]
