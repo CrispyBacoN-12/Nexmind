@@ -66,7 +66,7 @@ Hard context the code does not state:
 | Tests | `npm test` **1216 pass / 0 fail** (2026-11-03, master) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB. Columns `source` (default `"button"`) and `aiModel` were added 2026-11-03 |
 | Scorecard tables | `ScorecardRun`, `ScorecardOutcome`, `ScorecardSnapshot` were created 2026-11-03 on Neon with additive SQL over HTTPS. Port 5432 is blocked on this network, so `prisma db push` cannot connect (§5). One snapshot exists: `replay` / `sweep-v1` |
-| Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). **`NEXMIND Scorecard Score` Ready** (Tue-Sat 07:00 ICT). `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03) |
+| Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). **`NEXMIND Scorecard Score` Ready** (owner, 2026-11-06: fires on wake and logon, each with a 2-minute delay, plus a non-waking 07:00 Tue-Sat and a non-waking hourly retry added 2026-11-10, because two minutes after a wake the network was down every time; it works once per closed session, tracked in `Setting` key `scorecard:lastSummarySession`, and a failed run retries on the next trigger). `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03). `Scorecard Run` has `WakeToRun` on (owner, 2026-11-05), but it did not wake the machine for 21:30-22:30 on 2026-11-06. The power plan allows wake timers on AC only, so a laptop on battery or a shut-down machine misses the run |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
 | Desk #11 (archive) | `trend-pullback`, status `active` but unscheduled. 3 legacy open paper trades (KO, AZO, XOM); 45 closed, cumulative **−$358.98** |
@@ -290,6 +290,7 @@ There are no open research directions; the owner closed the search. Work items:
   - Never edit `REVIEW_SYSTEM` or the sweep rule without bumping `CHART_RULE_VERSION`.
   - Never overwrite the `replay` or `ai-verdict` snapshot. Each is computed once.
   - The scheduled scripts run from this working tree: keep a branch that has them checked out at 10:30 ET.
+- **Avoid `prisma.$transaction` in scripts here.** It needs Neon's WebSocket and failed with "Unable to start a transaction in the given time" on 2026-11-06, while plain queries over HTTPS worked.
 - **Port 5432 is blocked on this network.** `prisma db push` fails with P1001. Generate the SQL with
   `prisma migrate diff --from-schema <old> --to-schema prisma/schema.prisma --script`, then apply it through the
   Neon HTTPS driver.

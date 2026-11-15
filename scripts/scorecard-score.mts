@@ -1,7 +1,8 @@
-// Scorecard Job 2 for Task Scheduler: each morning at 07:00 ICT (Tue-Sat), after the US
-// close, score every scheduled ChartSetup row of the current ruleVersion on real Alpaca
-// SIP 5-minute bars, overwrite the "live" ScorecardSnapshot, freeze the "ai-verdict"
-// snapshot once when its 300-row sample is ready, and send one Thai Discord summary.
+// Scorecard Job 2 for Task Scheduler: fires when the machine wakes or the owner logs on, and
+// does its work once per closed US session. It scores every scheduled ChartSetup row of the
+// current ruleVersion on real Alpaca SIP 5-minute bars, overwrites the "live" ScorecardSnapshot,
+// freezes the "ai-verdict" snapshot once when its 300-row sample is ready, and sends one Thai
+// Discord summary. A failed run records nothing, so the next wake tries again.
 // Spec: docs/superpowers/specs/2026-11-03-scorecard-agent-design.md sections 5, 6, 8.
 //
 // Read-only toward the market: it never places or sizes an order. Writes: ScorecardOutcome
@@ -14,7 +15,9 @@ import { CHART_RULE_VERSION } from "@/lib/chartAgent/types";
 import { prisma } from "@/lib/db";
 import { sendDiscordNotification } from "@/lib/notify/discord";
 import { runScorecardNightly, type NightlyRow } from "@/lib/scorecard/nightly";
+import { latestClosedSession, summaryDue } from "@/lib/scorecard/summarySchedule";
 import { SCORECARD_SOURCE, type ExitReason, type ExitVariant, type Outcome, type OutcomeStatus } from "@/lib/scorecard/types";
+import { getSetting, setSetting } from "@/lib/settings";
 
 const log = (m: string) => console.log(`[${new Date().toISOString()}] ${m}`);
 const iso = (sec: number) => new Date(sec * 1000).toISOString();
@@ -22,6 +25,7 @@ const sec = (d: Date | null) => (d === null ? null : Math.floor(d.getTime() / 10
 const json = (x: unknown) => x as Prisma.InputJsonValue;
 const VERDICT_KEY = { kind: "ai-verdict", ruleVersion: CHART_RULE_VERSION };
 const LIVE_KEY = { kind: "live", ruleVersion: CHART_RULE_VERSION };
+const LAST_SUMMARY_SETTING = "scorecard:lastSummarySession";
 
 async function loadRows(): Promise<NightlyRow[]> {
   const setups = await prisma.chartSetup.findMany({
@@ -51,6 +55,12 @@ async function loadRows(): Promise<NightlyRow[]> {
 
 async function main() {
   try {
+    const startedAt = Date.now();
+    const lastSent = await getSetting(LAST_SUMMARY_SETTING, "");
+    if (!summaryDue(startedAt, lastSent)) {
+      log(`scorecard-score: summary for ${lastSent} already sent, nothing due`);
+      return;
+    }
     const snapshot = await runScorecardNightly({
       now: () => Date.now(),
       loadRows,
@@ -60,25 +70,26 @@ async function main() {
         return bars;
       },
       saveOutcomes: async (rows) => {
-        await prisma.$transaction(
-          rows.map(({ chartSetupId, variant, outcome: o }) => {
-            const data = {
-              status: o.status,
-              fillAt: o.fillAt === null ? null : new Date(o.fillAt * 1000),
-              fill: o.fill,
-              exitAt: o.exitAt === null ? null : new Date(o.exitAt * 1000),
-              exitPrice: o.exitPrice,
-              exitReason: o.exitReason,
-              r: o.r,
-              sessionsHeld: o.sessionsHeld,
-            };
-            return prisma.scorecardOutcome.upsert({
-              where: { chartSetupId_variant: { chartSetupId, variant } },
-              create: { chartSetupId, variant, ...data },
-              update: data,
-            });
-          }),
-        );
+        // No $transaction: it needs Neon's WebSocket, which timed out on this network while
+        // plain queries go over HTTPS. Each upsert is keyed and idempotent, so a run that
+        // stops halfway just rescores the rest next time.
+        for (const { chartSetupId, variant, outcome: o } of rows) {
+          const data = {
+            status: o.status,
+            fillAt: o.fillAt === null ? null : new Date(o.fillAt * 1000),
+            fill: o.fill,
+            exitAt: o.exitAt === null ? null : new Date(o.exitAt * 1000),
+            exitPrice: o.exitPrice,
+            exitReason: o.exitReason,
+            r: o.r,
+            sessionsHeld: o.sessionsHeld,
+          };
+          await prisma.scorecardOutcome.upsert({
+            where: { chartSetupId_variant: { chartSetupId, variant } },
+            create: { chartSetupId, variant, ...data },
+            update: data,
+          });
+        }
         log(`scorecard-score: upserted ${rows.length} outcomes`);
       },
       loadRuns: (sinceSession) => prisma.scorecardRun.findMany({ where: { sessionDate: { gte: sinceSession } } }),
@@ -101,6 +112,7 @@ async function main() {
       },
       send: (message) => sendDiscordNotification(message, "info"),
     });
+    await setSetting(LAST_SUMMARY_SETTING, latestClosedSession(startedAt));
     const p = snapshot.keptProgress;
     log(`scorecard-score: done session ${snapshot.sessionDate}; kept ${p.n}/${p.target} (${p.closed} closed); missed ${snapshot.missed.length}; last run ${snapshot.lastRun.status}`);
   } catch (e) {
