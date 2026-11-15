@@ -11,12 +11,15 @@
 //   node --env-file=.env --import tsx scripts/scorecard-score.mts
 import type { Prisma } from "@/generated/prisma/client";
 import { fetchAlpacaRange } from "@/lib/alpaca";
+import { reviewSetups } from "@/lib/chartAgent/review";
+import type { LogStatus } from "@/lib/chartAgent/logRows";
 import { CHART_RULE_VERSION } from "@/lib/chartAgent/types";
 import { prisma } from "@/lib/db";
 import { sendDiscordNotification } from "@/lib/notify/discord";
+import { applyPendingReviews } from "@/lib/scorecard/pendingReview";
 import { runScorecardNightly, type NightlyRow } from "@/lib/scorecard/nightly";
 import { latestClosedSession, summaryDue } from "@/lib/scorecard/summarySchedule";
-import { SCORECARD_SOURCE, type ExitReason, type ExitVariant, type Outcome, type OutcomeStatus } from "@/lib/scorecard/types";
+import { PENDING_BACKEND, SCORECARD_SOURCE, type ExitReason, type ExitVariant, type Outcome, type OutcomeStatus } from "@/lib/scorecard/types";
 import { getSetting, setSetting } from "@/lib/settings";
 
 const log = (m: string) => console.log(`[${new Date().toISOString()}] ${m}`);
@@ -53,9 +56,38 @@ async function loadRows(): Promise<NightlyRow[]> {
   return setups.map((s) => ({ ...s, outcomes: byId.get(s.id) ?? {} }));
 }
 
+// Reads the setups the cloud run logged as pending and writes the AI's decisions onto them.
+// Runs on every trigger, before the summary guard. No $transaction: sequential awaits.
+async function reviewPending() {
+  try {
+    const r = await applyPendingReviews({
+      now: () => Date.now(),
+      loadPending: async () => {
+        const rows = await prisma.chartSetup.findMany({
+          where: { source: SCORECARD_SOURCE, ruleVersion: CHART_RULE_VERSION, aiBackend: PENDING_BACKEND },
+          select: { id: true, runId: true, reviewInput: true },
+          orderBy: { id: "asc" },
+        });
+        return rows.map((x) => ({ id: x.id, runId: x.runId, reviewInput: x.reviewInput as unknown }));
+      },
+      review: reviewSetups,
+      saveRow: async ({ id, status, ...rest }) => {
+        await prisma.chartSetup.update({ where: { id }, data: { ...(status ? { status: status as LogStatus } : {}), ...rest } });
+      },
+      saveRunCounts: async (runId, c) => {
+        await prisma.scorecardRun.updateMany({ where: { runId }, data: c });
+      },
+    });
+    log(`scorecard-review: runs ${r.runs}, reviewed ${r.reviewed}, skipped ${r.skipped}, invalid ${r.invalid}`);
+  } catch (e) {
+    log(`scorecard-review ERROR ${String(e)}`);
+  }
+}
+
 async function main() {
   try {
     const startedAt = Date.now();
+    await reviewPending();
     const lastSent = await getSetting(LAST_SUMMARY_SETTING, "");
     if (!summaryDue(startedAt, lastSent)) {
       log(`scorecard-score: summary for ${lastSent} already sent, nothing due`);
