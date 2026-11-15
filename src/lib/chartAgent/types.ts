@@ -9,6 +9,8 @@ import type { Candle } from "@/lib/indicators";
 export const CHART_TOP_N = 20;
 /** Most setups shown on the panel. */
 export const CHART_MAX_SETUPS = 5;
+/** The reason a setup carries when the AI never read it. */
+export const UNREAD_REASON = "AI ไม่ได้อ่าน";
 /** Price bins of the previous-session volume profile. */
 export const CHART_PROFILE_BINS = 50;
 /** Share of volume inside the value area (VAH/VAL). */

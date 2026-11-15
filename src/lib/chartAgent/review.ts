@@ -15,7 +15,7 @@ import { aiBackend, aiOutageReason, callAgentJSON } from "@/lib/anthropic";
 import type { Candle } from "@/lib/indicators";
 import { RAW_WITHHELD_REASON, safeFailureReason } from "@/lib/scanAgent/annotate";
 import { etClock } from "@/lib/scanAgent/session";
-import { CHART_AI_BARS, type Setup } from "@/lib/chartAgent/types";
+import { CHART_AI_BARS, UNREAD_REASON, type Setup } from "@/lib/chartAgent/types";
 
 export type ReviewStatus = "kept" | "rejected" | "stripped" | "unread";
 
@@ -33,7 +33,6 @@ export interface ReviewItem {
 
 const STRIPPED_REASON = "ตัดออก: มีคำทำนาย";
 const NO_REASON = "AI ตัดออกโดยไม่ให้เหตุผลที่แสดงได้";
-const UNREAD_REASON = "AI ไม่ได้อ่าน";
 
 /**
  * What the chart prompt forbids that the advisor's guard does not catch:

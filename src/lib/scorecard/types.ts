@@ -30,6 +30,10 @@ export const SCORECARD_CONTROL_RUNS = 200;
 export const SCORECARD_SEED = 20260825;
 /** A setup with no bars at all this many days after its run is `no_data`. */
 export const SCORECARD_NO_DATA_DAYS = 15;
+/** `ChartSetup.aiBackend` of a row captured without AI, awaiting review on the owner's PC. */
+export const PENDING_BACKEND = "pending";
+/** A pending row older than this many days is stale. */
+export const PENDING_STALE_DAYS = 3;
 
 /**
  * 5 bps slippage on every fill and 1 bp round-turn commission on entry notional.

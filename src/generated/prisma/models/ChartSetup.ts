@@ -68,6 +68,7 @@ export type ChartSetupMinAggregateOutputType = {
   aiBackend: string | null
   source: string | null
   aiModel: string | null
+  reviewedAt: Date | null
 }
 
 export type ChartSetupMaxAggregateOutputType = {
@@ -90,6 +91,7 @@ export type ChartSetupMaxAggregateOutputType = {
   aiBackend: string | null
   source: string | null
   aiModel: string | null
+  reviewedAt: Date | null
 }
 
 export type ChartSetupCountAggregateOutputType = {
@@ -114,6 +116,8 @@ export type ChartSetupCountAggregateOutputType = {
   aiBackend: number
   source: number
   aiModel: number
+  reviewInput: number
+  reviewedAt: number
   _all: number
 }
 
@@ -158,6 +162,7 @@ export type ChartSetupMinAggregateInputType = {
   aiBackend?: true
   source?: true
   aiModel?: true
+  reviewedAt?: true
 }
 
 export type ChartSetupMaxAggregateInputType = {
@@ -180,6 +185,7 @@ export type ChartSetupMaxAggregateInputType = {
   aiBackend?: true
   source?: true
   aiModel?: true
+  reviewedAt?: true
 }
 
 export type ChartSetupCountAggregateInputType = {
@@ -204,6 +210,8 @@ export type ChartSetupCountAggregateInputType = {
   aiBackend?: true
   source?: true
   aiModel?: true
+  reviewInput?: true
+  reviewedAt?: true
   _all?: true
 }
 
@@ -315,6 +323,8 @@ export type ChartSetupGroupByOutputType = {
   aiBackend: string
   source: string
   aiModel: string | null
+  reviewInput: runtime.JsonValue | null
+  reviewedAt: Date | null
   _count: ChartSetupCountAggregateOutputType | null
   _avg: ChartSetupAvgAggregateOutputType | null
   _sum: ChartSetupSumAggregateOutputType | null
@@ -362,6 +372,8 @@ export type ChartSetupWhereInput = {
   aiBackend?: Prisma.StringFilter<"ChartSetup"> | string
   source?: Prisma.StringFilter<"ChartSetup"> | string
   aiModel?: Prisma.StringNullableFilter<"ChartSetup"> | string | null
+  reviewInput?: Prisma.JsonNullableFilter<"ChartSetup">
+  reviewedAt?: Prisma.DateTimeNullableFilter<"ChartSetup"> | Date | string | null
 }
 
 export type ChartSetupOrderByWithRelationInput = {
@@ -386,6 +398,8 @@ export type ChartSetupOrderByWithRelationInput = {
   aiBackend?: Prisma.SortOrder
   source?: Prisma.SortOrder
   aiModel?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewInput?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
 }
 
 export type ChartSetupWhereUniqueInput = Prisma.AtLeast<{
@@ -413,6 +427,8 @@ export type ChartSetupWhereUniqueInput = Prisma.AtLeast<{
   aiBackend?: Prisma.StringFilter<"ChartSetup"> | string
   source?: Prisma.StringFilter<"ChartSetup"> | string
   aiModel?: Prisma.StringNullableFilter<"ChartSetup"> | string | null
+  reviewInput?: Prisma.JsonNullableFilter<"ChartSetup">
+  reviewedAt?: Prisma.DateTimeNullableFilter<"ChartSetup"> | Date | string | null
 }, "id">
 
 export type ChartSetupOrderByWithAggregationInput = {
@@ -437,6 +453,8 @@ export type ChartSetupOrderByWithAggregationInput = {
   aiBackend?: Prisma.SortOrder
   source?: Prisma.SortOrder
   aiModel?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewInput?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.ChartSetupCountOrderByAggregateInput
   _avg?: Prisma.ChartSetupAvgOrderByAggregateInput
   _max?: Prisma.ChartSetupMaxOrderByAggregateInput
@@ -469,6 +487,8 @@ export type ChartSetupScalarWhereWithAggregatesInput = {
   aiBackend?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
   source?: Prisma.StringWithAggregatesFilter<"ChartSetup"> | string
   aiModel?: Prisma.StringNullableWithAggregatesFilter<"ChartSetup"> | string | null
+  reviewInput?: Prisma.JsonNullableWithAggregatesFilter<"ChartSetup">
+  reviewedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ChartSetup"> | Date | string | null
 }
 
 export type ChartSetupCreateInput = {
@@ -492,6 +512,8 @@ export type ChartSetupCreateInput = {
   aiBackend: string
   source?: string
   aiModel?: string | null
+  reviewInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reviewedAt?: Date | string | null
 }
 
 export type ChartSetupUncheckedCreateInput = {
@@ -516,6 +538,8 @@ export type ChartSetupUncheckedCreateInput = {
   aiBackend: string
   source?: string
   aiModel?: string | null
+  reviewInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reviewedAt?: Date | string | null
 }
 
 export type ChartSetupUpdateInput = {
@@ -539,6 +563,8 @@ export type ChartSetupUpdateInput = {
   aiBackend?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
   aiModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type ChartSetupUncheckedUpdateInput = {
@@ -563,6 +589,8 @@ export type ChartSetupUncheckedUpdateInput = {
   aiBackend?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
   aiModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type ChartSetupCreateManyInput = {
@@ -587,6 +615,8 @@ export type ChartSetupCreateManyInput = {
   aiBackend: string
   source?: string
   aiModel?: string | null
+  reviewInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reviewedAt?: Date | string | null
 }
 
 export type ChartSetupUpdateManyMutationInput = {
@@ -610,6 +640,8 @@ export type ChartSetupUpdateManyMutationInput = {
   aiBackend?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
   aiModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type ChartSetupUncheckedUpdateManyInput = {
@@ -634,6 +666,8 @@ export type ChartSetupUncheckedUpdateManyInput = {
   aiBackend?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
   aiModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewInput?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type StringNullableListFilter<$PrismaModel = never> = {
@@ -666,6 +700,8 @@ export type ChartSetupCountOrderByAggregateInput = {
   aiBackend?: Prisma.SortOrder
   source?: Prisma.SortOrder
   aiModel?: Prisma.SortOrder
+  reviewInput?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
 }
 
 export type ChartSetupAvgOrderByAggregateInput = {
@@ -698,6 +734,7 @@ export type ChartSetupMaxOrderByAggregateInput = {
   aiBackend?: Prisma.SortOrder
   source?: Prisma.SortOrder
   aiModel?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
 }
 
 export type ChartSetupMinOrderByAggregateInput = {
@@ -720,6 +757,7 @@ export type ChartSetupMinOrderByAggregateInput = {
   aiBackend?: Prisma.SortOrder
   source?: Prisma.SortOrder
   aiModel?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
 }
 
 export type ChartSetupSumOrderByAggregateInput = {
@@ -765,6 +803,8 @@ export type ChartSetupSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   aiBackend?: boolean
   source?: boolean
   aiModel?: boolean
+  reviewInput?: boolean
+  reviewedAt?: boolean
 }, ExtArgs["result"]["chartSetup"]>
 
 export type ChartSetupSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -789,6 +829,8 @@ export type ChartSetupSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   aiBackend?: boolean
   source?: boolean
   aiModel?: boolean
+  reviewInput?: boolean
+  reviewedAt?: boolean
 }, ExtArgs["result"]["chartSetup"]>
 
 export type ChartSetupSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -813,6 +855,8 @@ export type ChartSetupSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   aiBackend?: boolean
   source?: boolean
   aiModel?: boolean
+  reviewInput?: boolean
+  reviewedAt?: boolean
 }, ExtArgs["result"]["chartSetup"]>
 
 export type ChartSetupSelectScalar = {
@@ -837,9 +881,11 @@ export type ChartSetupSelectScalar = {
   aiBackend?: boolean
   source?: boolean
   aiModel?: boolean
+  reviewInput?: boolean
+  reviewedAt?: boolean
 }
 
-export type ChartSetupOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "runId" | "ruleVersion" | "ticker" | "status" | "dataAsOf" | "entry" | "stop" | "t1" | "t2" | "r1" | "r2" | "sweptLevels" | "sweepBarAt" | "levels" | "aiReading" | "aiRejectReason" | "aiBackend" | "source" | "aiModel", ExtArgs["result"]["chartSetup"]>
+export type ChartSetupOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "createdAt" | "runId" | "ruleVersion" | "ticker" | "status" | "dataAsOf" | "entry" | "stop" | "t1" | "t2" | "r1" | "r2" | "sweptLevels" | "sweepBarAt" | "levels" | "aiReading" | "aiRejectReason" | "aiBackend" | "source" | "aiModel" | "reviewInput" | "reviewedAt", ExtArgs["result"]["chartSetup"]>
 
 export type $ChartSetupPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ChartSetup"
@@ -888,6 +934,11 @@ export type $ChartSetupPayload<ExtArgs extends runtime.Types.Extensions.Internal
      * Resolved model id behind the review call (e.g. claude-sonnet-…); null when unknown or no AI call.
      */
     aiModel: string | null
+    /**
+     * The ReviewItem the AI is shown, frozen at capture, plus its input order; only on captured rows.
+     */
+    reviewInput: runtime.JsonValue | null
+    reviewedAt: Date | null
   }, ExtArgs["result"]["chartSetup"]>
   composites: {}
 }
@@ -1332,6 +1383,8 @@ export interface ChartSetupFieldRefs {
   readonly aiBackend: Prisma.FieldRef<"ChartSetup", 'String'>
   readonly source: Prisma.FieldRef<"ChartSetup", 'String'>
   readonly aiModel: Prisma.FieldRef<"ChartSetup", 'String'>
+  readonly reviewInput: Prisma.FieldRef<"ChartSetup", 'Json'>
+  readonly reviewedAt: Prisma.FieldRef<"ChartSetup", 'DateTime'>
 }
     
 

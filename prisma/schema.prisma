@@ -428,6 +428,9 @@ model ChartSetup {
   source         String   @default("button")
   /// Resolved model id behind the review call (e.g. claude-sonnet-…); null when unknown or no AI call.
   aiModel        String?
+  /// The ReviewItem the AI is shown, frozen at capture, plus its input order; only on captured rows.
+  reviewInput    Json?
+  reviewedAt     DateTime?
 
   @@index([createdAt])
   @@index([ticker])

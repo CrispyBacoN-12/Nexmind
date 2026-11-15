@@ -14,7 +14,8 @@ import { etDate, marketPhase, sessionDates } from "@/lib/scanAgent/session";
 import type { MarketPhase } from "@/lib/scanAgent/types";
 import { splitSessions } from "./bars";
 import { computeLevels } from "./levels";
-import { toLogRows, type ChartSetupRow, type LogStatus } from "./logRows";
+import { decideSetups } from "./decide";
+import { toLogRows, type ChartSetupRow } from "./logRows";
 import type { Review, reviewSetups } from "./review";
 import { findSetup } from "./setup";
 import {
@@ -71,7 +72,6 @@ export type ChartAgentResult =
 
 const NO_INTRADAY = "ไม่มีข้อมูลแท่ง 5 นาที";
 const NO_BARS_FOR_TICKER = "ไม่มีแท่งของตัวนี้";
-const UNREAD_REASON = "AI ไม่ได้อ่าน";
 /** A superseded or abandoned run: the page that asked is no longer waiting. */
 const CANCELLED = "ยกเลิกแล้ว";
 
@@ -182,22 +182,17 @@ export async function runChartAgent(
   if (deps.signal?.aborted) return { ok: false, error: CANCELLED };
 
   // 5. Decide: kept/unread are eligible, the first CHART_MAX_SETUPS are shown.
+  const decided = decideSetups(found.map((f) => f.setup), reviews);
   const shown: ShownSetup[] = [];
   const rejected: { ticker: string; review: Review }[] = [];
-  const decided: { setup: Setup; review: Review; status: LogStatus }[] = [];
-  for (const { setup, split } of found) {
-    const review: Review =
-      reviews.get(setup.ticker) ?? { status: "unread", reading: null, reason: UNREAD_REASON };
-    if (review.status === "rejected" || review.status === "stripped") {
-      rejected.push({ ticker: setup.ticker, review });
-      decided.push({ setup, review, status: review.status === "rejected" ? "ai_rejected" : "guard_stripped" });
-    } else if (shown.length < CHART_MAX_SETUPS) {
+  decided.forEach(({ setup, review, status }, i) => {
+    if (status === "shown") {
+      const { split } = found[i];
       shown.push({ setup, review, bars: [...split.previous, ...split.premarket, ...split.regular] });
-      decided.push({ setup, review, status: "shown" });
-    } else {
-      decided.push({ setup, review, status: "capped" });
+    } else if (status === "ai_rejected" || status === "guard_stripped") {
+      rejected.push({ ticker: setup.ticker, review });
     }
-  }
+  });
 
   // 6. Log every setup found. A failure here is a note, never a failed run.
   let logNote: string | null = null;
