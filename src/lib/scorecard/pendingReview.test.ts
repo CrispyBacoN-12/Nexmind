@@ -95,6 +95,45 @@ test("invalid reviewInput is finalized as unread, not left pending", async () =>
   assert.equal(u?.reviewedAt.getTime(), NOW);
   assert.ok(rec.updates.some((x) => x.id === 1 && x.aiBackend === "claude-cli"));
   assert.deepEqual(rec.calls[0], ["AAA"]);
+  assert.deepEqual(rec.counts, [{ runId: "A", c: { kept: 1, vetoed: 0, stripped: 0, unread: 1, aiBackend: "claude-cli", aiModel: "m1" } }]);
+});
+
+test("an all-invalid run still writes counts, all unread", async () => {
+  const { deps, rec } = make([{ id: 9, runId: "A", reviewInput: null }], answerAll);
+  const out = await applyPendingReviews(deps);
+  assert.equal(rec.calls.length, 0);
+  assert.equal(out.invalid, 1);
+  assert.deepEqual(rec.counts, [{ runId: "A", c: { kept: 0, vetoed: 0, stripped: 0, unread: 1, aiBackend: "review_input_invalid", aiModel: null } }]);
+});
+
+test("a save that fails midway is repaired by re-reviewing the whole run", async () => {
+  const rows = ["T0", "T1", "T2", "T3", "T4", "T5", "T6"].map((t, i) => row(i + 1, "A", t, i));
+  const { deps, rec } = make(rows, answerAll);
+  let n = 0;
+  const realSave = deps.saveRow;
+  deps.saveRow = async (u) => { if (++n === 4) throw new Error("net"); await realSave(u); };
+  const first = await applyPendingReviews(deps);
+  assert.equal(first.skipped, 1);
+  assert.equal(rec.counts.length, 0);
+  deps.saveRow = realSave;
+  rec.updates.length = 0;
+  rec.calls.length = 0;
+  const second = await applyPendingReviews(deps);
+  assert.deepEqual(rec.calls[0], ["T0", "T1", "T2", "T3", "T4", "T5", "T6"]);
+  assert.equal(second.reviewed, 7);
+  assert.deepEqual(rec.updates.map((u) => u.status), ["shown", "shown", "shown", "shown", "shown", "capped", "capped"]);
+  assert.equal(rec.counts[0].c.kept, 7);
+});
+
+test("one run's save failure does not stop the next run", async () => {
+  const { deps, rec } = make([row(1, "A", "AAA", 0), row(2, "B", "BBB", 0)], answerAll);
+  const realSave = deps.saveRow;
+  deps.saveRow = async (u) => { if (u.id === 1) throw new Error("net"); await realSave(u); };
+  const out = await applyPendingReviews(deps);
+  assert.equal(out.skipped, 1);
+  assert.equal(out.reviewed, 1);
+  assert.match(out.note ?? "", /A/);
+  assert.deepEqual(rec.counts.map((c) => c.runId), ["B"]);
 });
 
 test("a ticker missing from the AI answer is finalized as unread", async () => {

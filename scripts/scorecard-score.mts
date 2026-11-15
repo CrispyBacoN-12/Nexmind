@@ -62,9 +62,17 @@ async function reviewPending() {
   try {
     const r = await applyPendingReviews({
       now: () => Date.now(),
+      // The run is the unit: every row of any run that still has a pending row, including rows
+      // an earlier partial save already finalized, so the whole run is re-reviewed from its inputs.
       loadPending: async () => {
-        const rows = await prisma.chartSetup.findMany({
+        const open = await prisma.chartSetup.findMany({
           where: { source: SCORECARD_SOURCE, ruleVersion: CHART_RULE_VERSION, aiBackend: PENDING_BACKEND },
+          select: { runId: true },
+          distinct: ["runId"],
+        });
+        if (open.length === 0) return [];
+        const rows = await prisma.chartSetup.findMany({
+          where: { source: SCORECARD_SOURCE, ruleVersion: CHART_RULE_VERSION, runId: { in: open.map((o) => o.runId) } },
           select: { id: true, runId: true, reviewInput: true },
           orderBy: { id: "asc" },
         });
