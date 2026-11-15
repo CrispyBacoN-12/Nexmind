@@ -9,7 +9,7 @@ import type { Setup } from "@/lib/chartAgent/types";
 import type { ChartSetupRow } from "@/lib/chartAgent/logRows";
 import { runChartAgent } from "@/lib/chartAgent/runChartAgent";
 import type { ScanResult } from "@/lib/scanAgent/types";
-import { makeRecorder, parseReviewInput } from "./capture";
+import { makeRecorder, parseReviewInput, sanitizeConsole, SUPPRESSED_TAG } from "./capture";
 import { runScorecardDaily, type ScorecardRunInput } from "./runDaily";
 import { PENDING_BACKEND } from "./types";
 
@@ -124,4 +124,21 @@ test("a capture run through runScorecardDaily logs pending rows", async () => {
   assert.equal(logged[0].aiReading, null);
   assert.equal((logged[0].reviewInput as { order: number }).order, 0);
   assert.equal(runs[0].aiBackend, "pending");
+});
+
+test("sanitizeConsole makes warn and error print only the fixed tag", () => {
+  const origWarn = console.warn;
+  const origError = console.error;
+  const seen: unknown[][] = [];
+  console.warn = (...a: unknown[]) => void seen.push(a);
+  console.error = (...a: unknown[]) => void seen.push(a);
+  try {
+    sanitizeConsole();
+    console.warn("secret", new Error("secret"));
+    console.error("secret");
+  } finally {
+    console.warn = origWarn;
+    console.error = origError;
+  }
+  assert.deepEqual(seen, [[SUPPRESSED_TAG], [SUPPRESSED_TAG]]);
 });

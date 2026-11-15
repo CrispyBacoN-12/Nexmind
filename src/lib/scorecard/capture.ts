@@ -48,3 +48,17 @@ export function parseReviewInput(json: unknown): ReviewInput | null {
   if (!isObj(setup.levels) || !Object.values(setup.levels).every(isNumOrNull)) return null;
   return json as unknown as ReviewInput;
 }
+
+export const SUPPRESSED_TAG = "scorecard-capture: suppressed library message";
+
+/**
+ * The repo's Actions logs are public, and shared libraries print raw error text through
+ * console.warn / console.error. The capture script calls this first so those calls print
+ * only a fixed tag. console.log is left alone: the script's own lines use it.
+ */
+export function sanitizeConsole(): void {
+  const warn = console.warn.bind(console);
+  const error = console.error.bind(console);
+  console.warn = () => warn(SUPPRESSED_TAG);
+  console.error = () => error(SUPPRESSED_TAG);
+}

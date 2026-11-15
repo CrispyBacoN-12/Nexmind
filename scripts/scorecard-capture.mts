@@ -25,12 +25,16 @@ import { sendDiscordNotification } from "@/lib/notify/discord";
 import { fetchEconEvents } from "@/lib/scanAgent/econ";
 import { runScanAgent } from "@/lib/scanAgent/runScanAgent";
 import { fetchTradingViewRows } from "@/lib/scanAgent/tradingview";
-import { makeRecorder } from "@/lib/scorecard/capture";
+import { makeRecorder, sanitizeConsole } from "@/lib/scorecard/capture";
 import { etDayBoundsMs } from "@/lib/scorecard/etDay";
+import { etClock } from "@/lib/scanAgent/session";
 import { runScorecardDaily } from "@/lib/scorecard/runDaily";
 import { SCORECARD_SOURCE } from "@/lib/scorecard/types";
 import { CHART_TOP_N } from "@/lib/chartAgent/types";
 import type { Interval, Range } from "@/lib/yahoo";
+
+// The repo's Actions logs are public: library console.warn/error calls carry raw error text.
+sanitizeConsole();
 
 const CAT_SCAN = "สแกนไม่สำเร็จ";
 const CAT_CHART = "ดึงกราฟไม่สำเร็จ";
@@ -82,6 +86,7 @@ async function capture() {
   let scanBad = false;
   let chartBad = false;
   let chartLogBad = false;
+  let recordBad = false;
   try {
     const result = await runScorecardDaily({
       now: () => Date.now(),
@@ -137,23 +142,29 @@ async function capture() {
         }
       },
       record: async (run) => {
-        await prisma.scorecardRun.create({ data: run });
+        try {
+          await prisma.scorecardRun.create({ data: run });
+        } catch (e) {
+          recordBad = true;
+          throw e;
+        }
       },
       newRunId: () => randomUUID(),
     });
     // Never print result.note: it can carry a raw error message.
     log(`scorecard-capture: ${result.action} session ${result.sessionDate}`);
     if (result.action === "failed") {
-      const category = scanBad ? CAT_SCAN : chartBad ? CAT_CHART : chartLogBad || result.note?.includes("บันทึก") ? CAT_DB : CAT_UNKNOWN;
+      const category = scanBad ? CAT_SCAN : chartBad ? CAT_CHART : chartLogBad || recordBad ? CAT_DB : CAT_UNKNOWN;
       log(`scorecard-capture: failed (${category}) session ${result.sessionDate}`);
       await sendDiscordNotification(`scorecard: รอบเก็บข้อมูล ${result.sessionDate} ล้มเหลว: ${category}`, "warning");
       process.exitCode = 1;
     }
   } catch {
-    log(`scorecard-capture: failed (${CAT_UNKNOWN})`);
-    await sendDiscordNotification(`scorecard: scripts/scorecard-capture.mts พัง: ${CAT_UNKNOWN}`, "warning");
+    const sessionDate = etClock(Math.floor(Date.now() / 1000)).date;
+    log(`scorecard-capture: failed (${CAT_UNKNOWN}) session ${sessionDate}`);
+    await sendDiscordNotification(`scorecard: scripts/scorecard-capture.mts พัง: ${CAT_UNKNOWN} (${sessionDate})`, "warning");
     process.exitCode = 1;
   }
 }
 
-(process.argv.includes("--dry-run") ? dryRun() : capture()).finally(() => prisma.$disconnect());
+(process.argv.includes("--dry-run") ? dryRun() : capture()).finally(() => prisma.$disconnect().catch(() => {}));
