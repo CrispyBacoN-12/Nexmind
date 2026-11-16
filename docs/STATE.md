@@ -5,7 +5,7 @@ Auto-loaded every session via `CLAUDE.md`. This file is the current bar, not the
 deep evidence is in `docs/quant/`, reasoning is in commit bodies, and the full pre-2026-10-01
 text of this file (every desk-era entry, verbatim) is `docs/quant/2026-10-01-state-archive.md`.
 
-_Last verified: `npm test` on **2026-11-16** (branch `scorecard-cloud`); the Task Scheduler and the scorecard tables on **2026-11-03**; the `ChartSetup` row count on **2026-11-01**; the other §2 rows on **2026-10-01**._
+_Last verified: `npm test` on **2026-11-17** (master, after merging `scorecard-cloud`); the Task Scheduler and the scorecard tables on **2026-11-03**; the `ChartSetup` row count on **2026-11-01**; the other §2 rows on **2026-10-01**._
 
 ---
 
@@ -64,11 +64,11 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Branch | `master` at `d0323ee` contains agents #2, #3 (with the stop cluster rule) and #4 (the scorecard). It was fast-forwarded from `scorecard` and pushed 2026-11-03, the Vercel deploy succeeded, and the branch was deleted. Every push auto-deploys Vercel production |
-| Tests | `npm test` **1261 pass / 0 fail** (2026-11-16, branch `scorecard-cloud`) |
+| Tests | `npm test` **1262 pass / 0 fail** (2026-11-17, `scorecard-cloud` merged to master) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB. Columns `source` (default `"button"`) and `aiModel` were added 2026-11-03 |
 | Scorecard tables | `ScorecardRun`, `ScorecardOutcome`, `ScorecardSnapshot` were created 2026-11-03 on Neon with additive SQL over HTTPS. Port 5432 is blocked on this network, so `prisma db push` cannot connect (§5). One snapshot exists: `replay` / `sweep-v1` |
-| Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). On branch `scorecard-cloud` it is a **fallback capture**: no AI, its rows are logged pending like the cloud's; the GitHub Actions workflow is the primary capture, and a session claim (`Setting` key `scorecard:claim:<date>`, stale after 20 minutes) stops the two from logging one session twice. **`NEXMIND Scorecard Score` Ready** (owner, 2026-11-06: fires on wake and logon, each with a 2-minute delay, plus a non-waking 07:00 Tue-Sat and a non-waking hourly retry added 2026-11-10, because two minutes after a wake the network was down every time; it works once per closed session, tracked in `Setting` key `scorecard:lastSummarySession`, and a failed run retries on the next trigger). `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03). `Scorecard Run` has `WakeToRun` on (owner, 2026-11-05), but it did not wake the machine for 21:30-22:30 on 2026-11-06. The power plan allows wake timers on AC only, so a laptop on battery or a shut-down machine misses the run |
-| GitHub Actions | `.github/workflows/scorecard-capture.yml` (branch `scorecard-cloud`, not yet merged or run): cron `*/15 14-16 * * 1-5` UTC, plus `workflow_dispatch` with a `dry_run` input. The first step keeps only Mon-Fri 10:30-11:29 America/New_York and otherwise skips with success. Runs `scripts/scorecard-capture.mts`; no AI, no Claude CLI. Secrets (names only): `DATABASE_URL` (already set), `ALPACA_KEY`, `ALPACA_SECRET`, `DISCORD_WEBHOOK_URL`, optional `FINNHUB_API_KEY`, `SEC_USER_AGENT` |
+| Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). Since 2026-11-17 (merged) it is a **fallback capture**: no AI, its rows are logged pending like the cloud's; the GitHub Actions workflow is the primary capture, and a session claim (`Setting` key `scorecard:claim:<date>`, stale after 20 minutes) stops the two from logging one session twice. **`NEXMIND Scorecard Score` Ready** (owner, 2026-11-06: fires on wake and logon, each with a 2-minute delay, plus a non-waking 07:00 Tue-Sat and a non-waking hourly retry added 2026-11-10, because two minutes after a wake the network was down every time; it works once per closed session, tracked in `Setting` key `scorecard:lastSummarySession`, and a failed run retries on the next trigger). On every trigger it first has the AI read the pending rows; when that finalized rows and no summary is due, it rescores and saves the live snapshot without Discord (the page updates the same hour; a failed refresh is not retried until the next summary). The next summary still lists what such a refresh closed: it keeps the last summary's bar cutoff in `Setting` key `scorecard:lastSummaryCutoffSec` and lists hold closures whose `exitAt` is after it. `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03). `Scorecard Run` has `WakeToRun` on (owner, 2026-11-05), but it did not wake the machine for 21:30-22:30 on 2026-11-06. The power plan allows wake timers on AC only, so a laptop on battery or a shut-down machine misses the run |
+| GitHub Actions | `.github/workflows/scorecard-capture.yml` (merged and pushed 2026-11-17; not yet run on GitHub until the owner sets the secrets): cron `*/15 14-16 * * 1-5` UTC, plus `workflow_dispatch` with a `dry_run` input. The first step keeps only Mon-Fri 10:30-11:29 America/New_York and otherwise skips with success. Runs `scripts/scorecard-capture.mts`; no AI, no Claude CLI. Secrets (names only): `DATABASE_URL` (already set), `ALPACA_KEY`, `ALPACA_SECRET`, `DISCORD_WEBHOOK_URL`, optional `FINNHUB_API_KEY`, `SEC_USER_AGENT` |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
 | Desk #11 (archive) | `trend-pullback`, status `active` but unscheduled. 3 legacy open paper trades (KO, AZO, XOM); 45 closed, cumulative **−$358.98** |
@@ -89,7 +89,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-11-16: Scorecard cloud capture (branch `scorecard-cloud`).** The nightly capture no longer needs the PC.
+- **2026-11-16: Scorecard cloud capture (branch `scorecard-cloud`, merged + pushed 2026-11-17).** The nightly capture no longer needs the PC.
   - **Capture (cloud, no AI):** `scripts/scorecard-capture.mts` runs on GitHub Actions in the 10:30-11:29 ET window and
     writes `ChartSetup` rows (`source="scheduled"`) with `aiBackend "pending"`.
   - **Review (PC, AI):** the local scorecard jobs later review the pending rows and score them, so the verdict waits
@@ -364,7 +364,7 @@ There are no open research directions; the owner closed the search. Work items:
 ## 6. Blocked on the user (still open)
 
 - **AI features need `claude login`.** The CLI OAuth expired; `/scan` notes and the chart agent's readings show as unavailable until then.
-- **Cloud capture (branch `scorecard-cloud`):** `.github/workflows/scorecard-capture.yml` exists; it runs no AI.
+- **Cloud capture (merged 2026-11-17):** `.github/workflows/scorecard-capture.yml` exists; it runs no AI.
   - No Claude token is on GitHub, by owner decision: the AI review runs only on the PC (`scorecard-score`).
   - Secrets the owner must set in Actions before it can capture (names only; do not handle the values):
     `ALPACA_KEY`, `ALPACA_SECRET`, `DISCORD_WEBHOOK_URL`, `SEC_USER_AGENT`, optional `FINNHUB_API_KEY`.

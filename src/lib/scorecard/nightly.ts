@@ -91,7 +91,17 @@ export interface NightlyDeps {
   /** Must refuse (throw) when a verdict already exists. */
   saveVerdict(data: AiVerdict): Promise<void>;
   send(message: string): Promise<void>;
+  /**
+   * The previous summary's cutoff (epoch seconds, see `nightlyCutoffSec`), or null/absent when
+   * none is known. Hold closures with exitAt after it are listed as closed overnight even when
+   * a silent refresh between summaries scored them. Every closure a run finds has exitAt at or
+   * before that run's cutoff, so the previous summary's own closures are never listed twice.
+   */
+  closedSinceSec?: number | null;
 }
+
+/** The bar cutoff (epoch seconds) of a nightly run at `nowMs`: SIP bars are SIP_DELAY_MS late. */
+export const nightlyCutoffSec = (nowMs: number) => Math.floor((nowMs - SIP_DELAY_MS) / 1000);
 
 export type StatsGroup = Group | "afterVerdict";
 
@@ -369,7 +379,7 @@ const toTrade = (r: NightlyRow, hold: Outcome, bars: Candle[], cutoffSec: number
 
 export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapshot> {
   const nowMs = deps.now();
-  const cutoffSec = Math.floor((nowMs - SIP_DELAY_MS) / 1000);
+  const cutoffSec = nightlyCutoffSec(nowMs);
   const rows = [...(await deps.loadRows())].sort(order);
 
   // 1. Score what is missing or still open. Terminal outcomes are never rescored.
@@ -649,9 +659,15 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   };
   await deps.saveLive(snapshot);
 
-  // 5. Discord.
+  // 5. Discord. Closed overnight: what this run closed, plus what a silent refresh closed
+  // after the previous summary (its exitAt is past that summary's cutoff).
+  const since = deps.closedSinceSec ?? null;
+  const closedSinceSummary = (r: NightlyRow) => {
+    const h = holdOf(r);
+    return since !== null && h.status === "closed" && h.exitAt !== null && h.exitAt > since;
+  };
   const closedOvernight: ClosedLine[] = liveRows
-    .filter((r) => closedTonight.has(r.id))
+    .filter((r) => closedTonight.has(r.id) || closedSinceSummary(r))
     .map((r) => ({ ticker: r.ticker, group: groupOfRow(r), r: holdOf(r).r as number, reason: holdOf(r).exitReason! }));
   const openNow: OpenLine[] = liveRows
     .filter((r) => holdOf(r).status === "open" && holdOf(r).fill !== null)

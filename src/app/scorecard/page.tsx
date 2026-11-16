@@ -214,8 +214,11 @@ function AiCard({ live, verdict: verdictSnap, startDate }: { live: Snap<LiveSnap
  * A fixed category for a failed run; the raw error text stays in logs and Discord. A failed
  * run with setups logged got through the scan and chart agent, so its write failed.
  */
+// Pending rows (captured, not yet read by the AI) were saved too; an older snapshot has no `pending`.
+const capturedOf = (r: LiveSnapshot["lastRun"]) => r.setups + (r.pending ?? 0);
+
 function failureCategory(r: LiveSnapshot["lastRun"]): string {
-  return r.setups > 0 ? "บันทึกไม่สำเร็จ" : "รอบล้มเหลว";
+  return capturedOf(r) > 0 ? "บันทึกไม่สำเร็จ" : "รอบล้มเหลว";
 }
 
 function RunStatus({ live }: { live: LiveSnapshot }) {
@@ -224,7 +227,9 @@ function RunStatus({ live }: { live: LiveSnapshot }) {
     <div className="flex flex-wrap items-center gap-2 text-xs text-(--color-muted)">
       <span>
         รอบอัตโนมัติล่าสุด {r.sessionDate}: {RUN_STATUS_LABEL[r.status] ?? r.status}
-        {r.status === "ran" ? ` · ${r.setups} setup (เก็บ ${r.kept} ทิ้ง ${r.vetoed} ตัด ${r.stripped} ยังไม่อ่าน ${r.unread})` : ""}
+        {r.status === "ran"
+          ? ` · ${capturedOf(r)} setup (เก็บ ${r.kept} ทิ้ง ${r.vetoed} ตัด ${r.stripped} ยังไม่อ่าน ${r.unread}${(r.pending ?? 0) > 0 ? ` รอ AI อ่าน ${r.pending}` : ""})`
+          : ""}
       </span>
       {r.aiDown && <Badge tone="warning">AI ไม่ตอบ: ทุก setup ในรอบนี้ยังไม่ได้อ่าน</Badge>}
       {r.error && <Badge tone="negative">{failureCategory(r)}</Badge>}

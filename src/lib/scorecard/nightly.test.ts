@@ -626,3 +626,29 @@ test("F8: last night's pending rows are counted apart and shown on the setups li
   assert.equal(snap.lastRun.aiDown, false);
   assert.equal(rec.sent[0].split("\n")[1],"setup เมื่อคืน: 3 ตัว (รอ AI อ่าน 2) · AI เก็บ 1 · AI ตัดทิ้ง 0");
 });
+
+test("closures a silent refresh scored after the last summary still reach the next summary's closed line", async () => {
+  // Both rows were closed by an earlier run (stored closed); tonight scores nothing.
+  const exitAt = etEpoch("2026-11-02", "11:00");
+  const early = row({ id: 1, ticker: "OLD", outcomes: { hold: closedOutcome({ r: -1, exitReason: "stop", exitAt: etEpoch("2026-10-30", "11:00") }), sameDay: closedOutcome() } });
+  const late = row({ id: 2, ticker: "NEW", outcomes: { hold: closedOutcome({ r: 1, exitReason: "t1", exitAt }), sameDay: closedOutcome() } });
+  const closedLine = (m: string) => m.split("\n").find((l) => l.startsWith("ปิดแล้ว:"));
+
+  // The previous summary's cutoff is before NEW's exit (a same-hour refresh closed it): listed.
+  const since = deps({ nowMs: NOV3, rows: [early, late] });
+  since.deps.closedSinceSec = exitAt - 1;
+  await runScorecardNightly(since.deps);
+  assert.equal(since.rec.saved.length, 0);
+  assert.equal(closedLine(since.rec.sent[0]), "ปิดแล้ว: NEW +1.00R (ถึง T1)");
+
+  // The previous summary already covered the exit: not listed again.
+  const covered = deps({ nowMs: NOV3, rows: [early, late] });
+  covered.deps.closedSinceSec = exitAt;
+  await runScorecardNightly(covered.deps);
+  assert.equal(closedLine(covered.rec.sent[0]), "ปิดแล้ว: —");
+
+  // No stored cutoff (first summary): only tonight's own closures, as before.
+  const none = deps({ nowMs: NOV3, rows: [early, late] });
+  await runScorecardNightly(none.deps);
+  assert.equal(closedLine(none.rec.sent[0]), "ปิดแล้ว: —");
+});

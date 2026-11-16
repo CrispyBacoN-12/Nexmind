@@ -21,7 +21,7 @@ import { CHART_RULE_VERSION } from "@/lib/chartAgent/types";
 import { prisma } from "@/lib/db";
 import { sendDiscordNotification } from "@/lib/notify/discord";
 import { applyPendingReviews } from "@/lib/scorecard/pendingReview";
-import { runScorecardNightly, type NightlyDeps, type NightlyRow } from "@/lib/scorecard/nightly";
+import { nightlyCutoffSec, runScorecardNightly, type NightlyDeps, type NightlyRow } from "@/lib/scorecard/nightly";
 import { latestClosedSession, scoreAction } from "@/lib/scorecard/summarySchedule";
 import { PENDING_BACKEND, SCORECARD_SOURCE, type ExitReason, type ExitVariant, type Outcome, type OutcomeStatus } from "@/lib/scorecard/types";
 import { getSetting, setSetting } from "@/lib/settings";
@@ -33,6 +33,8 @@ const json = (x: unknown) => x as Prisma.InputJsonValue;
 const VERDICT_KEY = { kind: "ai-verdict", ruleVersion: CHART_RULE_VERSION };
 const LIVE_KEY = { kind: "live", ruleVersion: CHART_RULE_VERSION };
 const LAST_SUMMARY_SETTING = "scorecard:lastSummarySession";
+// The bar cutoff of the last summary sent, so the next one also lists what a silent refresh closed.
+const LAST_SUMMARY_CUTOFF_SETTING = "scorecard:lastSummaryCutoffSec";
 
 async function loadRows(): Promise<NightlyRow[]> {
   const setups = await prisma.chartSetup.findMany({
@@ -100,7 +102,7 @@ async function reviewPending(): Promise<number> {
 }
 
 // The real I/O of runScorecardNightly; `send` is Discord for the summary, a no-op for a refresh.
-const nightlyDeps = (send: NightlyDeps["send"]): NightlyDeps => ({
+const nightlyDeps = (send: NightlyDeps["send"], closedSinceSec: number | null = null): NightlyDeps => ({
   now: () => Date.now(),
   loadRows,
   fetchBars: async (tickers, fromSec, toSec) => {
@@ -150,6 +152,7 @@ const nightlyDeps = (send: NightlyDeps["send"]): NightlyDeps => ({
     log(`scorecard-score: AI verdict frozen: n ${data.n}, meanR ${data.meanR.toFixed(4)}, p95 ${data.controlP95.toFixed(4)}, pass ${data.pass}`);
   },
   send,
+  closedSinceSec,
 });
 
 async function main() {
@@ -164,8 +167,15 @@ async function main() {
     }
     const summary = action === "summary";
     if (!summary) log(`scorecard-score: summary for ${lastSent} already sent; review finalized ${finalized} rows, refreshing the live snapshot without Discord`);
-    const snapshot = await runScorecardNightly(nightlyDeps(summary ? (message) => sendDiscordNotification(message, "info") : async () => {}));
-    if (summary) await setSetting(LAST_SUMMARY_SETTING, latestClosedSession(startedAt));
+    const storedCutoff = Number(await getSetting(LAST_SUMMARY_CUTOFF_SETTING, ""));
+    const closedSince = Number.isFinite(storedCutoff) && storedCutoff > 0 ? storedCutoff : null;
+    const snapshot = await runScorecardNightly(
+      summary ? nightlyDeps((message) => sendDiscordNotification(message, "info"), closedSince) : nightlyDeps(async () => {}),
+    );
+    if (summary) {
+      await setSetting(LAST_SUMMARY_SETTING, latestClosedSession(startedAt));
+      await setSetting(LAST_SUMMARY_CUTOFF_SETTING, String(nightlyCutoffSec(Date.parse(snapshot.computedAt))));
+    }
     const p = snapshot.keptProgress;
     log(`scorecard-score: done session ${snapshot.sessionDate}; kept ${p.n}/${p.target} (${p.closed} closed); missed ${snapshot.missed.length}; last run ${snapshot.lastRun.status}`);
   } catch (e) {
