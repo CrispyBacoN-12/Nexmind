@@ -40,7 +40,10 @@ export function summarize(outcomes: Outcome[]): GroupStats {
 /**
  * The frozen sample the AI verdict is read on: the earliest SCORECARD_VERDICT_N kept
  * setups that filled. `ready` only when it is full, every one is closed, and every
- * one's 10-session window has passed (so no control trade can still be open).
+ * one's 10-session window has passed (so no control trade can still be open), and no
+ * `pending` row (captured but not yet read by the AI, so in no group) sorts at or before
+ * the last sample row: a late review could otherwise move it into the first 300 after
+ * the verdict froze.
  *
  * Order-independent: rows are sorted by (createdAt, id) ascending, so the sample is the
  * same whatever order the caller passes them in. The id tiebreak matters because one
@@ -48,14 +51,19 @@ export function summarize(outcomes: Outcome[]): GroupStats {
  */
 export function aiVerdictSample<T extends { id: number; createdAt: Date; group: Group; hold: Outcome; windowElapsed: boolean }>(
   rows: T[],
+  pending: { id: number; createdAt: Date }[] = [],
 ): { sample: T[]; ready: boolean } {
+  const byOrder = (a: { id: number; createdAt: Date }, b: { id: number; createdAt: Date }) =>
+    a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id;
   const sample = rows
     .filter((r) => r.group === "kept" && r.hold.status !== "not_filled" && r.hold.status !== "no_data")
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id)
+    .sort(byOrder)
     .slice(0, SCORECARD_VERDICT_N);
+  const last = sample[sample.length - 1];
   const ready =
     sample.length === SCORECARD_VERDICT_N &&
-    sample.every((r) => r.hold.status === "closed" && r.windowElapsed);
+    sample.every((r) => r.hold.status === "closed" && r.windowElapsed) &&
+    !pending.some((p) => byOrder(p, last) <= 0);
   return { sample, ready };
 }
 

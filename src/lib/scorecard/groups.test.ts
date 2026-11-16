@@ -107,3 +107,15 @@ test("aiVerdictSample is order-independent when createdAt ties straddle the boun
   assert.deepEqual(a.sample.map((r) => r.id), b.sample.map((r) => r.id));
   assert.ok(!a.sample.some((r) => r.id === 300)); // highest id among the ties is cut
 });
+
+test("verdict not ready while an earlier row is pending", () => {
+  const a = rows(300);
+  // Earlier than the last sample row (id 299): blocks.
+  assert.equal(aiVerdictSample(a, [{ id: 1000, createdAt: new Date(2026, 0, 1, 0, 10) }]).ready, false);
+  // Same createdAt as the last row, lower id sorts before it: blocks. Higher id: does not.
+  assert.equal(aiVerdictSample(a, [{ id: 298, createdAt: a[299].createdAt }]).ready, false);
+  assert.equal(aiVerdictSample(a, [{ id: 300, createdAt: a[299].createdAt }]).ready, true);
+  // After the last row: ready.
+  assert.equal(aiVerdictSample(a, [{ id: 301, createdAt: new Date(2026, 0, 2) }]).ready, true);
+  assert.equal(aiVerdictSample(a).ready, true);
+});

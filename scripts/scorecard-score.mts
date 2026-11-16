@@ -33,7 +33,7 @@ const LAST_SUMMARY_SETTING = "scorecard:lastSummarySession";
 async function loadRows(): Promise<NightlyRow[]> {
   const setups = await prisma.chartSetup.findMany({
     where: { source: SCORECARD_SOURCE, ruleVersion: CHART_RULE_VERSION },
-    select: { id: true, createdAt: true, ticker: true, status: true, aiReading: true, aiModel: true, entry: true, stop: true, t1: true },
+    select: { id: true, createdAt: true, ticker: true, status: true, aiReading: true, aiModel: true, aiBackend: true, entry: true, stop: true, t1: true },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
   const stored = setups.length

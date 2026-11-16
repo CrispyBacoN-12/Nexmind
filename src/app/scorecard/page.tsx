@@ -123,6 +123,17 @@ function ReplayCard({ snap }: { snap: Snap<ReplaySummary> }) {
   );
 }
 
+/** Captured setups the AI has not read yet; they are in no group until it does. Older snapshots lack the field. */
+function PendingLine({ live }: { live: Snap<LiveSnapshot> }) {
+  const p = live.kind === "ok" ? live.value.pendingReview : undefined;
+  if (!p || p.n <= 0) return null;
+  return (
+    <p className="text-xs text-amber-400 mt-2">
+      รอ AI อ่าน {p.n} setup (ตั้งแต่ {p.oldestDate ?? "—"})
+    </p>
+  );
+}
+
 function AiCard({ live, verdict: verdictSnap, startDate }: { live: Snap<LiveSnapshot>; verdict: Snap<AiVerdict>; startDate: string | null }) {
   const title = `ผลจริง AI${startDate ? ` (เริ่ม ${startDate})` : ""}`;
   if (verdictSnap.kind === "old" || (verdictSnap.kind === "absent" && live.kind === "old")) {
@@ -155,6 +166,7 @@ function AiCard({ live, verdict: verdictSnap, startDate }: { live: Snap<LiveSnap
         <p className="text-xs text-(--color-muted) mt-2">
           คำตัดสินตรึงแล้วเมื่อ {verdict.computedAt.slice(0, 10)} (setup #{verdict.firstId} ถึง #{verdict.lastId}) จะไม่ถูกคำนวณใหม่
         </p>
+        <PendingLine live={live} />
       </Card>
     );
   }
@@ -193,6 +205,7 @@ function AiCard({ live, verdict: verdictSnap, startDate }: { live: Snap<LiveSnap
           ? `ตัดสินเมื่อ AI เก็บและเข้าได้ครบ ${target} setup และทุกตัวปิดแล้ว ก่อนหน้านั้นไม่มีคำตัดสิน`
           : "ครบ 300 แล้ว รอให้ทุกตัวปิดครบก่อนตัดสิน"}
       </p>
+      <PendingLine live={live} />
     </Card>
   );
 }

@@ -4,7 +4,7 @@
 
 import type { Group } from "./groups";
 import type { LastRunSummary, LiveSnapshot } from "./nightly";
-import { SCORECARD_MIN_N, type ExitReason } from "./types";
+import { PENDING_STALE_DAYS, SCORECARD_MIN_N, type ExitReason } from "./types";
 
 export interface ClosedLine {
   ticker: string;
@@ -25,6 +25,10 @@ export interface DiscordInput {
   sessionDate: string;
   closedOvernight: ClosedLine[];
   openNow: OpenLine[];
+  /** createdAt (ms) of the oldest row still waiting for the AI; null/absent when none. */
+  oldestPendingAt?: number | null;
+  /** The clock for the stale-pending check; defaults to the real one. */
+  nowMs?: number;
 }
 
 const REASON: Record<ExitReason, string> = { stop: "โดน stop", t1: "ถึง T1", time: "ครบ 10 วัน" };
@@ -43,6 +47,15 @@ export function buildDiscordMessage(input: DiscordInput): string {
 
   const extra = [lastRun.unread > 0 ? ` · AI ไม่ได้อ่าน ${lastRun.unread}` : "", lastRun.stripped > 0 ? ` · ถูกตัดคำ ${lastRun.stripped}` : ""].join("");
   lines.push(`setup เมื่อคืน: ${lastRun.setups} ตัว · AI เก็บ ${lastRun.kept} · AI ตัดทิ้ง ${lastRun.vetoed}${extra}`);
+
+  const pend = snapshot.pendingReview;
+  if (pend && pend.n > 0) {
+    lines.push(`รอ AI อ่าน ${pend.n} setup (ตั้งแต่ ${pend.oldestDate ?? "—"})`);
+    const now = input.nowMs ?? Date.now();
+    if (input.oldestPendingAt != null && now - input.oldestPendingAt > PENDING_STALE_DAYS * 86_400_000) {
+      lines.push("⚠️ AI ยังไม่ได้อ่าน — เปิดคอมและเช็ก claude login");
+    }
+  }
 
   const closed = closedOvernight.map((c) => `${c.ticker} ${signed(c.r)} (${REASON[c.reason]})${GROUP_TAG[c.group]}`);
   lines.push(`ปิดแล้ว: ${closed.length ? closed.join(" · ") : "—"}`);

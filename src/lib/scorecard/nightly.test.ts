@@ -49,6 +49,7 @@ function row(over: Partial<NightlyRow> = {}): NightlyRow {
     status: "shown",
     aiReading: "อ่านโครงสร้าง",
     aiModel: "claude-sonnet-x",
+    aiBackend: "cli",
     entry: 100,
     stop: 99,
     t1: 102,
@@ -552,4 +553,27 @@ test("F8: no freeze when the sample fetch's SPY bars do not cover ten sessions",
   const snap = await runScorecardNightly(d);
   assert.equal(rec.verdicts.length, 0);
   assert.match(snap.verdictPending ?? "", /SPY/);
+});
+
+test("pending rows are scored but in no group", async () => {
+  const kept = row({ id: 1, ticker: "KEPT" });
+  const pending = row({ id: 2, ticker: "PEND", status: "shown", aiReading: null, aiModel: null, aiBackend: "pending" });
+  const { deps: d, rec } = deps({ nowMs: NOV3, rows: [kept, pending], bars: () => flatBars("2026-11-02") });
+  const snap = await runScorecardNightly(d);
+
+  assert.equal(snap.counts.kept.total, 1);
+  assert.equal(snap.counts.unread.total, 0);
+  assert.ok(!snap.recentTrades.some((t) => t.ticker === "PEND"));
+  assert.ok(rec.saved.some((s) => s.chartSetupId === 2 && s.variant === "hold"));
+  assert.deepEqual(snap.pendingReview, { n: 1, oldestDate: "2026-11-02" });
+  assert.equal(snap.lastRun.setups, 1);
+  assert.equal(snap.lastRun.unread, 0);
+  assert.equal(snap.lastRun.aiDown, false);
+  assert.ok(rec.sent[0].includes("รอ AI อ่าน 1 setup"));
+});
+
+test("no pending rows: pendingReview is zero", async () => {
+  const { deps: d } = deps({ nowMs: NOV3, rows: [row()], bars: () => flatBars("2026-11-02") });
+  const snap = await runScorecardNightly(d);
+  assert.deepEqual(snap.pendingReview, { n: 0, oldestDate: null });
 });

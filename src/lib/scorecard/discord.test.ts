@@ -39,6 +39,7 @@ function snapshot(over: Partial<LiveSnapshot> = {}): LiveSnapshot {
     recentTrades: [],
     verdict: null,
     verdictPending: null,
+    pendingReview: { n: 0, oldestDate: null },
     ...over,
   };
 }
@@ -161,4 +162,25 @@ test("after the verdict a caveat line follows the status line, and the message s
   assert.ok(!buildDiscordMessage(input()).includes("p95 ของการซื้อสุ่ม"));
   // The page's wording could not be used: "รับประกัน" is a CHART_PREDICTION_PHRASES_TH phrase.
   assert.equal(isChartPrediction("ชนะ p95 ของการซื้อสุ่ม ไม่ใช่การรับประกันว่ามี edge"), true);
+});
+
+test("shows the pending line and the stale warning", () => {
+  const now = Date.parse("2026-11-04T00:00:00.000Z");
+  const pending = (oldestDate: string) => snapshot({ pendingReview: { n: 2, oldestDate } });
+  const old = buildDiscordMessage(input({ snapshot: pending("2026-10-30"), nowMs: now, oldestPendingAt: now - 4 * 86_400_000 }));
+  assert.ok(old.includes("รอ AI อ่าน 2 setup (ตั้งแต่ 2026-10-30)"));
+  assert.ok(old.includes("AI ยังไม่ได้อ่าน — เปิดคอมและเช็ก claude login"));
+  assert.equal(isChartPrediction(old), false);
+
+  const fresh = buildDiscordMessage(input({ snapshot: pending("2026-11-03"), nowMs: now, oldestPendingAt: now - 86_400_000 }));
+  assert.ok(fresh.includes("รอ AI อ่าน 2 setup (ตั้งแต่ 2026-11-03)"));
+  assert.ok(!fresh.includes("claude login"));
+  assert.equal(isChartPrediction(fresh), false);
+
+  // Exactly 3 days is not "more than" 3 days.
+  const edge = buildDiscordMessage(input({ snapshot: pending("2026-11-01"), nowMs: now, oldestPendingAt: now - 3 * 86_400_000 }));
+  assert.ok(!edge.includes("claude login"));
+
+  const none = buildDiscordMessage(input());
+  assert.ok(!none.includes("รอ AI อ่าน"));
 });

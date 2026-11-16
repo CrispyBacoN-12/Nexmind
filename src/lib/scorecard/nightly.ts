@@ -32,6 +32,7 @@ import { aiVerdictSample, beatsControl, groupOf, summarize, type Group, type Gro
 import type { ScorecardRunInput } from "./runDaily";
 import { rMultiple, scoreSetup } from "./score";
 import {
+  PENDING_BACKEND,
   SCORECARD_MAX_HOLD_SESSIONS,
   SCORECARD_NO_DATA_DAYS,
   SCORECARD_RUN_ET_MINUTES,
@@ -61,6 +62,8 @@ export interface NightlyRow {
   status: string;
   aiReading: string | null;
   aiModel: string | null;
+  /** `PENDING_BACKEND` while the AI has not read it yet (captured in the cloud). */
+  aiBackend: string;
   entry: number;
   stop: number;
   t1: number;
@@ -169,6 +172,8 @@ export interface LiveSnapshot {
   /** Weekdays of the last 30 with no ran/no_session row and no logged setup. */
   missed: { date: string; failed: string | null }[];
   lastRun: LastRunSummary;
+  /** Captured rows the AI has not read yet: in no group, mean or count. `oldestDate` is the ET run date of the oldest. */
+  pendingReview: { n: number; oldestDate: string | null };
   /** Newest 30 rows first. */
   recentTrades: RecentTrade[];
   verdict: AiVerdict | null;
@@ -369,14 +374,19 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     return !o || o.status === "open";
   };
   const toScore = rows.filter((r) => VARIANTS.some((v) => needs(r, v)));
-  const groupMap = new Map(rows.map((r) => [r.id, groupOf(r)]));
+  // A pending row (captured, the AI has not read it) is scored above but is in no group,
+  // mean or count; groupOf is never called on one. The verdict sample waits for them.
+  const liveRows = rows.filter((r) => r.aiBackend !== PENDING_BACKEND);
+  const pendingRows = rows.filter((r) => r.aiBackend === PENDING_BACKEND);
+  const groupMap = new Map(liveRows.map((r) => [r.id, groupOf(r)]));
   const groupOfRow = (r: NightlyRow) => groupMap.get(r.id)!;
 
   // While no verdict is stored and the sample is already full, SPY must also reach back to
   // the sample's last run, so its readiness can be read even on a night with nothing to score.
   const stored = await deps.loadVerdict();
   const pre = aiVerdictSample(
-    rows.map((r) => ({ id: r.id, createdAt: r.createdAt, group: groupOfRow(r), hold: r.outcomes.hold ?? NO_OUTCOME, windowElapsed: false, row: r })),
+    liveRows.map((r) => ({ id: r.id, createdAt: r.createdAt, group: groupOfRow(r), hold: r.outcomes.hold ?? NO_OUTCOME, windowElapsed: false, row: r })),
+    pendingRows,
   );
   const sampleAnchor = stored === null && pre.sample.length === SCORECARD_VERDICT_N ? runAtSec(pre.sample[SCORECARD_VERDICT_N - 1].row) : Infinity;
   const fetchFrom = Math.min(toScore.length ? Math.min(...toScore.map(runAtSec)) : Infinity, sampleAnchor);
@@ -433,7 +443,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   //    SPY may start after an early row's fill, which can only under-count (never early),
   //    and the sample's last row (fetched from) bounds every earlier one.
   const sample = aiVerdictSample(
-    rows.map((r) => ({
+    liveRows.map((r) => ({
       id: r.id,
       createdAt: r.createdAt,
       group: groupOfRow(r),
@@ -441,6 +451,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
       windowElapsed: elapsedOn(calendar, holdOf(r).fillAt, cutoffSec),
       row: r,
     })),
+    pendingRows,
   );
 
   let verdict: AiVerdict | null = isAiVerdict(stored) ? stored : null;
@@ -516,7 +527,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   const stats = {} as LiveSnapshot["stats"];
   const counts = {} as LiveSnapshot["counts"];
   for (const g of statsGroups) {
-    const members = rows.filter((r) => statsGroupOf(r) === g);
+    const members = liveRows.filter((r) => statsGroupOf(r) === g);
     stats[g] = { hold: summarize(members.map(holdOf)), sameDay: summarize(members.map(sameDayOf)) };
     counts[g] = countsOf(members.map(holdOf));
   }
@@ -533,16 +544,16 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   };
 
   const cumulativeR = {} as LiveSnapshot["cumulativeR"];
-  for (const g of statsGroups) cumulativeR[g] = cumulative(rows.filter((r) => statsGroupOf(r) === g).map((r) => ({ id: r.id, hold: holdOf(r) })));
+  for (const g of statsGroups) cumulativeR[g] = cumulative(liveRows.filter((r) => statsGroupOf(r) === g).map((r) => ({ id: r.id, hold: holdOf(r) })));
 
   // 4. Last night's run and the missed weekdays.
   const sessionDate = lastRunSession(nowMs);
   const weekdays: string[] = [];
   for (let d = sessionDate; weekdays.length < MISSED_LOOKBACK_WEEKDAYS; d = addDays(d, -1)) if (isWeekday(d)) weekdays.unshift(d);
   const runs = await deps.loadRuns(weekdays[0]);
-  const rowsOn = (date: string) => {
+  const rowsOn = (date: string, from: NightlyRow[] = rows) => {
     const { startMs, endMs } = etDayBoundsMs(date);
-    return rows.filter((r) => r.createdAt.getTime() >= startMs && r.createdAt.getTime() < endMs);
+    return from.filter((r) => r.createdAt.getTime() >= startMs && r.createdAt.getTime() < endMs);
   };
   const done = (date: string) =>
     runs.some((r) => r.sessionDate === date && (r.status === "ran" || r.status === "no_session")) || rowsOn(date).length > 0;
@@ -557,7 +568,9 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
         })
     : [];
 
-  const lastRows = rowsOn(sessionDate);
+  // Pending rows prove the run happened (rowsOn above counts them) but are not in its group counts.
+  const lastRows = rowsOn(sessionDate, liveRows);
+  const lastAllRows = rowsOn(sessionDate);
   const lastCounts = { kept: 0, vetoed: 0, stripped: 0, unread: 0 };
   for (const r of lastRows) lastCounts[groupOfRow(r)]++;
   const sessionRuns = runs.filter((r) => r.sessionDate === sessionDate).sort((a, b) => b.ranAt.getTime() - a.ranAt.getTime());
@@ -575,9 +588,9 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     status = "failed";
     ranAt = failedRun.ranAt.toISOString();
     error = failedRun.error ?? null;
-  } else if (lastRows.length) {
+  } else if (lastAllRows.length) {
     status = "ran";
-    ranAt = lastRows[0].createdAt.toISOString();
+    ranAt = lastAllRows[0].createdAt.toISOString();
   }
   const lastRun: LastRunSummary = {
     sessionDate,
@@ -590,7 +603,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     aiDown: lastRows.length > 0 && lastCounts.unread === lastRows.length,
   };
 
-  const recentTrades: RecentTrade[] = [...rows]
+  const recentTrades: RecentTrade[] = [...liveRows]
     .sort((a, b) => order(b, a))
     .slice(0, RECENT_TRADES)
     .map((r) => {
@@ -619,6 +632,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     cumulativeR,
     missed,
     lastRun,
+    pendingReview: { n: pendingRows.length, oldestDate: pendingRows.length ? runDateOf(pendingRows[0]) : null },
     recentTrades,
     verdict,
     verdictPending,
@@ -626,13 +640,23 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   await deps.saveLive(snapshot);
 
   // 5. Discord.
-  const closedOvernight: ClosedLine[] = rows
+  const closedOvernight: ClosedLine[] = liveRows
     .filter((r) => closedTonight.has(r.id))
     .map((r) => ({ ticker: r.ticker, group: groupOfRow(r), r: holdOf(r).r as number, reason: holdOf(r).exitReason! }));
-  const openNow: OpenLine[] = rows
+  const openNow: OpenLine[] = liveRows
     .filter((r) => holdOf(r).status === "open" && holdOf(r).fill !== null)
     .map((r) => ({ ticker: r.ticker, group: groupOfRow(r), sessionsHeld: holdOf(r).sessionsHeld }));
-  await deps.send(buildDiscordMessage({ snapshot, lastRun, sessionDate, closedOvernight, openNow }));
+  await deps.send(
+    buildDiscordMessage({
+      snapshot,
+      lastRun,
+      sessionDate,
+      closedOvernight,
+      openNow,
+      oldestPendingAt: pendingRows.length ? pendingRows[0].createdAt.getTime() : null,
+      nowMs,
+    }),
+  );
 
   return snapshot;
 }
