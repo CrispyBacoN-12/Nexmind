@@ -1,0 +1,86 @@
+name: Scorecard capture
+
+# Nightly forward-test capture for /scorecard, run in the cloud so it no longer
+# depends on the owner's PC being awake. It runs scripts/scorecard-capture.mts:
+# the scan (no AI notes) plus the chart agent, writing ChartSetup rows with
+# source="scheduled" and aiBackend "pending". NO AI runs here: no Claude CLI is
+# installed and no Claude token is used. The owner's PC reviews the pending rows
+# later (scripts/scorecard-run.mts / score), so the CLI must stay logged in there.
+#
+# GitHub cron is UTC and has no DST, so it fires every 15 minutes across
+# 14:00-16:59 UTC on weekdays, which covers 10:30 ET in both EST and EDT. The
+# first step decides in America/New_York time and skips everything else unless
+# this is a dry run. A skipped day is a successful run.
+#
+# The repo is public, so Actions logs are public: never echo env or secrets.
+#
+# Secrets (Settings -> Secrets and variables -> Actions), names only:
+#   DATABASE_URL, ALPACA_KEY, ALPACA_SECRET, DISCORD_WEBHOOK_URL,
+#   FINNHUB_API_KEY (optional), SEC_USER_AGENT
+on:
+  schedule:
+    - cron: "*/15 14-16 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (skip the window check, write nothing)"
+        type: boolean
+        default: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: scorecard-capture
+      cancel-in-progress: false
+    env:
+      # DATABASE_URL must be present from the first step: `npm ci` runs the
+      # `postinstall: prisma generate` script, and prisma.config.ts throws if
+      # DATABASE_URL is unset, even though generate doesn't connect to it.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
+      ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+    steps:
+      - name: Check market window (America/New_York)
+        id: window
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "dry run, window check skipped"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          NOW=$(TZ=America/New_York date +%u%H%M)
+          DOW=${NOW:0:1}
+          HM=$((10#${NOW:1}))
+          if [ "$DOW" -ge 1 ] && [ "$DOW" -le 5 ] && [ "$HM" -ge 1030 ] && [ "$HM" -le 1129 ]; then
+            echo "inside window"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "outside window"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.window.outputs.run == 'true'
+        uses: actions/checkout@v4
+      - if: steps.window.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.window.outputs.run == 'true'
+        run: npm ci
+      - name: Capture scorecard setups
+        if: steps.window.outputs.run == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            node --import tsx scripts/scorecard-capture.mts --dry-run
+          else
+            node --import tsx scripts/scorecard-capture.mts
+          fi

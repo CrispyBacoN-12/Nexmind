@@ -27,6 +27,7 @@ hold-out (§3). The repo's value now lives in four surfaces:
 - **`/scorecard`** (agent #4, on master): what the chart agent's setups would have done if bought,
   against random entries. It shows a 3-year replay of the code rule (**REJECT**, §3) and a forward record that
   a scheduled job builds every trading night. The AI verdict freezes once at 300 kept setups. Read-only page.
+  Capture and review are split (2026-11-16): GitHub Actions captures with no AI, the PC reviews later (§2, §3).
 - **`/advisor`**: the owner types a ticker they already chose and gets back structure and risk only:
   - the stop, found by a chain (agent #3, on master): a stop the owner gave, else the
     latest 5-minute swing low, else the previous day's low, else 1.5 × ATR14; and the R ladder in prices
@@ -67,6 +68,7 @@ Hard context the code does not state:
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB. Columns `source` (default `"button"`) and `aiModel` were added 2026-11-03 |
 | Scorecard tables | `ScorecardRun`, `ScorecardOutcome`, `ScorecardSnapshot` were created 2026-11-03 on Neon with additive SQL over HTTPS. Port 5432 is blocked on this network, so `prisma db push` cannot connect (§5). One snapshot exists: `replay` / `sweep-v1` |
 | Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). **`NEXMIND Scorecard Score` Ready** (owner, 2026-11-06: fires on wake and logon, each with a 2-minute delay, plus a non-waking 07:00 Tue-Sat and a non-waking hourly retry added 2026-11-10, because two minutes after a wake the network was down every time; it works once per closed session, tracked in `Setting` key `scorecard:lastSummarySession`, and a failed run retries on the next trigger). `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03). `Scorecard Run` has `WakeToRun` on (owner, 2026-11-05), but it did not wake the machine for 21:30-22:30 on 2026-11-06. The power plan allows wake timers on AC only, so a laptop on battery or a shut-down machine misses the run |
+| GitHub Actions | `.github/workflows/scorecard-capture.yml` (branch `scorecard-cloud`, not yet merged or run): cron `*/15 14-16 * * 1-5` UTC, plus `workflow_dispatch` with a `dry_run` input. The first step keeps only Mon-Fri 10:30-11:29 America/New_York and otherwise skips with success. Runs `scripts/scorecard-capture.mts`; no AI, no Claude CLI. Secrets (names only): `DATABASE_URL` (already set), `ALPACA_KEY`, `ALPACA_SECRET`, `DISCORD_WEBHOOK_URL`, optional `FINNHUB_API_KEY`, `SEC_USER_AGENT` |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
 | Desk #11 (archive) | `trend-pullback`, status `active` but unscheduled. 3 legacy open paper trades (KO, AZO, XOM); 45 closed, cumulative **−$358.98** |
@@ -87,6 +89,11 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-11-16: Scorecard cloud capture (branch `scorecard-cloud`).** The nightly capture no longer needs the PC.
+  - **Capture (cloud, no AI):** `scripts/scorecard-capture.mts` runs on GitHub Actions in the 10:30-11:29 ET window and
+    writes `ChartSetup` rows (`source="scheduled"`) with `aiBackend "pending"`.
+  - **Review (PC, AI):** the local scorecard jobs later review the pending rows and score them, so the verdict waits
+    for them. The AI verdict still comes only from the PC.
 - **2026-11-03: Scorecard (agent #4), merged to master and pushed (`08205f3..d0323ee`).** Spec
   `docs/superpowers/specs/2026-11-03-scorecard-agent-design.md`.
   - **Replay of the code rule `sweep-v1`: REJECT.** Over 3 years and 1,201 filled setups, hold-to-stop/T1 averaged
@@ -290,6 +297,9 @@ There are no open research directions; the owner closed the search. Work items:
   - Never edit `REVIEW_SYSTEM` or the sweep rule without bumping `CHART_RULE_VERSION`.
   - Never overwrite the `replay` or `ai-verdict` snapshot. Each is computed once.
   - The scheduled scripts run from this working tree: keep a branch that has them checked out at 10:30 ET.
+  - **Cloud capture rows stay `aiBackend "pending"` until the PC reviews them.** The Claude CLI must stay logged in
+    on the PC (`claude login`), or they never get reviewed and the verdict never completes. The workflow itself uses
+    no Claude token and logs are public: never echo env or secrets in it.
 - **Avoid `prisma.$transaction` in scripts here.** It needs Neon's WebSocket and failed with "Unable to start a transaction in the given time" on 2026-11-06, while plain queries over HTTPS worked.
 - **Port 5432 is blocked on this network.** `prisma db push` fails with P1001. Generate the SQL with
   `prisma migrate diff --from-schema <old> --to-schema prisma/schema.prisma --script`, then apply it through the
