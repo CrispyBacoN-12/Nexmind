@@ -5,7 +5,7 @@ Auto-loaded every session via `CLAUDE.md`. This file is the current bar, not the
 deep evidence is in `docs/quant/`, reasoning is in commit bodies, and the full pre-2026-10-01
 text of this file (every desk-era entry, verbatim) is `docs/quant/2026-10-01-state-archive.md`.
 
-_Last verified: `npm test`, the Task Scheduler and the scorecard tables on **2026-11-03**; the `ChartSetup` row count on **2026-11-01**; the other §2 rows on **2026-10-01**._
+_Last verified: `npm test` on **2026-11-16** (branch `scorecard-cloud`); the Task Scheduler and the scorecard tables on **2026-11-03**; the `ChartSetup` row count on **2026-11-01**; the other §2 rows on **2026-10-01**._
 
 ---
 
@@ -64,10 +64,10 @@ Hard context the code does not state:
 | Thing | Value |
 |---|---|
 | Branch | `master` at `d0323ee` contains agents #2, #3 (with the stop cluster rule) and #4 (the scorecard). It was fast-forwarded from `scorecard` and pushed 2026-11-03, the Vercel deploy succeeded, and the branch was deleted. Every push auto-deploys Vercel production |
-| Tests | `npm test` **1216 pass / 0 fail** (2026-11-03, master) |
+| Tests | `npm test` **1261 pass / 0 fail** (2026-11-16, branch `scorecard-cloud`) |
 | `ChartSetup` | **0 rows** (2026-11-01, `prisma.chartSetup.count()`). Nothing has been logged yet, and the table only exists on the live Neon DB. Columns `source` (default `"button"`) and `aiModel` were added 2026-11-03 |
 | Scorecard tables | `ScorecardRun`, `ScorecardOutcome`, `ScorecardSnapshot` were created 2026-11-03 on Neon with additive SQL over HTTPS. Port 5432 is blocked on this network, so `prisma db push` cannot connect (§5). One snapshot exists: `replay` / `sweep-v1` |
-| Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). **`NEXMIND Scorecard Score` Ready** (owner, 2026-11-06: fires on wake and logon, each with a 2-minute delay, plus a non-waking 07:00 Tue-Sat and a non-waking hourly retry added 2026-11-10, because two minutes after a wake the network was down every time; it works once per closed session, tracked in `Setting` key `scorecard:lastSummarySession`, and a failed run retries on the next trigger). `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03). `Scorecard Run` has `WakeToRun` on (owner, 2026-11-05), but it did not wake the machine for 21:30-22:30 on 2026-11-06. The power plan allows wake timers on AC only, so a laptop on battery or a shut-down machine misses the run |
+| Task Scheduler | **`NEXMIND Risk Sentry` Ready** (Mon-Fri 19:00 ICT). **`NEXMIND Scorecard Run` Ready** (Mon-Fri 21:30/21:45/22:30/22:45 ICT; works only 10:30-11:29 ET). On branch `scorecard-cloud` it is a **fallback capture**: no AI, its rows are logged pending like the cloud's; the GitHub Actions workflow is the primary capture, and a session claim (`Setting` key `scorecard:claim:<date>`, stale after 20 minutes) stops the two from logging one session twice. **`NEXMIND Scorecard Score` Ready** (owner, 2026-11-06: fires on wake and logon, each with a 2-minute delay, plus a non-waking 07:00 Tue-Sat and a non-waking hourly retry added 2026-11-10, because two minutes after a wake the network was down every time; it works once per closed session, tracked in `Setting` key `scorecard:lastSummarySession`, and a failed run retries on the next trigger). `Stocks scan`, `Manage positions`, `Research round` **Disabled** (all 2026-11-03). `Scorecard Run` has `WakeToRun` on (owner, 2026-11-05), but it did not wake the machine for 21:30-22:30 on 2026-11-06. The power plan allows wake timers on AC only, so a laptop on battery or a shut-down machine misses the run |
 | GitHub Actions | `.github/workflows/scorecard-capture.yml` (branch `scorecard-cloud`, not yet merged or run): cron `*/15 14-16 * * 1-5` UTC, plus `workflow_dispatch` with a `dry_run` input. The first step keeps only Mon-Fri 10:30-11:29 America/New_York and otherwise skips with success. Runs `scripts/scorecard-capture.mts`; no AI, no Claude CLI. Secrets (names only): `DATABASE_URL` (already set), `ALPACA_KEY`, `ALPACA_SECRET`, `DISCORD_WEBHOOK_URL`, optional `FINNHUB_API_KEY`, `SEC_USER_AGENT` |
 | Journal | **0 rows**, 0 `NavSnapshot`, 0 `GateOverride`. So DRAWDOWN/GAP_HEAT read WARN (fail closed) until a NAV is logged |
 | Risk Sentry | manual extras `["AAPL","MSFT"]`, `riskSentry:lastGate = above`, `DISCORD_WEBHOOK_URL` set |
@@ -297,6 +297,8 @@ There are no open research directions; the owner closed the search. Work items:
   - Never edit `REVIEW_SYSTEM` or the sweep rule without bumping `CHART_RULE_VERSION`.
   - Never overwrite the `replay` or `ai-verdict` snapshot. Each is computed once.
   - The scheduled scripts run from this working tree: keep a branch that has them checked out at 10:30 ET.
+  - **GitHub disables a scheduled workflow in a public repo after 60 days without repository activity.** The cloud
+    capture then just stops; the `/scorecard` missed list shows it only after nights are already lost.
   - **Cloud capture rows stay `aiBackend "pending"` until the PC reviews them.** The Claude CLI must stay logged in
     on the PC (`claude login`), or they never get reviewed and the verdict never completes. The workflow itself uses
     no Claude token and logs are public: never echo env or secrets in it.
@@ -362,10 +364,11 @@ There are no open research directions; the owner closed the search. Work items:
 ## 6. Blocked on the user (still open)
 
 - **AI features need `claude login`.** The CLI OAuth expired; `/scan` notes and the chart agent's readings show as unavailable until then.
-- **Dormant, only if a cloud schedule is ever re-enabled:**
-  - Vercel has no `ANTHROPIC_API_KEY`.
-  - The GH runner's CLI produced `mock`, and why is unexplained.
-  - The `FINNHUB_API_KEY` Actions secret is empty. The owner sets it; do not handle the key.
+- **Cloud capture (branch `scorecard-cloud`):** `.github/workflows/scorecard-capture.yml` exists; it runs no AI.
+  - No Claude token is on GitHub, by owner decision: the AI review runs only on the PC (`scorecard-score`).
+  - Secrets the owner must set in Actions before it can capture (names only; do not handle the values):
+    `ALPACA_KEY`, `ALPACA_SECRET`, `DISCORD_WEBHOOK_URL`, `SEC_USER_AGENT`, optional `FINNHUB_API_KEY`.
+    `DATABASE_URL` is already set. Vercel has no `ANTHROPIC_API_KEY` either.
 
 ## 7. Housekeeping for whoever writes here next
 
