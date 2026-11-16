@@ -44,6 +44,7 @@ const closedOutcome = (over: Partial<Outcome> = {}): Outcome => ({
 function row(over: Partial<NightlyRow> = {}): NightlyRow {
   return {
     id: 1,
+    runId: "run-a",
     createdAt: new Date(etEpoch("2026-11-02", "10:30") * 1000),
     ticker: "AAA",
     status: "shown",
@@ -576,4 +577,52 @@ test("no pending rows: pendingReview is zero", async () => {
   const { deps: d } = deps({ nowMs: NOV3, rows: [row()], bars: () => flatBars("2026-11-02") });
   const snap = await runScorecardNightly(d);
   assert.deepEqual(snap.pendingReview, { n: 0, oldestDate: null });
+});
+
+// --- Whole-branch final review (F5, F8) ----------------------------------------
+
+test("F5: a finalized row inside the first 300 whose run still has a pending sibling blocks the verdict", async () => {
+  // Row 150 was finalized by a partial save; its run "R" still has pending row 301, which
+  // sorts after the sample's last row. The whole run is re-reviewed, so row 150 may still change.
+  const rows = keptSample(300).map((r) => (r.id === 150 ? { ...r, runId: "R" } : r));
+  const sibling = row({
+    id: 301,
+    runId: "R",
+    ticker: "SIB",
+    createdAt: new Date(etEpoch("2026-10-02", "10:30") * 1000),
+    status: "shown",
+    aiReading: null,
+    aiModel: null,
+    aiBackend: "pending",
+  });
+  const { deps: d, rec } = deps({ nowMs: V_NOW, rows: [...rows, sibling], bars: () => verdictBars() });
+  const snap = await runScorecardNightly(d);
+  assert.equal(rec.verdicts.length, 0);
+  assert.equal(snap.verdict, null);
+  // Groups still exclude only the pending row itself.
+  assert.equal(snap.keptProgress.n, 300);
+  assert.deepEqual(snap.pendingReview, { n: 1, oldestDate: "2026-10-02" });
+
+  // Once the run has no pending row the same sample freezes.
+  const done = deps({ nowMs: V_NOW, rows: [...rows, { ...sibling, aiBackend: "cli", aiReading: "อ่าน", aiModel: "claude-sonnet-b" }], bars: () => verdictBars() });
+  await runScorecardNightly(done.deps);
+  assert.equal(done.rec.verdicts.length, 1);
+});
+
+test("F8: last night's pending rows are counted apart and shown on the setups line", async () => {
+  const nowMs = Date.parse("2026-11-04T00:00:00Z"); // Tue 11-03 19:00 ET
+  const at = new Date(etEpoch("2026-11-03", "10:31") * 1000);
+  const runs: NightlyRun[] = [{ sessionDate: "2026-11-03", status: "ran", runId: "r", ranAt: at }];
+  const pend = { aiReading: null, aiModel: null, aiBackend: "pending" };
+  const rows = [
+    row({ id: 1, createdAt: at, ticker: "K1" }),
+    row({ id: 2, createdAt: at, ticker: "P1", ...pend }),
+    row({ id: 3, createdAt: at, ticker: "P2", ...pend }),
+  ];
+  const { deps: d, rec } = deps({ nowMs, rows, runs, bars: () => flatBars("2026-11-03") });
+  const snap = await runScorecardNightly(d);
+  assert.equal(snap.lastRun.setups, 1);
+  assert.equal(snap.lastRun.pending, 2);
+  assert.equal(snap.lastRun.aiDown, false);
+  assert.equal(rec.sent[0].split("\n")[1],"setup เมื่อคืน: 3 ตัว (รอ AI อ่าน 2) · AI เก็บ 1 · AI ตัดทิ้ง 0");
 });

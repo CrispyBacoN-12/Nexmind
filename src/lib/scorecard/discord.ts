@@ -46,7 +46,10 @@ export function buildDiscordMessage(input: DiscordInput): string {
   lines.push(`NEXMIND Scorecard — ${sessionDate}`);
 
   const extra = [lastRun.unread > 0 ? ` · AI ไม่ได้อ่าน ${lastRun.unread}` : "", lastRun.stripped > 0 ? ` · ถูกตัดคำ ${lastRun.stripped}` : ""].join("");
-  lines.push(`setup เมื่อคืน: ${lastRun.setups} ตัว · AI เก็บ ${lastRun.kept} · AI ตัดทิ้ง ${lastRun.vetoed}${extra}`);
+  // Captured rows the AI has not read are in no group: the line shows the captured total and how many wait.
+  const pendingLast = lastRun.pending;
+  const setupsText = pendingLast > 0 ? `${lastRun.setups + pendingLast} ตัว (รอ AI อ่าน ${pendingLast})` : `${lastRun.setups} ตัว`;
+  lines.push(`setup เมื่อคืน: ${setupsText} · AI เก็บ ${lastRun.kept} · AI ตัดทิ้ง ${lastRun.vetoed}${extra}`);
 
   const pend = snapshot.pendingReview;
   if (pend && pend.n > 0) {

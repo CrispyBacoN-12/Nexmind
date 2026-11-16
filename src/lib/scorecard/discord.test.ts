@@ -13,6 +13,7 @@ function lastRun(over: Partial<LastRunSummary> = {}): LastRunSummary {
     ranAt: "2026-11-03T15:31:00.000Z", // 22:31 ICT
     error: null,
     setups: 4,
+    pending: 0,
     kept: 2,
     vetoed: 1,
     stripped: 0,
@@ -135,6 +136,7 @@ test("contains no prediction phrase", () => {
     input({ snapshot: snapshot({ keptProgress: { n: 0, closed: 0, meanR: null, target: 300 } }) }),
     input({ snapshot: snapshot({ keptProgress: { n: 40, closed: 35, meanR: 0.2, target: 300 } }) }),
     input({ snapshot: snapshot({ verdict, keptControl: { median: 0, p95: 0.1, runs: 200 } }) }),
+    input({ lastRun: lastRun({ setups: 0, kept: 0, vetoed: 0, unread: 0, pending: 3 }) }),
   ];
   for (const v of variants) {
     const msg = buildDiscordMessage(v);
@@ -183,4 +185,17 @@ test("shows the pending line and the stale warning", () => {
 
   const none = buildDiscordMessage(input());
   assert.ok(!none.includes("รอ AI อ่าน"));
+});
+
+test("last night's pending rows: the setups line shows the captured total and how many wait", () => {
+  const all = buildDiscordMessage(input({ lastRun: lastRun({ setups: 0, kept: 0, vetoed: 0, unread: 0, pending: 3 }) }));
+  assert.equal(all.split("\n")[1], "setup เมื่อคืน: 3 ตัว (รอ AI อ่าน 3) · AI เก็บ 0 · AI ตัดทิ้ง 0");
+  assert.equal(isChartPrediction(all), false, all);
+
+  const some = buildDiscordMessage(input({ lastRun: lastRun({ pending: 2 }) }));
+  assert.equal(some.split("\n")[1], "setup เมื่อคืน: 6 ตัว (รอ AI อ่าน 2) · AI เก็บ 2 · AI ตัดทิ้ง 1 · AI ไม่ได้อ่าน 1");
+  assert.equal(isChartPrediction(some), false, some);
+
+  // No pending rows: the line is unchanged.
+  assert.equal(buildDiscordMessage(input()).split("\n")[1], "setup เมื่อคืน: 4 ตัว · AI เก็บ 2 · AI ตัดทิ้ง 1 · AI ไม่ได้อ่าน 1");
 });

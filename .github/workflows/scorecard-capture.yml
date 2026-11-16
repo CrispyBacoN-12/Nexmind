@@ -5,7 +5,9 @@ name: Scorecard capture
 # the scan (no AI notes) plus the chart agent, writing ChartSetup rows with
 # source="scheduled" and aiBackend "pending". NO AI runs here: no Claude CLI is
 # installed and no Claude token is used. The owner's PC reviews the pending rows
-# later (scripts/scorecard-run.mts / score), so the CLI must stay logged in there.
+# later (only scripts/scorecard-score.mts runs the AI), so the CLI must stay logged
+# in there. scripts/scorecard-run.mts on the PC is a fallback capture with no AI;
+# a session claim in the DB stops the two from logging the same session.
 #
 # GitHub cron is UTC and has no DST, so it fires every 15 minutes across
 # 14:00-16:59 UTC on weekdays, which covers 10:30 ET in both EST and EDT. The
@@ -13,6 +15,8 @@ name: Scorecard capture
 # this is a dry run. A skipped day is a successful run.
 #
 # The repo is public, so Actions logs are public: never echo env or secrets.
+# The token is read-only, and the real secrets reach only the capture step:
+# checkout, setup-node and `npm ci` (with its install scripts) never see them.
 #
 # Secrets (Settings -> Secrets and variables -> Actions), names only:
 #   DATABASE_URL, ALPACA_KEY, ALPACA_SECRET, DISCORD_WEBHOOK_URL,
@@ -27,6 +31,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 jobs:
   capture:
     runs-on: ubuntu-latest
@@ -35,15 +42,10 @@ jobs:
       group: scorecard-capture
       cancel-in-progress: false
     env:
-      # DATABASE_URL must be present from the first step: `npm ci` runs the
-      # `postinstall: prisma generate` script, and prisma.config.ts throws if
-      # DATABASE_URL is unset, even though generate doesn't connect to it.
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
-      ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-      SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+      # A placeholder, not a secret: `npm ci` runs the `postinstall: prisma
+      # generate` script, and prisma.config.ts throws if DATABASE_URL is unset,
+      # even though generate never connects to it. The capture step overrides it.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/db
     steps:
       - name: Check market window (America/New_York)
         id: window
@@ -78,6 +80,12 @@ jobs:
         if: steps.window.outputs.run == 'true'
         env:
           DRY_RUN: ${{ inputs.dry_run }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ALPACA_KEY: ${{ secrets.ALPACA_KEY }}
+          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
         run: |
           if [ "$DRY_RUN" = "true" ]; then
             node --import tsx scripts/scorecard-capture.mts --dry-run

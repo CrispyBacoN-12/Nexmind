@@ -14,3 +14,16 @@ export function latestClosedSession(nowMs: number): string {
 export function summaryDue(nowMs: number, lastSent: string): boolean {
   return lastSent < latestClosedSession(nowMs);
 }
+
+export type ScoreAction = "summary" | "refresh" | "none";
+
+/**
+ * What the scorer does after its review step. "summary": score, save the live snapshot and
+ * send Discord (marks the session sent). "refresh": no summary is due but the review finalized
+ * `finalized` >= 1 row, so score and save the live snapshot without Discord (the page updates
+ * the same hour; the session is not marked sent). "none": nothing to do.
+ */
+export function scoreAction(nowMs: number, lastSent: string, finalized: number): ScoreAction {
+  if (summaryDue(nowMs, lastSent)) return "summary";
+  return finalized >= 1 ? "refresh" : "none";
+}

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { latestClosedSession, summaryDue } from "./summarySchedule";
+import { latestClosedSession, scoreAction, summaryDue } from "./summarySchedule";
 
 const at = (iso: string) => Date.parse(iso);
 
@@ -34,4 +34,12 @@ test("summaryDue: sends once per closed session", () => {
   assert.equal(summaryDue(now, "2026-11-04"), true, "older session sent, catches up");
   assert.equal(summaryDue(now, "2026-11-06"), false, "already sent");
   assert.equal(summaryDue(now, "2026-11-09"), false, "a newer mark never re-sends");
+});
+
+test("scoreAction: the summary path is unchanged; a review that finalized rows refreshes the snapshot silently", () => {
+  const now = at("2026-11-07T00:00:00Z"); // latest closed session is 2026-11-06
+  assert.equal(scoreAction(now, "2026-11-04", 0), "summary", "due, nothing reviewed");
+  assert.equal(scoreAction(now, "2026-11-04", 3), "summary", "due wins over a refresh");
+  assert.equal(scoreAction(now, "2026-11-06", 1), "refresh", "not due, one row finalized");
+  assert.equal(scoreAction(now, "2026-11-06", 0), "none", "not due, nothing finalized");
 });

@@ -57,6 +57,8 @@ const RECENT_TRADES = 30;
 /** One scheduled `ChartSetup` row of the current ruleVersion with its stored outcomes. */
 export interface NightlyRow {
   id: number;
+  /** The capture run that logged it; the review step re-reviews a run as a whole. */
+  runId: string;
   createdAt: Date;
   ticker: string;
   status: string;
@@ -110,8 +112,10 @@ export interface LastRunSummary {
   /** ISO time the run row was written (or the first setup logged, for orphan rows). */
   ranAt: string | null;
   error: string | null;
-  /** Counted from that date's ChartSetup rows via groupOf, not from the run row. */
+  /** Counted from that date's ChartSetup rows via groupOf, not from the run row. Pending rows are not in it. */
   setups: number;
+  /** That date's rows the AI has not read yet (captured, aiBackend "pending"). */
+  pending: number;
   kept: number;
   vetoed: number;
   stripped: number;
@@ -379,6 +383,11 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   const liveRows = rows.filter((r) => r.aiBackend !== PENDING_BACKEND);
   const pendingRows = rows.filter((r) => r.aiBackend === PENDING_BACKEND);
   const groupMap = new Map(liveRows.map((r) => [r.id, groupOf(r)]));
+  // For the verdict gate only, every row of a run that still has a pending row counts as
+  // pending: the review re-reviews such a run whole, so a row an earlier partial save
+  // finalized can still change group. Groups and counts exclude only the pending rows.
+  const pendingRunIds = new Set(pendingRows.map((r) => r.runId));
+  const gateRows = rows.filter((r) => pendingRunIds.has(r.runId));
   const groupOfRow = (r: NightlyRow) => groupMap.get(r.id)!;
 
   // While no verdict is stored and the sample is already full, SPY must also reach back to
@@ -386,7 +395,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   const stored = await deps.loadVerdict();
   const pre = aiVerdictSample(
     liveRows.map((r) => ({ id: r.id, createdAt: r.createdAt, group: groupOfRow(r), hold: r.outcomes.hold ?? NO_OUTCOME, windowElapsed: false, row: r })),
-    pendingRows,
+    gateRows,
   );
   const sampleAnchor = stored === null && pre.sample.length === SCORECARD_VERDICT_N ? runAtSec(pre.sample[SCORECARD_VERDICT_N - 1].row) : Infinity;
   const fetchFrom = Math.min(toScore.length ? Math.min(...toScore.map(runAtSec)) : Infinity, sampleAnchor);
@@ -451,7 +460,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
       windowElapsed: elapsedOn(calendar, holdOf(r).fillAt, cutoffSec),
       row: r,
     })),
-    pendingRows,
+    gateRows,
   );
 
   let verdict: AiVerdict | null = isAiVerdict(stored) ? stored : null;
@@ -598,6 +607,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     ranAt,
     error,
     setups: lastRows.length,
+    pending: lastAllRows.length - lastRows.length,
     ...lastCounts,
     // Vetoed rows also carry a null aiReading, so "no reading" alone would call a veto an outage.
     aiDown: lastRows.length > 0 && lastCounts.unread === lastRows.length,

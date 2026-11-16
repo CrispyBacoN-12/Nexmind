@@ -401,7 +401,7 @@ export default async function ScorecardPage() {
             {live.missed.map((m) => (
               <li key={m.date} className="tabular-nums">
                 <span className="font-medium">{m.date}</span>{" "}
-                <span className="text-(--color-muted)">{m.failed ? "รอบล้มเหลว" : "ไม่มีบันทึกการรัน (เครื่องปิดหรือไม่ได้รัน)"}</span>
+                <span className="text-(--color-muted)">{m.failed ? "รอบล้มเหลว" : "ไม่มีบันทึกการรัน (ไม่มีรอบเก็บข้อมูล)"}</span>
               </li>
             ))}
           </ul>
