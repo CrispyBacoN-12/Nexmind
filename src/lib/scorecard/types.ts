@@ -34,6 +34,8 @@ export const SCORECARD_NO_DATA_DAYS = 15;
 export const PENDING_BACKEND = "pending";
 /** A pending row older than this many days is stale. */
 export const PENDING_STALE_DAYS = 3;
+/** A session claim (claim.ts) older than this many minutes may be taken over by another runner. */
+export const SCORECARD_CLAIM_STALE_MINUTES = 20;
 
 /**
  * 5 bps slippage on every fill and 1 bp round-turn commission on entry notional.
