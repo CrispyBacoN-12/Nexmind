@@ -10,6 +10,7 @@ import { SCORECARD_COST_MODEL, SCORECARD_MAX_HOLD_SESSIONS, SCORECARD_MIN_N, SCO
 import { cn, fmtMoney } from "@/lib/utils";
 
 import { CumulativeChart } from "./cumulative-chart";
+import { RulesVsHoldChart } from "./rules-vs-hold-chart";
 import { fmtR, rTone } from "./format";
 import { GroupTable, type TableRow } from "./group-table";
 import { isAiVerdict, isLiveSnapshot, isReplaySummary } from "./guards";
@@ -350,6 +351,23 @@ export default async function ScorecardPage() {
           <Empty title={liveFallback} />
         ) : (
           <Empty title="ยังไม่มีเทรดที่ปิดแล้ว" hint="เส้นจะขึ้นเมื่อมีเทรดแรกที่ปิด" />
+        )}
+      </Card>
+
+      <Card>
+        <CardTitle>ตามกฎ vs ซื้อแล้วถือ (R)</CardTitle>
+        {live && live.rulesVsHold && live.rulesVsHold.length > 0 ? (
+          <>
+            <RulesVsHoldChart points={live.rulesVsHold} />
+            <p className="text-xs text-(--color-muted) mt-2">
+              เฉพาะ setup ที่ AI เก็บและได้ซื้อ · ทั้งสองเส้นคิดตามราคาปิดของแต่ละวัน · ใช้ดูเฉยๆ ไม่มีผลต่อคำตัดสิน ·{" "}
+              {live.rulesVsHold[live.rulesVsHold.length - 1].n} เทรด
+            </p>
+          </>
+        ) : liveFallback ? (
+          <Empty title={liveFallback} />
+        ) : (
+          <Empty title="ยังไม่มีข้อมูล" hint="เส้นจะขึ้นหลังรอบสรุปถัดไป" />
         )}
       </Card>
 

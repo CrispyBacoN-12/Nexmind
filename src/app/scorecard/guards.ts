@@ -8,6 +8,7 @@
 import type { GroupStats } from "@/lib/scorecard/groups";
 import type { AiVerdict, LiveSnapshot, RecentTrade } from "@/lib/scorecard/nightly";
 import type { ReplaySummary } from "@/lib/scorecard/replay";
+import type { RulesVsHoldPoint } from "@/lib/scorecard/rulesVsHold";
 
 type Obj = Record<string, unknown>;
 
@@ -109,5 +110,7 @@ export function isLiveSnapshot(v: unknown): v is LiveSnapshot {
   if (!(v.verdictPending === undefined || isStrOrNull(v.verdictPending))) return false;
   const pr = v.pendingReview;
   if (!(pr === undefined || (isObj(pr) && isNum(pr.n) && isStrOrNull(pr.oldestDate)))) return false;
+  const rvh = v.rulesVsHold;
+  if (!(rvh === undefined || isArrayOf(rvh, (p): p is RulesVsHoldPoint => isObj(p) && isStr(p.date) && hasNums(p, ["rules", "hold", "n"])))) return false;
   return v.verdict == null || isAiVerdict(v.verdict);
 }
