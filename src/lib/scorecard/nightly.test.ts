@@ -663,13 +663,15 @@ test("rulesVsHold: kept filled rows only, one daily fetch with SPY", async () =>
   const kept = row({ id: 1, ticker: "KEEP", outcomes: filled });
   const vetoed = row({ id: 2, ticker: "VETO", status: "ai_rejected", aiReading: null, outcomes: filled });
   const { deps: d } = deps({ nowMs: NOV3, rows: [kept, vetoed] });
-  const calls: { tickers: string[]; fromSec: number; toSec: number }[] = [];
-  d.fetchDailyBars = async (tickers, fromSec, toSec) => {
-    calls.push({ tickers: [...tickers].sort(), fromSec, toSec });
+  const calls: { tickers: string[]; fromSec: number; toSec: number; adjustment: string }[] = [];
+  d.fetchDailyBars = async (tickers, fromSec, toSec, adjustment) => {
+    calls.push({ tickers: [...tickers].sort(), fromSec, toSec, adjustment });
     return new Map(tickers.map((t) => [t, [dailyBar("2026-11-02", 101)]]));
   };
   const snap = await runScorecardNightly(d);
-  assert.equal(calls.length, 1);
+  // Adjusted and raw, so a later split or dividend can be mapped back to the fill's units.
+  assert.deepEqual(calls.map((c) => c.adjustment), ["all", "raw"]);
+  assert.deepEqual(calls[1].tickers, ["KEEP", "SPY"]);
   assert.deepEqual(calls[0].tickers, ["KEEP", "SPY"]);
   assert.equal(calls[0].fromSec, fillAt - 86_400);
   assert.equal(calls[0].toSec, Math.floor((NOV3 - 16 * 60_000) / 1000));

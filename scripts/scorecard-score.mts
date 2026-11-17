@@ -111,10 +111,10 @@ const nightlyDeps = (send: NightlyDeps["send"], closedSinceSec: number | null = 
     return bars;
   },
   // Info-only rules vs buy-and-hold series: a failure is logged here and the nightly stores [].
-  fetchDailyBars: async (tickers, fromSec, toSec) => {
+  fetchDailyBars: async (tickers, fromSec, toSec, adjustment) => {
     try {
-      const bars = await fetchAlpacaRange(tickers, iso(fromSec), iso(toSec), "1d");
-      log(`scorecard-score: daily bars for ${bars.size}/${tickers.length} tickers ${iso(fromSec)}..${iso(toSec)}`);
+      const bars = await fetchAlpacaRange(tickers, iso(fromSec), iso(toSec), "1d", adjustment);
+      log(`scorecard-score: daily ${adjustment} bars for ${bars.size}/${tickers.length} tickers ${iso(fromSec)}..${iso(toSec)}`);
       return bars;
     } catch (e) {
       log(`scorecard-score: daily bars failed: ${String(e)}`);

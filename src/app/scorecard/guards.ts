@@ -110,7 +110,11 @@ export function isLiveSnapshot(v: unknown): v is LiveSnapshot {
   if (!(v.verdictPending === undefined || isStrOrNull(v.verdictPending))) return false;
   const pr = v.pendingReview;
   if (!(pr === undefined || (isObj(pr) && isNum(pr.n) && isStrOrNull(pr.oldestDate)))) return false;
-  const rvh = v.rulesVsHold;
-  if (!(rvh === undefined || isArrayOf(rvh, (p): p is RulesVsHoldPoint => isObj(p) && isStr(p.date) && hasNums(p, ["rules", "hold", "n"])))) return false;
+  // rulesVsHold is info only and not checked here: the page checks it with isRulesVsHold, so a bad series hides one card, not the page.
   return v.verdict == null || isAiVerdict(v.verdict);
+}
+
+/** The info-only rules vs buy-and-hold series; the page draws it only when this holds. */
+export function isRulesVsHold(v: unknown): v is RulesVsHoldPoint[] {
+  return isArrayOf(v, (p): p is RulesVsHoldPoint => isObj(p) && isStr(p.date) && hasNums(p, ["rules", "hold", "n"]));
 }

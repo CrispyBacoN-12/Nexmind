@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { Candle } from "@/lib/indicators";
 import { etClock } from "@/lib/scanAgent/session";
-import { rulesVsHoldSeries, type HoldTrade } from "./rulesVsHold";
+import { rulesVsHoldSeries as build, type HoldTrade } from "./rulesVsHold";
 import { rMultiple } from "./score";
 
 function etEpoch(date: string, hhmm: string): number {
@@ -18,6 +18,10 @@ function etEpoch(date: string, hhmm: string): number {
 
 /** A daily bar as Alpaca stamps it: ET midnight of its session. */
 const day = (date: string, c: number): Candle => ({ t: etEpoch(date, "00:00"), o: c, h: c, l: c, c, v: 1000 });
+/** Long after every test date: every session counts as closed. */
+const FAR = etEpoch("2027-01-04", "12:00");
+/** No corporate action: the raw series is the adjusted one. */
+const rulesVsHoldSeries = (trades: HoldTrade[], daily: Map<string, Candle[]>, cal: string) => build(trades, daily, daily, cal, FAR);
 const spy = (...dates: string[]) => dates.map((d) => day(d, 500));
 
 const trade = (over: Partial<HoldTrade> = {}): HoldTrade => ({
@@ -88,4 +92,28 @@ test("a trade joins on its own fill date; dates before any fill are omitted", ()
 
 test("no trades → []", () => {
   assert.deepEqual(rulesVsHoldSeries([], new Map([["SPY", spy("2026-11-02")]]), "SPY"), []);
+});
+
+test("a split after the fill: adjusted closes are marked in the fill's own price units", () => {
+  // 2:1 split after 11-02: adjusted history is halved, raw shows the as-traded 101 then 51.
+  const adjusted = new Map([
+    ["SPY", spy("2026-11-02", "2026-11-03")],
+    ["AAA", [day("2026-11-02", 50.5), day("2026-11-03", 51)]],
+  ]);
+  const raw = new Map([
+    ["SPY", spy("2026-11-02", "2026-11-03")],
+    ["AAA", [day("2026-11-02", 101), day("2026-11-03", 51)]],
+  ]);
+  const pts = build([trade()], adjusted, raw, "SPY", FAR);
+  assert.equal(pts[0].hold, rMultiple(100, 101, 99));
+  assert.equal(pts[1].hold, rMultiple(100, 102, 99));
+});
+
+test("a session not closed by the cutoff is left out (no partial daily bar)", () => {
+  const daily = new Map([
+    ["SPY", spy("2026-11-02", "2026-11-03")],
+    ["AAA", [day("2026-11-02", 101), day("2026-11-03", 150)]],
+  ]);
+  const pts = build([trade()], daily, daily, "SPY", etEpoch("2026-11-03", "12:00"));
+  assert.deepEqual(pts.map((p) => p.date), ["2026-11-02"]);
 });

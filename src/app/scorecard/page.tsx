@@ -13,7 +13,7 @@ import { CumulativeChart } from "./cumulative-chart";
 import { RulesVsHoldChart } from "./rules-vs-hold-chart";
 import { fmtR, rTone } from "./format";
 import { GroupTable, type TableRow } from "./group-table";
-import { isAiVerdict, isLiveSnapshot, isReplaySummary } from "./guards";
+import { isAiVerdict, isLiveSnapshot, isReplaySummary, isRulesVsHold } from "./guards";
 
 export const metadata = { title: "Scorecard — NEXMIND" };
 
@@ -356,7 +356,7 @@ export default async function ScorecardPage() {
 
       <Card>
         <CardTitle>ตามกฎ vs ซื้อแล้วถือ (R)</CardTitle>
-        {live && live.rulesVsHold && live.rulesVsHold.length > 0 ? (
+        {live && isRulesVsHold(live.rulesVsHold) && live.rulesVsHold.length > 0 ? (
           <>
             <RulesVsHoldChart points={live.rulesVsHold} />
             <p className="text-xs text-(--color-muted) mt-2">

@@ -103,7 +103,7 @@ export interface NightlyDeps {
    * Daily bars for `tickers` over [fromSec, toSec], for the info-only rules vs buy-and-hold
    * series. Absent or throwing: the series is empty and nothing else changes.
    */
-  fetchDailyBars?(tickers: string[], fromSec: number, toSec: number): Promise<Map<string, Candle[]>>;
+  fetchDailyBars?(tickers: string[], fromSec: number, toSec: number, adjustment: "all" | "raw"): Promise<Map<string, Candle[]>>;
 }
 
 /** The bar cutoff (epoch seconds) of a nightly run at `nowMs`: SIP bars are SIP_DELAY_MS late. */
@@ -586,8 +586,10 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   if (holdTrades.length && deps.fetchDailyBars) {
     try {
       const from = Math.min(...holdTrades.map((t) => t.fillAt)) - DAY_SEC;
-      const daily = await deps.fetchDailyBars([...new Set([...holdTrades.map((t) => t.ticker), CALENDAR_TICKER])], from, cutoffSec);
-      rulesVsHold = rulesVsHoldSeries(holdTrades, daily, CALENDAR_TICKER);
+      const tickers = [...new Set([...holdTrades.map((t) => t.ticker), CALENDAR_TICKER])];
+      const adjusted = await deps.fetchDailyBars(tickers, from, cutoffSec, "all");
+      const raw = await deps.fetchDailyBars(tickers, from, cutoffSec, "raw");
+      rulesVsHold = rulesVsHoldSeries(holdTrades, adjusted, raw, CALENDAR_TICKER, cutoffSec);
     } catch {
       rulesVsHold = [];
     }
