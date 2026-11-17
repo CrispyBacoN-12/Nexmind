@@ -110,6 +110,17 @@ const nightlyDeps = (send: NightlyDeps["send"], closedSinceSec: number | null = 
     log(`scorecard-score: bars for ${bars.size}/${tickers.length} tickers ${iso(fromSec)}..${iso(toSec)}`);
     return bars;
   },
+  // Info-only rules vs buy-and-hold series: a failure is logged here and the nightly stores [].
+  fetchDailyBars: async (tickers, fromSec, toSec) => {
+    try {
+      const bars = await fetchAlpacaRange(tickers, iso(fromSec), iso(toSec), "1d");
+      log(`scorecard-score: daily bars for ${bars.size}/${tickers.length} tickers ${iso(fromSec)}..${iso(toSec)}`);
+      return bars;
+    } catch (e) {
+      log(`scorecard-score: daily bars failed: ${String(e)}`);
+      throw e;
+    }
+  },
   saveOutcomes: async (rows) => {
     // No $transaction: it needs Neon's WebSocket, which timed out on this network while
     // plain queries go over HTTPS. Each upsert is keyed and idempotent, so a run that

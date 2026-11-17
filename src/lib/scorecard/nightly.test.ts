@@ -652,3 +652,55 @@ test("closures a silent refresh scored after the last summary still reach the ne
   await runScorecardNightly(none.deps);
   assert.equal(closedLine(none.rec.sent[0]), "ปิดแล้ว: —");
 });
+
+// --- Rules vs buy-and-hold (info only) ---------------------------------------------
+
+const dailyBar = (date: string, c: number): Candle => ({ t: etEpoch(date, "00:00"), o: c, h: c, l: c, c, v: 1000 });
+
+test("rulesVsHold: kept filled rows only, one daily fetch with SPY", async () => {
+  const fillAt = etEpoch("2026-11-02", "10:35");
+  const filled = { hold: closedOutcome({ fillAt, exitAt: etEpoch("2026-11-02", "14:00") }), sameDay: closedOutcome({ fillAt }) };
+  const kept = row({ id: 1, ticker: "KEEP", outcomes: filled });
+  const vetoed = row({ id: 2, ticker: "VETO", status: "ai_rejected", aiReading: null, outcomes: filled });
+  const { deps: d } = deps({ nowMs: NOV3, rows: [kept, vetoed] });
+  const calls: { tickers: string[]; fromSec: number; toSec: number }[] = [];
+  d.fetchDailyBars = async (tickers, fromSec, toSec) => {
+    calls.push({ tickers: [...tickers].sort(), fromSec, toSec });
+    return new Map(tickers.map((t) => [t, [dailyBar("2026-11-02", 101)]]));
+  };
+  const snap = await runScorecardNightly(d);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].tickers, ["KEEP", "SPY"]);
+  assert.equal(calls[0].fromSec, fillAt - 86_400);
+  assert.equal(calls[0].toSec, Math.floor((NOV3 - 16 * 60_000) / 1000));
+  assert.deepEqual(snap.rulesVsHold, [{ date: "2026-11-02", rules: 0.5, hold: rMultiple(100, 101, 99), n: 1 }]);
+});
+
+test("rulesVsHold: a failed daily fetch leaves [] and the snapshot still saves", async () => {
+  const kept = row({ outcomes: { hold: closedOutcome(), sameDay: closedOutcome() } });
+  const { deps: d, rec } = deps({ nowMs: NOV3, rows: [kept] });
+  d.fetchDailyBars = async () => {
+    throw new Error("alpaca down");
+  };
+  const snap = await runScorecardNightly(d);
+  assert.deepEqual(snap.rulesVsHold, []);
+  assert.equal(rec.live.length, 1);
+  assert.equal(rec.sent.length, 1);
+});
+
+test("rulesVsHold: no dep or no eligible rows → [] and no call", async () => {
+  const kept = row({ outcomes: { hold: closedOutcome(), sameDay: closedOutcome() } });
+  const noDep = await runScorecardNightly(deps({ nowMs: NOV3, rows: [kept] }).deps);
+  assert.deepEqual(noDep.rulesVsHold, []);
+
+  const unfilled = row({ outcomes: { hold: { ...closedOutcome(), status: "not_filled", fill: null, fillAt: null, exitAt: null, r: null, exitReason: null, exitPrice: null }, sameDay: closedOutcome() } });
+  const { deps: d } = deps({ nowMs: NOV3, rows: [unfilled] });
+  let called = 0;
+  d.fetchDailyBars = async () => {
+    called++;
+    return new Map();
+  };
+  const snap = await runScorecardNightly(d);
+  assert.equal(called, 0);
+  assert.deepEqual(snap.rulesVsHold, []);
+});

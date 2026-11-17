@@ -31,6 +31,7 @@ import { etDayBoundsMs } from "./etDay";
 import { aiVerdictSample, beatsControl, groupOf, summarize, type Group, type GroupStats } from "./groups";
 import type { ScorecardRunInput } from "./runDaily";
 import { rMultiple, scoreSetup } from "./score";
+import { rulesVsHoldSeries, type HoldTrade, type RulesVsHoldPoint } from "./rulesVsHold";
 import {
   PENDING_BACKEND,
   SCORECARD_MAX_HOLD_SESSIONS,
@@ -98,6 +99,11 @@ export interface NightlyDeps {
    * before that run's cutoff, so the previous summary's own closures are never listed twice.
    */
   closedSinceSec?: number | null;
+  /**
+   * Daily bars for `tickers` over [fromSec, toSec], for the info-only rules vs buy-and-hold
+   * series. Absent or throwing: the series is empty and nothing else changes.
+   */
+  fetchDailyBars?(tickers: string[], fromSec: number, toSec: number): Promise<Map<string, Candle[]>>;
 }
 
 /** The bar cutoff (epoch seconds) of a nightly run at `nowMs`: SIP bars are SIP_DELAY_MS late. */
@@ -197,6 +203,8 @@ export interface LiveSnapshot {
    * Null when no verdict was due or it was frozen.
    */
   verdictPending: string | null;
+  /** AI-kept filled setups under the exit rules vs held forever, marked at each daily close (info only). Absent in older snapshots. */
+  rulesVsHold?: RulesVsHoldPoint[];
 }
 
 const NO_OUTCOME: Outcome = {
@@ -565,6 +573,26 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
   const cumulativeR = {} as LiveSnapshot["cumulativeR"];
   for (const g of statsGroups) cumulativeR[g] = cumulative(liveRows.filter((r) => statsGroupOf(r) === g).map((r) => ({ id: r.id, hold: holdOf(r) })));
 
+  // 3b. Rules vs buy-and-hold (info only): the AI-kept fills, marked daily. A failed fetch
+  //     leaves the series empty; nothing above or below depends on it.
+  const holdTrades: HoldTrade[] = liveRows
+    .filter((r) => groupOfRow(r) === "kept" && holdOf(r).fill !== null && holdOf(r).fillAt !== null)
+    .map((r) => {
+      const h = holdOf(r);
+      const closed = h.status === "closed" && h.r !== null && h.exitAt !== null;
+      return { ticker: r.ticker, fill: h.fill as number, fillAt: h.fillAt as number, stop: r.stop, closedR: closed ? h.r : null, exitAt: closed ? h.exitAt : null };
+    });
+  let rulesVsHold: RulesVsHoldPoint[] = [];
+  if (holdTrades.length && deps.fetchDailyBars) {
+    try {
+      const from = Math.min(...holdTrades.map((t) => t.fillAt)) - DAY_SEC;
+      const daily = await deps.fetchDailyBars([...new Set([...holdTrades.map((t) => t.ticker), CALENDAR_TICKER])], from, cutoffSec);
+      rulesVsHold = rulesVsHoldSeries(holdTrades, daily, CALENDAR_TICKER);
+    } catch {
+      rulesVsHold = [];
+    }
+  }
+
   // 4. Last night's run and the missed weekdays.
   const sessionDate = lastRunSession(nowMs);
   const weekdays: string[] = [];
@@ -656,6 +684,7 @@ export async function runScorecardNightly(deps: NightlyDeps): Promise<LiveSnapsh
     recentTrades,
     verdict,
     verdictPending,
+    rulesVsHold,
   };
   await deps.saveLive(snapshot);
 
