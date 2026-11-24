@@ -5,7 +5,7 @@
 
 import { daysBetween } from "@/lib/advisor/earningsPhrase";
 import type { EarningsInfo, LiveQuote } from "@/lib/advisor/types";
-import { worstGapDownPct } from "@/lib/hedge/math";
+import { worstGapDownPct } from "./gaps";
 import type { Candle } from "@/lib/indicators";
 import { CORRELATION_WINDOW, dateAlignedCorrelation } from "@/lib/portfolio/marketInputs";
 
