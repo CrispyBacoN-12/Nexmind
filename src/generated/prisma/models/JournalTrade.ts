@@ -293,7 +293,7 @@ export type JournalTradeWhereInput = {
   id?: Prisma.IntFilter<"JournalTrade"> | number
   ticker?: Prisma.StringFilter<"JournalTrade"> | string
   sector?: Prisma.StringFilter<"JournalTrade"> | string
-  shares?: Prisma.IntFilter<"JournalTrade"> | number
+  shares?: Prisma.FloatFilter<"JournalTrade"> | number
   entryPrice?: Prisma.FloatFilter<"JournalTrade"> | number
   entryDate?: Prisma.StringFilter<"JournalTrade"> | string
   stop?: Prisma.FloatFilter<"JournalTrade"> | number
@@ -330,7 +330,7 @@ export type JournalTradeWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.JournalTradeWhereInput | Prisma.JournalTradeWhereInput[]
   ticker?: Prisma.StringFilter<"JournalTrade"> | string
   sector?: Prisma.StringFilter<"JournalTrade"> | string
-  shares?: Prisma.IntFilter<"JournalTrade"> | number
+  shares?: Prisma.FloatFilter<"JournalTrade"> | number
   entryPrice?: Prisma.FloatFilter<"JournalTrade"> | number
   entryDate?: Prisma.StringFilter<"JournalTrade"> | string
   stop?: Prisma.FloatFilter<"JournalTrade"> | number
@@ -371,7 +371,7 @@ export type JournalTradeScalarWhereWithAggregatesInput = {
   id?: Prisma.IntWithAggregatesFilter<"JournalTrade"> | number
   ticker?: Prisma.StringWithAggregatesFilter<"JournalTrade"> | string
   sector?: Prisma.StringWithAggregatesFilter<"JournalTrade"> | string
-  shares?: Prisma.IntWithAggregatesFilter<"JournalTrade"> | number
+  shares?: Prisma.FloatWithAggregatesFilter<"JournalTrade"> | number
   entryPrice?: Prisma.FloatWithAggregatesFilter<"JournalTrade"> | number
   entryDate?: Prisma.StringWithAggregatesFilter<"JournalTrade"> | string
   stop?: Prisma.FloatWithAggregatesFilter<"JournalTrade"> | number
@@ -419,7 +419,7 @@ export type JournalTradeUncheckedCreateInput = {
 export type JournalTradeUpdateInput = {
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   sector?: Prisma.StringFieldUpdateOperationsInput | string
-  shares?: Prisma.IntFieldUpdateOperationsInput | number
+  shares?: Prisma.FloatFieldUpdateOperationsInput | number
   entryPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   entryDate?: Prisma.StringFieldUpdateOperationsInput | string
   stop?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -436,7 +436,7 @@ export type JournalTradeUncheckedUpdateInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   sector?: Prisma.StringFieldUpdateOperationsInput | string
-  shares?: Prisma.IntFieldUpdateOperationsInput | number
+  shares?: Prisma.FloatFieldUpdateOperationsInput | number
   entryPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   entryDate?: Prisma.StringFieldUpdateOperationsInput | string
   stop?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -468,7 +468,7 @@ export type JournalTradeCreateManyInput = {
 export type JournalTradeUpdateManyMutationInput = {
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   sector?: Prisma.StringFieldUpdateOperationsInput | string
-  shares?: Prisma.IntFieldUpdateOperationsInput | number
+  shares?: Prisma.FloatFieldUpdateOperationsInput | number
   entryPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   entryDate?: Prisma.StringFieldUpdateOperationsInput | string
   stop?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -484,7 +484,7 @@ export type JournalTradeUncheckedUpdateManyInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   sector?: Prisma.StringFieldUpdateOperationsInput | string
-  shares?: Prisma.IntFieldUpdateOperationsInput | number
+  shares?: Prisma.FloatFieldUpdateOperationsInput | number
   entryPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   entryDate?: Prisma.StringFieldUpdateOperationsInput | string
   stop?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -633,7 +633,7 @@ export type JournalTradeUpdateToOneWithWhereWithoutOverridesInput = {
 export type JournalTradeUpdateWithoutOverridesInput = {
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   sector?: Prisma.StringFieldUpdateOperationsInput | string
-  shares?: Prisma.IntFieldUpdateOperationsInput | number
+  shares?: Prisma.FloatFieldUpdateOperationsInput | number
   entryPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   entryDate?: Prisma.StringFieldUpdateOperationsInput | string
   stop?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -649,7 +649,7 @@ export type JournalTradeUncheckedUpdateWithoutOverridesInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   ticker?: Prisma.StringFieldUpdateOperationsInput | string
   sector?: Prisma.StringFieldUpdateOperationsInput | string
-  shares?: Prisma.IntFieldUpdateOperationsInput | number
+  shares?: Prisma.FloatFieldUpdateOperationsInput | number
   entryPrice?: Prisma.FloatFieldUpdateOperationsInput | number
   entryDate?: Prisma.StringFieldUpdateOperationsInput | string
   stop?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -778,6 +778,9 @@ export type $JournalTradePayload<ExtArgs extends runtime.Types.Extensions.Intern
      * GICS sector resolved at entry (src/lib/portfolio/sectorMap.ts); "Other" = unknown.
      */
     sector: string
+    /**
+     * Fractional allowed (Webull sells fractions); Int until 2026-11-25.
+     */
     shares: number
     entryPrice: number
     /**
@@ -1224,7 +1227,7 @@ export interface JournalTradeFieldRefs {
   readonly id: Prisma.FieldRef<"JournalTrade", 'Int'>
   readonly ticker: Prisma.FieldRef<"JournalTrade", 'String'>
   readonly sector: Prisma.FieldRef<"JournalTrade", 'String'>
-  readonly shares: Prisma.FieldRef<"JournalTrade", 'Int'>
+  readonly shares: Prisma.FieldRef<"JournalTrade", 'Float'>
   readonly entryPrice: Prisma.FieldRef<"JournalTrade", 'Float'>
   readonly entryDate: Prisma.FieldRef<"JournalTrade", 'String'>
   readonly stop: Prisma.FieldRef<"JournalTrade", 'Float'>
