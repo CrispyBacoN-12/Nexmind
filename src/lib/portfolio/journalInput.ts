@@ -6,7 +6,7 @@
 import { GICS_SECTORS, type ResolvedSector } from "./sectorMap";
 import type { NavPoint, PortfolioSlot } from "./types";
 
-const TICKER_RE = /^[A-Z][A-Z.\-]{0,9}$/;
+export const TICKER_RE = /^[A-Z][A-Z.\-]{0,9}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
