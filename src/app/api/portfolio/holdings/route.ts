@@ -1,7 +1,8 @@
-// The owner's holdings (local file). LOCAL ONLY: on Vercel every method 404s
-// before touching the file — the deployed site is public.
+// The owner's holdings (local file). LOCAL ONLY: on Vercel, or for any request
+// not addressed to localhost (another device on the Wi-Fi, DNS rebinding, a
+// cross-site POST), every method 404s before touching the file.
 
-import { isDeployed } from "@/lib/portfolioRisk/localOnly";
+import { isDeployed, isLocalRequest } from "@/lib/portfolioRisk/localOnly";
 import { deleteHolding, parseHoldingInput, readHoldings, upsertHolding } from "@/lib/portfolioRisk/store";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +10,8 @@ export const dynamic = "force-dynamic";
 const notFound = () => Response.json({ ok: false, error: "not found" }, { status: 404 });
 const fail = (e: unknown) => Response.json({ ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 120) }, { status: 500 });
 
-export async function GET() {
-  if (isDeployed()) return notFound();
+export async function GET(request: Request) {
+  if (isDeployed() || !isLocalRequest(request.headers)) return notFound();
   try {
     return Response.json({ ok: true, holdings: await readHoldings() });
   } catch (e) {
@@ -19,7 +20,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (isDeployed()) return notFound();
+  if (isDeployed() || !isLocalRequest(request.headers)) return notFound();
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const parsed = parseHoldingInput(body);
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (isDeployed()) return notFound();
+  if (isDeployed() || !isLocalRequest(request.headers)) return notFound();
   try {
     const ticker = new URL(request.url).searchParams.get("ticker")?.trim().toUpperCase() ?? "";
     if (!ticker) return Response.json({ ok: false, error: "ticker is required" }, { status: 400 });

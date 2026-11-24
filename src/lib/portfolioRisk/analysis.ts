@@ -134,6 +134,11 @@ export async function buildPortfolioAnalysis(holdings: HoldingRow[], deps: Analy
       await deps.pace();
       try {
         const e = await deps.earnings(h.ticker);
+        // fetchNextEarnings never throws: a refused call (429, no key) comes back
+        // as date null with a reason. Only "none scheduled" means none is coming.
+        if (e.date == null && !/^no report scheduled/.test(e.note ?? "")) {
+          missing.push({ ticker: h.ticker, what: "earnings", reason: (e.note ?? "unknown").slice(0, 80) });
+        }
         const days = e.date ? daysBetween(todayNY, e.date) : null;
         if (e.date && days != null && days >= 0 && days <= EARNINGS_AHEAD_DAYS) {
           earnings.push({ ticker: h.ticker, date: e.date, hour: e.hour, days, worstGapPct: worstGapDownPct(deps.candles.get(h.ticker) ?? null) });
@@ -163,8 +168,10 @@ export async function buildPortfolioAnalysis(holdings: HoldingRow[], deps: Analy
   });
 
   const weightOf = new Map(rows.map((r) => [r.ticker, r.weight]));
+  // ETFs are left out: a broad fund correlates with most large caps and would
+  // chain them all into one cluster. Their market sensitivity is in the beta section.
   const clusters = correlationClusters(
-    rows.map((r) => r.ticker),
+    rows.filter((r) => r.kind !== "etf").map((r) => r.ticker),
     (a, b) => {
       const ca = deps.candles.get(a);
       const cb = deps.candles.get(b);

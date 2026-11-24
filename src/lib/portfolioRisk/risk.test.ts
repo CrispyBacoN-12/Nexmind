@@ -108,7 +108,9 @@ test("portfolioBeta: weighted, excluded listed", () => {
   ]);
   assert.ok(close(r.beta!, 1.25));
   assert.ok(close(r.scenarioUsd, -25));
-  assert.ok(close(r.scenarioPct!, -0.1));
+  // % of the MEASURED part only; coverage says how much of the book that is.
+  assert.ok(close(r.scenarioPct!, -0.125));
+  assert.ok(close(r.coverage!, 0.8));
   assert.deepEqual(r.excluded, ["CCC"]);
   assert.equal(r.excludedValue, 50);
 });
@@ -117,7 +119,8 @@ test("portfolioBeta: nothing measurable", () => {
   const r = portfolioBeta([{ ticker: "AAA", value: 100, beta: null }]);
   assert.equal(r.beta, null);
   assert.equal(r.scenarioUsd, 0);
-  assert.equal(r.scenarioPct, 0);
+  assert.equal(r.scenarioPct, null);
+  assert.equal(r.coverage, 0);
   const empty = portfolioBeta([]);
   assert.equal(empty.scenarioPct, null);
 });
@@ -132,6 +135,8 @@ test("correlationClusters: connected components at 0.75", () => {
   assert.ok(close(c[0].weight, 0.45));
   assert.equal(c[0].flagged, true);
   assert.deepEqual(c[0].strongest, { a: "AAA", b: "BBB", r: 0.9 });
+  // the weakest measured pair inside a chained cluster is shown too
+  assert.equal(c[0].weakest?.r, 0.8);
   assert.deepEqual(c[1].members, ["DDD", "EEE"]);
   assert.ok(close(c[1].weight, 0.35));
   assert.equal(c[1].flagged, true);

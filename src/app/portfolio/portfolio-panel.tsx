@@ -265,20 +265,25 @@ function AnalysisView({ a }: { a: PortfolioAnalysis }) {
                 <span className="font-medium">{c.members.join(", ")}</span>
                 <span className="text-(--color-muted)">
                   คู่ที่ไปด้วยกันมากสุด {c.strongest.a}–{c.strongest.b} ({fmtNumber(c.strongest.r, 2)})
+                  {c.weakest && c.members.length > 2 && ` · คู่ที่ห่างที่สุดในกลุ่ม ${c.weakest.a}–${c.weakest.b} (${fmtNumber(c.weakest.r, 2)})`}
                 </span>
               </li>
             ))}
           </ul>
         )}
-        <p className="text-xs text-(--color-muted)">ป้ายสีเหลือง = กลุ่มรวมกันตั้งแต่ 30% ของพอร์ตขึ้นไป</p>
+        <p className="text-xs text-(--color-muted)">
+          ป้ายสีเหลือง = กลุ่มรวมกันตั้งแต่ 30% ของพอร์ตขึ้นไป · ไม่นับ ETF / กองทุน (กองทุนขึ้นลงตามตลาดอยู่แล้ว ดูในหัวข้อ 4) · หุ้นในกลุ่มเดียวกันเชื่อมกันเป็นทอด ๆ ไม่ใช่ทุกคู่จะไปด้วยกันแรงเท่ากัน
+        </p>
       </Section>
 
       <Section title="4. ถ้าตลาดลง">
         {a.market.scenarioPct == null ? (
-          <p className="text-xs text-(--color-muted)">คำนวณไม่ได้</p>
+          <p className="text-xs text-amber-400">คำนวณไม่ได้: ไม่มีหุ้นตัวไหนมีประวัติราคาพอคำนวณ beta</p>
         ) : (
           <p>
-            ถ้า S&amp;P 500 ลง 10% พอร์ตน่าจะลงประมาณ <span className="font-semibold">{pct(Math.abs(a.market.scenarioPct))}</span> (≈{" "}
+            ถ้า S&amp;P 500 ลง 10%{" "}
+            {a.market.coverage != null && a.market.coverage < 0.999 ? `ส่วนที่วัดได้ (${pct(a.market.coverage)} ของพอร์ต)` : "พอร์ต"}{" "}
+            น่าจะลงประมาณ <span className="font-semibold">{pct(Math.abs(a.market.scenarioPct))}</span> (≈{" "}
             {fmtMoney(Math.abs(a.market.scenarioUsd))})
           </p>
         )}

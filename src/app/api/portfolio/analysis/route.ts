@@ -6,7 +6,7 @@ import { fetchNextEarnings } from "@/lib/market/earnings";
 import { fetchLiveQuote } from "@/lib/market/quote";
 import { fetchCandlesBatch } from "@/lib/marketData";
 import { buildPortfolioAnalysis, makePacer } from "@/lib/portfolioRisk/analysis";
-import { isDeployed } from "@/lib/portfolioRisk/localOnly";
+import { isDeployed, isLocalRequest } from "@/lib/portfolioRisk/localOnly";
 import { fetchProfileKind } from "@/lib/portfolioRisk/profile";
 import { readHoldings, setProfiles } from "@/lib/portfolioRisk/store";
 
@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
 /** Finnhub's free tier is 60/min; stay under it. */
 const FINNHUB_PER_MINUTE = 55;
 
-export async function GET() {
-  if (isDeployed()) return Response.json({ ok: false, error: "not found" }, { status: 404 });
+export async function GET(request: Request) {
+  if (isDeployed() || !isLocalRequest(request.headers)) return Response.json({ ok: false, error: "not found" }, { status: 404 });
   try {
     const holdings = await readHoldings();
     const asOf = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });

@@ -7,7 +7,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { isDeployed } from "./localOnly";
+import { isDeployed, isLocalRequest } from "./localOnly";
 import { deleteHolding, parseHoldingInput, readHoldings, setProfiles, upsertHolding } from "./store";
 
 const tmpFile = async () => path.join(await mkdtemp(path.join(os.tmpdir(), "holdings-")), "nested", "holdings.json");
@@ -65,4 +65,16 @@ test("deleteHolding removes only that ticker; absent is a no-op", async () => {
 test("isDeployed", () => {
   assert.equal(isDeployed({ VERCEL: "1" }), true);
   assert.equal(isDeployed({}), false);
+});
+
+test("isLocalRequest: only localhost hosts and same-origin writes", () => {
+  const h = (o: Record<string, string>) => new Headers(o);
+  assert.equal(isLocalRequest(h({ host: "localhost:3275" })), true);
+  assert.equal(isLocalRequest(h({ host: "127.0.0.1:3275" })), true);
+  assert.equal(isLocalRequest(h({ host: "[::1]:3275" })), true);
+  assert.equal(isLocalRequest(h({ host: "192.168.1.20:3275" })), false); // another device on the Wi-Fi
+  assert.equal(isLocalRequest(h({ host: "evil.example:3275" })), false); // DNS rebinding
+  assert.equal(isLocalRequest(h({})), false);
+  assert.equal(isLocalRequest(h({ host: "localhost:3275", origin: "http://localhost:3275" })), true);
+  assert.equal(isLocalRequest(h({ host: "localhost:3275", origin: "https://evil.example" })), false); // cross-site POST
 });

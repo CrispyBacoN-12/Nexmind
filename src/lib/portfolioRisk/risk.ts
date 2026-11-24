@@ -131,12 +131,15 @@ export interface BetaInput {
 /**
  * Value-weighted beta over the holdings that have one, and the $ / % move if
  * SPY moves SCENARIO_SPY_MOVE. Holdings without beta are excluded and listed,
- * never assumed to be beta 1. scenarioPct is over ALL holdings' value.
+ * never assumed to be beta 1 (or 0). scenarioPct is the move of the MEASURED
+ * part only; `coverage` is how much of the book that part is, so a half-measured
+ * book never reads as half the risk. Nothing measured → scenarioPct null.
  */
 export function portfolioBeta(rows: BetaInput[]): {
   beta: number | null;
   scenarioUsd: number;
   scenarioPct: number | null;
+  coverage: number | null;
   excluded: string[];
   excludedValue: number;
 } {
@@ -148,7 +151,8 @@ export function portfolioBeta(rows: BetaInput[]): {
   return {
     beta: measuredValue > 0 ? measured.reduce((s, r) => s + r.value * r.beta!, 0) / measuredValue : null,
     scenarioUsd,
-    scenarioPct: totalValue > 0 ? scenarioUsd / totalValue : null,
+    scenarioPct: measuredValue > 0 ? scenarioUsd / measuredValue : null,
+    coverage: totalValue > 0 ? measuredValue / totalValue : null,
     excluded: excludedRows.map((r) => r.ticker),
     excludedValue: excludedRows.reduce((s, r) => s + r.value, 0),
   };
@@ -159,6 +163,8 @@ export interface Cluster {
   weight: number;
   flagged: boolean;
   strongest: { a: string; b: string; r: number };
+  /** The least-correlated measured pair inside the cluster: a chained cluster is not all this tight. */
+  weakest: { a: string; b: string; r: number } | null;
 }
 
 /** Connected components of the graph whose edges have correlation ≥ threshold; 2+ members only. */
@@ -191,7 +197,14 @@ export function correlationClusters(
     const set = new Set(members);
     const strongest = edges.filter((e) => set.has(e.a)).sort((x, y) => y.r - x.r)[0];
     const weight = members.reduce((s, t) => s + weightOf(t), 0);
-    out.push({ members, weight, flagged: weight >= CLUSTER_FLAG - EPS, strongest });
+    let weakest: Cluster["weakest"] = null;
+    for (let i = 0; i < members.length; i++) {
+      for (let j = i + 1; j < members.length; j++) {
+        const r = corr(members[i], members[j]);
+        if (r != null && Number.isFinite(r) && (weakest == null || r < weakest.r)) weakest = { a: members[i], b: members[j], r };
+      }
+    }
+    out.push({ members, weight, flagged: weight >= CLUSTER_FLAG - EPS, strongest, weakest });
   }
   return out.sort((a, b) => b.weight - a.weight);
 }

@@ -118,6 +118,29 @@ test("buildPortfolioAnalysis: one failing source per holding is reported, rest r
   assert.ok(a.industries.length > 0);
 });
 
+test("buildPortfolioAnalysis: a refused earnings call is reported, not read as none coming", async () => {
+  const a = await buildPortfolioAnalysis(
+    [row("AAA", 1, 8, "stock", "S"), row("BBB", 1, 8, "stock", "S")],
+    deps({
+      earnings: async (t) =>
+        t === "AAA" ? { date: null, hour: null, note: "Finnhub HTTP 429" } : { date: null, hour: null, note: "no report scheduled in the next 120 days" },
+    }),
+    "2026-11-25",
+  );
+  assert.ok(a.missing.some((m) => m.ticker === "AAA" && m.what === "earnings" && m.reason.includes("429")));
+  assert.ok(!a.missing.some((m) => m.ticker === "BBB" && m.what === "earnings"));
+});
+
+test("buildPortfolioAnalysis: ETFs are not chained into move-together clusters", async () => {
+  const same = bars(200, 10, 0.02);
+  const a = await buildPortfolioAnalysis(
+    [row("AAA", 1, 8, "stock", "S"), row("BBB", 1, 8, "etf"), row("CCC", 1, 8, "stock", "S")],
+    deps({ candles: new Map([["AAA", same], ["BBB", same], ["CCC", same]]) }),
+    "2026-11-25",
+  );
+  assert.deepEqual(a.clusters.map((c) => c.members), [["AAA", "CCC"]]);
+});
+
 test("makePacer: spaces calls", async () => {
   const slept: number[] = [];
   let now = 0;

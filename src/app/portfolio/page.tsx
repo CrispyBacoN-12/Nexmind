@@ -1,5 +1,7 @@
+import { headers } from "next/headers";
+
 import { Card, PageHeader } from "@/components/ui";
-import { isDeployed } from "@/lib/portfolioRisk/localOnly";
+import { isDeployed, isLocalRequest } from "@/lib/portfolioRisk/localOnly";
 
 import { PortfolioPanel } from "./portfolio-panel";
 
@@ -7,8 +9,8 @@ export const metadata = { title: "พอร์ตของฉัน — NEXMIND"
 export const dynamic = "force-dynamic";
 
 /** LOCAL ONLY: the owner's real holdings never render on the public site. */
-export default function PortfolioPage() {
-  if (isDeployed()) {
+export default async function PortfolioPage() {
+  if (isDeployed() || !isLocalRequest(await headers())) {
     return (
       <Card>
         <p className="text-sm">ใช้ได้เฉพาะบนเครื่อง</p>
