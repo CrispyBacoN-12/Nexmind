@@ -117,23 +117,40 @@ export function hvnNodes(bars: Candle[], lookback = HVN_BARS, bins = HVN_BINS, m
     const z = binOf(b.h);
     for (let k = a; k <= z; k++) vol[k] += b.v / (z - a + 1);
   }
-  const median = [...vol].sort((x, y) => x - y)[Math.floor(bins / 2)];
-  // A bar spreads its volume evenly over its bins, so a heavy bar makes a flat
-  // top of equal bins: a node is the whole plateau, not its first bin.
+  // Spreading each bar evenly over its bins makes the raw histogram jagged
+  // (edge bins pick up neighbours' volume), which splits one heavy area into
+  // several peaks and lets tiny bumps pass a median test. So: smooth over 3
+  // bins, find peaks on the smoothed curve, require ≥ minRatio × the MEAN bin,
+  // and report each node as its peak bin ± 1 with the raw volume share.
+  const sm = vol.map((_, k) => {
+    let s = 0;
+    let n = 0;
+    for (let m = k - 1; m <= k + 1; m++) {
+      if (m >= 0 && m < bins) {
+        s += vol[m];
+        n++;
+      }
+    }
+    return s / n;
+  });
+  const mean = total / bins;
   const same = (a: number, b: number) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a));
   const out: Hvn[] = [];
   for (let k = 0; k < bins; k++) {
-    const left = k > 0 ? vol[k - 1] : -Infinity;
-    if (!(vol[k] > 0 && vol[k] > left && !same(vol[k], left))) continue;
+    const left = k > 0 ? sm[k - 1] : -Infinity;
+    if (!(sm[k] > left && !same(sm[k], left))) continue;
     let j = k;
-    while (j + 1 < bins && same(vol[j + 1], vol[k])) j++;
-    const right = j + 1 < bins ? vol[j + 1] : -Infinity;
-    if (vol[k] > right && vol[k] >= minRatio * median) {
-      let plateau = 0;
-      for (let m = k; m <= j; m++) plateau += vol[m];
-      const low = lo + k * width;
-      const high = lo + (j + 1) * width;
-      out.push({ low, high, center: (low + high) / 2, share: plateau / total });
+    while (j + 1 < bins && same(sm[j + 1], sm[k])) j++; // flat top: one node
+    const right = j + 1 < bins ? sm[j + 1] : -Infinity;
+    if (sm[k] > right && sm[k] >= minRatio * mean) {
+      const peak = Math.floor((k + j) / 2);
+      const a = Math.max(0, peak - 1);
+      const z = Math.min(bins - 1, peak + 1);
+      let share = 0;
+      for (let m = a; m <= z; m++) share += vol[m];
+      const low = lo + a * width;
+      const high = lo + (z + 1) * width;
+      out.push({ low, high, center: (low + high) / 2, share: share / total });
     }
     k = j;
   }
