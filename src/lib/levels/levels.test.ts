@@ -87,8 +87,7 @@ function wave(levels: number[], last: number, cycles = 4): Candle[] {
 test("computeLevels: support below, resistance above, nearest first, ≤ 3", () => {
   const candles = wave([90, 105, 95, 110], 100);
   const r = computeLevels(candles, candles.at(-1)!.t + 86400);
-  assert.ok(!("note" in r && r.note === "noData"));
-  if ("note" in r && r.note === "noData") return;
+  if (!("price" in r)) throw new Error("noData");
   assert.ok(r.support.length >= 1 && r.support.length <= 3);
   assert.ok(r.resistance.length >= 1 && r.resistance.length <= 3);
   assert.ok(r.support.every((z) => z.high < r.price));
@@ -103,7 +102,7 @@ test("computeLevels: support below, resistance above, nearest first, ≤ 3", () 
 test("computeLevels: no zone above → none message", () => {
   const candles = Array.from({ length: 200 }, (_, i) => bar(i, 50 + i * 0.5));
   const r = computeLevels(candles, candles.at(-1)!.t + 86400);
-  if ("note" in r && r.note === "noData") throw new Error("noData");
+  if (!("price" in r)) throw new Error("noData");
   assert.deepEqual(r.resistance, []);
   assert.equal(r.price, candles.at(-1)!.c);
 });
@@ -111,7 +110,7 @@ test("computeLevels: no zone above → none message", () => {
 test("computeLevels: short history", () => {
   const candles = Array.from({ length: 30 }, (_, i) => bar(i, 100 + (i % 5)));
   const r = computeLevels(candles, candles.at(-1)!.t + 86400);
-  if ("note" in r && r.note === "noData") throw new Error("noData");
+  if (!("price" in r)) throw new Error("noData");
   assert.equal(r.note, "shortHistory");
   assert.deepEqual(r.support, []);
   assert.equal(r.ma50, null);
@@ -123,7 +122,7 @@ test("computeLevels: stale flag", () => {
   const rise = Array.from({ length: 400 }, (_, k) => bar(41 + k, 111 + k * 0.2));
   const candles = [...head, ...rise];
   const r = computeLevels(candles, candles.at(-1)!.t + 86400);
-  if ("note" in r && r.note === "noData") throw new Error("noData");
+  if (!("price" in r)) throw new Error("noData");
   const z = r.allZones.find((x) => x.low <= 100 && x.high >= 99);
   assert.ok(z, "the old pivot's zone is listed");
   assert.equal(z!.stale, true);
