@@ -11,8 +11,20 @@ test("parseOpenTrade: normalises a valid entry", () => {
   assert.deepEqual(r.value, { ticker: "NVDA", shares: 2, entryPrice: 180, entryDate: "2026-09-25", stop: 171, note: "" });
 });
 
+test("parseOpenTrade: fractional shares are accepted (Webull sells fractions)", () => {
+  const r = parseOpenTrade({ ...open, shares: "2.5" });
+  assert.ok(r.ok);
+  assert.equal(r.value.shares, 2.5);
+  const small = parseOpenTrade({ ...open, shares: "0.37" });
+  assert.ok(small.ok);
+  assert.equal(small.value.shares, 0.37);
+});
+
 test("parseOpenTrade: malformed fields are errors, not defaults", () => {
-  assert.equal(parseOpenTrade({ ...open, shares: "1.5" }).ok, false); // whole shares only
+  assert.equal(parseOpenTrade({ ...open, shares: "0" }).ok, false);
+  assert.equal(parseOpenTrade({ ...open, shares: "-1" }).ok, false);
+  assert.equal(parseOpenTrade({ ...open, shares: "abc" }).ok, false);
+  assert.equal(parseOpenTrade({ ...open, shares: "" }).ok, false);
   assert.equal(parseOpenTrade({ ...open, entryPrice: "18O" }).ok, false);
   assert.equal(parseOpenTrade({ ...open, stop: "185" }).ok, false); // stop above entry
   assert.equal(parseOpenTrade({ ...open, entryDate: "25/09/2026" }).ok, false);

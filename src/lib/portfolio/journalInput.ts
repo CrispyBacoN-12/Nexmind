@@ -11,13 +11,12 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
-function num(raw: unknown, label: string, opts: { optional?: boolean; integer?: boolean } = {}): Parsed<number | null> {
+function num(raw: unknown, label: string, opts: { optional?: boolean } = {}): Parsed<number | null> {
   if (raw == null || (typeof raw === "string" && raw.trim() === "")) {
     return opts.optional ? { ok: true, value: null } : { ok: false, error: `${label} is required.` };
   }
   const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw.trim()) : NaN;
   if (!Number.isFinite(n) || n <= 0) return { ok: false, error: `${label} must be a positive number — got "${String(raw)}".` };
-  if (opts.integer && !Number.isInteger(n)) return { ok: false, error: `${label} must be whole shares — got "${String(raw)}".` };
   return { ok: true, value: n };
 }
 
@@ -41,7 +40,8 @@ export interface OpenTradeInput {
 export function parseOpenTrade(body: Record<string, unknown>): Parsed<OpenTradeInput> {
   const ticker = String(body.ticker ?? "").trim().toUpperCase();
   if (!TICKER_RE.test(ticker)) return { ok: false, error: "Enter a ticker symbol, e.g. AAPL." };
-  const shares = num(body.shares, "Shares", { integer: true });
+  // Fractional shares are allowed: Webull sells fractions (owner, 2026-10-31 / 2026-11-25).
+  const shares = num(body.shares, "Shares");
   if (!shares.ok) return shares;
   const entryPrice = num(body.entryPrice, "Entry price");
   if (!entryPrice.ok) return entryPrice;
