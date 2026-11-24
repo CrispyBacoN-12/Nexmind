@@ -352,7 +352,8 @@ model JournalTrade {
   ticker     String
   /// GICS sector resolved at entry (src/lib/portfolio/sectorMap.ts); "Other" = unknown.
   sector     String
-  shares     Int
+  /// Fractional allowed (Webull sells fractions); Int until 2026-11-25.
+  shares     Float
   entryPrice Float
   /// YYYY-MM-DD
   entryDate  String
