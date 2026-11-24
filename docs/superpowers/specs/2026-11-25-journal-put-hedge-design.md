@@ -74,7 +74,7 @@ keys exist but are not used. Contract symbol format `AAPL261231P00240000`
 
 ### Underlying price and gap history: existing `fetchCandlesBatch(tickers, "1y", "1d")`
 
-- Current price = last daily close (the card says the bar's date).
+- Current price: see "Calls made after the builder check" §1 (live quote, daily close as fallback).
 - Worst overnight gap-down in the last year, as % = max over days of `(prevClose − open) / prevClose`.
   Used only for the stop-only comparison below.
 
@@ -139,7 +139,7 @@ weekends), mark it "ราคาเก่า".
 Sketch of one card:
 
 ```
-MSFT · 20 หุ้น · ทุน $410.00 · stop $395.00 · ราคาล่าสุด $418.20 (แท่ง 2026-11-24)
+MSFT · 20 หุ้น · ทุน $410.00 · stop $395.00 · ราคาตอนนี้ $418.20 (23:41 ICT)
 ประกาศงบ 2026-12-03 (หลังตลาดปิด) → put หมดอายุ 2026-12-05 (หมดอายุหลังประกาศงบ)
 ⚠ 1 สัญญาคุม 100 หุ้น แต่ถือ 20 → คุมเกิน ×5
 
@@ -170,9 +170,17 @@ stop อย่างเดียว: ขาดทุน $300 ถ้า fill ท�
 
 ## Calls made after the builder check (Claude's calls, owner can overrule)
 
-1. **Current price P = last completed daily close.** A daily bar dated today (New York) before
-   16:00 ET is forming and is dropped, as the chart agents and rules-vs-hold do. The card prints
-   the bar's date.
+1. **Current price P = the price at the moment the button is pressed (owner's call, 2026-11-25).**
+   - Source: the existing `fetchLiveQuote(symbol)` (Finnhub `/quote`, last trade, the same one
+     /advisor's fill guard uses). The card prints the quote's time in ICT.
+   - If the quote misses, fall back to the close of the newest daily bar, forming or not, and say so
+     ("ใช้ราคาปิดแท่งล่าสุด <date> เพราะดึงราคาสดไม่ได้: <reason>").
+   - Why live is fine here: the option quotes are also taken now, so the underlying and the put are
+     priced at about the same moment. This is a display for a human, never research data.
+   - Outside US hours (21:30–04:00 ICT, one hour earlier in US summer time) the "live" price is the
+     last close; the quote time makes that visible.
+   - Gap history still uses daily bars. Today's bar's open counts once the session has opened (that
+     gap has already happened); its close is never used for the gap.
 2. **Positions at or below their stop, or with stop ≥ entry, still get a card.**
    - The "stop" strike target is skipped when stop ≥ P (a put above the price is not insurance, it is
      already in the money), with a line saying "ราคาอยู่ต่ำกว่า stop แล้ว".
