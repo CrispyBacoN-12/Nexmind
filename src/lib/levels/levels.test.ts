@@ -105,6 +105,18 @@ test("computeLevels: no zone above → none message", () => {
   if (!("price" in r)) throw new Error("noData");
   assert.deepEqual(r.resistance, []);
   assert.equal(r.price, candles.at(-1)!.c);
+  assert.equal(r.nearHigh, true);
+});
+
+test("computeLevels: no qualifying zone above but far below the high → not 'near the high'", () => {
+  // peak about a year ago, then a long steady decline: the old single pivot does not qualify
+  const up = Array.from({ length: 100 }, (_, i) => bar(i, 100 + i * 0.63));
+  const down = Array.from({ length: 300 }, (_, k) => bar(100 + k, 163 - k * 0.21));
+  const candles = [...up, ...down];
+  const r = computeLevels(candles, candles.at(-1)!.t + 86400);
+  if (!("price" in r)) throw new Error("noData");
+  assert.deepEqual(r.resistance, []);
+  assert.equal(r.nearHigh, false);
 });
 
 test("computeLevels: short history", () => {

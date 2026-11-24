@@ -58,6 +58,10 @@ export interface LevelsResult {
   ma200: number | null;
   high52: number | null;
   low52: number | null;
+  /** Price within 1 ATR of (or beyond) the 2-year high / low. Only then may an
+   *  empty side say "near the high/low"; otherwise no zone simply qualified. */
+  nearHigh: boolean;
+  nearLow: boolean;
   note: "shortHistory" | null;
 }
 
@@ -100,7 +104,7 @@ export function findPivots(bars: Candle[], side = PIVOT_SIDE): Pivot[] {
   return out;
 }
 
-/** Volume by price over the last `lookback` bars: local-maximum bins at ≥ minRatio × the median bin. */
+/** Volume by price over the last `lookback` bars: peaks of a 3-bin smoothed histogram at ≥ minRatio × the mean bin. */
 export function hvnNodes(bars: Candle[], lookback = HVN_BARS, bins = HVN_BINS, minRatio = HVN_MIN_RATIO): Hvn[] {
   const win = bars.slice(-lookback);
   if (win.length === 0) return [];
@@ -240,6 +244,8 @@ export function computeLevels(candles: Candle[], nowSec: number): LevelsResult |
     ma200: lastOf(sma(closes, 200)),
     high52: year.length ? Math.max(...year.map((b) => b.h)) : null,
     low52: year.length ? Math.min(...year.map((b) => b.l)) : null,
+    nearHigh: false,
+    nearLow: false,
     note: null,
   };
   if (bars.length < MIN_BARS) return { ...base, note: "shortHistory" };
@@ -252,12 +258,18 @@ export function computeLevels(candles: Candle[], nowSec: number): LevelsResult |
   );
 
   const price = base.price;
+  const high2y = Math.max(...bars.map((b) => b.h));
+  const low2y = Math.min(...bars.map((b) => b.l));
+  const nearHigh = high2y - price <= atrValue;
+  const nearLow = price - low2y <= atrValue;
   const support = zones.filter((z) => z.high < price).sort((a, b) => b.mid - a.mid);
   const resistance = zones.filter((z) => z.low > price).sort((a, b) => a.mid - b.mid);
   const containing = zones.filter((z) => z.low <= price && z.high >= price).sort((a, b) => Math.abs(a.mid - price) - Math.abs(b.mid - price));
   return {
     ...base,
     atr: atrValue,
+    nearHigh,
+    nearLow,
     support: support.slice(0, SUMMARY_PER_SIDE),
     resistance: resistance.slice(0, SUMMARY_PER_SIDE),
     inZone: containing[0] ?? null,

@@ -47,12 +47,16 @@ function evidence(z: Zone): string {
   return parts.join(" · ");
 }
 
-function NoneText({ side }: { side: "support" | "resistance" }) {
-  return (
-    <span className="text-(--color-muted)">
-      {side === "resistance" ? "ไม่มีแนวต้านในช่วง 2 ปี (ราคาใกล้จุดสูงสุด)" : "ไม่มีแนวรับในช่วง 2 ปี (ราคาใกล้จุดต่ำสุด)"}
-    </span>
-  );
+function NoneText({ side, near }: { side: "support" | "resistance"; near: boolean }) {
+  const text =
+    side === "resistance"
+      ? near
+        ? "ไม่มีแนวต้านในช่วง 2 ปี (ราคาใกล้จุดสูงสุด)"
+        : "ไม่มีโซนที่เข้าเกณฑ์เหนือราคา"
+      : near
+        ? "ไม่มีแนวรับในช่วง 2 ปี (ราคาใกล้จุดต่ำสุด)"
+        : "ไม่มีโซนที่เข้าเกณฑ์ใต้ราคา";
+  return <span className="text-(--color-muted)">{text}</span>;
 }
 
 function Detail({ row }: { row: Row & { result: LevelsResult } }) {
@@ -118,8 +122,8 @@ function RowView({ row, onExpand, open }: { row: Row; onExpand: () => void; open
           </td>
         ) : (
           <>
-            <td className="pr-3">{r.support[0] ? <ZoneText z={r.support[0]} price={r.price} /> : <NoneText side="support" />}</td>
-            <td className="pr-3">{r.resistance[0] ? <ZoneText z={r.resistance[0]} price={r.price} /> : <NoneText side="resistance" />}</td>
+            <td className="pr-3">{r.support[0] ? <ZoneText z={r.support[0]} price={r.price} /> : <NoneText side="support" near={r.nearLow} />}</td>
+            <td className="pr-3">{r.resistance[0] ? <ZoneText z={r.resistance[0]} price={r.price} /> : <NoneText side="resistance" near={r.nearHigh} />}</td>
           </>
         )}
         <td>{r.inZone && <Badge tone="warning">ราคาอยู่ในโซน</Badge>}</td>
