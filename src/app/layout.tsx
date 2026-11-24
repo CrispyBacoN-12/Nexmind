@@ -18,7 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full">
         <Providers>
           <div className="flex min-h-screen">
-            <Sidebar />
+            {/* /portfolio holds real holdings: link only off Vercel (public site). */}
+            <Sidebar showPortfolio={!process.env.VERCEL} />
             <main className="flex-1 min-w-0 px-6 py-8 lg:px-10">{children}</main>
           </div>
         </Providers>
