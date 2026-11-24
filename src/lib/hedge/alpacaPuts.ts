@@ -30,11 +30,17 @@ export async function fetchPutQuotes(
     fetchImpl?: typeof fetch;
     env?: { ALPACA_KEY?: string; ALPACA_SECRET?: string };
     maxPages?: number;
+    timeoutMs?: number;
   } = {},
 ): Promise<PutQuotesResult> {
   const env = opts.env ?? process.env;
   const doFetch = opts.fetchImpl ?? fetch;
   const maxPages = opts.maxPages ?? 5;
+  const timeoutMs = opts.timeoutMs ?? 10_000;
+  // Standard contracts only: after a split or merger, adjusted contracts get a
+  // different root (AAPL1) and deliver something other than 100 shares, so their
+  // premium and coverage would be silently wrong. BRK.B's root is BRKB.
+  const root = ticker.toUpperCase().replace(/\./g, "");
   if (!env.ALPACA_KEY || !env.ALPACA_SECRET) return { error: "ALPACA_KEY/ALPACA_SECRET not set" };
   const headers = { "APCA-API-KEY-ID": env.ALPACA_KEY, "APCA-API-SECRET-KEY": env.ALPACA_SECRET };
 
@@ -52,13 +58,16 @@ export async function fetchPutQuotes(
         limit: "1000",
       });
       if (pageToken) params.set("page_token", pageToken);
-      const res = await doFetch(`${BASE}/${encodeURIComponent(ticker.toUpperCase())}?${params}`, { headers });
+      const res = await doFetch(`${BASE}/${encodeURIComponent(ticker.toUpperCase())}?${params}`, {
+        headers,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
       if (!res.ok) return { error: `Alpaca options HTTP ${res.status}` };
 
       const body = (await res.json()) as { snapshots?: Record<string, Snapshot>; next_page_token?: string | null };
       for (const [symbol, snap] of Object.entries(body.snapshots ?? {})) {
         const occ = parseOccSymbol(symbol);
-        if (!occ || occ.type !== "P") continue;
+        if (!occ || occ.type !== "P" || occ.root !== root) continue;
         const q = snap.latestQuote ?? {};
         quotes.push({
           symbol,

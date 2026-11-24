@@ -105,3 +105,28 @@ test("fetchPutQuotes: unparseable symbol skipped", async () => {
   assert.ok("quotes" in r);
   assert.deepEqual(r.quotes.map((q) => q.symbol), ["AAPL261231P00240000"]);
 });
+
+test("fetchPutQuotes: adjusted contracts (other root) are skipped; BRK.B matches BRKB", async () => {
+  const q = { latestQuote: { ap: 1, bp: 0.9, t: "2026-11-24T18:47:01Z" } };
+  const a = fakeFetch([{ snapshots: { AAPL261231P00240000: q, AAPL1261231P00240000: q } }]);
+  const ra = await fetchPutQuotes("AAPL", W, { fetchImpl: a.impl, env: ENV });
+  assert.ok("quotes" in ra);
+  assert.deepEqual(ra.quotes.map((x) => x.symbol), ["AAPL261231P00240000"]);
+  const b = fakeFetch([{ snapshots: { BRKB261231P00480000: q } }]);
+  const rb = await fetchPutQuotes("BRK.B", W, { fetchImpl: b.impl, env: ENV });
+  assert.ok("quotes" in rb);
+  assert.equal(rb.quotes.length, 1);
+});
+
+test("fetchPutQuotes: a hung request times out", async () => {
+  const hang = ((_u: string, init?: RequestInit) =>
+    new Promise((_res, rej) => {
+      init?.signal?.addEventListener("abort", () => rej(new Error("aborted")));
+    })) as typeof fetch;
+  // AbortSignal.timeout's timer is unref'd: keep the event loop alive until it fires.
+  const keepAlive = setTimeout(() => {}, 5_000);
+  const r = await fetchPutQuotes("AAPL", W, { fetchImpl: hang, env: ENV, timeoutMs: 50 });
+  clearTimeout(keepAlive);
+  assert.ok("error" in r);
+  assert.ok(r.error.startsWith("option quotes fetch failed"));
+});

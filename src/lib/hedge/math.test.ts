@@ -137,3 +137,9 @@ test("isQuoteStale: more than 4 days", () => {
   assert.equal(isQuoteStale("2026-11-20T18:47:01Z", now), true);
   assert.equal(isQuoteStale(null, now), true);
 });
+
+test("stopOnly: a gap that would not reach the stop still costs the stop", () => {
+  // Opening 3% lower (405.65) stays above the stop, so the stop is still what fills.
+  const s = stopOnly({ entry: 410, stop: 395, shares: 20, price: 418.2, gapPct: 0.03 });
+  assert.equal(s.gapLoss, 300);
+});

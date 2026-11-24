@@ -152,7 +152,10 @@ export function stopOnly(a: { entry: number; stop: number; shares: number; price
   if (a.stop >= a.entry) return { atStop: null, gapPct: a.gapPct, gapLoss: null, note: "stopNotBelowEntry" };
   const atStop = (a.entry - a.stop) * a.shares;
   if (a.gapPct == null) return { atStop, gapPct: null, gapLoss: null, note: "notEnoughHistory" };
-  return { atStop, gapPct: a.gapPct, gapLoss: (a.entry - a.price * (1 - a.gapPct)) * a.shares, note: null };
+  // A gap that opens above the stop does not reach it: the stop is still what fills,
+  // so the gap case is never shown as cheaper than the stop.
+  const fill = Math.min(a.stop, a.price * (1 - a.gapPct));
+  return { atStop, gapPct: a.gapPct, gapLoss: (a.entry - fill) * a.shares, note: null };
 }
 
 export function isQuoteStale(quotedAt: string | null, nowMs: number): boolean {

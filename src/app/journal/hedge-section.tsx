@@ -43,6 +43,10 @@ function HedgeCardView({ card, asOf }: { card: HedgeCard; asOf: string }) {
         {fmtMoney(card.stop)} ·{" "}
         {card.price == null ? (
           <span className="text-amber-400">ไม่มีราคาหุ้น</span>
+        ) : card.priceSource === "lastClose" ? (
+          <span className="text-amber-400">
+            ราคาปิดแท่งล่าสุด {fmtMoney(card.price)} (แท่งวันที่ {card.priceAt?.slice(0, 10) ?? "?"})
+          </span>
         ) : (
           <>
             ราคาตอนนี้ {fmtMoney(card.price)} ({ictTime(card.priceAt)})
@@ -69,6 +73,9 @@ function HedgeCardView({ card, asOf }: { card: HedgeCard; asOf: string }) {
             </p>
           )}
 
+          <p>
+            ใช้ {n} สัญญา (คุม {n * 100} หุ้น) · ค่าเบี้ยรวมในตารางคิดจาก {n} สัญญา
+          </p>
           {card.overHedge > 1 && (
             <Badge tone="warning">
               {n} สัญญาคุม {n * 100} หุ้น แต่ถือ {card.shares} → คุมเกิน ×{fmtNumber(card.overHedge, 2)}
