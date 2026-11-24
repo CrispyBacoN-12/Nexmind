@@ -89,6 +89,24 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-11-25: Protective-put check on /journal (branch `journal-put-hedge`, merged to master locally, NOT pushed).**
+  - Button "เช็กประกัน put" under the open positions. On press, one card per open JournalTrade, each showing:
+    - put cost per strike (near stop / −5% / ATM), % of position, contracts and over-hedge ×N
+    - breakeven and max loss with the put
+    - the stop-only loss at the stop and at the worst 1-year overnight gap (never shown cheaper than the stop)
+  - Data:
+    - Alpaca `feed=indicative` put snapshots (free; `opra` is 403). Standard contracts only; BRK.B's root is BRKB.
+    - Finnhub live price, with the last daily close as fallback.
+    - Finnhub earnings: the first expiry after a report within 45 days, else about 30 days out.
+  - Read-only `GET /api/journal/hedges`: no schema change, no writes, no cron. Risk display only, never "buy".
+  - Spec `docs/superpowers/specs/2026-11-25-journal-put-hedge-design.md`, plan in `docs/superpowers/plans/`.
+  - Deferred minors:
+    - an empty chain reads "no suitable expiry"
+    - no "max loss at strike" line
+    - with no price, the at-stop loss is hidden
+    - earnings tonight is labelled "~30 days"
+    - the 5-page cap truncates silently
+  - Open: whether the owner's broker (Webull / Pi) allows US options.
 - **2026-11-16: Scorecard cloud capture (branch `scorecard-cloud`, merged + pushed 2026-11-17).** The nightly capture no longer needs the PC.
   - **Capture (cloud, no AI):** `scripts/scorecard-capture.mts` runs on GitHub Actions in the 10:30-11:29 ET window and
     writes `ChartSetup` rows (`source="scheduled"`) with `aiBackend "pending"`.
