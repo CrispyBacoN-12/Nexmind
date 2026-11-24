@@ -9,6 +9,8 @@ import { DEFAULT_PORTFOLIO_CONFIG } from "@/lib/portfolio/types";
 import type { StopWatchHit } from "@/lib/riskSentry/stopWatch";
 import { fmtMoney, fmtNumber } from "@/lib/utils";
 
+import { HedgeSection } from "./hedge-section";
+
 interface TradeRow {
   id: number;
   ticker: string;
@@ -310,6 +312,7 @@ export function JournalPanel() {
             </table>
           </div>
         )}
+        <HedgeSection openCount={data?.open.length ?? 0} />
       </Card>
 
       <Card>
