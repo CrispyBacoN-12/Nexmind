@@ -89,6 +89,34 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-11-25: Local-only `/portfolio` with risk analysis (merged + pushed).**
+  - **What it is.** The owner's real holdings (from the Dime! app) live in the git-ignored
+    `.local/holdings.json` on the PC: ticker, fractional shares, avg cost, note, and the cached
+    stock/ETF kind and industry. They are not in the DB and never committed, because the repo and
+    the site are public.
+  - **The analysis button shows:**
+    - weights and the top-3 share
+    - Finnhub-industry buckets; the ETF bucket is never flagged
+    - 60-day correlation clusters (r ≥ 0.75, ETFs excluded, weakest pair shown)
+    - 1-year beta vs SPY, and the −10% scenario over the measured part with coverage
+    - earnings within 14 days, with the worst 1-year gap
+  - **Finnhub pacing:** calls are held to 55/min, so a run takes about 1 minute.
+  - **Guards:**
+    - `VERCEL` env: the production `/portfolio` shows "ใช้ได้เฉพาะบนเครื่อง", the APIs return 404,
+      and there is no sidebar link (verified on nexmind-gamma after deploy).
+    - Localhost Host/Origin check: requests from the LAN, DNS rebinding and cross-site POSTs all get 404.
+  - **Risk display only**, no advice.
+  - Spec and plan are `docs/superpowers/{specs,plans}/2026-11-25-portfolio-risk*`.
+  - **Deferred minors:**
+    - an empty profile caches "etf" forever, with no re-check
+    - a kind-null holding skips earnings silently
+    - rows are not validated on read
+    - a negative-beta scenario wording issue
+    - `priceNote` is not rendered
+    - a shared `.tmp` write path
+    - no `.vercelignore`
+  - The production site (`nexmind-gamma.vercel.app`) is **public and unauthenticated**, and so is
+    `/journal`. Keep real money data out of the DB-backed pages unless the owner adds a password.
 - **2026-11-25: /journal accepts fractional shares (merged + pushed).**
   - `JournalTrade.shares` changed from Int to Float. The `ALTER COLUMN` was applied to Neon over HTTPS; the table had 0 rows.
   - `parseOpenTrade` accepts any shares value > 0. The table and the put card show up to 4 decimals.
