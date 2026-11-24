@@ -17,7 +17,7 @@ export const MIN_CORRELATION_DAYS = 40;
 const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
 
 /** Close-to-close returns keyed by the date of the later bar. */
-function returnsByDate(candles: Candle[]): Map<string, number> {
+export function returnsByDate(candles: Candle[]): Map<string, number> {
   const out = new Map<string, number>();
   for (let i = 1; i < candles.length; i++) {
     const prev = candles[i - 1].c;

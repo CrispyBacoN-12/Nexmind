@@ -114,3 +114,6 @@ scripts/risk-sentry.log
 scripts/scorecard-run.log
 scripts/scorecard-score.log
 scripts/scorecard-replay.log
+
+# local-only data (owner holdings): never commit
+/.local/
