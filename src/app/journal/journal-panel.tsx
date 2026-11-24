@@ -197,7 +197,7 @@ export function JournalPanel() {
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="หุ้น" value={ticker} onChange={setTicker} placeholder="NVDA" />
-          <Field label="จำนวนหุ้น" value={shares} onChange={setShares} />
+          <Field label="จำนวนหุ้น (เศษหุ้นได้ เช่น 2.5)" value={shares} onChange={setShares} />
           <Field label="ราคาเข้า" value={entryPrice} onChange={setEntryPrice} />
           <Field label="จุดตัดขาดทุน (stop)" value={stop} onChange={setStop} />
           <Field label="วันที่เข้า" type="date" value={entryDate} onChange={setEntryDate} />
@@ -270,7 +270,7 @@ export function JournalPanel() {
                     <tr key={t.id} className="border-t border-(--color-border) align-top">
                       <td className="py-2 pr-3 font-medium">{t.ticker}<div className="text-xs text-(--color-muted)">{t.entryDate}</div></td>
                       <td className="pr-3">{t.sector === "Other" ? <Badge tone="warning">ไม่ทราบ</Badge> : t.sector}</td>
-                      <td className="pr-3">{t.shares} × {fmtMoney(t.entryPrice)}</td>
+                      <td className="pr-3">{fmtNumber(t.shares, 4)} × {fmtMoney(t.entryPrice)}</td>
                       <td className="pr-3">
                         {fmtMoney(t.stop)}
                         {hit && (

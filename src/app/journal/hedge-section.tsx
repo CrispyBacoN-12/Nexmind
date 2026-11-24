@@ -39,7 +39,7 @@ function HedgeCardView({ card, asOf }: { card: HedgeCard; asOf: string }) {
   return (
     <div className="rounded-md border border-(--color-border) p-3 space-y-2 text-xs">
       <p className="text-sm">
-        <span className="font-semibold">{card.ticker}</span> · {card.shares} หุ้น · ทุน {fmtMoney(card.entryPrice)} · stop{" "}
+        <span className="font-semibold">{card.ticker}</span> · {fmtNumber(card.shares, 4)} หุ้น · ทุน {fmtMoney(card.entryPrice)} · stop{" "}
         {fmtMoney(card.stop)} ·{" "}
         {card.price == null ? (
           <span className="text-amber-400">ไม่มีราคาหุ้น</span>
@@ -78,7 +78,7 @@ function HedgeCardView({ card, asOf }: { card: HedgeCard; asOf: string }) {
           </p>
           {card.overHedge > 1 && (
             <Badge tone="warning">
-              {n} สัญญาคุม {n * 100} หุ้น แต่ถือ {card.shares} → คุมเกิน ×{fmtNumber(card.overHedge, 2)}
+              {n} สัญญาคุม {n * 100} หุ้น แต่ถือ {fmtNumber(card.shares, 4)} → คุมเกิน ×{fmtNumber(card.overHedge, 2)}
             </Badge>
           )}
 
