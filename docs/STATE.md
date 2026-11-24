@@ -89,7 +89,12 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-11-25: Protective-put check on /journal (branch `journal-put-hedge`, merged to master locally, NOT pushed).**
+- **2026-11-25: /journal accepts fractional shares (merged + pushed).**
+  - `JournalTrade.shares` changed from Int to Float. The `ALTER COLUMN` was applied to Neon over HTTPS; the table had 0 rows.
+  - `parseOpenTrade` accepts any shares value > 0. The table and the put card show up to 4 decimals.
+  - `/advisor` sizing and the portfolio-gates suggested size still floor to whole shares.
+    - Deferred until the owner checks whether Webull keeps a resting stop on a fractional position.
+- **2026-11-25: Protective-put check on /journal (branch `journal-put-hedge`, merged + pushed 2026-11-25).**
   - Button "เช็กประกัน put" under the open positions. On press, one card per open JournalTrade, each showing:
     - put cost per strike (near stop / −5% / ATM), % of position, contracts and over-hedge ×N
     - breakeven and max loss with the put
