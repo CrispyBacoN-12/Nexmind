@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardCheck, Compass, NotebookPen, PieChart, Radar } from "lucide-react";
+import { Activity, CandlestickChart, ClipboardCheck, Compass, NotebookPen, PieChart, Radar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -12,12 +12,15 @@ const nav = [
   { href: "/scorecard", label: "Scorecard", icon: ClipboardCheck },
 ];
 
-/** Local-only page (owner's real holdings): the layout passes false on Vercel. */
-const portfolioItem = { href: "/portfolio", label: "Portfolio", icon: PieChart };
+/** Local-only pages (owner's real holdings / average cost): the layout passes false on Vercel. */
+const localItems = [
+  { href: "/portfolio", label: "Portfolio", icon: PieChart },
+  { href: "/levels", label: "Levels", icon: CandlestickChart },
+];
 
 export function Sidebar({ showPortfolio = false }: { showPortfolio?: boolean }) {
   const pathname = usePathname();
-  const items = showPortfolio ? [...nav, portfolioItem] : nav;
+  const items = showPortfolio ? [...nav, ...localItems] : nav;
   return (
     <aside className="w-60 shrink-0 border-r border-(--color-border) bg-(--color-card) flex flex-col">
       <div className="px-5 py-6 border-b border-(--color-border)">

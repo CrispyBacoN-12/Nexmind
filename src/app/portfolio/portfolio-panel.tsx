@@ -11,7 +11,6 @@ import type { PortfolioAnalysis } from "@/lib/portfolioRisk/analysis";
 import type { HoldingRow } from "@/lib/portfolioRisk/store";
 import { fmtMoney, fmtNumber } from "@/lib/utils";
 
-import { LevelsSection } from "./levels-section";
 
 const FOOTER = "ข้อมูลความเสี่ยงเท่านั้น ไม่ใช่คำแนะนำให้ซื้อหรือขาย";
 
@@ -179,7 +178,6 @@ export function PortfolioPanel() {
         </Card>
       )}
 
-      {holdings && <LevelsSection />}
     </div>
   );
 }
