@@ -19,8 +19,10 @@ export interface ChartBar {
 
 const finiteBar = (b: Candle) => [b.o, b.h, b.l, b.c].every(Number.isFinite);
 
-/** Strictly ascending, one bar per timestamp (the later copy wins). */
-function clean(candles: Candle[]): Candle[] {
+/** Strictly ascending, one bar per timestamp (the later copy wins), finite OHLC only.
+ *  The route runs this once and hands the result to both the zones and the chart,
+ *  so they always read the same bars. */
+export function cleanCandles(candles: Candle[]): Candle[] {
   const byT = new Map<number, Candle>();
   for (const b of candles) if (Number.isFinite(b.t) && finiteBar(b)) byT.set(b.t, b);
   return [...byT.values()].sort((a, b) => a.t - b.t);
@@ -28,7 +30,7 @@ function clean(candles: Candle[]): Candle[] {
 
 /** Every completed bar with MA50/MA200, then the still-forming bar (no MAs). */
 export function chartSeries(candles: Candle[], nowSec: number): ChartBar[] {
-  const { bars, forming } = completedBars(clean(candles), nowSec);
+  const { bars, forming } = completedBars(cleanCandles(candles), nowSec);
   const closes = bars.map((b) => b.c);
   const ma50 = sma(closes, 50);
   const ma200 = sma(closes, 200);

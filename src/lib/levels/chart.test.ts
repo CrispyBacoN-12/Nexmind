@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 
 import type { Candle } from "@/lib/indicators";
 
-import { bandColor, bandRects, chartSeries, rangeStart, widenRange, type ChartBar } from "./chart";
+import { bandColor, bandRects, chartSeries, cleanCandles, rangeStart, widenRange, type ChartBar } from "./chart";
 import type { Zone } from "./levels";
 
 const T0 = Date.UTC(2024, 0, 2, 14, 30) / 1000; // 09:30 ET
@@ -42,6 +42,15 @@ test("chartSeries: drops non-finite bars and de-duplicates timestamps", () => {
     [b0.t, b1.t, b3.t],
   );
   assert.equal(out[1].c, 105);
+});
+
+test("cleanCandles: the one candle list both the zones and the chart read", () => {
+  const b0 = bar(0, 100);
+  const b1 = bar(1, 101);
+  const b1b = { ...b1, c: 105 };
+  const b2 = { ...bar(2, 102), o: Number.POSITIVE_INFINITY };
+  assert.deepEqual(cleanCandles([b1, b2, b0, b1b]), [b0, b1b]);
+  assert.deepEqual(cleanCandles([]), []);
 });
 
 test("chartSeries: empty → []", () => {
@@ -89,6 +98,8 @@ test("bandRects: clips, skips off-pane and null, fades stale", () => {
   assert.deepEqual(below, { top: 525, bottom: 550, color: "#10b981", opacity: 0.18 });
   assert.deepEqual(bandRects([zone(210, 220)], 100, toY, 600), []); // y −100..−50
   assert.equal(bandRects([zone(195, 205)], 100, toY, 600)[0].top, 0); // y −25..25
+  assert.deepEqual(bandRects([zone(75, 85)], 100, toY, 600)[0], { top: 575, bottom: 600, color: "#10b981", opacity: 0.18 }); // y 575..625
+  assert.deepEqual(bandRects([zone(10, 20)], 100, toY, 600), []); // y 900..950
   assert.deepEqual(bandRects([zone(90, 95)], 100, () => null, 600), []);
   assert.equal(bandRects([zone(90, 95, true)], 100, toY, 600)[0].opacity, 0.08);
   assert.equal(bandRects([zone(98, 102)], 100, toY, 600)[0].color, "#f59e0b");

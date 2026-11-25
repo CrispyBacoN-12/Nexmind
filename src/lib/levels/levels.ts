@@ -1,4 +1,4 @@
-// Support / resistance zones from daily candles, for /portfolio. DESCRIPTIVE
+// Support / resistance zones from daily candles, for /levels. DESCRIPTIVE
 // ONLY: where price has turned (swing pivots) or traded heavily (high-volume
 // nodes). NEXMIND's research has not shown these levels predict a bounce, so
 // nothing here scores, ranks by "strength" or says a level will hold.

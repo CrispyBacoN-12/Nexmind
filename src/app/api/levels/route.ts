@@ -3,7 +3,7 @@
 // owner's average cost. Candles only: no Finnhub, no DB.
 //   GET ?ticker=X → one ticker: zones + 2 years of daily OHLCV with MA50/MA200
 
-import { chartSeries } from "@/lib/levels/chart";
+import { chartSeries, cleanCandles } from "@/lib/levels/chart";
 import { computeLevels } from "@/lib/levels/levels";
 import { fetchCandlesBatch } from "@/lib/marketData";
 import { TICKER_RE } from "@/lib/portfolio/journalInput";
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     const holding = (await readHoldings()).find((h) => h.ticker === ticker);
     const nowSec = Math.floor(Date.now() / 1000);
     const asOf = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-    const candles = (await fetchCandlesBatch([ticker], "2y", "1d")).get(ticker)?.candles ?? [];
+    const candles = cleanCandles((await fetchCandlesBatch([ticker], "2y", "1d")).get(ticker)?.candles ?? []);
     return Response.json({
       ok: true,
       asOf,
