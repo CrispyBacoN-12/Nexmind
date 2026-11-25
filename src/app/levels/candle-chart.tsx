@@ -6,9 +6,20 @@
 // average cost as a dashed line. Draws only what the zone list below says.
 
 import { useEffect, useRef, useState } from "react";
-import { CandlestickSeries, createChart, HistogramSeries, LineSeries, LineStyle, type IChartApi, type MouseEventParams, type Time, type UTCTimestamp } from "lightweight-charts";
+import {
+  CandlestickSeries,
+  createChart,
+  HistogramSeries,
+  LineSeries,
+  LineStyle,
+  type AutoscaleInfo,
+  type IChartApi,
+  type MouseEventParams,
+  type Time,
+  type UTCTimestamp,
+} from "lightweight-charts";
 
-import { rangeStart, type ChartBar, type RangeKey } from "@/lib/levels/chart";
+import { rangeStart, widenRange, type ChartBar, type RangeKey } from "@/lib/levels/chart";
 import type { Zone } from "@/lib/levels/levels";
 import { fmtMoney } from "@/lib/utils";
 
@@ -48,7 +59,21 @@ export function CandleChart({ series, zones, price, avgCost }: { series: ChartBa
     });
     chartRef.current = chart;
 
-    const candles = chart.addSeries(CandlestickSeries, { upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN, wickUpColor: UP, wickDownColor: DOWN });
+    const candles = chart.addSeries(CandlestickSeries, {
+      upColor: UP,
+      downColor: DOWN,
+      borderUpColor: UP,
+      borderDownColor: DOWN,
+      wickUpColor: UP,
+      wickDownColor: DOWN,
+      // keep the cost line on screen even when the price has moved far from it
+      autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => {
+        const info = base();
+        return info && { ...info, priceRange: widenRange(info.priceRange, avgCost) };
+      },
+    });
+    // leave the bottom quarter for the volume strip so the lowest candles never sit on it
+    candles.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.25 } });
     candles.setData(series.map((b) => ({ time: ts(b.t), open: b.o, high: b.h, low: b.l, close: b.c })));
 
     const volume = chart.addSeries(HistogramSeries, { priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
