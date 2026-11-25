@@ -42,7 +42,12 @@ export function CandleChart({ series, zones, price, avgCost }: { series: ChartBa
   const box = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [hover, setHover] = useState<ChartBar | null>(null);
-  const [range, setRange] = useState<RangeKey>("6M");
+  // null once the owner zooms or drags: the view no longer matches any button
+  const [range, setRange] = useState<RangeKey | null>("6M");
+  // set by a wheel or pointer press on the chart and cleared only by a range button
+  // (or a new chart), so the range events that setVisibleRange fires on the next frame
+  // never clear the highlight, while any zoom/drag after a touch does
+  const userMoving = useRef(false);
 
   useEffect(() => {
     const el = box.current;
@@ -96,11 +101,25 @@ export function CandleChart({ series, zones, price, avgCost }: { series: ChartBa
     const onMove = (p: MouseEventParams<Time>) => setHover(p.time == null ? null : (byT.get(p.time as number) ?? null));
     chart.subscribeCrosshairMove(onMove);
 
+    userMoving.current = false;
     const from = rangeStart(series, "6M");
     if (from != null) chart.timeScale().setVisibleRange({ from: ts(from), to: ts(series.at(-1)!.t) });
     setRange("6M");
 
+    const press = () => {
+      userMoving.current = true;
+    };
+    const onRange = () => {
+      if (userMoving.current) setRange(null);
+    };
+    el.addEventListener("wheel", press, { capture: true, passive: true });
+    el.addEventListener("pointerdown", press, { capture: true });
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
+
     return () => {
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
+      el.removeEventListener("wheel", press, { capture: true });
+      el.removeEventListener("pointerdown", press, { capture: true });
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
       chartRef.current = null;
@@ -111,6 +130,7 @@ export function CandleChart({ series, zones, price, avgCost }: { series: ChartBa
   function show(key: RangeKey) {
     const from = rangeStart(series, key);
     if (from == null || !chartRef.current) return;
+    userMoving.current = false;
     chartRef.current.timeScale().setVisibleRange({ from: ts(from), to: ts(series.at(-1)!.t) });
     setRange(key);
   }

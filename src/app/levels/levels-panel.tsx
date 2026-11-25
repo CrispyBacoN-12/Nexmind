@@ -134,7 +134,9 @@ export function LevelsPanel() {
       setRow(j.row);
       setTicker("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      // drop the previous ticker's chart so the error is never read as being about it
+      setRow(null);
+      setError(`${t}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
