@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 
 import type { Candle } from "@/lib/indicators";
 
-import { bandColor, bandRects, chartSeries, rangeStart, type ChartBar } from "./chart";
+import { bandColor, bandRects, chartSeries, rangeStart, widenRange, type ChartBar } from "./chart";
 import type { Zone } from "./levels";
 
 const T0 = Date.UTC(2024, 0, 2, 14, 30) / 1000; // 09:30 ET
@@ -56,6 +56,19 @@ test("rangeStart: picks the first bar inside the window and clamps to the series
   const short = chartSeries(bars(100), T0 + 200 * DAY);
   assert.equal(rangeStart(short, "2Y"), short[0].t);
   assert.equal(rangeStart([], "6M"), null);
+});
+
+test("rangeStart: 2Y always shows the whole series (holidays make 504 trading days < 2 calendar years)", () => {
+  const s = chartSeries(bars(750), T0 + 800 * DAY);
+  assert.equal(rangeStart(s, "2Y"), s[0].t);
+});
+
+test("widenRange: stretches the price range to include the cost line", () => {
+  assert.deepEqual(widenRange({ minValue: 150, maxValue: 200 }, 120), { minValue: 120, maxValue: 200 });
+  assert.deepEqual(widenRange({ minValue: 150, maxValue: 200 }, 260), { minValue: 150, maxValue: 260 });
+  assert.deepEqual(widenRange({ minValue: 150, maxValue: 200 }, 170), { minValue: 150, maxValue: 200 });
+  assert.deepEqual(widenRange({ minValue: 150, maxValue: 200 }, null), { minValue: 150, maxValue: 200 });
+  assert.equal(widenRange(null, 120), null);
 });
 
 const zone = (low: number, high: number, stale = false): Zone => ({

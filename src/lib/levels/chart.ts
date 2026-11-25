@@ -49,14 +49,28 @@ export function chartSeries(candles: Candle[], nowSec: number): ChartBar[] {
 
 export type RangeKey = "3M" | "6M" | "1Y" | "2Y";
 
-const TRADING_DAYS: Record<RangeKey, number> = { "3M": 63, "6M": 126, "1Y": 252, "2Y": 504 };
+const TRADING_DAYS: Record<Exclude<RangeKey, "2Y">, number> = { "3M": 63, "6M": 126, "1Y": 252 };
 
-/** First bar inside the last N trading days (as calendar time); never before the series. */
+/** First bar inside the last N trading days (as calendar time); never before the series.
+ *  2Y is the whole fetched series: 504 trading days × 7/5 ignores holidays and
+ *  would hide the first few weeks. */
 export function rangeStart(bars: ChartBar[], key: RangeKey): number | null {
   const last = bars.at(-1);
   if (!last) return null;
+  if (key === "2Y") return bars[0].t;
   const from = last.t - (TRADING_DAYS[key] * 86400 * 7) / 5;
   return (bars.find((b) => b.t >= from) ?? bars[0]).t;
+}
+
+export interface PriceSpan {
+  minValue: number;
+  maxValue: number;
+}
+
+/** The candle autoscale range stretched to include `extra` (the cost line), so it is never off-screen. */
+export function widenRange(range: PriceSpan | null, extra: number | null): PriceSpan | null {
+  if (!range || extra == null || !Number.isFinite(extra)) return range;
+  return { minValue: Math.min(range.minValue, extra), maxValue: Math.max(range.maxValue, extra) };
 }
 
 export interface BandRect {
