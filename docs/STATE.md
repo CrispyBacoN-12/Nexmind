@@ -89,6 +89,38 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
+- **2026-11-25: Support/resistance zones on `/portfolio`; the put card is REMOVED (branch `levels`, merged + pushed).**
+  - **Removed:**
+    - Per the owner, all option code is gone: `src/lib/hedge/`, `/api/journal/hedges` and the
+      /journal "เช็กประกัน put" card.
+    - `worstGapDownPct` moved to `src/lib/portfolioRisk/gaps.ts`.
+    - Git history keeps the old code. The owner decided against options for a ~$6k book: every
+      contract over-hedged ×5–×7,000.
+  - **Added:**
+    - A "แนวรับ–แนวต้าน" section on the local-only `/portfolio`, for every holding plus any typed ticker.
+    - Each ticker shows the nearest support and resistance with % distance. An expanded row adds
+      every zone (touches, last touch, volume share, "เก่า" after 252 bars, above/below cost) and a
+      1-year recharts chart with the zones, cost line and MA50/MA200.
+  - **How the zones are built:**
+    - Inputs: 2-year daily swing pivots (5 bars each side) plus 6-month high-volume nodes. The
+      nodes are peaks of a 3-bin smoothed histogram at ≥ 1.5× the mean bin.
+    - Clustering: a point joins a zone within 0.5 ATR of its running mean, and a zone spans at most
+      1 ATR.
+    - Inclusion: a zone shows if it has ≥ 2 touches, an HVN, or a pivot within 60 bars.
+    - A forming bar is left out of the math but shown as the price.
+  - **Route and data:** `GET /api/portfolio/levels`, local-only guarded. Candles only: no Finnhub,
+    no DB.
+  - **Descriptive only.** The footer says the zones do not predict a bounce, consistent with the
+    REJECTED sweep and level research.
+  - **Specs and plans:** `docs/superpowers/{specs,plans}/2026-11-25-levels*`.
+  - **Deferred minors:**
+    - HVN bounds can widen or overlap zones after a crash
+    - Webull 04:00Z winter bars may miss forming-bar detection
+    - a flat series reads "ประวัติราคาไม่พอ"
+    - the chart placeholder can stick on a failed fetch
+    - the chart has no y-domain pad on an all-equal series
+    - green/red colours
+    - a corrupt holdings file blocks ticker lookups
 - **2026-11-25: Local-only `/portfolio` with risk analysis (merged + pushed).**
   - **What it is.** The owner's real holdings (from the Dime! app) live in the git-ignored
     `.local/holdings.json` on the PC: ticker, fractional shares, avg cost, note, and the cached
@@ -122,7 +154,7 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
   - `parseOpenTrade` accepts any shares value > 0. The table and the put card show up to 4 decimals.
   - `/advisor` sizing and the portfolio-gates suggested size still floor to whole shares.
     - Deferred until the owner checks whether Webull keeps a resting stop on a fractional position.
-- **2026-11-25: Protective-put check on /journal (branch `journal-put-hedge`, merged + pushed 2026-11-25).**
+- **2026-11-25: Protective-put check on /journal (branch `journal-put-hedge`, merged + pushed 2026-11-25). REMOVED the same day (branch `levels`); kept here as history.**
   - Button "เช็กประกัน put" under the open positions. On press, one card per open JournalTrade, each showing:
     - put cost per strike (near stop / −5% / ATM), % of position, contracts and over-hedge ×N
     - breakeven and max loss with the put
