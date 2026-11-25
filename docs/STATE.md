@@ -89,7 +89,24 @@ Also run `Get-ScheduledTask -TaskName "NEXMIND*"`.
 ## 3. Done recently
 
 **Copilot era (newest first):**
-- **2026-11-25: Support/resistance zones on `/portfolio`; the put card is REMOVED (branch `levels`, merged + pushed).**
+- **2026-11-25: Levels moved to its own local-only page `/levels` (branch `levels-page`).**
+  - **Why:** the owner wanted the zones on their own page, one searched ticker at a time, on a
+    chart that behaves like TradingView. /portfolio no longer has a levels section.
+  - **Page:** search box. Only the latest search is shown, and there is no "every holding"
+    button. Sidebar entry "Levels" sits beside Portfolio, under the same `!VERCEL` flag.
+  - **Chart:** `lightweight-charts` pinned to **5.2.1**, attribution logo on.
+    - 2 years of daily candles, opening on 6 months, with 3M/6M/1Y/2Y buttons.
+    - Wheel zooms, drag pans. A crosshair O/H/L/C/V legend sits top-left.
+    - Volume strip and MA50/MA200 lines.
+    - Zones are full-width bands from a series primitive (`src/app/levels/zone-bands.ts`).
+    - A held ticker gets a dashed "ทุน" price line.
+  - **Route:** `GET /api/levels?ticker=X`, which replaces `/api/portfolio/levels`.
+    - Local-only. Without a ticker it returns 400.
+    - It returns `{ row: { ticker, held, avgCost, result, series } }`, where `series` is the full 2-year OHLCV with MAs.
+  - **Helpers:** `src/lib/levels/chart.ts` (`chartSeries`, `rangeStart`, `bandRects`), tested.
+    `chartSeries` de-duplicates and sorts timestamps, because lightweight-charts throws otherwise.
+  - The zone math is unchanged. Spec and plan: `docs/superpowers/{specs,plans}/2026-11-25-levels-page*`.
+- **2026-11-25: Support/resistance zones on `/portfolio`; the put card is REMOVED (branch `levels`, merged + pushed). Superseded the same day by `/levels` above.**
   - **Removed:**
     - Per the owner, all option code is gone: `src/lib/hedge/`, `/api/journal/hedges` and the
       /journal "เช็กประกัน put" card.
